@@ -90,7 +90,7 @@ def test_emby_actor_settings_dialog_startup_no_crash(app):
 
 
 def test_emby_actor_manager_table_has_birthday_and_location_columns(app):
-    """议题 #134/#136 + 新规格：出生日期恒 110；常规出生地等宽/标签×2，最大化 1.5×/2.5×，详情铺满。"""
+    """议题 #134/#136 + 新规格：出生日期恒 110；姓名与出生地同宽，常规等宽/标签×2，最大化 1.5×/2.5×，详情铺满。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     dlg = EmbyActorManagerDialog()
@@ -111,14 +111,15 @@ def test_emby_actor_manager_table_has_birthday_and_location_columns(app):
         assert table.columnWidth(7) == 220
         total = sum(table.columnWidth(i) for i in range(table.columnCount()))
         assert total == pytest.approx(table.viewport().width(), abs=4), "各列总宽未铺满视口"
-        # 固定列宽度保持不变
+        # 固定列宽度保持不变（姓名列与出生地同宽，随状态切换）
         assert table.columnWidth(0) == 50
-        assert table.columnWidth(1) == 160
+        assert table.columnWidth(1) == 110
 
-        # 宽态（最大化）：出生地 1.5 倍，标签 2.5 倍，出生日期不变，总宽仍铺满
+        # 宽态（最大化）：姓名与出生地同为 1.5 倍，标签 2.5 倍，出生日期不变，总宽仍铺满
         dlg._is_wide_state = lambda: True
         dlg._apply_column_widths()
         app.processEvents()
+        assert table.columnWidth(1) == 165
         assert table.columnWidth(5) == 110
         assert table.columnWidth(6) == 165
         assert table.columnWidth(7) == 275
