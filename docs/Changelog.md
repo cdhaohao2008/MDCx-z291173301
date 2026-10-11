@@ -2,6 +2,11 @@
 # Changelog
 ## v2.3.4 (2026-10-11)
 ### 调整
+- **演员管理器日志行数精确化（普通窗 8 整行，最大化 10 整行）**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 现象：普通窗日志 8.1 行（第 9 行冒头一点点），最大化日志约 11 行（用户截图）。
+  - 根因：①余数（< rows px）堆在日志侧，必然 peek 出下一行行首；② 20 行档在用户机器上直接 bail——行高下限曾保"自然行高 - 2"，高分屏大字体下收不到装得下的行高；且表头 `minimumSectionSize` 会把过小的行高静默钳位（真机实测 21→24），算出的整行数全部作废。
+  - 改法：余数均摊到前余数行各 +1px，表格侧 total 恰好 rows 整行、日志侧恰好 lines 整行（无半行/无 peek/无空白垫）；行高下限只保可读 `max(字高+2, 表头 minimumSectionSize)`，不够直接 bail 不留半截状态；其余纯内部约束不变（不锁窗格/不碰窗口几何/minHint 恒定）。
+  - 回归：`tests/test_actor_manager_row_count.py` 改按"逐行累加满行数 + 日志像素精确"断言；相关套件与 `ruff check` 通过。
 - **演员管理器行数对齐回归（普通窗 15 行演员 + 8 行日志，最大化 20 行 + 10 行）**（`mdcx/tools/emby_actor_manager_ui.py`）：
   - 现象：原生重写后普通窗 16.1 行（末行半截）+ 日志 6.1 行，最大化 21.5 行 + 日志 8.1 行（用户截图）。
   - 改法：纯内部对齐 `_fit_visible_rows`——只调表行高（整数除法 absorb 全部余量，上浮封顶 `ROW_GROW_CAP=40`、下探至硬下限 `max(字高+2, 表头 minimumSectionSize)`，低于会被静默钳位、不够直接 bail）与 `splitter.setSizes()` 分配，表格侧永远 rows 整行、余数进日志侧底部；绝不锁窗格/绝不碰窗口几何/不留快照（真机实测行高增减与 setSizes 均不抬 `minimumSizeHint`，恒 1120×293）。触发点：`resizeEvent`/`showEvent`/`_populate_table` 末尾 `singleShot(0)` 排队，触发时读 settled 状态定档、最小化跳过；高度不够直接返回。
