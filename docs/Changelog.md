@@ -2,11 +2,23 @@
 # Changelog
 ## v2.3.4 (2026-10-11)
 ### 调整
+- **演员详情与演员管理器改为互不干扰的独立窗口（连接代码未动）**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 说明：工作区 diff 取证——本次及之前所有改动只碰布局/标题栏/stretch/按钮高度，含 `connect`/`timeout`/`session`/`http`/`thread` 关键字的增删行为零；`EmbyActorManagerDialog._on_connect` 及抓取/同步线程与 HEAD 逐字一致，无可恢复项。用户截图的 `ConnectTimeout`/`All connection attempts failed` 是 socket 层连不上 `192.168.0.101:8096`（服务器未启动/IP 变动/防火墙），与 UI 改动无关。
+  - 改法：双击行不再 `exec()` 模态阻塞，改经 `_open_detail_dialog` 开无父级非模态独立窗口（`WA_DeleteOnClose`，打开时落在管理器中央，之后各走各的几何）；同一演员只开一个（存在则前台/还原），不同演员可多开；管理器 `_detail_dialogs` 按 actor_id 常驻 + `destroyed` 摘除；回写经 `_make_detail_synced` 弱引用守卫（管理器先关则静默丢弃，不撞已销毁 C++ 对象）；详情后台回写统一走 `_emit_done`（关窗中途回写丢弃）；顺手补上详情缺失的本地 `log()`（此前三处失败路径调 `self.log` 直接 `AttributeError`）。
+  - 回归：`tests/test_actor_detail_display.py` 新增独立窗口项（无父级/非模态/复用/多开/关窗摘除/本地 log/管理器先关回写不炸）；detail 5 项 + row_count/restore_geometry/font_size 全绿；`ruff check` 通过。
 - **演员管理器日志下方空白消除 + 最大化按钮与数据源测试窗同款比例拉升**（`mdcx/tools/emby_actor_manager_ui.py`）：
   - 现象：最大化/还原态下日志超过 10 条时日志下方留空白（窗格被撑大、内容填不满）；最大化按钮固定 +12px 太高，与数据源测试窗观感不一致。
   - 根因：①巨幅 resize 后内部布局要等事件循环才落定，`_fit_visible_rows` 首轮量到过渡态 chrome，把日志窗格算大，且旧校准环只验表格侧，错值 baked in；②行高封顶后 `setSizes` 总和小于可用高度时 QSplitter 按相对权重重分配，两窗格同时错位；③按钮高度是写死的绝对增量。
   - 改法：fit 每轮重测 chrome/avail 再重算（最多 4 轮）+ 下一拍按存档目标校验（漂移才重对，否则空操作）；行高取消封顶、等比吸收（分配总和恒等于可用高度，不触发重分配）；按钮行改成数据源测试窗 `_sync_panel_stretch` 同款——最大化/全屏按对话框当前高度/基准高度比例拉升（只设 minimumHeight、不锁 max，还原回到 1.0），宽度仍由 `_apply_button_widths` 管、逐像素不变；表格/日志视口变化补排对齐（滚动条冒出不漂移）；resize/show 链改为按钮拉升先行、行数对齐后排一拍（等布局落定再量）；用户拖过分隔条后高度与对齐全程 hands-off。minHint 恒定（窄态 350/宽态 354）。
   - 回归：`tests/test_actor_manager_row_count.py` 宽态项改按比例断言（min==round(base×当前/基准)、max 不锁、定宽不变）+ 2200 超高窗 25 条日志下 20 整行 + 日志 10 整行 + 分配之和等于可用高度；row_count 7 项 + restore_geometry/font_size 全绿；`ruff check` 通过。
+- **演员详情窗口加原生最大化/最小化，三栏 1:2:1，默认 1080x720（数据源测试窗同款）**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 改法：`ActorDetailDialog` 加标题栏最大/最小化按钮 hint（模态 `exec` 下同样原生有效），三栏 stretch 由 `0:1:0` 改为 `1:2:1`，快速设置面板改 `fixed_width=None`（数据源测试窗同款，不定宽 stretch 才分得到）；最小尺寸与初始尺寸由 `900x580` 改为 `1080x720`（小屏钳制）。
+  - 回归：`tests/test_actor_detail_display.py` 新增按钮/stretch/尺寸断言；`ruff check` 通过。
+- **演员详情窗口三栏按总宽精确 1:2:1，两列表 1:1 平分快速设置高度**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 现象：stretch 已是 1:2:1，但现有数据栏仍比快速设置窄；两列表只占面板上半截、下方大片空白（用户截图）。
+  - 根因：stretch 只分配 sizeHint 之外的富余，hint 不等（目录输入框最小 260 等）则比例失真；两列表 stretch 为 0、富余全被底部弹簧吃掉。
+  - 改法：三栏水平策略改 Ignored（按 stretch 分总宽，最大化同步放大）；目录输入框最小宽 260→120（数据源测试窗面板更宽、不受影响）；详情窗 `panel.set_lists_expanded(True)` 常开、两列表 1:1 平分面板高度、目录行贴底。
+  - 回归：`tests/test_actor_detail_display.py` 新增三栏宽度比 + 两列表等高断言；离屏 1080 下 262/523/261、1600 下 392/783/391；`ruff check` 通过。
 - **演员管理器分隔条用户拖动后不再被抢回（本次打开有效，重开回默认）**（`mdcx/tools/emby_actor_manager_ui.py`）：
   - 现象：运行日志上下拉动后，重新获取演员数据会恢复到默认位置。
   - 改法：主分隔条接 `splitterMoved` 置 `_user_moved_splitter`（数据源测试窗 `_result_user_moved` 同款）；`_fit_visible_rows` 入口遇此标记直接返回，取数/缩放都不重排；我们自己的 `setSizes` 用 `_setting_splitter_sizes` 守卫，不算用户拖动（真机实测程序化 setSizes 不发信号，守卫纯兜底）。对话框关闭即销毁、重开是新实例，天然恢复默认行数。

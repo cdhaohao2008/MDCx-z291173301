@@ -4,6 +4,7 @@ import asyncio
 import concurrent.futures
 import re
 import threading
+import weakref
 from pathlib import Path
 
 from pydantic import HttpUrl
@@ -841,6 +842,9 @@ class EmbyActorManagerDialog(QDialog):
         # 独立子窗口单例引用（设置/数据源测试）：destroyed 信号负责清空
         self._settings_dialog = None
         self._test_dialog = None
+        # 演员详情独立窗口（与管理器互不干扰）：按 actor_id 常驻，可多开、
+        # 随各自关闭销毁；destroyed 信号负责从字典摘除。
+        self._detail_dialogs: dict[str, ActorDetailDialog] = {}
         # 议题 #25: 任务会话代数——取消/重启任务后旧线程的排队回调整体作废
         self._session_gen = 0
         self._failed_names: set[str] = set()
@@ -2554,8 +2558,69 @@ class EmbyActorManagerDialog(QDialog):
         actor = next((a for a in self._actors if a.name == name), None)
         if actor is None:
             return
-        dialog = ActorDetailDialog(actor, self, on_synced=self._on_detail_synced)
-        dialog.exec()
+        self._open_detail_dialog(actor)
+
+    def _open_detail_dialog(self, actor: ActorInfo):
+        """演员详情独立窗口：无父级、非模态，与管理器互不干扰、可并存操作。
+
+        同一演员只开一个（已存在则前台/还原）；不同演员可多开。
+        打开位置落在管理器中央，之后各走各的几何。
+        """
+        key = actor.actor_id or actor.name
+        existing = self._detail_dialogs.get(key)
+        if existing is not None:
+            try:
+                if existing.isMinimized():
+                    existing.showNormal()
+                else:
+                    existing.show()
+                existing.raise_()
+                existing.activateWindow()
+                return existing
+            except RuntimeError:
+                # C++ 对象已被销毁，掉进新建分支
+                self._detail_dialogs.pop(key, None)
+        dialog = ActorDetailDialog(actor, None, on_synced=self._make_detail_synced())
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        try:
+            mg = self.frameGeometry()
+            dialog.move(mg.center().x() - dialog.width() // 2, mg.center().y() - dialog.height() // 2)
+        except Exception:
+            pass
+        _self_ref = weakref.ref(self)
+
+        def _forget(*_a, _key=key, _ref=_self_ref):
+            mgr = _ref()
+            if mgr is None:
+                return
+            try:
+                mgr._detail_dialogs.pop(_key, None)
+            except RuntimeError:
+                pass
+
+        dialog.destroyed.connect(_forget)
+        self._detail_dialogs[key] = dialog
+        dialog.show()
+        return dialog
+
+    def _make_detail_synced(self):
+        """详情回写回调：弱引用守卫，管理器先关则静默丢弃（独立窗口互不干扰）。
+
+        直接传 bound method 会强引用管理器，导致管理器关不掉、或关后回写
+        撞上已销毁的 C++ 对象。
+        """
+        _self_ref = weakref.ref(self)
+
+        def _synced(actor: ActorInfo):
+            mgr = _self_ref()
+            if mgr is None:
+                return
+            try:
+                mgr._on_detail_synced(actor)
+            except RuntimeError:
+                pass
+
+        return _synced
 
     def _on_detail_synced(self, actor: ActorInfo):
         # 同步单个演员后刷新主窗口表格与统计
@@ -2762,7 +2827,9 @@ class _SourceQuickSettingsPanel(QGroupBox):
             folder_row.setContentsMargins(-460, 0, 0, 0)
             folder_row.setAlignment(Qt.AlignmentFlag.AlignLeft)
             self.folder_edit = QLineEdit(manager.config.actor_photo_folder)
-            self.folder_edit.setMinimumWidth(260)
+            # 详情窗快速设置栏按总宽 1:2:1 精确分配（最小窗下约 260px）：输入框
+            # 最小宽须让位，Browse 行才塞得下；数据源测试窗面板更宽，不受影响。
+            self.folder_edit.setMinimumWidth(120)
             browse_btn = QPushButton("浏览")
             browse_btn.clicked.connect(self._browse_folder)
             folder_row.addWidget(self.folder_edit)
@@ -4153,11 +4220,37 @@ class ActorDetailDialog(QDialog):
         self.actor = actor
         self.on_synced = on_synced
         self.setWindowTitle(f"演员详情 - {actor.name}")
-        self.setMinimumSize(900, 580)
+        # 原生最大化/最小化：与演员管理器、数据源测试窗口同款——只加标题栏按钮 hint，
+        # 三栏按总宽精确 1:2:1，不做任何定制几何。
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowType.Window
+            | Qt.WindowType.WindowMinimizeButtonHint
+            | Qt.WindowType.WindowMaximizeButtonHint
+        )
+        # 独立窗口：无父级、非模态打开，关闭即销毁 C++ 对象（无 QThread 子对象，
+        # 后台回写全经信号 + _emit_done 守卫，关窗中途回写不炸）。
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self._log_lines: list[str] = []
+        # 默认宽高与数据源测试窗口一致（1080x720），小屏钳制。
+        self.setMinimumSize(1080, 720)
+        try:
+            _screen = QGuiApplication.primaryScreen()
+            _avail = _screen.availableGeometry() if _screen is not None else None
+            if _avail is not None and _avail.isValid():
+                self.resize(min(1080, _avail.width()), min(720, _avail.height()))
+            else:
+                self.resize(1080, 720)
+        except Exception:
+            self.resize(1080, 720)
         root = QHBoxLayout(self)
 
         # 左栏：现有数据（Emby 当前）
         left = QGroupBox("现有数据")
+        # 三栏按总宽精确 1:2:1：stretch 只分配 sizeHint 之外的富余，hint 不等
+        # （目录输入框最小 260 等）则左栏永远比快速设置窄；水平 Ignored 让布局
+        # 按 stretch 分总宽，最大化同步放大。
+        left.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         left_layout = QVBoxLayout(left)
         self.existing_avatar_label = QLabel("头像预览")
         self.existing_avatar_label.setFixedSize(130, 180)
@@ -4179,10 +4272,11 @@ class ActorDetailDialog(QDialog):
             + (", ".join(actor.existing_taglines) if actor.existing_taglines else "无")
         )
         left_layout.addWidget(self.existing_info)
-        root.addWidget(left)
+        root.addWidget(left, stretch=1)
 
         # 右栏：新数据（可编辑）
         right = QGroupBox("新数据（同步前可编辑）")
+        right.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         right_layout = QVBoxLayout(right)
         self.new_avatar_label = QLabel("新头像预览")
         self.new_avatar_label.setFixedSize(130, 180)
@@ -4224,11 +4318,16 @@ class ActorDetailDialog(QDialog):
             b.setObjectName("btnPrimary")
             btn_row.addWidget(b)
         right_layout.addLayout(btn_row)
-        root.addWidget(right, stretch=1)
+        root.addWidget(right, stretch=2)
 
-        # 右侧快速设置面板（改即保存）
-        panel = _SourceQuickSettingsPanel(self)
-        root.addWidget(panel)
+        # 右侧快速设置面板（改即保存）：不限定宽，与左右两栏按 1:2:1 分配
+        #（数据源测试窗口同款 fixed_width=None，定宽会卡死 stretch）。
+        panel = _SourceQuickSettingsPanel(self, show_folder_row=True, fixed_width=None)
+        panel.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        # 头像/信息两列表 1:1 占据面板高度：详情窗常开（数据源测试窗是最大化才开，
+        # 此处按用户要求始终平分，底部弹簧分不到富余、目录行贴底）。
+        panel.set_lists_expanded(True)
+        root.addWidget(panel, stretch=1)
 
         self.btn_fetch_image.clicked.connect(lambda: self._run_fetch_image())
         self.btn_fetch_info.clicked.connect(lambda: self._run_fetch_info())
@@ -4271,6 +4370,23 @@ class ActorDetailDialog(QDialog):
         elif chosen == del_action:
             self.info_table.removeRow(self.info_table.currentRow())
 
+    def log(self, msg: str):
+        """详情窗口本地日志：只记不弹窗（独立窗口不碰管理器的日志框）。
+
+        此前详情窗口无此方法，三处失败路径调 self.log 会直接 AttributeError。
+        """
+        try:
+            self._log_lines.append(msg)
+        except Exception:
+            pass
+
+    def _emit_done(self, action: str, result: object):
+        """后台回写统一出口：关窗中途回写撞上已销毁对象时静默丢弃。"""
+        try:
+            self._detail_done.emit(action, result)
+        except RuntimeError:
+            pass
+
     def _load_existing_avatar(self):
         if not self.actor.has_image:
             self.existing_avatar_label.setText("无头像")
@@ -4282,7 +4398,7 @@ class ActorDetailDialog(QDialog):
             self.existing_avatar_label.setText("头像加载失败")
             self.log(f"🔶 加载现有头像失败: {e}")
             return
-        future.add_done_callback(lambda fut: self._detail_done.emit("existing_avatar", _future_result_or(fut, None)))
+        future.add_done_callback(lambda fut: self._emit_done("existing_avatar", _future_result_or(fut, None)))
 
     async def _download_existing_avatar(self) -> str | None:
         from .emby_shared import _build_jellyfin_headers, _generate_server_url
@@ -4306,7 +4422,7 @@ class ActorDetailDialog(QDialog):
             self.log(f"🔶 获取头像失败: {e}")
             return
         future.add_done_callback(
-            lambda fut: self._detail_done.emit("fetch_image", _future_result_or(fut, (False, None)))
+            lambda fut: self._emit_done("fetch_image", _future_result_or(fut, (False, None)))
         )
 
     async def _fetch_image(self) -> tuple[bool, str | None]:
@@ -4344,7 +4460,7 @@ class ActorDetailDialog(QDialog):
         except Exception as e:
             self.log(f"🔶 获取简介失败: {e}")
             return
-        future.add_done_callback(lambda fut: self._detail_done.emit("fetch_info", _future_result_or(fut, False)))
+        future.add_done_callback(lambda fut: self._emit_done("fetch_info", _future_result_or(fut, False)))
 
     def _on_detail_done(self, action: str, result: object):
         if action == "existing_avatar":
@@ -4386,7 +4502,7 @@ class ActorDetailDialog(QDialog):
                 import traceback
 
                 result = (False, f"同步异常: {traceback.format_exc()}")
-            self._detail_done.emit("sync", result)
+            self._emit_done("sync", result)
 
         threading.Thread(target=_worker, daemon=True).start()
 
