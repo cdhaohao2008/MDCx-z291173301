@@ -2,10 +2,14 @@
 # Changelog
 ## v2.3.4 (2026-10-11)
 ### 调整
+- **演员管理器行数对齐回归（普通窗 15 行演员 + 8 行日志，最大化 20 行 + 10 行）**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 现象：原生重写后普通窗 16.1 行（末行半截）+ 日志 6.1 行，最大化 21.5 行 + 日志 8.1 行（用户截图）。
+  - 改法：纯内部对齐 `_fit_visible_rows`——只调表行高（整数除法 absorb 全部余量，上浮封顶 `ROW_GROW_CAP=40`、下探至硬下限 `max(字高+2, 表头 minimumSectionSize)`，低于会被静默钳位、不够直接 bail）与 `splitter.setSizes()` 分配，表格侧永远 rows 整行、余数进日志侧底部；绝不锁窗格/绝不碰窗口几何/不留快照（真机实测行高增减与 setSizes 均不抬 `minimumSizeHint`，恒 1120×293）。触发点：`resizeEvent`/`showEvent`/`_populate_table` 末尾 `singleShot(0)` 排队，触发时读 settled 状态定档、最小化跳过；高度不够直接返回。
+  - 回归：新增 `tests/test_actor_manager_row_count.py` 4 项（常量档/普通窗整行/最大化桩整行/无冻结且 minHint 稳定）；`tests/test_actor_manager_restore_geometry.py` 同步更新；真机 1400×844 下 15.00 整行、8 整行、minHint 恒定、最小化还原几何不变；`ruff check` 通过。
 - **演员管理器最大化/最小化/还原重写为系统原生行为（主界面同款）**（`mdcx/tools/emby_actor_manager_ui.py`）：
   - 现象：最大化后点最小化，窗口先跳到左上角再往中间缩；主界面是四周向中间正常收缩。
   - 根因：`_fit_visible_rows` 为整行对齐用 `setFixedHeight` 锁死上下窗格，稳态最大化下对话框的 `minimumSizeHint` 被抬到接近最大化高度（真机实测 1120×293 → 1120×793）；另有 `_on_window_state_change` 手动 `setGeometry` 复位普通态矩形。两轮"守卫式"修法（`isMinimized` 检查、切换进行标记、排队时状态快照）全部无效——病根在稳态最小尺寸本身，不在事件时序。
-  - 改法：整套机制删除（10 个方法 + `TABLE_VISIBLE_ROWS` 等 6 个常量 + `changeEvent` 过载，-482/+83）；`resizeEvent`/`showEvent` 只同步内部列宽与提示折行；分隔条按 stretch 4:1 自由拖拽（`setChildrenCollapsible(False)` 防压没）；议题 #160 列宽自适应保留。代价：不再保证 20/10、15/8 整行（末行可半截，与主界面一致）。
+  - 改法：整套机制删除（10 个方法 + `TABLE_VISIBLE_ROWS` 等 6 个常量 + `changeEvent` 过载，-482/+83）；`resizeEvent`/`showEvent` 只同步内部列宽与提示折行；分隔条按 stretch 4:1 自由拖拽（`setChildrenCollapsible(False)` 防压没）；议题 #160 列宽自适应保留。代价：当时不再保证整行（随后见本节首条，已用纯内部手段恢复普通窗 15/8、最大化 20/10）。
   - 回归：`tests/test_actor_manager_restore_geometry.py` 重写为 5 项新不变量（无定制机制/窗格永不冻结且 minHint 稳定/resize 保几何/分隔条不被抢回/最小化还原保几何）；`tests/test_emby_actor_row_fit.py` 随功能删除；`ruff check` 通过。
 - **演员管理器普通窗（未最大化）默认 15 行演员 + 8 行运行日志；最大化/全屏仍是不多不少 20 行演员 + 10 行日志，且布局、组件、控件、提示词全部保持不变**（`mdcx/tools/emby_actor_manager_ui.py`）：
   - 原行为：非最大化时 `_fit_visible_rows` 只会按 20/10 试算、塞不下就整体不干预（小窗 noop），普通窗落到 splitter 4:1 自然分配，实测约 14.5 行演员 + 10 行日志（末行半截）。现新增 `_visible_rows_target()` 按**窗口状态**取双档目标：`isMaximized() or isFullScreen()` → `TABLE_VISIBLE_ROWS(20) + LOG_VISIBLE_LINES(10)`（旧逻辑原样，最大化侧零变化），否则 → `NORMAL_TABLE_ROWS(15) + NORMAL_LOG_LINES(8)`；`_fit_visible_rows` 全程用这一档（`_solve`/`_refit`/日志折叠均取同一目标），高度仍不够才维持小窗 noop 语义。日志最小高度随普通窗档由 10 行改为 8 行（最大化目标 10 行高于该下限，不受影响）。

@@ -756,8 +756,14 @@ class EmbyActorManagerDialog(QDialog):
     _connect_result = Signal(object)
     _media_folders_result = Signal(object)
     _gfriends_result = Signal(object)
-    # 布局说明（主界面同款）：窗格高度不锁死、不按窗口状态对整行数，
-    # 最大化/最小化/还原全走系统原生行为；分隔条 stretch 4:1，用户可自由拖拽。
+    # 双档可视行数：最大化/全屏 20 行演员 + 10 行日志，普通窗 15 行 + 8 行日志。
+    # 对齐只许纯内部手段（行高 + 分隔条分配），窗格不锁、窗口几何不动（主界面同款）。
+    TABLE_VISIBLE_ROWS = 20
+    LOG_VISIBLE_LINES = 10
+    NORMAL_TABLE_ROWS = 15
+    NORMAL_LOG_LINES = 8
+    # 行高上浮封顶：每行最多比自然行高 +40px（富余优先长高行，而非留空白）。
+    ROW_GROW_CAP = 40
     CONN_BASE_MARGINS = (6, 4, 6, 4)
 
     def __init__(self, parent=None):
@@ -1202,16 +1208,19 @@ class EmbyActorManagerDialog(QDialog):
         return super().eventFilter(a0, a1)
 
     def resizeEvent(self, a0):
-        # 主界面同款：只同步内部控件几何（列宽/提示折行），从不改窗口自身
-        # min/max/fixed 与几何——最大化/最小化/还原全走系统原生行为。
+        # 主界面同款：只同步内部控件几何，从不改窗口自身 min/max/fixed 与几何——
+        # 最大化/最小化/还原全走系统原生行为。行数对齐下一拍排队：触发时状态位
+        # 已落定，按 settled 状态定档；只调行高与分隔条分配，不抬 minimumSizeHint。
         super().resizeEvent(a0)
         self._apply_column_widths()
         self._update_help_line_break()
+        QTimer.singleShot(0, self._fit_visible_rows)
 
     def showEvent(self, a0):
         super().showEvent(a0)
         self._apply_column_widths()
         QTimer.singleShot(0, self._update_help_line_break)
+        QTimer.singleShot(0, self._fit_visible_rows)
 
     def _update_help_line_break(self) -> None:
         """窄窗两行（断在「获|取」处）、宽窗一行：按 help_label 实宽切换。"""
@@ -1225,6 +1234,119 @@ class EmbyActorManagerDialog(QDialog):
             return
         need = label.fontMetrics().horizontalAdvance(single) + 4
         label.setText(double if need > avail else single)
+
+    def _fit_visible_rows(self) -> None:
+        """行数对齐（仅内部）：演员表视口 = rows 整行，日志 = lines 整行不缺行。
+
+        主界面同款约束：只调表行高与 splitter 分配，绝不 setFixedHeight 锁窗格、
+        绝不 setGeometry 自身、绝不留存几何——真机实测行高增减与 setSizes 均不抬
+        `minimumSizeHint`，最大化/最小化/还原动画零干扰。高度不够（连可读下限
+        都塞不下）时直接返回（小窗自然布局）；最小化时跳过。行高整数除法 absorb
+        余量：余数（< rows px）均摊到前余数行各 +1px，表格侧 total 恰好 rows 整行、
+        日志侧恰好 lines 整行——无半行、无 peek、无空白垫。
+        """
+        table = getattr(self, "table", None)
+        log = getattr(self, "log_text", None)
+        splitter = getattr(self, "_splitter", None)
+        list_widget = getattr(self, "_list_widget", None)
+        log_widget = getattr(self, "_log_widget", None)
+        if table is None or log is None or splitter is None or list_widget is None or log_widget is None:
+            return
+        try:
+            if self.isMinimized() or (self.windowState() & Qt.WindowState.WindowMinimized):
+                return
+            maximized = self.isMaximized() or self.isFullScreen()
+        except (RuntimeError, AttributeError):
+            return
+        except Exception:
+            maximized = False
+        rows, log_lines = (
+            (self.TABLE_VISIBLE_ROWS, self.LOG_VISIBLE_LINES)
+            if maximized
+            else (self.NORMAL_TABLE_ROWS, self.NORMAL_LOG_LINES)
+        )
+        try:
+            vhead = table.verticalHeader()
+            # 自然行高只取 pristine 值并缓存：若把上轮长高/收窄后的行高再当基准，
+            # 会棘轮式越长越高（或越收越矮）。
+            natural = getattr(self, "_natural_row_h", None)
+            if not natural or natural <= 0:
+                natural = table.rowHeight(0) if table.rowCount() > 0 else vhead.defaultSectionSize()
+            if natural <= 0:
+                natural = table.fontMetrics().height() + 10
+            self._natural_row_h = natural
+            line_h = log.fontMetrics().lineSpacing()
+            if line_h <= 0:
+                return
+            try:
+                doc_top = int(log.document().documentMargin())
+            except Exception:
+                doc_top = 0
+            # 硬下限只保可读（字高 + 2），不再保"自然行高 - 2"：高分屏大字体下
+            # 20 行档需要收到自然行高一成左右（如 40→35）才能装下，否则直接 bail、
+            # 最大化永远落回自然布局（用户报障 21.5 行 / 11 行即此）。
+            # 必须同时服从表头 minimumSectionSize：低于它时 setDefaultSectionSize/
+            # setRowHeight 会被静默钳位，算出的整行数全部作废（实测 21→24 的坑）。
+            hard_min = max(
+                table.fontMetrics().height() + 2, int(vhead.minimumSectionSize())
+            )
+
+            header_h = table.horizontalHeader().height()
+            table_fixed = (list_widget.height() - table.height()) + header_h + (
+                table.height() - header_h - table.viewport().height()
+            )
+            log_chrome = (log_widget.height() - log.height()) + (log.height() - log.viewport().height())
+            try:
+                handle = max(0, splitter.count() - 1) * splitter.handleWidth()
+            except Exception:
+                handle = 0
+            avail = splitter.height() - handle
+            if avail <= 0:
+                return
+            log_need = log_chrome + log_lines * line_h + doc_top
+            row_h = (avail - table_fixed - log_need) // rows
+            if row_h < hard_min:
+                return  # 实在塞不下：小窗自然布局，不干预
+            row_h = min(row_h, natural + self.ROW_GROW_CAP)
+            # 余数 rem（< rows px）均摊到前 rem 行各 +1px：表格侧 total 恰好
+            # rows*row_h + rem，日志侧恰好 log_need——两边像素精确，无半行无 peek。
+            # 只动前 rem 行并 reset 上轮旧分布（O(40) 以内），新行自动取默认行高。
+            # （setRowHeight/setDefaultSectionSize 实测不抬 minimumSizeHint。）
+            rem = (avail - table_fixed - log_need) - rows * int(row_h)
+            rem = max(0, min(int(rem), rows - 1))
+            if row_h != vhead.defaultSectionSize():
+                vhead.setDefaultSectionSize(int(row_h))
+            if vhead.defaultSectionSize() != int(row_h):
+                return  # 被静默钳位：按自然布局，不留半截状态
+            n_rows = table.rowCount()
+            plus_old = int(getattr(self, "_plus_rows", 0) or 0)
+            try:
+                for i in range(min(plus_old, n_rows)):
+                    table.setRowHeight(i, int(row_h))
+                for i in range(min(rem, n_rows)):
+                    table.setRowHeight(i, int(row_h) + 1)
+            except Exception:
+                pass
+            self._plus_rows = int(min(rem, n_rows))
+            list_target = table_fixed + rows * int(row_h) + rem
+            log_target = log_need
+            # 无冻结故一次即中；按实测残差再校，最多 3 轮（仍只是 setSizes）。
+            want_vp = rows * int(row_h) + rem
+            for _ in range(3):
+                try:
+                    splitter.setSizes([int(list_target), int(log_target)])
+                except Exception:
+                    return
+                vp_now = table.viewport().height()
+                if vp_now == want_vp:
+                    break
+                list_target += want_vp - vp_now
+                log_target -= want_vp - vp_now
+                if log_target < 0:
+                    break
+        except (RuntimeError, AttributeError):
+            # C++ 对象已销毁等竞态：纯外观调整，静默放弃
+            pass
 
     def _build_log_section(self, parent_layout: QVBoxLayout):
         group = QGroupBox("运行日志")
@@ -2116,6 +2238,8 @@ class EmbyActorManagerDialog(QDialog):
                         item.setBackground(QColor("#c8e6c9"))
         self.table.setSortingEnabled(True)
         self._update_sync_button()
+        # 取数后行高/视口落定，按当前窗口状态重对一次行数（纯内部，不碰窗口几何）。
+        QTimer.singleShot(0, self._fit_visible_rows)
 
     def _on_count_mode_changed(self, index: int):
         self._show_unique = index == 1

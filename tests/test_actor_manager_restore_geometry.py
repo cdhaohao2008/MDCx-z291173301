@@ -1,10 +1,7 @@
 """演员管理器窗口几何：最大化/最小化/还原全走系统原生行为（主界面同款）。
 
-重写说明：此前为「整行对齐」引入的定制机制（`_fit_visible_rows` 用 setFixedHeight
-锁窗格 → minimumSizeHint 被抬到接近最大化高度 → 最大化后最小化动画先跳左上角
-再收缩；另需 `_on_window_state_change` 手动 setGeometry 复位）已整体删除。
-现 resize/show 只同步内部控件（列宽/提示折行），不碰窗口自身几何与 min/max；
-本文件钉住这些新不变量，而非旧机制的行为。
+行数对齐只许纯内部手段（`_fit_visible_rows` 调行高 + 分隔条分配）：窗格不锁、
+窗口几何不动、`minimumSizeHint` 全程稳定。本文件钉住这些不变量。
 """
 
 from __future__ import annotations
@@ -49,7 +46,6 @@ def test_no_custom_geometry_machinery(dlg):
     from mdcx.tools import emby_actor_manager_ui as ui_mod
 
     for name in (
-        "_fit_visible_rows",
         "_on_window_state_change",
         "_after_state_change",
         "_collapsed_sizes",
@@ -65,7 +61,7 @@ def test_no_custom_geometry_machinery(dlg):
         "_capture_pending",
         "_fitting_rows",
     ):
-        assert not hasattr(dlg, name), f"定制机制残留: {name}"
+        assert not hasattr(dlg, name), f"定制几何机制残留: {name}"
     assert "changeEvent" not in ui_mod.EmbyActorManagerDialog.__dict__, "changeEvent 不应再被过载"
 
 
