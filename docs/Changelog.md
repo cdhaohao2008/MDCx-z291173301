@@ -36,6 +36,8 @@
   - 现象：窄窗两行动平衡后行尾仍各空 `实宽 − 总宽/2`（用户截图红框），右边视觉上仍比左边宽；该空是 label 把 layout 富余宽度吃进自家内部，调 spacing/stretch 够不着。
   - 改法：`_update_help_line_break` 窄窗两行可行时把 `help_label` 最大宽度钳到最长行宽（新增 `_HELP_MAX_W` 常量），行尾与 label 右缘对齐，右边距只剩一份 layout spacing（4px）、与左侧对称，多出的宽度落到行尾设置按钮右侧，各按钮与文字位置不动；每次先解除限宽并同步布局再量宽（加宽后能切回单行，防卡死），宽窗单行与塞不下窄窗不限宽——最大化布局/组件/控件/提示词逐字不变。
   - 回归：离屏实测窄窗 label 宽 == 最长行宽、左右边距 4px/4px，调两次无漂移，窄→宽切回单行并解除限宽，宽→窄回到 4px/4px，太窄回落固定双行不限宽，最小化态保持；`ruff check` 通过，相关 53 项全绿。
+- **演员管理器状态/头像/简介/影片数列宽改为出生日期一半**（`mdcx/tools/emby_actor_manager_ui.py`）：状态 50→55、影片数 60→55（头像/简介本就是 55），四列统一 55（`_BIRTHDAY_W // 2`，新增 `_HALF_BIRTHDAY_W` 常量，改出生日期自动跟随）；两者一加一减 `fixed_sum` 不变，详情列宽逐像素不变，总宽仍铺满。
+  - 回归：`tests/test_main_window_startup.py` 窄态/宽态双断言 0/2/3/8 列均为 55；`ruff check` 通过，相关 53 项全绿。
 - **版本号**：`2.3.3` → `2.3.4`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
 ### 修复
 - **演员管理器最大化获取演员时中间只有 19 行，改成 20 行；获取中/完成后都是 20 整行，运行日志 10 行**（`mdcx/tools/emby_actor_manager_ui.py`）：
