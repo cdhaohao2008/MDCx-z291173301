@@ -28,7 +28,6 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
-    QProgressBar,
     QPushButton,
     QSizePolicy,
     QSplitter,
@@ -911,7 +910,7 @@ class EmbyActorManagerDialog(QDialog):
         except Exception:
             pass
 
-        # 横向滚动条冒出会吃视口高度：监听 Show 事件以便重对 20/10（见 eventFilter）。
+        # 横向滚动条冒出会吃掉视口高度：监听以便重对 20/10（见 eventFilter）。
         try:
             self.table.horizontalScrollBar().installEventFilter(self)
             self.log_text.horizontalScrollBar().installEventFilter(self)
@@ -929,6 +928,21 @@ class EmbyActorManagerDialog(QDialog):
         connected = hasattr(self, "_connected") and self._connected
         prefix = "已连接" if connected else "未连接"
         self.status_bar.showMessage(f"{prefix} | {message}")
+
+    def _set_progress(self, current: int, total: int, label: str) -> None:
+        """把后台线程进度换算成百分比显示在底部状态栏，不占表格布局高度。
+
+        以前这里用的是演员表布局里的 QProgressBar，显隐会吃掉/归还约 26px
+        表格视口高度，最大化获取演员时只能看到 19 整行——该控件已彻底删除。
+        状态栏是单行定高控件，改文字不触发任何布局变化，表格行数在获取中
+        和完成后都保持 20 整行。
+        """
+        try:
+            if total > 0:
+                pct = max(0, min(100, int(current * 100 / total)))
+                self._set_status(f"{label} {current}/{total}（{pct}%）")
+        except (RuntimeError, AttributeError, TypeError, ValueError, ZeroDivisionError):
+            pass
 
     def _build_connection_section(self, parent_layout: QVBoxLayout):
         group = QGroupBox("Emby/Jellyfin 连接设置")
@@ -1134,9 +1148,10 @@ class EmbyActorManagerDialog(QDialog):
         self.cmb_count_mode.currentIndexChanged.connect(self._on_count_mode_changed)
         stats_layout.addWidget(self.cmb_count_mode)
         parent_layout.addLayout(stats_layout)
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        parent_layout.addWidget(self.progress_bar)
+        # 注意：此处原来有一个 QProgressBar（获取/同步时显隐），它在演员表布局里
+        # 吃掉/归还约 26px 视口高度，导致最大化获取演员时只能看到 19 整行——该控件
+        # 已彻底删除。进度改走底部状态栏文本（_set_progress），单行定高，改文字
+        # 不影响任何布局，表格行数在获取中/完成后纹丝不动。
         self.table = QTableWidget()
         self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels(
@@ -1204,7 +1219,8 @@ class EmbyActorManagerDialog(QDialog):
     def eventFilter(self, a0, a1):
         """议题 #160: viewport 尺寸变化(含纵向滚动条显隐/DPI 变化)后重算列宽；
         表格/日志横向滚动条冒出（Show）会吃掉视口高度，调度重对 20/10。
-        只响应 Show 不响应 Hide：用户手动拉大日志导致滚动条消失时不抢回。"""
+        只响应 Show 不响应 Hide：用户手动拉大日志导致滚动条消失时不抢回。
+        （进度条控件已删除，不再有显隐吃高度的情况。）"""
         table = getattr(self, "table", None)
         if table is not None and a0 is table.viewport() and a1 is not None and a1.type() == QEvent.Type.Resize:
             self._apply_column_widths()
@@ -1355,17 +1371,48 @@ class EmbyActorManagerDialog(QDialog):
         except (TypeError, RuntimeError, AttributeError):
             pass
 
+    def _apply_conn_extra(self, extra: int) -> None:
+        """把连接组的富余留白按「基准边距 + extra」绝对赋值（extra=0 即回到基准）。
+
+        必须绝对赋值而非增量加：增量加时「空间放出来了」没人把它减回去，
+        extra 会单向累积（实测 0→14→26 不归零），既撑高连接组又挤掉表格行高。
+        """
+        conn_grid = getattr(self, "_conn_grid", None)
+        if conn_grid is None:
+            return
+        try:
+            _l, _t, _r, _b = self.CONN_BASE_MARGINS
+            extra = max(0, int(extra))
+            _top = extra // 2
+            conn_grid.setContentsMargins(_l, _t + _top, _r, _b + extra - _top)
+        except (RuntimeError, AttributeError, TypeError, ValueError):
+            pass
+
+    def _settle_layout(self) -> None:
+        """把「改固定高度 / 改 splitter 尺寸」引发的重排尽量落定，再继续实测。
+
+        这里刻意**不用** `QLayout.activate()` 或 `QApplication.sendPostedEvents()`：
+        二者都会在本轮 fit 还没算完时重入布局，Qt 直接让进程崩掉（实测 0xC0000409）。
+        真正会导致「测到旧高度」的连接组边距，改由 `_fit_visible_rows` 里的
+        `_avail()` 做解析补偿，与布局是否落定无关。
+        """
+        QApplication.processEvents()
+
     def _fit_visible_rows(self) -> None:
         """精确对齐：演员表视口 = 20 整行（含末行下横线），运行日志 = 10 整行，无空白垫。
 
         求解顺序（每一步都按实测而非估算）：
+        0) 测量「可用高度」时把连接组上下边距的富余解析加回（见 _avail）：
+           Qt 重排要等下一轮事件循环，本轮 fit 内 splitter 还停在旧高度，
+           直接实测会让行高棘轮式一路递减（实测 43→42→41… 直到贴住下限）；
         1) 按可用高度定行高 → 富余先给行高（封顶 ROW_GROW_CAP/行）；
         2) 剩余富余给连接组上下边距（封顶 CONN_EXTRA_CAP，绝对赋值），
            改完等布局落定再重测 splitter 高度；
         3) 两个窗格用固定高度锁死，按实测残差迭代修正，直到表格视口
            恰好 == 20×行高 —— 即便 QSplitter 因最小高度钳制也无法把它顶成 21 行；
-        4) 日志视口多于「10 行 + 文档顶边距」的部分折进连接组边距，
+        4) 日志视口多于「10 行 + 文档顶边距」的部分从日志侧收回、折进连接组边距，
            不在日志里留空白垫（封顶后实在放不下才垫底）。
+           注意此步只缩日志侧、不回头重算行高：重算会把刚分给行高的像素再扣回去。
         """
         if getattr(self, "_fitting_rows", False):
             return
@@ -1384,6 +1431,12 @@ class EmbyActorManagerDialog(QDialog):
             except Exception:
                 pass
             self._apply_column_widths()
+            # 让「解除冻结 + 改列宽」触发的布局请求先落定，再开始实测取数。
+            # 注意这里**不**再把连接组边距提前归零：Qt 投递 LayoutRequest 要等下一轮
+            # 事件循环才重排，此刻 splitter 仍是旧高度；边距一旦先归零，_avail() 就
+            # 失去了「当前边距」这个补偿量，只能量到被压小的旧高度。可用高度改由
+            # _avail() 解析补偿（见其 docstring），边距由求解循环按需绝对赋值。
+            self._settle_layout()
             vhead = table.verticalHeader()
             # 基准行高取「未被我们动过的自然行高」并缓存：否则每次 fit 都把上轮
             # 长高后的行高当基准再长一次，棘轮式越涨越高，表格就被顶出 21 行。
@@ -1401,12 +1454,12 @@ class EmbyActorManagerDialog(QDialog):
                 doc_top = int(log.document().documentMargin())
             except Exception:
                 doc_top = 0
-            conn_grid = getattr(self, "_conn_grid", None)
-            conn_grid = getattr(self, "_conn_grid", None)
             # 行高下限：自然行高允许略收（差 1~2px 时收紧几像素即可，仍比字高大，
             # 不压字），保证"差几像素"的场景也能精确落在 20 整行上。
             rows, log_lines = self.TABLE_VISIBLE_ROWS, self.LOG_VISIBLE_LINES
             hard_min = max(natural - 2, table.fontMetrics().height() + 2)
+            # 连接组富余边距统一走类方法（绝对赋值 + 自带异常兜底）。
+            _set_conn_extra = self._apply_conn_extra
 
             def _table_fixed() -> int:
                 header_h = table.horizontalHeader().height()
@@ -1417,20 +1470,27 @@ class EmbyActorManagerDialog(QDialog):
                 return max(0, (log_widget.height() - log.height()) + (log.height() - log.viewport().height()))
 
             def _avail() -> int:
-                try:
-                    return splitter.height() - max(0, splitter.count() - 1) * splitter.handleWidth()
-                except Exception:
-                    return splitter.height()
+                """splitter 可用高度，并把「连接组上下边距富余」原样加回。
 
-            def _set_conn_extra(extra: int) -> None:
-                if conn_grid is None:
-                    return
+                连接组的上下边距是我们自己抬上去的，而 Qt 投递 LayoutRequest 要等
+                下一轮事件循环才重排——本轮 fit 刚把边距归零时，splitter.height()
+                还是上一轮被压小的旧值。直接实测会让可用高度每轮少 17~20px，
+                行高棘轮式递减（实测 43→42→41… 直到贴住下限）。
+
+                这里按「当前上下边距 - 基准上下边距」把富余加回去，得到的就是
+                「边距归零后」应有的可用高度，与布局是否已经落定无关。
+                """
                 try:
-                    _l, _t, _r, _b = self.CONN_BASE_MARGINS
-                    _top = extra // 2
-                    conn_grid.setContentsMargins(_l, _t + _top, _r, _b + extra - _top)
+                    handle = max(0, splitter.count() - 1) * splitter.handleWidth()
                 except Exception:
-                    pass
+                    handle = 0
+                base_v = self.CONN_BASE_MARGINS[1] + self.CONN_BASE_MARGINS[3]
+                try:
+                    _m = self._conn_grid.contentsMargins()
+                    cur_v = _m.top() + _m.bottom()
+                except (AttributeError, RuntimeError):
+                    cur_v = base_v
+                return splitter.height() - handle + (cur_v - base_v)
 
             def _solve(avail: int, conn_extra: int) -> tuple[int, int, int]:
                 """按可用高度定 (行高, 表格侧高, 日志侧高)。"""
@@ -1460,7 +1520,7 @@ class EmbyActorManagerDialog(QDialog):
                         w.setFixedHeight(int(h))
                     except (RuntimeError, AttributeError):
                         pass
-                QApplication.processEvents()
+                self._settle_layout()
 
             conn_extra = 0
             row_h, list_target, log_target = _solve(_avail(), 0)
@@ -1482,7 +1542,7 @@ class EmbyActorManagerDialog(QDialog):
                 row_h, list_target, log_target = r_new, l_new, g_new
                 _set_conn_extra(conn_extra)
                 # 连接组变高会挤占 splitter：让布局落定后再确认行高仍成立
-                QApplication.processEvents()
+                self._settle_layout()
                 r2, l2, g2 = _solve(_avail(), conn_extra)
                 if not r2 or (r2, l2, g2) == (row_h, list_target, log_target):
                     break
@@ -1518,26 +1578,32 @@ class EmbyActorManagerDialog(QDialog):
                 if (list_target, log_target) == before:
                     break
 
-            # 日志视口超出「10 行 + 文档顶边距」的部分折进连接组，不留空白垫
+            # 日志视口超出「10 行 + 文档顶边距」的部分，从日志侧收回、折进连接组，
+            # 不在日志里留空白垫。
+            # 此处刻意「只缩日志侧、不重解行高」：把日志收回来的像素已经通过
+            # conn_extra 让给了连接组，若再跑一次 _solve()，它会把这部分像素从行高
+            # 里再扣一遍——行高矮一截、日志却照样露第 11 行，两头不讨好。
             _freeze(list_target, log_target)
             try:
-                extra = max(0, log.viewport().height() - (log_lines * line_h + doc_top))
-                take = min(extra, max(0, self.CONN_EXTRA_CAP - conn_extra))
-                if take > 0:
+                for _ in range(4):
+                    extra = max(0, log.viewport().height() - (log_lines * line_h + doc_top))
+                    take = min(extra, max(0, self.CONN_EXTRA_CAP - conn_extra))
+                    if take <= 0:
+                        break
                     conn_extra += take
+                    log_target -= take
                     _set_conn_extra(conn_extra)
-                    QApplication.processEvents()
-                    r3, l3, g3 = _solve(_avail(), conn_extra)
-                    if r3:
-                        row_h, list_target, log_target = r3, l3, g3
-                        if row_h != base_r and row_h >= vhead.minimumSectionSize():
-                            vhead.setDefaultSectionSize(int(row_h))
-                        for _ in range(6):
-                            before = (list_target, log_target)
-                            _refit()
-                            if (list_target, log_target) == before:
-                                break
+                    _freeze(list_target, log_target)
                 log.setViewportMargins(0, 0, 0, 0)
+            except Exception:
+                pass
+            # 收回多余空白后按实测再校一次，保证表格仍落在 20 整行。
+            try:
+                for _ in range(4):
+                    before = (list_target, log_target)
+                    _refit()
+                    if (list_target, log_target) == before:
+                        break
             except Exception:
                 pass
             try:
@@ -1914,8 +1980,6 @@ class EmbyActorManagerDialog(QDialog):
         library_ids = None if len(selected_ids) == len(libraries) else selected_ids
         self._current_library_ids = library_ids  # 供同步后自动刷新复用，避免丢媒体库过滤
         self._set_buttons_enabled(False)
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
         self._set_status("获取演员列表...")
         self.log("📜 开始获取演员列表...")
         self._fetch_thread = FetchActorsThread(self)
@@ -1930,8 +1994,7 @@ class EmbyActorManagerDialog(QDialog):
         if self._is_stale_session():
             return
         if total > 0:
-            self.progress_bar.setMaximum(total)
-            self.progress_bar.setValue(current)
+            self._set_progress(current, total, "获取演员列表")
         self.setWindowTitle(f"Emby/Jellyfin演员管理器 - {msg}")
 
     def _on_fetch_finished(self, actors: list[ActorInfo], raw_count: int, all_staff_count: int = 0):
@@ -1949,7 +2012,6 @@ class EmbyActorManagerDialog(QDialog):
         self._populate_table(actors)
         self._update_statistics(actors)
         self.btn_preview.setEnabled(True)
-        self.progress_bar.setVisible(False)
         self._set_buttons_enabled(True)
         # 清洗链式流程无需等头像索引：取到列表后直接进清洗流程（含确认弹窗）。
         if self._pending_auto_clean:
@@ -1989,7 +2051,6 @@ class EmbyActorManagerDialog(QDialog):
             self._session_gen += 1
             self.log("⏹️ 用户取消")
             self.btn_preview.setText("根据设定获取数据")
-            self.progress_bar.setVisible(False)
             self._set_status("已取消")
             self._set_buttons_enabled(True)
             return
@@ -2037,8 +2098,6 @@ class EmbyActorManagerDialog(QDialog):
         self._set_buttons_enabled(False)
         self.btn_preview.setEnabled(True)
         self.btn_preview.setText("停止获取")
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
         self._set_status("获取数据中...")
         self.log(f"📥 正在获取数据（模式: {self.cmb_fetch_mode.currentText()}，共 {len(targets)} 人）")
         self._preview_thread = PreparePreviewThread(self)
@@ -2070,7 +2129,6 @@ class EmbyActorManagerDialog(QDialog):
         self._set_status("数据准备完成")
         self.log(f"✅ 预览准备完成，{len(to_sync)} 项待同步")
         self.btn_preview.setText("根据设定获取数据")
-        self.progress_bar.setVisible(False)
         self._set_buttons_enabled(True)
 
     def _on_clean_data(self):
@@ -2115,8 +2173,6 @@ class EmbyActorManagerDialog(QDialog):
             QMessageBox.information(self, "数据清洗", "✅ 按当前规则未发现需要清洗的数据")
             return
         self._set_buttons_enabled(False)
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
         self._set_status("数据清洗中...")
         self.log(f"🧹 开始数据清洗，共 {len(dirty)} 个演员...")
         self._clean_items = {a.actor_id: (new_ov, fix_birth) for a, new_ov, fix_birth in dirty}
@@ -2154,7 +2210,6 @@ class EmbyActorManagerDialog(QDialog):
     def _on_clean_finished(self, success: int, fail: int):
         if self._is_stale_session():
             return
-        self.progress_bar.setVisible(False)
         self._set_buttons_enabled(True)
         self._set_status("数据清洗完成")
         self._clean_items = {}
@@ -2190,8 +2245,6 @@ class EmbyActorManagerDialog(QDialog):
         if reply != QMessageBox.StandardButton.Yes:
             return
         self._set_buttons_enabled(False)
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
         self.btn_sync.setText("同步中...")
         self._set_status("同步中...")
         self.log(f"📛 开始同步 {len(to_sync)} 个演员...")
@@ -2208,8 +2261,7 @@ class EmbyActorManagerDialog(QDialog):
     def _on_sync_progress(self, current: int, total: int, msg: str):
         if self._is_stale_session():
             return
-        self.progress_bar.setMaximum(total)
-        self.progress_bar.setValue(current)
+        self._set_progress(current, total, "同步")
         self.setWindowTitle(f"Emby/Jellyfin演员管理器 - {msg}")
 
     def _on_sync_actor_done(self, actor_id: str, name: str, success: bool, msg: str):
@@ -2246,7 +2298,6 @@ class EmbyActorManagerDialog(QDialog):
     def _on_sync_finished(self, success: int, fail: int):
         if self._is_stale_session():
             return
-        self.progress_bar.setVisible(False)
         self._set_buttons_enabled(True)
         self.btn_sync.setText("开始全部更新同步")
         self._set_status("同步完成")
@@ -2307,7 +2358,6 @@ class EmbyActorManagerDialog(QDialog):
     def _on_thread_error(self, msg: str):
         if self._is_stale_session():
             return
-        self.progress_bar.setVisible(False)
         # 链式流程中断：清掉待处理的自动获取/预览/清洗标记，避免后续回调误触发。
         self._pending_auto_fetch = False
         self._pending_auto_preview = False

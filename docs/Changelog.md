@@ -1,5 +1,14 @@
 
 # Changelog
+## v2.3.4 (2026-10-11)
+### 调整
+- **版本号**：`2.3.3` → `2.3.4`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
+### 修复
+- **演员管理器最大化获取演员时中间只有 19 行，改成 20 行；获取中/完成后都是 20 整行，运行日志 10 行**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 根因：演员表布局里的 `QProgressBar` 在获取/同步时显隐，会吃掉/归还约 26px 表格视口高度——进度条一冒出来，20 整行就掉成 19 整行 + 1 半行；隐藏后 QSplitter 的比例分配也不会把差额还给表格。
+  - 改法：该控件已彻底删除（import、创建/`addWidget`、全部 10 处 `setVisible` 调用点、`setValue`/`setMaximum`）。进度改走底部状态栏单行文本：新增 `_set_progress(current, total, label)`，显示如「已连接 | 获取演员列表 300/13568（2%）」；`_on_fetch_progress`/`_on_sync_progress` 改调它（窗口标题栏仍显示 msg）。状态栏是单行定高控件，改文字不触发任何布局变化，表格行数在获取中和完成后都保持 20 整行。
+  - 顺带修掉此前被进度条显隐掩盖的两个潜伏 bug：① 连接组富余边距增量累积（0→14→26 不归零，撑高连接组又挤掉表格行高）→ 新增 `_apply_conn_extra` 改为绝对赋值；② 日志折叠步重解行高会把刚分给行高的像素再扣一遍、日志却照样露第 11 行 → 只缩日志侧、不回头重算行高；`_avail()` 对连接组边距做解析补偿（Qt 重排要等下一轮事件循环，直接实测会量到被压小的旧高度、行高棘轮式递减）。
+  - 回归：1400x1000 / 1600x1100 / 1600x1200 / 1920x1200 四种尺寸 × idle / 获取中 / 完成 / 同步中四种状态，全部表格 `20 整行`、日志 `10.000 行`，进度回调前后视口（如 860/43）完全不变；行对齐相关 `test_emby_actor_row_fit.py` + `test_actor_manager_restore_geometry.py` + `test_actor_manager_font_size.py` 23 项全绿；actor/emby 全量 599 通过，仅剩 4 项既有红（`test_actor_db_sync_row_align.py::test_maximized_state_unchanged`、`test_actor_manager_session_gen.py::test_thread_starts_begin_session`、2 项 `test_emby_library_dialog_size.py`——`git stash` 回干净 HEAD 复跑同样红，属字体/DPI 相关断言与过时测试，与本次改动无关）
 ## v2.3.3 (2026-10-20)
 ### 调整
 - **版本号**：`2.3.2` → `2.3.3`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261010`）
