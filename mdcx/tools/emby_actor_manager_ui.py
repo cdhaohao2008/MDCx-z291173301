@@ -1202,7 +1202,7 @@ class EmbyActorManagerDialog(QDialog):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSortingEnabled(True)
         self.table.setColumnWidth(0, 50)
-        self.table.setColumnWidth(1, 160)
+        self.table.setColumnWidth(1, 110)
         self.table.setColumnWidth(2, 55)
         self.table.setColumnWidth(3, 55)
         self.table.setColumnWidth(5, 110)
@@ -1217,11 +1217,11 @@ class EmbyActorManagerDialog(QDialog):
         assert table_viewport is not None
         table_viewport.installEventFilter(self)
 
-    # 出生日期宽恒定 110；出生地/标签按窗口状态取相对宽度：
-    # 还原/常规：出生地=出生日期等宽，标签=出生日期×2；
-    # 最大化/全屏：出生地=出生日期×1.5，标签=出生日期×2.5；详情吃掉剩余视口。
+    # 出生日期宽恒定 110；姓名与出生地同宽，按窗口状态取相对宽度：
+    # 还原/常规：姓名=出生地=出生日期等宽，标签=出生日期×2；
+    # 最大化/全屏：姓名=出生地=出生日期×1.5，标签=出生日期×2.5；详情吃掉剩余视口。
     _BIRTHDAY_W = 110
-    _FIXED_COLUMN_WIDTHS = {0: 50, 1: 160, 2: 55, 3: 55, 5: 110, 6: 110, 8: 60}
+    _FIXED_COLUMN_WIDTHS = {0: 50, 2: 55, 3: 55, 5: 110, 6: 110, 8: 60}  # 姓名(1)不再定宽，跟随出生地
     _DETAIL_WIDTH_RATIO = 0.75  # 历史比例（议题 #136），现仅保留兼容，实际按出生日期倍率定宽
 
     def _is_wide_state(self) -> bool:
@@ -1244,10 +1244,11 @@ class EmbyActorManagerDialog(QDialog):
         birthday_w = self._BIRTHDAY_W
         wide = self._is_wide_state()
         birthplace_w = int(birthday_w * 1.5) if wide else birthday_w
+        name_w = birthplace_w  # 姓名列与出生地同宽
         tags_w = int(birthday_w * 2.5) if wide else birthday_w * 2
         base_fixed = (
             self._FIXED_COLUMN_WIDTHS.get(0, 50)
-            + self._FIXED_COLUMN_WIDTHS.get(1, 160)
+            + name_w
             + self._FIXED_COLUMN_WIDTHS.get(2, 55)
             + self._FIXED_COLUMN_WIDTHS.get(3, 55)
             + self._FIXED_COLUMN_WIDTHS.get(8, 60)
@@ -1259,6 +1260,7 @@ class EmbyActorManagerDialog(QDialog):
             return
         self._applying_widths = True
         try:
+            table.setColumnWidth(1, name_w)
             table.setColumnWidth(5, birthday_w)
             table.setColumnWidth(6, birthplace_w)
             table.setColumnWidth(4, detail_w)
