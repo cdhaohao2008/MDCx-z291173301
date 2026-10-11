@@ -27,6 +27,11 @@
   - 现象：出生地/标签列在最大化与还原态下同宽，详情列直接透出 `<br>`、`（无）` 等原始字符（用户截图）。
   - 改法：出生日期宽恒定 `110`（`_BIRTHDAY_W`，两态都不动）；新增 `_is_wide_state()`（`isMaximized() or isFullScreen()` 即宽态）与 `changeEvent(WindowStateChange)` 补排，避开窗口管理器「先发尺寸、后发状态」时序；`_apply_column_widths()` 按态定宽——还原/常规出生地=出生日期等宽、标签=出生日期×2，最大化/全屏出生地=出生日期×1.5、标签=出生日期×2.5，详情吃掉视口剩余，总宽仍铺满。详情列新增 `format_detail_cell_text()` 纯展示层清洗：`<br>` 变体转空格、其余 `<...>` 与行尾截断标签（如 `<b...`）剥除、`（无）`/`(无)` 与 `=` 装饰线去除、空白坍缩后截断 80 字；缺简介/占位经 `clean_overview_text` 取余量后仍空则置空，数据本体与同步不受影响。
   - 回归：`tests/test_main_window_startup.py::test_emby_actor_manager_detail_hides_br_and_none` 新增，`test_emby_actor_manager_table_has_birthday_and_location_columns` 同步更新为双态断言；相关套件与 `ruff check` 通过。
+- **演员管理器按钮行帮助提示窄窗断点动态平衡 + 右间距与左对齐**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 现象：窄窗（未最大化）帮助提示折成两行时，旧固定断在「获|取」的双行在部分字体下两行不等长，第一行行尾空出一大块（用户截图：右边比左边宽）；另 `help_label` 后的零 stretch `addStretch()` 在右侧多占一份 spacing，使右端部件间距成左端的两倍。
+  - 改法：① 删掉该多余 `addStretch()`（`help_label` 本已是 `Expanding stretch=1` 吃掉全部富余宽度），两侧都只剩一份 layout spacing（4px），最小化图标态与常态量到左右部件边距同为 4px，最大化可见像素不动（省下的 4px 进不可见 label 空宽）；② `_update_help_line_break` 窄窗不再用固定双行，新增 `_balanced_help_text()` 按当前字体实测字宽取差值最小的断点（两行都≤实宽，中文任意字边界可断），两行等长、右空最小，窄到两行塞不下回落固定双行保持现状；单行放得下仍用原文单行（最大化与原来逐字相同），另加 `text() !=` 才 `setText` 免无谓重排。
+  - 说明：两行总字宽固定时右空 `= 实宽 − 总宽/2` 几何上消不掉，本改法压到该宽度下的最小值，精确 4px 须动窗宽/字数/字号或固定按钮宽（本次未动）。
+  - 回归：离屏实测 2500 宽单行原文逐字一致、1600/1920 双行动平衡 403/403、1280/1400/1536 太窄回落固定双行现状、左右部件边距常态与最小化态均为 4px；`ruff check` 通过，相关 48 项全绿。
 - **版本号**：`2.3.3` → `2.3.4`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
 ### 修复
 - **演员管理器最大化获取演员时中间只有 19 行，改成 20 行；获取中/完成后都是 20 整行，运行日志 10 行**（`mdcx/tools/emby_actor_manager_ui.py`）：
