@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 
 from pydantic import HttpUrl
-from PyQt6.QtCore import QEvent, Qt, QThread, QTimer
+from PyQt6.QtCore import QEvent, QRect, Qt, QThread, QTimer
 from PyQt6.QtCore import pyqtSignal as Signal
 from PyQt6.QtGui import QColor, QGuiApplication, QKeySequence
 from PyQt6.QtWidgets import (
@@ -788,6 +788,16 @@ class EmbyActorManagerDialog(QDialog):
             self.resize(max(1100, int(geo.width() * 0.8)), max(700, int(geo.height() * 0.8)))
         else:
             self.resize(1100, 700)
+        # 议题 #176: 最大化→还原的还原矩形。_fit_visible_rows 为把演员表对齐到 20 整行，
+        # 会用 setFixedHeight 锁死上下两个窗格，锁死值取自当前（最大化时即最大化）
+        # 分割区高度，对话框的 minimumSizeHint 随之被抬到接近该高度；此时点还原，
+        # Windows 会把还原矩形按这个被抬大的最小尺寸钳位——窗口就以最大化的尺寸回来，
+        # 底部越过屏幕边界（宽也被顺带撑大）。故在此留存普通态矩形，还原后一帧复位。
+        self._capture_pending = False
+        self._restoring = False
+        self._normal_geometry = QRect(self.geometry())
+        if self._normal_geometry.width() <= 0 or self._normal_geometry.height() <= 0:
+            self._normal_geometry = QRect(0, 0, self.width(), self.height())
         self.setSizeGripEnabled(True)
         self.setStyleSheet(self._load_stylesheet())
         self.cache_dir = resources.u("emby_actor_cache")
@@ -1215,12 +1225,105 @@ class EmbyActorManagerDialog(QDialog):
         self._update_help_line_break()
         # 高度够就对齐 20/10（最大化一定够；小窗 _fit 内自行跳过）；拖分隔条不进这里。
         QTimer.singleShot(0, self._fit_visible_rows)
+        # 议题 #176: 记下普通态矩形（最大化期间延迟一帧后会自行跳过），
+        # 还原时据此复位，抵消系统按被抬大的 minimumSizeHint 做的钳位。
+        self._schedule_capture_normal_geometry()
 
     def showEvent(self, a0):
         super().showEvent(a0)
         self._apply_column_widths()
         QTimer.singleShot(0, self._update_help_line_break)
         QTimer.singleShot(0, self._fit_visible_rows)
+        self._schedule_capture_normal_geometry()
+
+    def changeEvent(self, a0):
+        super().changeEvent(a0)
+        try:
+            if a0 is not None and a0.type() == QEvent.Type.WindowStateChange:
+                self._on_window_state_change(a0)
+        except Exception:
+            pass
+
+    def _capture_normal_geometry(self):
+        """记住普通态矩形；最大化/最小化/全屏期间与复位期间不记。
+
+        最大化期间的 resize 记不得：那会把放大后的尺寸当成普通尺寸存下来，
+        下次还原就没有「回到默认尺寸」的基准了。
+        """
+        try:
+            if getattr(self, "_restoring", False):
+                return
+            if self.isMaximized() or self.isFullScreen() or self.isMinimized():
+                return
+            geo = self.geometry()
+            if geo.width() > 0 and geo.height() > 0:
+                self._normal_geometry = QRect(geo)
+        except Exception:
+            pass
+
+    def _schedule_capture_normal_geometry(self):
+        """延迟一帧再采样普通态矩形。
+
+        窗口管理器「先发尺寸、后发状态」：resizeEvent 到达时 isMaximized() 还是
+        旧值，当场读会把最大化尺寸记成普通尺寸。等 WindowStateChange 走完、状态位
+        可靠了再取（与主窗 changeEvent 里 QTimer.singleShot(0, ...) 同一手法）。
+        """
+        try:
+            if getattr(self, "_capture_pending", False):
+                return
+            self._capture_pending = True
+
+            def _capture():
+                self._capture_pending = False
+                self._capture_normal_geometry()
+
+            QTimer.singleShot(0, _capture)
+        except Exception:
+            self._capture_pending = False
+
+    def _on_window_state_change(self, a0):
+        """从最大化还原时：解除 fit 冻结，并把还原矩形钉回普通态尺寸。
+
+        背景见 __init__ 里 _normal_geometry 的注释：_fit_visible_rows 锁死上下
+        窗格会把对话框的 minimumSizeHint 抬到接近最大化高度，系统还原时把矩形按
+        这个最小尺寸钳位，窗口底部遂越过屏幕边界。这里做两件事——
+
+        ① 先解除 fit 冻结，否则复位后的窗口仍被抬大的最小尺寸卡着；
+        ② 再把矩形复位，抵消系统那次钳位；宽度同样按普通态尺寸收回。
+
+        复位前先按屏幕可用区夹一次尺寸，保证任何情况下都不会超出屏幕边界
+        （换过分辨率或拔掉副屏后存下来的旧矩形同样适用）。
+        """
+        try:
+            was_max = bool(a0.oldState() & Qt.WindowState.WindowMaximized)
+            now_max = bool(self.windowState() & Qt.WindowState.WindowMaximized)
+            if now_max or not was_max:
+                return
+            self._collapsed_sizes()
+            stored = getattr(self, "_normal_geometry", None)
+            if stored is None or not stored.isValid():
+                return
+            target = QRect(stored)
+            screen_obj = self.screen()
+            if screen_obj is not None:
+                avail = screen_obj.availableGeometry()
+                target.setWidth(max(self.minimumWidth(), min(target.width(), avail.width())))
+                target.setHeight(max(self.minimumHeight(), min(target.height(), avail.height())))
+            # 复位期间不接受新的普通态采样：resizeEvent 里已经排队的采样若先跑，
+            # 会把系统钳位后的矩形当成普通尺寸记下来，之后就再也回不去默认尺寸。
+            self._restoring = True
+
+            def _restore():
+                try:
+                    if not (self.isMaximized() or self.isMinimized()):
+                        self.setGeometry(target)
+                finally:
+                    self._restoring = False
+                    self._schedule_capture_normal_geometry()
+
+            QTimer.singleShot(0, _restore)
+        except Exception:
+            self._restoring = False
 
     def _collapsed_sizes(self):
         """解除上次冻结：让用户能手动拖拽分隔条（固定高度只是 fit 期间的锁定手段）。"""
