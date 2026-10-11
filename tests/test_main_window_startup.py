@@ -90,7 +90,7 @@ def test_emby_actor_settings_dialog_startup_no_crash(app):
 
 
 def test_emby_actor_manager_table_has_birthday_and_location_columns(app):
-    """议题 #134/#136：新增出生日期/出生地列；详情/标签列按 3:1 分配且总宽铺满。"""
+    """议题 #134/#136 + 新规格：出生日期恒 110；常规出生地等宽/标签×2，最大化 1.5×/2.5×，详情铺满。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     dlg = EmbyActorManagerDialog()
@@ -99,22 +99,31 @@ def test_emby_actor_manager_table_has_birthday_and_location_columns(app):
         headers = [table.horizontalHeaderItem(i).text() for i in range(table.columnCount())]
         assert headers == ["状态", "姓名", "头像", "简介", "详情", "出生日期", "出生地", "标签", "影片数"]
 
-        # #136：详情:标签 = 3:1（标签约为原等分宽度的一半），各列总宽铺满视口
+        # 常规态：出生日期恒定，出生地等宽，标签 2 倍，总宽铺满视口
         dlg.resize(1600, 900)
         dlg.show()
         app.processEvents()
+        dlg._is_wide_state = lambda: False
         dlg._apply_column_widths()
         app.processEvents()
-        detail_w = table.columnWidth(4)
-        tags_w = table.columnWidth(7)
-        assert detail_w == pytest.approx(tags_w * 3, rel=0.15), f"详情/标签非 3:1: {detail_w}:{tags_w}"
+        assert table.columnWidth(5) == 110
+        assert table.columnWidth(6) == 110
+        assert table.columnWidth(7) == 220
         total = sum(table.columnWidth(i) for i in range(table.columnCount()))
         assert total == pytest.approx(table.viewport().width(), abs=4), "各列总宽未铺满视口"
         # 固定列宽度保持不变
         assert table.columnWidth(0) == 50
         assert table.columnWidth(1) == 160
+
+        # 宽态（最大化）：出生地 1.5 倍，标签 2.5 倍，出生日期不变，总宽仍铺满
+        dlg._is_wide_state = lambda: True
+        dlg._apply_column_widths()
+        app.processEvents()
         assert table.columnWidth(5) == 110
-        assert table.columnWidth(6) == 140
+        assert table.columnWidth(6) == 165
+        assert table.columnWidth(7) == 275
+        total = sum(table.columnWidth(i) for i in range(table.columnCount()))
+        assert total == pytest.approx(table.viewport().width(), abs=4), "宽态各列总宽未铺满视口"
     finally:
         dlg.close()
         dlg.deleteLater()
@@ -139,6 +148,42 @@ def test_emby_actor_manager_populates_birthday_and_location(app):
         dlg._populate_table(dlg._actors)
         assert dlg.table.item(0, 5).text() == "1994-08-26"
         assert dlg.table.item(0, 6).text() == "日本, 东京都"
+    finally:
+        dlg.close()
+        dlg.deleteLater()
+        app.processEvents()
+
+
+def test_emby_actor_manager_detail_hides_br_and_none(app):
+    """详情列不显示 <br>/（无）等字符：仅展示层清洗，数据本体不动。"""
+    from mdcx.tools.emby_actor_manager import ActorInfo
+    from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog, format_detail_cell_text
+
+    assert format_detail_cell_text("") == ""
+    assert format_detail_cell_text("（无）") == ""
+    assert format_detail_cell_text("(无)") == ""
+    assert "<br" not in format_detail_cell_text("a<br>b<br/>c").lower()
+    assert format_detail_cell_text("a<br>b") == "a b"
+
+    dlg = EmbyActorManagerDialog()
+    try:
+        empty_actor = ActorInfo(name="空简介", actor_id="e1", server_id="s", has_overview=False)
+        br_actor = ActorInfo(
+            name="br简介",
+            actor_id="e2",
+            server_id="s",
+            has_overview=True,
+            existing_overview="<br>====== 个人资料 ======<br>本名: 牧野 左代子<br>出身地: 日本",
+        )
+        dlg._actors = [empty_actor, br_actor]
+        dlg._populate_table(dlg._actors)
+        assert dlg.table.item(0, 4).text() == ""
+        detail = dlg.table.item(1, 4).text()
+        assert "<br" not in detail.lower()
+        assert "（无）" not in detail and "(无)" not in detail
+        assert "<" not in detail and ">" not in detail
+        # 数据本体不受展示清洗影响
+        assert "<br>" in br_actor.existing_overview
     finally:
         dlg.close()
         dlg.deleteLater()

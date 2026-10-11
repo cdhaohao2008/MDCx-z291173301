@@ -138,6 +138,33 @@ def save_clean_rules(rules: object) -> list[tuple[str, str]]:
     return cleaned
 
 
+def format_detail_cell_text(overview: object) -> str:
+    """详情列表格展示文本：去 <br>/残留标签/占位字符，仅展示层清洗，不改数据。
+
+    - 空、纯空白、“(无)”/“（无）”一律置空（不再显示“（无）”）；
+    - “<br>”变体先转空格，再剥除其余 <...> 标签（含截图中的截断“<b...”）；
+    - 剥除“(无)”/“（无）”残留与“=”装饰线（“====== 个人资料 ======”只留文字）；
+    - 空白坍缩后截断 80 字 + “...”，空结果返回空串。
+    """
+    if not isinstance(overview, str):
+        return ""
+    t = overview.strip()
+    if not t or t in ("(无)", "（无）", "无"):
+        return ""
+    t = re.sub(r"(?i)<br\s*/?>", " ", t)
+    t = re.sub(r"<[^>]*>", "", t)
+    # 残留字面 <br>（标签被截断时尖括号不完整，上面剥不掉）与行尾截断标签（如截图末尾“<b...”）
+    t = re.sub(r"(?i)<br\s*/?", " ", t)
+    t = re.sub(r"<[^>]*$", "", t)
+    for token in ("(无)", "（无）"):
+        t = t.replace(token, "")
+    t = re.sub(r"={2,}", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    if not t or t in ("(无)", "（无）"):
+        return ""
+    return t[:80] + "..." if len(t) > 80 else t
+
+
 def scan_actor_data_noise(
     actors: list[ActorInfo], rules: object | None = None
 ) -> list[tuple[ActorInfo, str, bool]]:
@@ -1167,7 +1194,8 @@ class EmbyActorManagerDialog(QDialog):
         self.table.setColumnWidth(2, 55)
         self.table.setColumnWidth(3, 55)
         self.table.setColumnWidth(5, 110)
-        self.table.setColumnWidth(6, 140)
+        self.table.setColumnWidth(6, 110)
+        self.table.setColumnWidth(7, 220)
         self.table.setColumnWidth(8, 60)
         self.table.cellDoubleClicked.connect(self._on_table_double_clicked)
         parent_layout.addWidget(self.table)
@@ -1177,32 +1205,64 @@ class EmbyActorManagerDialog(QDialog):
         assert table_viewport is not None
         table_viewport.installEventFilter(self)
 
-    # 固定宽度列（0 状态/1 姓名/2 头像/3 简介/5 出生日期/6 出生地/8 影片数）；
-    # 剩余宽度在 4 详情 与 7 标签 之间按 _DETAIL_WIDTH_RATIO 分配（议题 #136）。
-    _FIXED_COLUMN_WIDTHS = {0: 50, 1: 160, 2: 55, 3: 55, 5: 110, 6: 140, 8: 60}
-    _DETAIL_WIDTH_RATIO = 0.75  # 详情占剩余宽度的 3/4，标签 1/4（标签约为原一半）
+    # 出生日期宽恒定 110；出生地/标签按窗口状态取相对宽度：
+    # 还原/常规：出生地=出生日期等宽，标签=出生日期×2；
+    # 最大化/全屏：出生地=出生日期×1.5，标签=出生日期×2.5；详情吃掉剩余视口。
+    _BIRTHDAY_W = 110
+    _FIXED_COLUMN_WIDTHS = {0: 50, 1: 160, 2: 55, 3: 55, 5: 110, 6: 110, 8: 60}
+    _DETAIL_WIDTH_RATIO = 0.75  # 历史比例（议题 #136），现仅保留兼容，实际按出生日期倍率定宽
+
+    def _is_wide_state(self) -> bool:
+        """最大化/全屏即宽态，其余（还原/常规/最小化）即窄态。"""
+        try:
+            return bool(self.isMaximized() or self.isFullScreen())
+        except (RuntimeError, AttributeError):
+            return False
+        except Exception:
+            return False
 
     def _apply_column_widths(self) -> None:
-        """按视口宽度重新分配「详情/标签」列宽，保证各列总宽铺满且比例稳定。"""
+        """按视口宽度重排各列，保证总宽铺满且比例按窗口状态切换。"""
         table = getattr(self, "table", None)
         if table is None:
             return
         viewport_w = table.viewport().width()
         if viewport_w <= 0:
             return
-        fixed_sum = sum(self._FIXED_COLUMN_WIDTHS.values())
-        remain = max(viewport_w - fixed_sum, 120)
-        detail_w = int(remain * self._DETAIL_WIDTH_RATIO)
-        tags_w = remain - detail_w
+        birthday_w = self._BIRTHDAY_W
+        wide = self._is_wide_state()
+        birthplace_w = int(birthday_w * 1.5) if wide else birthday_w
+        tags_w = int(birthday_w * 2.5) if wide else birthday_w * 2
+        base_fixed = (
+            self._FIXED_COLUMN_WIDTHS.get(0, 50)
+            + self._FIXED_COLUMN_WIDTHS.get(1, 160)
+            + self._FIXED_COLUMN_WIDTHS.get(2, 55)
+            + self._FIXED_COLUMN_WIDTHS.get(3, 55)
+            + self._FIXED_COLUMN_WIDTHS.get(8, 60)
+        )
+        fixed_sum = base_fixed + birthday_w + birthplace_w + tags_w
+        detail_w = max(viewport_w - fixed_sum, 120)
         # 防御性重入保护: setColumnWidth 实测不改 viewport 宽(不会自激), 嵌套调用为同值空操作
         if getattr(self, "_applying_widths", False):
             return
         self._applying_widths = True
         try:
+            table.setColumnWidth(5, birthday_w)
+            table.setColumnWidth(6, birthplace_w)
             table.setColumnWidth(4, detail_w)
             table.setColumnWidth(7, tags_w)
         finally:
             self._applying_widths = False
+
+    def changeEvent(self, a0):
+        super().changeEvent(a0)
+        try:
+            from PyQt6.QtCore import QEvent as _QE
+
+            if a0 is not None and a0.type() == _QE.Type.WindowStateChange:
+                self._apply_column_widths()
+        except Exception:
+            pass
 
     def _on_splitter_moved(self, *_args) -> None:
         """用户亲手拖动分隔条：本次打开记住，不再自动重排（取数/缩放都不抢回）。
@@ -2232,11 +2292,18 @@ class EmbyActorManagerDialog(QDialog):
             if actor.need_update_info:
                 info_item.setText("🔄")
             self.table.setItem(row, 3, info_item)
-            overview_text = (
-                actor.existing_overview[:80] + "..."
-                if len(actor.existing_overview) > 80
-                else (actor.existing_overview or "（无）")
-            )
+            # 详情列仅展示清洗文本：缺简介/占位/空一律置空，不显示“（无）”；
+            # <br>/残留标签/“=”装饰线只在展示层剥除，数据与同步不受影响。
+            if is_missing_overview(actor):
+                try:
+                    from ..models.emby import clean_overview_text as _clean_ov
+
+                    _rest = _clean_ov(actor.existing_overview)
+                except Exception:
+                    _rest = ""
+                overview_text = format_detail_cell_text(_rest)
+            else:
+                overview_text = format_detail_cell_text(actor.existing_overview)
             self.table.setItem(row, 4, QTableWidgetItem(overview_text))
             # 议题 #134：详情与标签之间展示出生日期、出生地，均为 Emby 服务器现有值
             raw_birthday = (actor.existing_premiere_date or "")[:10]

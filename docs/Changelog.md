@@ -23,6 +23,10 @@
 - **演员管理器普通窗（未最大化）默认 15 行演员 + 8 行运行日志；最大化/全屏仍是不多不少 20 行演员 + 10 行日志，且布局、组件、控件、提示词全部保持不变**（`mdcx/tools/emby_actor_manager_ui.py`）：
   - 原行为：非最大化时 `_fit_visible_rows` 只会按 20/10 试算、塞不下就整体不干预（小窗 noop），普通窗落到 splitter 4:1 自然分配，实测约 14.5 行演员 + 10 行日志（末行半截）。现新增 `_visible_rows_target()` 按**窗口状态**取双档目标：`isMaximized() or isFullScreen()` → `TABLE_VISIBLE_ROWS(20) + LOG_VISIBLE_LINES(10)`（旧逻辑原样，最大化侧零变化），否则 → `NORMAL_TABLE_ROWS(15) + NORMAL_LOG_LINES(8)`；`_fit_visible_rows` 全程用这一档（`_solve`/`_refit`/日志折叠均取同一目标），高度仍不够才维持小窗 noop 语义。日志最小高度随普通窗档由 10 行改为 8 行（最大化目标 10 行高于该下限，不受影响）。
   - 两处必须配套的时序/布局修复（否则双档会在最大化切换时失效或把布局撑变形）：① `changeEvent` 收到 `WindowStateChange` 后补排一次 `_fit_visible_rows`——窗口管理器可能「先发尺寸、后发状态」，`resizeEvent` 到达时 `isMaximized()` 还是旧值，只靠 resize 排的对齐会停在旧档（放大后 15/8、还原后 20/10），而此事件里 `windowState()` 已是新值；② `resizeEvent` 最前面先 `_collapsed_sizes()` 再让新尺寸落布局——窗格被 `setFixedHeight` 锁死时 QSplitter 的 maximum 被压到「两窗格固定高之和」，窗口拉大分割区也不长，多出的高度被连接组/状态栏吸走（实测连接组 89→206px、状态栏 22→205px 且不自行缩回），与议题 #176 还原路径「先解冻再复位矩形」同一手法；collapse 幂等，随后调度的 fit 会按新状态重新锁。
+- **演员管理器列宽按窗口状态切换 + 详情列展示清洗**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 现象：出生地/标签列在最大化与还原态下同宽，详情列直接透出 `<br>`、`（无）` 等原始字符（用户截图）。
+  - 改法：出生日期宽恒定 `110`（`_BIRTHDAY_W`，两态都不动）；新增 `_is_wide_state()`（`isMaximized() or isFullScreen()` 即宽态）与 `changeEvent(WindowStateChange)` 补排，避开窗口管理器「先发尺寸、后发状态」时序；`_apply_column_widths()` 按态定宽——还原/常规出生地=出生日期等宽、标签=出生日期×2，最大化/全屏出生地=出生日期×1.5、标签=出生日期×2.5，详情吃掉视口剩余，总宽仍铺满。详情列新增 `format_detail_cell_text()` 纯展示层清洗：`<br>` 变体转空格、其余 `<...>` 与行尾截断标签（如 `<b...`）剥除、`（无）`/`(无)` 与 `=` 装饰线去除、空白坍缩后截断 80 字；缺简介/占位经 `clean_overview_text` 取余量后仍空则置空，数据本体与同步不受影响。
+  - 回归：`tests/test_main_window_startup.py::test_emby_actor_manager_detail_hides_br_and_none` 新增，`test_emby_actor_manager_table_has_birthday_and_location_columns` 同步更新为双态断言；相关套件与 `ruff check` 通过。
 - **版本号**：`2.3.3` → `2.3.4`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
 ### 修复
 - **演员管理器最大化获取演员时中间只有 19 行，改成 20 行；获取中/完成后都是 20 整行，运行日志 10 行**（`mdcx/tools/emby_actor_manager_ui.py`）：
