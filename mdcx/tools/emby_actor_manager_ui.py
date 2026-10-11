@@ -756,8 +756,9 @@ class EmbyActorManagerDialog(QDialog):
     _connect_result = Signal(object)
     _media_folders_result = Signal(object)
     _gfriends_result = Signal(object)
-    # 双档可视行数：最大化 20 演员 + 10 日志；普通窗 15 演员 + 8 日志。
-    # _fit 优先 20/10（最大化路径与旧逻辑完全一致），高度不够时回落 15/8。
+    # 双档可视行数（按窗口状态切换）：最大化/全屏时演员表格不多不少 20 整行、
+    # 运行日志不多不少 10 整行（旧行为，最大化侧布局/组件/控件/提示词全不变）；
+    # 普通窗（未最大化）默认 演员表格 15 整行 + 运行日志 8 整行。
     TABLE_VISIBLE_ROWS = 20
     LOG_VISIBLE_LINES = 10
     NORMAL_TABLE_ROWS = 15
@@ -790,7 +791,8 @@ class EmbyActorManagerDialog(QDialog):
             self.resize(max(1100, int(geo.width() * 0.8)), max(700, int(geo.height() * 0.8)))
         else:
             self.resize(1100, 700)
-        # 议题 #176: 最大化→还原的还原矩形。_fit_visible_rows 为把演员表对齐到整行，
+        # 议题 #176: 最大化→还原的还原矩形。_fit_visible_rows 为把演员表对齐到整行
+        # （最大化 20 行 / 普通窗 15 行），
         # 会用 setFixedHeight 锁死上下两个窗格，锁死值取自当前（最大化时即最大化）
         # 分割区高度，对话框的 minimumSizeHint 随之被抬到接近该高度；此时点还原，
         # Windows 会把还原矩形按这个被抬大的最小尺寸钳位——窗口就以最大化的尺寸回来，
@@ -878,7 +880,8 @@ class EmbyActorManagerDialog(QDialog):
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
-        # 顶部收紧：连接设置组上移，腾出纵向空间给演员表格（最大化 20 行、普通窗 15 行完整显示）。
+        # 顶部收紧：连接设置组上移，腾出纵向空间给演员表格
+        # （最大化 20 行、普通窗 15 行完整显示）。
         main_layout.setSpacing(4)
         main_layout.setContentsMargins(12, 4, 12, 6)
         self._build_connection_section(main_layout)
@@ -903,8 +906,8 @@ class EmbyActorManagerDialog(QDialog):
             splitter.splitterMoved.connect(self._on_splitter_moved)
         except (TypeError, RuntimeError, AttributeError):
             pass
-        # 运行日志默认保证 8 行高度：小窗不被压扁；再由 _fit 精确对齐
-        #（普通窗 15/8，最大化 20/10）。
+        # 运行日志默认保证 8 行高度（普通窗档）：小窗不被压扁；
+        # 精确对齐由 _fit_visible_rows 按窗口状态完成（普通窗 15/8，最大化 20/10）。
         try:
             _lh = self.log_text.fontMetrics().lineSpacing()
             _dm = int(self.log_text.document().documentMargin())
@@ -914,7 +917,7 @@ class EmbyActorManagerDialog(QDialog):
         except Exception:
             pass
 
-        # 横向滚动条冒出会吃掉视口高度：监听以便重对 20/10 或 15/8（见 eventFilter）。
+        # 横向滚动条冒出会吃掉视口高度：监听以便重对 20/10 ↔ 15/8（见 eventFilter）。
         try:
             self.table.horizontalScrollBar().installEventFilter(self)
             self.log_text.horizontalScrollBar().installEventFilter(self)
@@ -1074,7 +1077,8 @@ class EmbyActorManagerDialog(QDialog):
         parent_layout.setSpacing(2)
         parent_layout.setContentsMargins(0, 0, 0, 0)
         stats_layout = QHBoxLayout()
-        # 收紧统计栏上下边距：腾出的纵向空间让演员表格正好显示整行数（最大化 20 行、普通窗 15 行）。
+        # 收紧统计栏上下边距：腾出的纵向空间让演员表格正好显示整行数
+        #（最大化 20 行、普通窗 15 行）。
         stats_layout.setSpacing(2)
         stats_layout.setContentsMargins(0, 0, 0, 0)
         self.lbl_all_staff = QLabel("总数: ")
@@ -1222,7 +1226,7 @@ class EmbyActorManagerDialog(QDialog):
 
     def eventFilter(self, a0, a1):
         """议题 #160: viewport 尺寸变化(含纵向滚动条显隐/DPI 变化)后重算列宽；
-        表格/日志横向滚动条冒出（Show）会吃掉视口高度，调度重对 20/10 或 15/8。
+        表格/日志横向滚动条冒出（Show）会吃掉视口高度，调度重对 20/10 ↔ 15/8。
         只响应 Show 不响应 Hide：用户手动拉大日志导致滚动条消失时不抢回。
         （进度条控件已删除，不再有显隐吃高度的情况。）"""
         table = getattr(self, "table", None)
@@ -1240,6 +1244,14 @@ class EmbyActorManagerDialog(QDialog):
         return super().eventFilter(a0, a1)
 
     def resizeEvent(self, a0):
+        # 先解除上次 fit 冻结，再让新尺寸落布局：窗格被 setFixedHeight 锁死时
+        # QSplitter 的 maximum 被压到「两窗格固定高之和」，窗口即便拉大分割区也
+        # 不跟着长——多出来的高度会被连接组/状态栏吸走（实测连接组 89→206px、
+        # 状态栏 22→205px，且不会自己缩回去，最大化布局被撑变形）。解除后分割区
+        # 随 stretch 正常长大，随后调度的 _fit_visible_rows 再按新状态重新锁。
+        # （议题 #176 的还原路径用同一手法：先 _collapsed_sizes() 再复位矩形。）
+        # collapse 幂等且自愈：随后调度的 _fit_visible_rows 会按新状态重新锁一次。
+        self._collapsed_sizes()
         super().resizeEvent(a0)
         self._apply_column_widths()
         self._update_help_line_break()
@@ -1261,6 +1273,11 @@ class EmbyActorManagerDialog(QDialog):
         try:
             if a0 is not None and a0.type() == QEvent.Type.WindowStateChange:
                 self._on_window_state_change(a0)
+                # 最大化↔普通切换后行数目标不同（20/10 ↔ 15/8），且窗口管理器可能
+                # 「先发尺寸、后发状态」——resizeEvent 到达时 isMaximized() 还是旧值，
+                # 只靠 resize 排的对齐会停在旧档（放大后 15/8、还原后 20/10）。
+                # 此事件里 windowState() 已是新值，等一帧布局落定后必须按新状态再对一次。
+                QTimer.singleShot(0, self._fit_visible_rows)
         except Exception:
             pass
 
@@ -1402,11 +1419,25 @@ class EmbyActorManagerDialog(QDialog):
         """
         QApplication.processEvents()
 
-    def _fit_visible_rows(self) -> None:
-        """精确对齐：最大化 20 整行演员 + 10 整行日志，普通窗 15 整行 + 8 整行，无半行。
+    def _visible_rows_target(self) -> tuple[int, int]:
+        """按窗口状态取 (演员表格行数, 运行日志行数)。
 
-        双档：优先 20/10（最大化路径与旧逻辑完全一致），高度不够回落 15/8
-       （普通窗默认）。布局、组件、提示词均不动，只是目标行数不同。
+        最大化/全屏：20 行演员 + 10 行日志（旧行为，最大化侧完全不变）；
+        普通窗（含启动默认尺寸、用户手动拖大的非最大化尺寸）：15 行演员 + 8 行日志。
+        """
+        try:
+            maximized = self.isMaximized() or self.isFullScreen()
+        except (RuntimeError, AttributeError):
+            maximized = False
+        if maximized:
+            return self.TABLE_VISIBLE_ROWS, self.LOG_VISIBLE_LINES
+        return self.NORMAL_TABLE_ROWS, self.NORMAL_LOG_LINES
+
+    def _fit_visible_rows(self) -> None:
+        """精确对齐：演员表视口 = 目标整行（含末行下横线），运行日志 = 目标行数，无空白垫。
+
+        目标行数按窗口状态取（见 _visible_rows_target）：最大化 20 演员 + 10 日志；
+        普通窗 15 演员 + 8 日志。高度不够时 fit 整体不干预（小窗保持自然布局）。
 
         求解顺序（每一步都按实测而非估算）：
         0) 测量「可用高度」时把连接组上下边距的富余解析加回（见 _avail）：
@@ -1416,8 +1447,8 @@ class EmbyActorManagerDialog(QDialog):
         2) 剩余富余给连接组上下边距（封顶 CONN_EXTRA_CAP，绝对赋值），
            改完等布局落定再重测 splitter 高度；
         3) 两个窗格用固定高度锁死，按实测残差迭代修正，直到表格视口
-           恰好 == rows×行高 —— 即便 QSplitter 因最小高度钳制也无法把它顶多一行；
-        4) 日志视口多于「log_lines 行 + 文档顶边距」的部分从日志侧收回、折进连接组边距，
+           恰好 == 目标行数×行高 —— 即便 QSplitter 因最小高度钳制也无法把它顶成多一行；
+        4) 日志视口多于「目标行数 + 文档顶边距」的部分从日志侧收回、折进连接组边距，
            不在日志里留空白垫（封顶后实在放不下才垫底）。
            注意此步只缩日志侧、不回头重算行高：重算会把刚分给行高的像素再扣回去。
         """
@@ -1462,7 +1493,9 @@ class EmbyActorManagerDialog(QDialog):
             except Exception:
                 doc_top = 0
             # 行高下限：自然行高允许略收（差 1~2px 时收紧几像素即可，仍比字高大，
-            # 不压字），保证"差几像素"的场景也能精确落在整行上。
+            # 不压字），保证"差几像素"的场景也能精确落在目标整行上。
+            # 目标行数按窗口状态取（_visible_rows_target）：最大化 20/10，普通窗 15/8。
+            rows, log_lines = self._visible_rows_target()
             hard_min = max(natural - 2, table.fontMetrics().height() + 2)
             # 连接组富余边距统一走类方法（绝对赋值 + 自带异常兜底）。
             _set_conn_extra = self._apply_conn_extra
@@ -1498,15 +1531,15 @@ class EmbyActorManagerDialog(QDialog):
                     cur_v = base_v
                 return splitter.height() - handle + (cur_v - base_v)
 
-            def _solve(avail: int, conn_extra: int, rows: int, log_lines: int) -> tuple[int, int, int]:
-                """按可用高度定 (行高, 表格侧高, 日志侧高)。"""
+            def _solve(avail: int, conn_extra: int) -> tuple[int, int, int]:
+                """按可用高度定 (行高, 表格侧高, 日志侧高)。行数目标取当前窗口状态档。"""
                 tf, lc = _table_fixed(), _log_chrome()
                 log_need = lc + log_lines * line_h + doc_top
                 if avail - conn_extra - tf - log_need < rows * hard_min:
                     return 0, 0, 0  # 塞不下
                 slack = avail - conn_extra - tf - log_need - rows * base_r
                 # slack 可为负（缺几像素）：向下用 hard_min 收缩行高；向上长到 cap
-                # 后钳制（不拒绝），整数除法保证 rows 行正好铺满。
+                # 后钳制（不拒绝），整数除法保证目标行数正好铺满。
                 row_h = base_r + slack // rows
                 if row_h < hard_min:
                     return 0, 0, 0  # 实在塞不下
@@ -1527,14 +1560,8 @@ class EmbyActorManagerDialog(QDialog):
                         pass
                 self._settle_layout()
 
-            # 双档目标：先按 20/10 试算（最大化路径），塞不下回落 15/8（普通窗）。
-            # 两档都塞不下才放弃（恢复基准、不干预），保持小窗 noop 语义。
-            rows, log_lines = self.TABLE_VISIBLE_ROWS, self.LOG_VISIBLE_LINES
             conn_extra = 0
-            row_h, list_target, log_target = _solve(_avail(), 0, rows, log_lines)
-            if not row_h:
-                rows, log_lines = self.NORMAL_TABLE_ROWS, self.NORMAL_LOG_LINES
-                row_h, list_target, log_target = _solve(_avail(), 0, rows, log_lines)
+            row_h, list_target, log_target = _solve(_avail(), 0)
             if not row_h:
                 # 实在塞不下：恢复基准边距、解除冻结，不干预
                 _set_conn_extra(0)
@@ -1545,7 +1572,7 @@ class EmbyActorManagerDialog(QDialog):
             # → 剩余给日志侧（此时才出现底部空白）。每改一步都等布局落定再重测。
             conn_extra = 0
             for _ in range(4):
-                r_new, l_new, g_new = _solve(_avail(), conn_extra, rows, log_lines)
+                r_new, l_new, g_new = _solve(_avail(), conn_extra)
                 if not r_new:
                     _set_conn_extra(0)
                     self._collapsed_sizes()
@@ -1554,7 +1581,7 @@ class EmbyActorManagerDialog(QDialog):
                 _set_conn_extra(conn_extra)
                 # 连接组变高会挤占 splitter：让布局落定后再确认行高仍成立
                 self._settle_layout()
-                r2, l2, g2 = _solve(_avail(), conn_extra, rows, log_lines)
+                r2, l2, g2 = _solve(_avail(), conn_extra)
                 if not r2 or (r2, l2, g2) == (row_h, list_target, log_target):
                     break
                 # 富余仍在：尝试把连接组边距往上加一档，再看能否吸收
@@ -1582,14 +1609,14 @@ class EmbyActorManagerDialog(QDialog):
                 if log_target < _log_chrome() + log_lines * line_h + doc_top:
                     return
 
-            # 锁死高度后按实测视口迭代修正，直至表格恰好 rows 整行（含末行下横线）
+            # 锁死高度后按实测视口迭代修正，直至表格恰好目标行整行（含末行下横线）
             for _ in range(6):
                 before = (list_target, log_target)
                 _refit()
                 if (list_target, log_target) == before:
                     break
 
-            # 日志视口超出「log_lines 行 + 文档顶边距」的部分，从日志侧收回、折进连接组，
+            # 日志视口超出「目标行数 + 文档顶边距」的部分，从日志侧收回、折进连接组，
             # 不在日志里留空白垫。
             # 此处刻意「只缩日志侧、不重解行高」：把日志收回来的像素已经通过
             # conn_extra 让给了连接组，若再跑一次 _solve()，它会把这部分像素从行高
@@ -1608,7 +1635,7 @@ class EmbyActorManagerDialog(QDialog):
                 log.setViewportMargins(0, 0, 0, 0)
             except Exception:
                 pass
-            # 收回多余空白后按实测再校一次，保证表格仍落在 rows 整行。
+            # 收回多余空白后按实测再校一次，保证表格仍落在目标行整行上。
             try:
                 for _ in range(4):
                     before = (list_target, log_target)
