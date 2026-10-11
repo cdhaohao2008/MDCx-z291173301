@@ -15,7 +15,7 @@ MCP client.
 
 Both servers already expose a large API, and an MCP server that wraps it lets a model browse
 your library and read your watch state. This one does that too, but the reason it exists is
-the layer above: **19 audits**, each a sweep over the whole library for one specific thing
+the layer above: **17 audits**, each a sweep over the whole library for one specific thing
 that goes wrong in a real collection - unmatched films, wrong-year matches, duplicates, a
 4K and a 1080p copy merged into one entry, a file whose runtime says it is not the film it
 claims to be, a DVD rip still waiting for a better copy, an episode missing between two on
@@ -27,34 +27,32 @@ differences between them live in one package, and every tool is tested against b
 
 ### What else is in the box
 
-- **88 tools, in toolsets.** Search, browse and inspect, read a whole library's episodes at once, resolve a release name to a series, identify and re-identify, batch edits and renames, artwork, subtitles, watch state, people, playlists, collections, remote control, scans, tasks, logs and libraries. Each sits in a toolset a session can load on its own, so a client spends about a thousand tokens of context by default rather than seventeen thousand.
-- **Three Go SDKs.** `lib/emby`, `lib/jf` and `lib/tmdb` are complete typed clients for the Emby, Jellyfin and TMDB APIs - all 499, 346 and 152 operations, generated from their own OpenAPI documents (each package's `APIVersion` says which), standard library only, no knowledge of MCP. Useful on their own, whether or not you care about AI. `lib/embyfin` is the thin layer that makes the two servers answer alike.
+- **89 tools, in toolsets.** Search, browse and inspect, read a whole library's episodes at once, resolve a release name to a series, identify and re-identify, batch edits and renames, artwork, subtitles, watch state, people, playlists, collections, remote control, scans, tasks, logs and libraries. Each sits in a toolset a session can load on its own, so a client spends about two thousand tokens of context by default rather than thirty-five thousand.
+- **Three Go SDKs.** `sdk/emby`, `sdk/jf` and `sdk/tmdb` are complete typed clients for the Emby, Jellyfin and TMDB APIs - all 499, 346 and 152 operations, generated from their own OpenAPI documents (each package's `APIVersion` says which), standard library only, no knowledge of MCP. Useful on their own, whether or not you care about AI. `sdk/embyfin` is the thin layer that makes the two servers answer alike.
 - **Tested against real servers.** Every tool runs against a real Emby and a real Jellyfin in Docker, the suite fails if a registered tool has no test, and the servers' calls out to TMDB and TheTVDB are recorded once and replayed, so CI needs no network.
 
 ### The audits
 
 | audit | what it catches |
 |---|---|
-| `audit_all` | every audit in one call, counts only, so one call says where a library needs work - start here after a scan. Every audit has a row; the three that need more than the server (a language, TMDB, the Anime-Lists file) are rows marked skipped, with why. A music library is counted for its albums' covers and genre spellings |
-| `audit_missing_metadata_provider` | items with no provider id of any kind (a link to a show's website or Facebook page is not one): never matched, so nothing else can be filled in automatically; `item_identify` fixes them. `missing` drills down to the providers named: `missing=tmdb` also finds a show matched on TVDB or IMDB but not on TMDB, and `ignore` leaves out libraries whose items never carry an id, such as YouTube |
-| `audit_missing_poster` | items with no primary image; `item_artwork` and `item_artwork_set` fix them |
-| `audit_missing_overview` | items with no plot text, usually a failed match; `item_refresh` or `item_identify` fix them |
+| `audit_all` | every audit in one call, counts only, so one call says where a library needs work - start here after a scan. Every audit has a row; the four it does not run itself (one needs a language, one asks TMDB, one reads the Anime-Lists file, one asks the server about every video) are rows marked skipped, with why. A music library is counted for its albums' covers and genre spellings |
+| `audit_missing_metadata` | items missing what a matched, finished item has, each finding naming which: a provider id of any kind (a link to a show's website or Facebook page is not one, so never matched, and nothing else can be filled in automatically; `item_identify` fixes them), a primary image (`item_artwork` and `item_artwork_set`), a plot (usually a failed match; `item_refresh` or `item_identify`). `problems` picks which to look for, `by_problem` counts each, `missing` drills the id check down to the providers named (`missing=tmdb` also finds a show matched on TVDB or IMDB but not on TMDB), and `ignore` leaves out libraries whose items never carry an id, such as YouTube |
 | `audit_file_path` | items whose path disagrees with their metadata, every version's file included: a folder saying `(2021)` under a film matched to 1984 (the wrong edition, or the wrong film), a folder or file named for a different title, and for episodes the series, season and episode number the file name claims against the ones the server holds - a file holding two episodes (`S01E01E02`) where the server lists one has the second's content on disk while the server calls it missing, and a file named after one episode where the server holds another is a file from another series, or, with a TMDB token, one numbered in another provider's order (each such row says which TMDB episode the file's title is). A film's or a series' path is held against every title it goes by - its name, original title, sort name and, with a TMDB token, the alternative titles TMDB lists - and a year either side is the same film; with a TMDB token a path naming another film says which, beside the id the item carries, and whether the file's runtime backs either. A name spelled with a letter of another script that only looks Latin (a Cyrillic A, U+0410, in a Latin title) is its own row, since no search for the plain title finds it. `checks` narrows to any of title, year, series, season, episode, lookalike; `ids` checks a handful of items |
-| `audit_duplicates` | separate entries sharing one tmdb/imdb id, in one library or across libraries, each group listing every copy with its path and quality; a group whose file names another film is marked as probably two films on one id, not copies |
+| `audit_duplicates` | separate entries sharing one tmdb/imdb id, in one library or across libraries, each group listing every copy with its path and quality; a group whose file names another film is marked as probably two films on one id, not copies. Its `folder_groups` are the shows held twice because two folders name the same series - a rename that changed only spacing, case, an accent or punctuation - which splits the episodes across two entries that each answer "no" to half the questions, and which sharing an id cannot see when the second entry carries no id |
 | `audit_multiple_versions` | one entry the server has merged from several files - a 4K and a 1080p copy - which is what `audit_duplicates` cannot see; on both servers it reads the library as people see it, so a pair Emby shows as one film is versions, not duplicates. A version whose file names another film is marked as probably another film merged in on the same ids |
-| `audit_runtime` | episodes whose runtime disagrees with their season's: truncated downloads, wrong files, wrong matches, each against the median of its season, with no external data |
+| `audit_runtime` | films and episodes whose runtime no film or episode can have: under 2 minutes (a download cut off, a sample, a broken file) or 12 hours or more (broken duration metadata). Nothing is judged against its season or library; a length against TMDB's is `audit_provider`. A disc image (`.iso`) is counted and not judged: the runtime a server holds for one can be a single title's or a menu's |
 | `audit_quality` | films and episodes worth replacing with a better copy: below a resolution (720 lines by default, so 480p and 576p rips), in a legacy codec (MPEG-2, XviD and DivX, WMV, VC-1), or below a bitrate when one is given; an item is judged by its best version on both servers (Emby stores each version apart), lowest resolution first. Two more lists say which facts cannot be trusted: files the server never probed (every quality question reads as nothing, so they are not judged) and, on Emby, files written over after the server first saw them, whose facts may be the old file's until a scan re-reads them; each such row carries the size the server believes |
-| `audit_missing_episodes` | series with episodes missing: the numbers a season skips between the episodes on disk, whole seasons skipped, and, when the server records them, the episodes its provider lists without a file. `provider: true` reads every series' whole run from the configured metadata providers instead (TMDB today), one request a series and paged, so what a series lacks after its last file is seen too |
-| `audit_spelling` | genres, tags and studios that mean the same thing spelled differently: `Sci-Fi` and `Sci Fi`, `Science-Fiction` and `Science Fiction`, a letter apart, or a studio cut short (`Warner Bros.` and `Warner Bros. Pictures`); each group names the spelling to keep, and `metadata_rename` merges it |
+| `audit_missing_episodes` | series with episodes missing: the numbers a season skips between the episodes on disk, whole seasons skipped, and, when the server records them, the episodes its provider lists without a file. `provider: true` reads every series' whole run from the configured metadata providers instead (TMDB today), one request a series and paged, so what a series lacks after its last file is seen too. A show held under two entries sharing its ids, or in two folders named alike beside each other, is judged as one |
+| `audit_spelling` | genres, tags and studios that mean the same thing spelled differently: `Sci-Fi` and `Sci Fi`, `Science-Fiction` and `Science Fiction`, a letter apart, or a studio cut short (`Warner Bros.` and `Warner Bros. Pictures`); each group names the spelling to keep, and `metadata_rename` merges it. In a music library it reads the tracks' album and artist names too - an album spelled two ways by one album artist, an artist written with and without `The` - which are the files' tags, fixed in the files rather than with `metadata_rename` |
 | `audit_whitespace` | doubled, leading, trailing and odd spaces, and a space before a colon or a file extension, in names, sort names, original titles, genres, tags, studios, people, folders and file names, each with the fixed text beside it (a double space in a path usually marks a character a renamer stripped, so the row sets the path beside the item's title) |
 | `audit_unwatched` | the films, or series, no account on the server has watched, oldest additions first, optionally only those added more than some days ago: what to archive, or what to recommend. A watch by an account that has since lost access to the library still counts; one by an account now held back by a parental rating does not, as neither server lists what the limit hides |
 | `audit_language` | films and episodes by the language of their audio or subtitles: what has audio or subtitles in a language, what has no audio in it, or what cannot be watched in it at all; a track with no language tag is never taken as lacking one |
 | `audit_duplicate_episodes` | one episode's content filed under two episode numbers: a season holding the same episode title twice, which neither other duplicate audit can see. Each group says how sure it is: near certain only on proof in the files (the same size to the byte, or a runtime no other episode shares), a lead otherwise, far apart when the lengths differ too much to be copies |
-| `audit_duplicate_series` | shows held twice because two folders name the same series - a rename that changed only spacing, case, an accent or punctuation - which splits the episodes across two entries that each answer "no" to half the questions |
 | `audit_orphans` | items a renamed or removed library folder left behind: outside every library, so no library lists them but every sweep counts them. `item_orphans_delete` removes them once their folder is gone ([how](#cleaning-up-after-a-removed-library)) |
 | `audit_disc_folders` | a disc copied in as its own files: a Blu-ray's numbered streams or a DVD's VOBs in a film's folder, with no BDMV or VIDEO_TS structure, so the server makes a film of each stream and matches them separately - which files short clips under other films' names |
+| `audit_previews` | videos whose preview thumbnails - the frames over the seek bar while scrubbing, one BIF file a video on Emby - are missing, damaged (empty, not a thumbnail file, cut off) or the wrong length for the video, read off each file as it is on disk now. Emby's scheduled task can pass over a video it made them for before (seen on 4.10.1), so a file deleted or damaged since can stay that way; `item_previews_regenerate` makes it again. Only libraries that make thumbnails are read, paged. Emby only so far |
 | `audit_anime_ids` | anime held against Anime-Lists, the community mapping of AniDB entries to TVDB and TMDB: ids that disagree (a TMDB id that is the whole show beside an AniDB id that is one of its specials), specials that are an OVA or a film of their own and could be split out into a series, and series already kept apart, with the AniDB entry that justifies it |
-| `audit_provider` | films against their metadata provider, one request a film: the ids the film holds agree with each other and exist there (a TMDB id whose film carries a different IMDb id, a TMDB id TMDB no longer has, an IMDb id that is a series or an episode), and the file's runtime is the provider's (a truncated download, a wrong file, a wrong match). `provider` names which to ask, TMDB being the only one yet; paged with `offset`, every film once in the same order, or `ids` for a handful. Needs `EMBYFIN_TMDB_TOKEN` |
+| `audit_provider` | films and episodes against their metadata provider. A film, one request each: the ids it holds agree with each other and exist there (a TMDB id whose film carries a different IMDb id, a TMDB id TMDB no longer has, an IMDb id that is a series or an episode), and the file's runtime is the provider's (a truncated download, a wrong file, a wrong match). An episode: the file's runtime against TMDB's for that episode, one read per series, naming the TMDB episode compared with. `provider` names which to ask, TMDB being the only one yet; paged with `offset`, every film and episode once in the same order, or `ids` for a handful. Needs `EMBYFIN_TMDB_TOKEN` |
 
 The design principle: **detection is code, correction is judgment.** The server runs cheap
 deterministic checks over the whole library and produces worklists; the AI reasons only about
@@ -67,7 +65,7 @@ API object (`BaseItemDto` runs to 150 fields; `item_get` returns about 15).
 go install github.com/katbyte/embyfin-mcp@latest
 ```
 
-Tested against Emby 4.10 and Jellyfin 12.1; both servers' current stable images are what the
+Tested against Emby 4.10 and Jellyfin 12.2; both servers' current stable images are what the
 live suites run.
 
 ## Configuration
@@ -82,14 +80,15 @@ All options can be passed as command-line flags, environment variables, or via a
 | `EMBYFIN_READ_ONLY` | `--read-only` | register only tools that never change server state |
 | `EMBYFIN_ENABLE_DELETE` | `--enable-delete` | register `item_delete` (removes the item's files, and a film's or series' whole folder), `item_orphans_delete`, `library_delete`, `playlist_delete` and `collection_delete`, and allows `library_edit`'s `remove_paths` and `task_run` of anything but a scan |
 | `EMBYFIN_TOOLSETS` | `--toolsets` | groups of tools to register, default `core`: `all`, `core`, `curation`, `watching`, `organise`, `remote`, `admin`, or a resource family like `item` (`core` is always included) |
-| `EMBYFIN_ALLOW_TOOLS` | `--allow-tools` | only register these tools (names, `library_*` globs, or `essential`), chosen from every tool unless toolsets are given too |
+| `EMBYFIN_ALLOW_TOOLS` | `--allow-tools` | register these tools (names, `library_*` globs, or `essential`): on its own only these, beside `--toolsets` these as well as the sets |
 | `EMBYFIN_DENY_TOOLS` | `--deny-tools` | never register these tools (names or globs such as `*_delete`) |
-| `EMBYFIN_TMDB_TOKEN` | `--tmdb-token` | TMDB API Read Access Token, or the older API Key; enables `audit_provider` (films' ids and runtimes checked against TMDB), `audit_missing_episodes` with `provider: true` (each series' whole run), the episode TMDB gives a file's title to, a film's alternative titles and what TMDB's search finds by a path's title in `audit_file_path`, and `show_missing` on servers that keep no record of a series' run. `EMBYFIN_TMDB_KEY` / `--tmdb-key` still work |
+| `EMBYFIN_TMDB_TOKEN` | `--tmdb-token` | TMDB API Read Access Token, or the older API Key; enables `audit_provider` (films' ids and runtimes, and episodes' runtimes, checked against TMDB), `audit_missing_episodes` with `provider: true` (each series' whole run), the episode TMDB gives a file's title to, a film's alternative titles and what TMDB's search finds by a path's title in `audit_file_path`, and `show_missing` on servers that keep no record of a series' run. Answers are kept an hour; `provider_cache_clear` forgets them at once. `EMBYFIN_TMDB_KEY` / `--tmdb-key` still work |
 | `EMBYFIN_ANIME_LIST` | `--anime-list` | where `audit_anime_ids` reads the Anime-Lists mapping: a URL or a file. Default the list on GitHub, fetched once a day |
-| `EMBYFIN_LOG` | | log level (`WARN` default; `DEBUG`, `TRACE`, ...) |
+| `EMBYFIN_LOG` | | log level (`WARN` default): `INFO` adds a line for every call of a write or delete tool, `TRACE` every request to the server and its answer, with keys blanked |
 | `EMBYFIN_LISTEN` | `--listen` | serve MCP over HTTP on this address (e.g. `:8080`) instead of stdio |
 | `EMBYFIN_AUTH_TOKEN` | `--auth-token` | bearer token required on the HTTP endpoint (required with `--listen`) |
 | `EMBYFIN_ALLOW_NO_AUTH` | `--allow-no-auth` | serve HTTP with no bearer token at all: anyone who can reach the port can use every tool |
+| `EMBYFIN_CONFIG` | `--config` | read settings from this file and no other, in place of `./.embyfin-mcp` or `~/.embyfin-mcp` |
 
 An API key acts as the server, not as a user, so the tools that read or change watch state
 take a `user` (name or id) and default to the first administrator.
@@ -108,6 +107,23 @@ TMDB_TOKEN=...
 ```
 
 A two-word flag takes an underscore: `TMDB_TOKEN` for `--tmdb-token`. A flag or an environment variable still wins over the file.
+
+`--config` (or `EMBYFIN_CONFIG`) names the file to read, and it is then the only one read: nothing in `~/.embyfin-mcp` reaches that run. A file that is named and is not there stops the server from starting.
+
+### Two servers at once
+
+Run one instance a server, each with a settings file of its own, and register each under its own name. A client keeps their tools apart by that name, so the same question can be put to both:
+
+```json
+{
+  "mcpServers": {
+    "emby": { "command": "embyfin-mcp", "args": ["serve"] },
+    "jellyfin": { "command": "embyfin-mcp", "args": ["serve", "--config", "~/.embyfin-mcp-jf"] }
+  }
+}
+```
+
+The first reads `~/.embyfin-mcp` as usual; the second reads `~/.embyfin-mcp-jf`, which sets `BACKEND=jellyfin` with its own `SERVER` and `TOKEN`.
 
 ## Usage
 
@@ -184,11 +200,11 @@ back as an error listing what exists. Timeframe-taking tools default to the last
 
 | Resource | Tools |
 |---|---|
-| server | `server_info`, `server_stats`, `server_activity`, `server_devices`, `server_logs`, `server_log` |
-| tasks | `task_list`, `task_run` |
-| libraries | `library_list`, `library_get` (counts by type), `library_items` (a title search, a structured filter by genre, tag, studio, rating, year, person and watch state, or both, sorted and paged), `library_filters` (every genre, tag, studio, rating and year, with counts), `library_episodes` (every episode of a show, one season of it, or a whole library, paged, with quality), `library_export` (a whole library to a new file on the machine embyfin-mcp runs on, never over an existing one), `library_recent`, `library_genres`, `library_scan` (every library, or one), `library_create`, `library_edit` (rename, add and remove folders, switch nfo saving), `library_delete` |
-| audits | `audit_all` and the 19 audits in [the table above](#the-audits) |
-| items | `item_get` (every version the server shows it in, and a warning when a film's file names another film), `item_find_by_metadata_id` (the definitive "do I already have this?"), `item_similar`, `item_refresh` (waits for the refresh to land), `item_edit` (one item's fields, or the same genres, tags, studios or rating across many; `add_*` and `remove_*` edit each item's own list), `item_instant_mix`, `item_last_watched`, `item_watch_history`, `item_set_state` (watched, favourite and resume point, any or all) |
+| server | `server_info` (with whether a restart is pending, and the machine as the server's log describes it), `server_health` (how the server is doing in one call: tasks running and failed, who is playing and how, and what the last stretch of the log shows), `server_stats`, `server_activity` (the log, or the entries about one item or one user), `server_devices`, `server_plugins` (what is installed into the server, and on Jellyfin whether each is running), `server_log` (the newest log's tail, and every log file), `server_log_search` (the log between two times or over its last stretch, filtered, and as entries, counts, a histogram, the gaps of a freeze, or the slow answers), `server_config` (the server's own settings, in groups), `server_config_edit` (Jellyfin: the settings that tune trickplay images and scanning, and no others) |
+| tasks | `task_list` (with progress, what starts each, and how its last run went), `task_get` (one task, with its last failure in full), `task_run`, `task_stop`, `task_edit` (when a task starts by itself) |
+| libraries | `library_list`, `library_get` (counts by type), `library_options` (every library's settings side by side, and which libraries are set differently), `library_items` (a title search, a structured filter by genre, tag, studio, rating, year, person and watch state, or both, sorted and paged; `added_since` for what came in after a moment), `library_filters` (every genre, tag, studio, rating and year, with counts), `library_episodes` (every episode of a show, one season of it, or a whole library, paged, with quality), `library_export` (a whole library to a new file on the machine embyfin-mcp runs on, never over an existing one), `library_scan` (every library, or one), `library_create`, `library_edit` (rename, add and remove folders, switch nfo saving), `library_delete` |
+| audits | `audit_all` and the 17 audits in [the table above](#the-audits) |
+| items | `item_get` (every version the server shows it in, and a warning when a film's file names another film), `item_find_by_metadata_id` (the definitive "do I already have this?"), `item_similar`, `item_refresh` (waits for the refresh to land), `item_previews_regenerate` (makes a video's preview thumbnails again, one video at a time, and names anything else the refresh changed; Emby only so far), `item_edit` (one item's fields, or the same genres, tags, studios or rating across many; `add_*` and `remove_*` edit each item's own list), `item_instant_mix`, `item_last_watched`, `item_set_state` (watched, favourite and resume point, any or all) |
 | metadata | `metadata_rename` (a genre, tag or studio, everywhere it is used; renaming onto an existing value merges, `remove` drops it) |
 | people | `person_get` (an actor, director or writer and everything the library holds with them in it) |
 | identify | `item_identify` (candidates from the server's providers) → `item_identify_apply` (takes the candidate and its `candidate_ids`; a candidate without ids can't be applied) |
@@ -198,29 +214,29 @@ back as an error listing what exists. Timeframe-taking tools default to the last
 | users | `user_list`, `user_get` (permissions, libraries, playback preferences), `user_history`, `user_next_up` (the next episode of each series, and everything part way through, with positions), `user_stats` (films and episodes watched, in progress and favourited, hours, series finished, top genres and series, in one pass) |
 | quality | `quality_compare` (which of two copies is better, by how much, and why) |
 | plan | `plan_check` (before writing files: what is at each destination path now, which series it would join, which entries collide) |
-| sessions | `session_list`, `session_play`, `session_command`, `session_message` |
-| playlists | `playlist_list`, `playlist_get`, `playlist_create`, `playlist_edit` (rename, move an entry), `playlist_add`, `playlist_remove`, `playlist_delete` (remove and move name an entry by its entry id and the item it holds, plus the playlist's `fingerprint` when an item is held twice) |
-| collections | `collection_list`, `collection_get`, `collection_create`, `collection_edit` (rename, sort name, overview), `collection_add`, `collection_remove`, `collection_delete` |
+| sessions | `session_list` (what each device plays and how; `details` for the file and the transcode), `session_play`, `session_command`, `session_message` |
+| playlists | `playlist_list`, `playlist_get`, `playlist_create`, `playlist_edit` (rename, `add_items`, `remove_entries`, move an entry; a removal and a move name an entry by its entry id and the item it holds, plus the playlist's `fingerprint` when an item is held twice), `playlist_delete` |
+| collections | `collection_list`, `collection_get`, `collection_create`, `collection_edit` (rename, sort name, overview, `add_items`, `remove_items`), `collection_delete` |
 
-`item_delete` (permanently removes the item's files - a film alone in its folder or a series goes with the whole folder, and a film sharing a folder takes every sidecar whose name starts with its file's name, another film's too - and without `confirm` says what it would remove; it refuses collections, playlists, libraries, genres, studios, people and artists, naming the tool that removes each), `item_orphans_delete` (what a removed library left behind, once its folder is gone), `library_delete`, `playlist_delete` and `collection_delete` are only registered when `--enable-delete` / `EMBYFIN_ENABLE_DELETE` is set: none of them can be undone. `--read-only` registers the 61 read tools and nothing else, so a write tool is absent from `tools/list` rather than refused when called.
+`item_delete` (permanently removes the item's files - a film alone in its folder or a series goes with the whole folder, and a film sharing a folder takes every sidecar whose name starts with its file's name, another film's too - and without `confirm` says what it would remove; it refuses collections, playlists, libraries, genres, studios, people and artists, naming the tool that removes each), `item_orphans_delete` (what a removed library left behind, once its folder is gone), `library_delete`, `playlist_delete` and `collection_delete` are only registered when `--enable-delete` / `EMBYFIN_ENABLE_DELETE` is set: none of them can be undone. `--read-only` registers the 55 read tools and nothing else, so a write tool is absent from `tools/list` rather than refused when called.
 
 ### Choosing which tools load
 
-**The default is `core`: six read-only tools, about 1,100 tokens.** The whole surface is around 17,300 tokens of tool definitions before anyone asks a question, which is a poor way to spend a client's context by default. `--toolsets` / `EMBYFIN_TOOLSETS` loads the groups a session actually needs, and `core` comes along with whatever else is asked for, because nothing else can find a library or open an item.
+**The default is `core`: six read-only tools, about 2,000 tokens.** The whole surface is around 35,600 tokens of tool definitions before anyone asks a question, which is a poor way to spend a client's context by default. `--toolsets` / `EMBYFIN_TOOLSETS` loads the groups a session actually needs, and `core` comes along with whatever else is asked for, because nothing else can find a library or open an item.
 
 **Curating a library needs `EMBYFIN_TOOLSETS=curation`** - every audit but `audit_orphans`, and everything that fixes what they find. Cleaning up after a removed library is in `admin` ([below](#cleaning-up-after-a-removed-library)). `EMBYFIN_TOOLSETS=all` restores every tool.
 
 | toolset | tools | with core | ~tokens |
 |---|---|---|---|
-| `core` *(default)* | 6 | 6 | 1,800 |
-| `remote` | 4 | 10 | 2,500 |
-| `admin` | 14 | 20 | 5,600 |
-| `watching` | 9 | 15 | 3,800 |
-| `organise` | 14 | 20 | 5,300 |
-| `curation` | 41 | 47 | 20,800 |
-| `all` | 88 | 88 | 30,800 |
+| `core` *(default)* | 6 | 6 | 2,000 |
+| `remote` | 4 | 10 | 2,700 |
+| `admin` | 22 | 28 | 9,400 |
+| `watching` | 8 | 14 | 3,800 |
+| `organise` | 10 | 16 | 5,100 |
+| `curation` | 39 | 45 | 22,500 |
+| `all` | 89 | 89 | 35,600 |
 
-Tokens are what the model sees: each tool's name, description and input schema, measured over a real `tools/list` at four bytes a token, with `--enable-delete`. Every tool also carries an output schema, another 62,000 tokens across `all`, but clients keep that to themselves to validate results rather than sending it to the model.
+Tokens are what the model sees: each tool's name, description and input schema, measured over a real `tools/list` at four bytes a token, with `--enable-delete`. Every tool also carries an output schema, another 59,000 tokens across `all`, but clients keep that to themselves to validate results rather than sending it to the model.
 
 `--toolsets` also takes a resource family - `library`, `item`, `audit`, `show`, `user`,
 `person`, `metadata`, `session`, `playlist`, `collection`, `server`, `task` - which is every
@@ -245,25 +261,27 @@ embyfin-mcp tools --read-only -q    # names only
 
 ### Narrowing further
 
-`--allow-tools` and `--deny-tools` take comma-separated tool names, globs with a leading or trailing `*`, or the `essential` preset (`library_list`, `library_items`, `item_get`, `user_next_up`, `item_set_state`). An allow list with no `--toolsets` chooses from every tool, so it is the whole list; beside `--toolsets` it narrows what the sets hold. `--deny-tools` takes away from either.
+`--allow-tools` and `--deny-tools` take comma-separated tool names, globs with a leading or trailing `*`, or the `essential` preset (`library_list`, `library_items`, `item_get`, `user_next_up`, `item_set_state`). An allow list with no `--toolsets` is the whole of what loads: only the tools it names. Beside `--toolsets` it adds to them: the sets, and the tools named as well. `--deny-tools` takes tools out of whatever was asked for, which is how a set is narrowed.
 
 ```sh
 EMBYFIN_ALLOW_TOOLS=essential                      # exactly those five
 EMBYFIN_ALLOW_TOOLS=library_*,item_get,user_*      # every library_ and user_ tool, and item_get
-EMBYFIN_TOOLSETS=curation EMBYFIN_ALLOW_TOOLS=audit_*   # the audits alone
+EMBYFIN_ALLOW_TOOLS=audit_*                        # the audits alone
+EMBYFIN_TOOLSETS=curation EMBYFIN_ALLOW_TOOLS=task_list,task_run   # curation, and two tools from admin as well
+EMBYFIN_TOOLSETS=curation EMBYFIN_DENY_TOOLS=audit_*   # curation without its audits
 EMBYFIN_DENY_TOOLS=*_delete,session_*
 ```
 
-A pattern that matches no tool aborts startup and names it, so a typo cannot silently hide a tool. So does an allow list naming a tool the toolsets asked for do not hold, and it says which set to add.
+A pattern that matches no tool aborts startup and names it, so a typo cannot silently hide a tool. Neither list gets a tool past `--read-only` or the delete switch.
 
 ### A typical curation session
 
-1. `audit_all` says where the library needs work; `audit_missing_metadata_provider` lists
-   the films never matched to a provider.
+1. `audit_all` says where the library needs work; `audit_missing_metadata problems=provider_id`
+   lists the films never matched to a provider.
 2. For each, `item_identify` returns candidates with year and ids; compare them with the
    file and `item_identify_apply candidate=N candidate_ids=…` (the ids pin the choice).
 3. `audit_file_path` finds the wrong editions and the files named for something else; the same two tools fix them.
-4. `audit_missing_poster` and `item_artwork` / `item_artwork_set` fill the gaps.
+4. `audit_missing_metadata problems=poster` and `item_artwork` / `item_artwork_set` fill the gaps.
 5. `audit_duplicates` and `audit_multiple_versions` show what to prune;
    `audit_runtime`, `audit_provider` and `audit_quality` show what to re-download.
 6. `audit_spelling` finds the genres, tags and studios typed several ways; `metadata_rename`
@@ -284,13 +302,13 @@ It refuses a folder inside a library or holding one, a folder the server can sti
 
 ## Using the clients on their own
 
-`lib/emby` and `lib/jf` are complete Go clients for the Emby and Jellyfin APIs that depend on
-nothing but the standard library, the shared base client in `lib/client` and
-`go-kt/version`, and know nothing of MCP. If you only want to talk to one of the servers from
+`sdk/emby` and `sdk/jf` are complete Go clients for the Emby and Jellyfin APIs that depend on
+nothing but the standard library, [pandorest](https://github.com/katbyte/pandorest)'s base
+client and `go-kt`, and know nothing of MCP. If you only want to talk to one of the servers from
 Go, take the package and ignore the rest:
 
 ```go
-import "github.com/katbyte/embyfin-mcp/lib/jf"
+import "github.com/katbyte/embyfin-mcp/sdk/jf"
 
 c, err := jf.New("http://nas:8096", os.Getenv("EMBYFIN_TOKEN"))
 res, err := c.GetItems(ctx, jf.GetItemsOperationOptions{
@@ -301,10 +319,10 @@ for _, it := range res.Model.Items { ... }
 all, err := c.GetItemsComplete(ctx, jf.GetItemsOperationOptions{Recursive: new(true)}) // every page
 ```
 
-`lib/tmdb` is the same for TMDB, generated from TMDB's own OpenAPI document; it takes an API Read Access Token or the older API Key:
+`sdk/tmdb` is the same for TMDB, generated from TMDB's own OpenAPI document; it takes an API Read Access Token or the older API Key:
 
 ```go
-import "github.com/katbyte/embyfin-mcp/lib/tmdb"
+import "github.com/katbyte/embyfin-mcp/sdk/tmdb"
 
 c, err := tmdb.New(tmdb.DefaultBaseURL, os.Getenv("EMBYFIN_TMDB_TOKEN"))
 film, err := c.MovieDetails(ctx, 550, tmdb.MovieDetailsOperationOptions{AppendToResponse: "credits"})
@@ -312,8 +330,8 @@ found, err := c.FindById(ctx, "tt0137523", tmdb.FindByIdOperationOptions{Externa
 ```
 
 They are generated from the servers' own OpenAPI documents (`docs/`, see
-[api-defs/README.md](api-defs/README.md)) by `internal/pandorest`, a generator kept in this
-repository and modelled on [hashicorp/pandora](https://github.com/hashicorp/pandora): an
+[api-defs/README.md](api-defs/README.md)) with [pandorest](https://github.com/katbyte/pandorest), a generator that began in this
+repository and is modelled on [hashicorp/pandora](https://github.com/hashicorp/pandora): an
 importer normalises each spec into checked-in definitions (`api-defs/<service>-<version>/`, one file per
 tag) through named workarounds for the spec's known bugs, a differ reports what a spec
 refresh changes, and a generator writes one file per operation and model from the
@@ -323,10 +341,10 @@ status codes the operation documents (anything else is an error), and a `Complet
 every paged list. `make apicheck` proves the coverage claim against the spec, `make gencheck`
 (and the unit tests) fail when the generated code is stale, and the integration suite proves
 the shapes **against a running server** - which is the only thing that catches the server
-changing shape underneath a spec that says otherwise. See
-[internal/pandorest/README.md](internal/pandorest/README.md).
+changing shape underneath a spec that says otherwise. This repository's part of it, the
+services and the workarounds for their documents, is in [sdk/pandorest](sdk/pandorest/README.md).
 
-`lib/embyfin` is the backend-neutral layer the tools use: the handful of item, library, user,
+`sdk/embyfin` is the backend-neutral layer the tools use: the handful of item, library, user,
 session and provider operations a curation session needs, answering the same way on both
 servers. [api-defs/README.md](api-defs/README.md) records where the two servers differ and how it
 hides that.
@@ -343,17 +361,17 @@ make check-all  # build + unit tests + both live suites on both servers (needs d
 `make test` is hermetic and fast. It covers the pure logic - tool registration and toolsets,
 the audit heuristics, the CLI's flags, config files and HTTP auth, the record/replay proxy -
 and, against a canned server, the requests the base client, the two generated clients and the
-neutral `lib/embyfin` build for each server and the answers they decode. It also re-imports
+neutral `sdk/embyfin` build for each server and the answers they decode. It also re-imports
 both specs and regenerates both SDKs to check the checked-in code is current, and applies every
 importer workaround twice to prove each one notices when its bug is fixed.
 
 Everything else runs against **a real Emby and a real Jellyfin in Docker**, because a stub can
 only confirm what you already believed. Two suites, each in its own container, each run
-against both servers:
+against both servers; the environment, the proxy and the way the tools are driven as a client drives them (calls that count their coverage, readers of the answers, put-backs, files laid out for the container) are go-kt's `test/env`, `test/replayproxy` and `mcp/acctest`, shared with the other MCP servers; `lib/testenv` holds this suite's settings for them and `lib/acceptance` adds the waits on scans:
 
 | | Covers | Command |
 |---|---|---|
-| `integration/` | the `lib/emby` and `lib/jf` clients: bespoke tests that the calls the tools rely on decode with their fields populated and do what they say, and a sweep that calls every GET in each document against the server and classifies the ones that cannot answer in a container. `lib/tmdb` gets the same sweep against the real TMDB API, recorded once with a token and replayed with none (`make test-tmdb`, `make record-tmdb`) | `make testacc-integration` |
+| `integration/` | the `sdk/emby` and `sdk/jf` clients: bespoke tests that the calls the tools rely on decode with their fields populated and do what they say, and a sweep that calls every GET in each document against the server and classifies the ones that cannot answer in a container. `sdk/tmdb` gets the same sweep against the real TMDB API, recorded once with a token and replayed with none (`make test-tmdb`, `make record-tmdb`) | `make testacc-integration` |
 | `acceptance/` | the tools: name resolution, projections, audits, provider flows, and journeys that chain them (edits during a library scan and through a refresh, every fixable audit fixed and re-audited, the fixes each audit names with the fetchers on and off, a client's playback reaching the history tools, a series watched through, a user restricted to one library, a library's whole life, deletes letting go of what held their items, writes repeated and made in parallel, copies of a film watched, a genre added, renamed and removed, lookups that must change nothing), and the built binary itself over stdio and HTTP (flags and environment reaching the server, nothing but protocol on stdout, the bearer check, clean shutdown, refusing to start without a token) | `make testacc-acceptance` |
 
 ```bash
@@ -367,14 +385,14 @@ Coverage has to span every suite or it lies: `go test -cover ./...` reports a fr
 `tools/`, because almost everything real happens in the live suites behind the `integration`
 tag. `make cover` runs each into its own binary coverage directory and merges them with
 `go tool covdata` - stdlib tooling, no third-party merger - which is what the badge reports.
-The generated `lib/emby`, `lib/jf` and `lib/tmdb` are left out of the number and reported on a line of
+The generated `sdk/emby`, `sdk/jf` and `sdk/tmdb` are left out of the number and reported on a line of
 their own: they are one method per operation, and the integration suite exercises the ones
 the tools rely on rather than all 997.
 
 **Every tool is exercised on both servers.** Tool coverage is enforced rather than claimed: the
 acceptance suite records every tool it calls and fails if the server registered one nothing
 called, so a new tool cannot ship untested. The servers' own calls out to TMDB, TheTVDB, OMDb
-and the image CDNs go through a record/replay proxy (`lib/providerproxy`) - the containers are
+and the image CDNs go through a record/replay proxy (go-kt's `test/replayproxy`) - the containers are
 started with `HTTPS_PROXY` pointing at it and trust its certificate authority - so neither suite
 needs a network:
 
@@ -387,8 +405,8 @@ make record-check   # check the cassettes still match, without rewriting them
 vanished fields, changed types - and ignores values, so it goes red when a provider changes its
 contract rather than when a poster changes.
 
-Fixtures are generated, never committed: `scripts/testenv.sh` writes one-second videos with
-`ffmpeg` under `~/.cache/embyfin-mcp` (`EMBYFIN_TEST_DATA` to move them - not `$TMPDIR`, which
+Fixtures are generated, never committed: `scripts/testenv.sh` writes videos with
+`ffmpeg` - every film and episode runs TMDB's length for it, a still frame joined end to end so it costs a few megabytes - under `~/.cache/embyfin-mcp` (`EMBYFIN_TEST_DATA` to move them - not `$TMPDIR`, which
 Docker Desktop does not share), each with a Kodi-style `.nfo` carrying the real film's ids,
 completes the server's setup wizard, mints an API key and a second user, and prints the
 environment. The suites create the libraries through `library_create` and fill them with
@@ -397,7 +415,7 @@ clean and fetch their metadata from the providers (through the proxy), so the au
 something to leave alone and identify has something to find; the two `Messy` libraries keep
 the providers off and are seeded with every defect the audits exist to find - a film with no
 ids, one with no plot and no poster, a folder whose year disagrees with its metadata, one
-film twice, one film in two versions, a runtime that cannot be right - and each audit has a
+film twice, one film in two versions, a file cut short, a runtime that cannot be right - and each audit has a
 test against them. A fifth library holds music - four artists, five albums, twenty one-second
 tracks tagged with the real MusicBrainz ids, art beside and inside them - so the mixes have
 something to work with and the audits can be pointed at albums; it too keeps the providers

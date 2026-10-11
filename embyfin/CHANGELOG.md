@@ -1,5 +1,113 @@
 # Changelog
 
+## 0.7.0 (2026-10-10)
+
+### Breaking
+
+- the Emby SDK's `GetSystemPing` and `GetEnvironmentParentPath` give their text as `Model`, a string, where a caller had to read and close the response body
+
+### Changed
+
+- built on pandorest 0.6.0: a call that answers a file, an image or a stream asks the server for that type, where every call asked for JSON
+- eight of the workarounds for Emby's document are pandorest's ready-made ones, which say what the document declares and what the server really answers
+
+## 0.6.0 (2026-10-10)
+
+### Breaking
+
+- `sdk/client` is gone: the three SDKs send through [pandorest](https://github.com/katbyte/pandorest)'s base client, so a Go program that used it imports `github.com/katbyte/pandorest/client`, and each SDK's `New` takes that client's options
+
+### Changed
+
+- the SDKs are generated with pandorest, the generator that began in this repository and is now a library shared with the other MCP servers; `sdk/pandorest` keeps what is embyfin's, the three services and the workarounds for their documents
+- `EMBYFIN_LOG=trace` shows each request to the server and its answer, with keys and passwords blanked
+- a server url that answers with a web page is told so and to check the url, where it was a JSON error; a server that cannot be reached names the request that failed
+- built on go-kt 0.6.1: `EMBYFIN_LOG=info` writes a line for every call of a write or delete tool, with the tool, what the call sent and whether it was refused, failed or answered. A value is blanked only when the name it was sent under reads as a credential's; no tool here takes one
+- a call with an argument the tool does not take is told which arguments it does take
+
+### Fixed
+
+- a live suite that failed on Emby left its two test servers running
+
+## 0.5.0 (2026-10-10)
+
+### Breaking
+
+- `--allow-tools` beside `--toolsets` adds the tools it names to the sets: `--toolsets curation --allow-tools task_list` is curation and `task_list` as well. It used to keep only what both held, and refused a name the sets did not hold. On its own it is still only the tools it names. Narrow a set with `--deny-tools`
+
+### Added
+
+- `server_health` says how the server is doing in one call: tasks running and failed, who is playing and how, and what the last stretch of the log shows
+- `server_log_search` searches the log between two times or over its last stretch, as entries, counts by message, a histogram, the gaps of a freeze, or the slow answers and requests still waiting
+- `task_get`, `task_stop` and `task_edit`; `task_list` gives progress, what starts each task and how its last run went
+- `session_list` says how each device plays, as the file is or transcoded and why; `details` adds the file and the whole transcode
+- `server_config` reads the server's settings in groups; `server_config_edit` changes the ones that tune Jellyfin's trickplay images and scanning
+- `library_options` puts every library's settings side by side, and says which libraries are set differently
+- `server_plugins` lists what is installed into the server
+- `server_info` says whether a restart is pending or an update is out, and what the log says of the machine
+- `--config` (or `EMBYFIN_CONFIG`) names the settings file, so two instances can serve two servers side by side
+- 89 tools: 62 read, 22 write, 5 delete
+
+### Changed
+
+- built on go-kt 0.5.1: `audit_whitespace` sees a space before the extension when spaces trail the name too, and counts a no-break space beside an ordinary one as a double space
+- test servers and builds take their images from Google's mirror of Docker Hub first
+
+### Fixed
+
+- `audit_spelling` reported an artist's numbered albums, "II" beside "III", as one name typed two ways
+- `audit_whitespace` gave an empty suggestion for a name that is nothing but spaces, and said to rename to it
+
+## 0.4.1 (2026-10-09)
+
+### Fixed
+
+- the release build takes its images from Google's mirror of Docker Hub. Docker Hub turned the 0.4.0 build away every time it was tried, so 0.4.0 was tagged and never published: this release is what 0.4.0 was to be
+
+## 0.4.0 (2026-10-09)
+
+### Breaking
+
+- `collection_add` and `collection_remove` are `collection_edit`'s `add_items` and `remove_items`; `playlist_add` and `playlist_remove` are `playlist_edit`'s `add_items` and `remove_entries`
+- `library_recent` is `library_items` with `added_since`; `library_genres` is `library_filters`
+- `server_logs` is gone: `server_log` lists every log file beside the newest one's tail
+- the three missing-metadata audits are one, `audit_missing_metadata`, with `problems` to pick from
+- `audit_duplicate_series` is `audit_duplicates`' `folder_groups`
+- `item_watch_history` is `server_activity` with `item`
+- `audit_runtime` reports only runtimes no film or episode can have: under 2 minutes, or 12 hours or more. `tolerance_percent`, `runtime_multiple` and `season_median_runtime_s` are gone
+- `audit_provider` checks episodes too by default
+- the SDKs and their generator moved under `sdk/`, so a Go program importing them uses the new paths
+
+### Added
+
+- `audit_previews` finds missing, damaged or wrong-length preview thumbnails, and `item_previews_regenerate` makes them again (Emby only so far)
+- `audit_spelling` checks album and artist names
+- a file holding a run of episodes is read in every common form, and `run_warning` says when the server will not read it as a run
+- `audit_provider` checks each episode's runtime against TMDB's
+- `provider_cache_clear` forgets the TMDB answers the tools keep
+- `server_activity` takes `item` and `user`, carries `item_id`, and says how far back it could read
+- `audit_missing_metadata` on a music library looks at the albums' covers alone
+- `audit_anime_ids` says when an older copy of the anime list answered
+- 80 tools: 56 read, 19 write, 5 delete
+
+### Changed
+
+- serving, choosing which tools a session gets, the locks that keep two edits of one item apart, the spelling and whitespace checks, and the tests' recording proxy are go-kt's, shared with the other MCP servers
+- over HTTP, a session its client left open and stopped using is closed after half an hour
+
+### Fixed
+
+- stopping the HTTP server with a client still connected no longer takes ten seconds and exits with an error
+- a date or a number from TMDB, the server or the anime list that can't be read is an error, not a guess
+- a failed server read while finding a show or checking a folder is reported instead of dropped
+- `audit_missing_episodes` judges a show in two folders named alike as one show, and reads Jellyfin's records of episodes it has no file for
+- TMDB titles and searches are kept an hour, not until a restart
+- `quality_compare` judges a thinly encoded frame as thin, and says when the server has not read a file yet
+- `item_delete` says Jellyfin can keep an item deleted during a scan listed through several more scans
+- `audit_file_path` no longer misreads a dotted acronym with a number after it (`Q.R.S.1`), nor says a Jellyfin search misses a lookalike letter
+- `audit_runtime` leaves a disc image (`.iso`) unjudged
+- `library_edit` says what a rename does to an account given that library alone on Jellyfin 12.2
+
 ## 0.3.0 (2026-09-27)
 
 ### Breaking
