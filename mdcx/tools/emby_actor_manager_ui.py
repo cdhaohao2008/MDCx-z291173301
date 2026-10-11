@@ -791,8 +791,8 @@ class EmbyActorManagerDialog(QDialog):
     LOG_VISIBLE_LINES = 10
     NORMAL_TABLE_ROWS = 15
     NORMAL_LOG_LINES = 8
-    # 行高上浮封顶：每行最多比自然行高 +40px（富余优先长高行，而非留空白）。
-    ROW_GROW_CAP = 40
+    # 按钮行高度：最大化/全屏统一加高（只加高、宽不动）。
+    BTN_WIDE_EXTRA = 12
     CONN_BASE_MARGINS = (6, 4, 6, 4)
 
     def __init__(self, parent=None):
@@ -864,6 +864,8 @@ class EmbyActorManagerDialog(QDialog):
         # 对话框关闭即销毁、重开是新实例，天然恢复默认行数（数据源测试窗同款）。
         self._user_moved_splitter = False
         self._setting_splitter_sizes = False
+        self._fit_verify_queued = False
+        self._viewport_refit_queued = False
         self._list_widget = None
         self._log_widget = None
         self._conn_grid = None
@@ -965,6 +967,10 @@ class EmbyActorManagerDialog(QDialog):
         try:
             self.table.horizontalScrollBar().installEventFilter(self)
             self.log_text.horizontalScrollBar().installEventFilter(self)
+            # 纵向滚动条显隐只改 viewport 几何：视口变化后补对行数（见 eventFilter）。
+            log_viewport = self.log_text.viewport()
+            assert log_viewport is not None
+            log_viewport.installEventFilter(self)
         except Exception:
             pass
 
@@ -1275,6 +1281,72 @@ class EmbyActorManagerDialog(QDialog):
     _CLEAN_W_NARROW = 70
     _SETTINGS_W_NARROW = 70
 
+    # 按钮行高度只动这 9 个（提示 label 是文本、随行高居中，不碰）。
+    _CONN_BUTTON_NAMES = (
+        "btn_connect",
+        "btn_fetch",
+        "cmb_fetch_mode",
+        "btn_preview",
+        "btn_clean",
+        "btn_sync",
+        "btn_test_source",
+        "btn_clear_cache",
+        "btn_settings",
+    )
+
+    def _apply_button_heights(self) -> None:
+        """按钮行高度：窄态恢复自适应；宽态统一加高，宽度逐像素不动。
+
+        只碰高度 min/max（setFixedHeight），`_apply_button_widths` 只碰宽度——
+        两者正交，最大化时按钮变高、combobox/清洗/设置的定宽保持不变。
+        用户拖过分隔条后不碰（本次打开全程 hands-off，免得连接组高度一变、
+        splitter 可用高度跟着变、拖后位置失配）。重复调用结果一致。
+        """
+        try:
+            if getattr(self, "_user_moved_splitter", False):
+                return
+            wide = self._is_wide_state()
+        except (RuntimeError, AttributeError):
+            return
+        except Exception:
+            return
+        try:
+            total = self.BTN_WIDE_EXTRA if wide else 0
+            for name in self._CONN_BUTTON_NAMES:
+                w = getattr(self, name, None)
+                if w is None:
+                    continue
+                if total <= 0:
+                    # 窄态：解除限高、回到自适应（minHint 不被抬高）。
+                    if w.minimumHeight() != 0 or w.maximumHeight() != self._HELP_MAX_W:
+                        w.setMinimumHeight(0)
+                        w.setMaximumHeight(self._HELP_MAX_W)
+                    continue
+                base = w.sizeHint().height()
+                if base <= 0:
+                    base = w.height()
+                if base <= 0:
+                    continue
+                h = base + total
+                if w.minimumHeight() != h or w.maximumHeight() != h:
+                    w.setFixedHeight(h)
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+
+    def _deferred_after_resize(self) -> None:
+        """resize/show 下一拍： settled 状态定档，先按钮行高、再行数对齐。
+
+        按钮定高会改变连接组高度、进而改变 splitter 可用高度——必须等布局
+        落定后再量 `_fit_visible_rows`，故 fit 在其后再排一拍（两拍链）。
+        """
+        self._apply_button_widths()
+        self._apply_button_heights()
+        self._apply_column_widths()
+        self._update_help_line_break()
+        QTimer.singleShot(0, self._fit_visible_rows)
+
     def _apply_button_widths(self) -> None:
         """按窗口状态切换三处控件宽度：宽态恢复原宽，窄态收窄 30px。
 
@@ -1371,30 +1443,94 @@ class EmbyActorManagerDialog(QDialog):
     def eventFilter(self, a0, a1):
         """议题 #160: viewport 尺寸变化(含纵向滚动条显隐/DPI 变化)后重算列宽，
         使各列总宽始终铺满视口、不产生横向滚动条。只做表格内部列宽，
-        从不碰窗口自身几何（最大化/最小化/还原全走系统原生行为）。"""
+        从不碰窗口自身几何（最大化/最小化/还原全走系统原生行为）。
+        表格/日志视口变化另补排一次行数对齐：日志条数增长冒出滚动条只改
+        viewport 几何、不触发窗口 resize，整行数不能 silently 漂移。
+        """
         table = getattr(self, "table", None)
-        if table is not None and a0 is table.viewport() and a1 is not None and a1.type() == QEvent.Type.Resize:
-            self._apply_column_widths()
+        log = getattr(self, "log_text", None)
+        if a1 is not None and a1.type() == QEvent.Type.Resize:
+            if table is not None and a0 is table.viewport():
+                self._apply_column_widths()
+            if (
+                (table is not None and a0 is table.viewport())
+                or (log is not None and a0 is log.viewport())
+            ):
+                self._queue_viewport_refit()
         return super().eventFilter(a0, a1)
+
+    def _queue_viewport_refit(self) -> None:
+        """视口几何变化后的补对：合并同拍多次事件，只排一次，守卫与 fit 同款。"""
+        try:
+            if getattr(self, "_user_moved_splitter", False):
+                return
+            if getattr(self, "_setting_splitter_sizes", False):
+                return
+            if getattr(self, "_viewport_refit_queued", False):
+                return
+            self._viewport_refit_queued = True
+        except (RuntimeError, AttributeError):
+            return
+        except Exception:
+            return
+        QTimer.singleShot(0, self._viewport_refit_tick)
+
+    def _viewport_refit_tick(self) -> None:
+        self._viewport_refit_queued = False
+        try:
+            if getattr(self, "_user_moved_splitter", False):
+                return
+            if self.isMinimized() or (self.windowState() & Qt.WindowState.WindowMinimized):
+                return
+        except (RuntimeError, AttributeError):
+            return
+        except Exception:
+            return
+        self._fit_visible_rows()
+
+    def _fit_verify_tick(self) -> None:
+        """fit 下一拍校验：布局若在 fit 落定之后才 settle，按实测对照存档目标，
+        漂移才重对——已精确是空操作，天然收敛不循环。"""
+        self._fit_verify_queued = False
+        try:
+            if getattr(self, "_user_moved_splitter", False):
+                return
+            if self.isMinimized() or (self.windowState() & Qt.WindowState.WindowMinimized):
+                return
+            table = getattr(self, "table", None)
+            log = getattr(self, "log_text", None)
+            if table is None or log is None:
+                return
+            want_vp = getattr(self, "_last_want_vp", None)
+            want_log = getattr(self, "_last_want_log_vp", None)
+            if want_vp is None or want_log is None:
+                return
+            if table.viewport().height() == want_vp and log.viewport().height() == want_log:
+                return
+        except (RuntimeError, AttributeError):
+            return
+        except Exception:
+            return
+        self._fit_visible_rows()
 
     def resizeEvent(self, a0):
         # 主界面同款：只同步内部控件几何，从不改窗口自身 min/max/fixed 与几何——
-        # 最大化/最小化/还原全走系统原生行为。行数对齐下一拍排队：触发时状态位
-        # 已落定，按 settled 状态定档；只调行高与分隔条分配，不抬 minimumSizeHint。
+        # 最大化/最小化/还原全走系统原生行为。按钮定高先行（settled 态下一拍再定一次，盖住最大化过渡帧的旧态），
+        # 行数对齐排在其后（定高改变连接组高度，须等布局落定再量，不抬 minimumSizeHint）。
         super().resizeEvent(a0)
         self._apply_button_widths()
+        self._apply_button_heights()
         self._apply_column_widths()
         self._update_help_line_break()
-        # 状态位若在 resize 时尚未落定（如最大化过渡帧），下一拍按落定状态再对一次
-        QTimer.singleShot(0, self._apply_button_widths)
-        QTimer.singleShot(0, self._fit_visible_rows)
+        QTimer.singleShot(0, self._deferred_after_resize)
 
     def showEvent(self, a0):
         super().showEvent(a0)
         self._apply_button_widths()
+        self._apply_button_heights()
         self._apply_column_widths()
         QTimer.singleShot(0, self._update_help_line_break)
-        QTimer.singleShot(0, self._fit_visible_rows)
+        QTimer.singleShot(0, self._deferred_after_resize)
 
     # Qt 默认最大宽：清除限宽用（与 16777215 字面值同义，写常量免魔法数）。
     _HELP_MAX_W = 16777215
@@ -1511,14 +1647,6 @@ class EmbyActorManagerDialog(QDialog):
         )
         try:
             vhead = table.verticalHeader()
-            # 自然行高只取 pristine 值并缓存：若把上轮长高/收窄后的行高再当基准，
-            # 会棘轮式越长越高（或越收越矮）。
-            natural = getattr(self, "_natural_row_h", None)
-            if not natural or natural <= 0:
-                natural = table.rowHeight(0) if table.rowCount() > 0 else vhead.defaultSectionSize()
-            if natural <= 0:
-                natural = table.fontMetrics().height() + 10
-            self._natural_row_h = natural
             line_h = log.fontMetrics().lineSpacing()
             if line_h <= 0:
                 return
@@ -1536,64 +1664,81 @@ class EmbyActorManagerDialog(QDialog):
             )
 
             header_h = table.horizontalHeader().height()
-            table_fixed = (list_widget.height() - table.height()) + header_h + (
-                table.height() - header_h - table.viewport().height()
-            )
-            log_chrome = (log_widget.height() - log.height()) + (log.height() - log.viewport().height())
             try:
                 handle = max(0, splitter.count() - 1) * splitter.handleWidth()
             except Exception:
                 handle = 0
-            avail = splitter.height() - handle
-            if avail <= 0:
-                return
-            log_need = log_chrome + log_lines * line_h + doc_top
-            row_h = (avail - table_fixed - log_need) // rows
-            if row_h < hard_min:
-                return  # 实在塞不下：小窗自然布局，不干预
-            row_h = min(row_h, natural + self.ROW_GROW_CAP)
-            # 余数 rem（< rows px）均摊到前 rem 行各 +1px：表格侧 total 恰好
-            # rows*row_h + rem，日志侧恰好 log_need——两边像素精确，无半行无 peek。
-            # 只动前 rem 行并 reset 上轮旧分布（O(40) 以内），新行自动取默认行高。
-            # （setRowHeight/setDefaultSectionSize 实测不抬 minimumSizeHint。）
-            rem = (avail - table_fixed - log_need) - rows * int(row_h)
-            rem = max(0, min(int(rem), rows - 1))
-            if row_h != vhead.defaultSectionSize():
-                vhead.setDefaultSectionSize(int(row_h))
-            if vhead.defaultSectionSize() != int(row_h):
-                return  # 被静默钳位：按自然布局，不留半截状态
-            n_rows = table.rowCount()
-            plus_old = int(getattr(self, "_plus_rows", 0) or 0)
-            try:
-                for i in range(min(plus_old, n_rows)):
-                    table.setRowHeight(i, int(row_h))
-                for i in range(min(rem, n_rows)):
-                    table.setRowHeight(i, int(row_h) + 1)
-            except Exception:
-                pass
-            self._plus_rows = int(min(rem, n_rows))
-            list_target = table_fixed + rows * int(row_h) + rem
-            log_target = log_need
-            # 无冻结故一次即中；按实测残差再校，最多 3 轮（仍只是 setSizes）。
-            # 我们自己的 setSizes 不算用户拖动：守卫住 splitterMoved 信号，
-            # 否则第一次对齐就把自己锁死、以后永远不再对齐。
-            want_vp = rows * int(row_h) + rem
-            self._setting_splitter_sizes = True
-            try:
-                for _ in range(3):
+            # 巨幅 resize 后内部布局要等事件循环才落定：首轮量到的 chrome 可能是
+            # 过渡态（如日志窗格尚未铺开，log_target 会算大、日志下方留空白），
+            # 故每轮重测 chrome/avail 再重算，最多 4 轮；仍不收敛由尾部的下一拍
+            # 校验兜底。全程只调表行高与 splitter 分配（setRowHeight/
+            # setDefaultSectionSize 实测不抬 minimumSizeHint）。
+            want_vp = None
+            want_log_vp = log_lines * line_h + doc_top
+            list_target = None
+            log_target = None
+            avail = 0
+            for _ in range(4):
+                table_fixed = (list_widget.height() - table.height()) + header_h + (
+                    table.height() - header_h - table.viewport().height()
+                )
+                log_chrome = (log_widget.height() - log.height()) + (
+                    log.height() - log.viewport().height()
+                )
+                avail = splitter.height() - handle
+                if avail <= 0:
+                    return
+                log_need = log_chrome + want_log_vp
+                row_h = (avail - table_fixed - log_need) // rows
+                if row_h < hard_min:
+                    return  # 实在塞不下：小窗自然布局，不干预
+                # 余数 rem（< rows px）均摊到前 rem 行各 +1px：表格侧 total 恰好
+                # rows*row_h + rem，日志侧恰好 log_need——无半行、无 peek。
+                # 只动前 rem 行并 reset 上轮旧分布（O(40) 以内），新行自动取默认行高。
+                rem = (avail - table_fixed - log_need) - rows * int(row_h)
+                rem = max(0, min(int(rem), rows - 1))
+                if row_h != vhead.defaultSectionSize():
+                    vhead.setDefaultSectionSize(int(row_h))
+                if vhead.defaultSectionSize() != int(row_h):
+                    return  # 被静默钳位：按自然布局，不留半截状态
+                n_rows = table.rowCount()
+                plus_old = int(getattr(self, "_plus_rows", 0) or 0)
+                try:
+                    for i in range(min(plus_old, n_rows)):
+                        table.setRowHeight(i, int(row_h))
+                    for i in range(min(rem, n_rows)):
+                        table.setRowHeight(i, int(row_h) + 1)
+                except Exception:
+                    pass
+                self._plus_rows = int(min(rem, n_rows))
+                list_target = table_fixed + rows * int(row_h) + rem
+                log_target = log_need
+                want_vp = rows * int(row_h) + rem
+                # 我们自己的 setSizes 不算用户拖动：守卫住 splitterMoved 信号，
+                # 否则第一次对齐就把自己锁死、以后永远不再对齐。
+                self._setting_splitter_sizes = True
+                try:
                     try:
                         splitter.setSizes([int(list_target), int(log_target)])
                     except Exception:
                         return
-                    vp_now = table.viewport().height()
-                    if vp_now == want_vp:
-                        break
-                    list_target += want_vp - vp_now
-                    log_target -= want_vp - vp_now
-                    if log_target < 0:
-                        break
-            finally:
-                self._setting_splitter_sizes = False
+                finally:
+                    self._setting_splitter_sizes = False
+                # 横向滚动条出现时会吃掉日志视口高度（属正常 chrome，不追）。
+                if table.viewport().height() == want_vp and (
+                    log.horizontalScrollBar().isVisible()
+                    or log.viewport().height() == want_log_vp
+                ):
+                    break
+            if want_vp is None or list_target is None or log_target is None:
+                return
+            self._last_want_vp = int(want_vp)
+            self._last_want_log_vp = int(want_log_vp)
+            # 下一拍校验：若布局在本次落定之后才 settle，按落定几何再对一次；
+            # 已精确则是空操作。同一时刻只排一个，多源排队自动合并。
+            if not getattr(self, "_fit_verify_queued", False):
+                self._fit_verify_queued = True
+                QTimer.singleShot(0, self._fit_verify_tick)
         except (RuntimeError, AttributeError):
             # C++ 对象已销毁等竞态：纯外观调整，静默放弃
             pass
