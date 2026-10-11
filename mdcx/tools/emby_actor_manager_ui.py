@@ -1061,13 +1061,17 @@ class EmbyActorManagerDialog(QDialog):
         # 不写 font-size：跟随 _load_stylesheet 里放大后的统一字号，写死 12px 会反盖回去。
         # 位于「开始全部更新同步」按钮右侧（按钮行内），向上向右收纳以节省纵向空间；
         # 允许折行：单行长文本不折行时会撑大对话框最小宽度，折行后最小宽度回到按钮行决定。
-        # 窄窗两行（断在「获|取」处）、宽窗一行：见 _update_help_line_break（resize/show 时按实宽切换）。
+        # 窄窗两行（断点按实测字宽动态平衡）、宽窗一行：见 _update_help_line_break（resize/show 时按实宽切换）。
         help_label.setWordWrap(True)
         help_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         help_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         help_label.setStyleSheet("color: #888888; padding: 0;")
         btn_layout.addWidget(help_label, 1)
-        btn_layout.addStretch()
+        # 右间距与左间距对称：help 已是 Expanding stretch=1，吃掉全部富余宽度；
+        # 此处再加一个零 stretch 的 addStretch 只会在右侧多占一份 spacing，
+        # 使「详情→数据源测试」变成两份间距、与「同步→使用说明」的一份不对称。
+        # 删掉后两侧都只剩一份 layout spacing（4px）：最小化图标态量到的是 4px；
+        # 最大化时省下的 4px 进了不可见的 label 空宽，文字与按钮可见像素不动。
         self.btn_test_source = QPushButton("数据源测试")
         self.btn_test_source.setObjectName("btnPrimary")
         btn_layout.addWidget(self.btn_test_source)
@@ -1299,7 +1303,12 @@ class EmbyActorManagerDialog(QDialog):
         QTimer.singleShot(0, self._fit_visible_rows)
 
     def _update_help_line_break(self) -> None:
-        """窄窗两行（断在「获|取」处）、宽窗一行：按 help_label 实宽切换。"""
+        """窄窗两行、宽窗一行：按 help_label 实宽切换；窄窗断点按实测字宽动态平衡。
+
+        旧固定断在「获|取」的双行在部分字体下两行不等长，第一行行尾空出一大块
+        （视觉上右边比左边宽）。改按当前字体实测字宽取差值最小的断点，两行等长、
+        右空最小；宽窗（单行放得下）仍用原文单行，最大化渲染与原来逐字相同。
+        """
         label = getattr(self, "help_label", None)
         single = getattr(self, "_help_single", None)
         double = getattr(self, "_help_double", None)
@@ -1309,7 +1318,44 @@ class EmbyActorManagerDialog(QDialog):
         if avail <= 0:
             return
         need = label.fontMetrics().horizontalAdvance(single) + 4
-        label.setText(double if need > avail else single)
+        if need <= avail:
+            if label.text() != single:
+                label.setText(single)
+            return
+        balanced = self._balanced_help_text(single, label.fontMetrics(), avail)
+        text = balanced if balanced is not None else double
+        if label.text() != text:
+            label.setText(text)
+
+    @staticmethod
+    def _balanced_help_text(text: str, fm, avail: int) -> str | None:
+        """找断点把 text 切成两行：两行都 <=avail 且长度差最小；无可行断点回 None。
+
+        中文随处可断，按字逐个累宽度挑差值最小者。窄到连两行都塞不下时回 None，
+        调用方回落固定双行（保持现状，不再加行）。
+        """
+        widths = [0]
+        for ch in text:
+            widths.append(widths[-1] + fm.horizontalAdvance(ch))
+        total = widths[-1]
+        if total <= avail:
+            return text
+        best: int | None = None
+        best_diff: int | None = None
+        for i in range(1, len(text)):
+            left = widths[i]
+            right = total - left
+            if left > avail or right > avail:
+                continue
+            diff = abs(left - right)
+            if best_diff is None or diff < best_diff:
+                best_diff = diff
+                best = i
+                if diff == 0:
+                    break
+        if best is None:
+            return None
+        return text[:best] + "\n" + text[best:]
 
     def _fit_visible_rows(self) -> None:
         """行数对齐（仅内部）：演员表视口 = rows 整行，日志 = lines 整行不缺行。
