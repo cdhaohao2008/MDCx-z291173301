@@ -5065,7 +5065,9 @@ class MyMAinWindow(QMainWindow):
         _tree_x = max(main_w - tree_w - 18, 300)
         ui.label_result.move(_tree_x if _maxed else max(main_w - 211 - 9, 300), 70)
         ui.treeWidget_number.move(_tree_x, 110)
-        ui.treeWidget_number.resize(tree_w, max(ui.treeWidget_number.height(), 100))
+        # 最大化时列表向下延伸到界面底部
+        new_tree_h = max(avail_h - 130, 300) if _maxed else max(ui.treeWidget_number.height(), 100)
+        ui.treeWidget_number.resize(tree_w, new_tree_h)
         # 刷子按钮（清空结果列表）：最大化时钉在结果树左缘右侧固定 _MAIN_TREE_CLEAR_DX，
         # 使它与树内「成功」两字的间距同还原态一致；还原/最小化态沿用贴右缘原位
         # （设计态 main_w=820 时两者同为 760，双向幂等）。

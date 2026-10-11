@@ -714,7 +714,7 @@
               <string>缩略图</string>
             </property>
             <property name="scaledContents">
-              <bool>true</bool>
+              <bool>false</bool>
             </property>
             <property name="alignment">
               <set>Qt::AlignCenter</set>
@@ -772,7 +772,7 @@
               <string>封面图</string>
             </property>
             <property name="scaledContents">
-              <bool>true</bool>
+              <bool>false</bool>
             </property>
             <property name="alignment">
               <set>Qt::AlignCenter</set>
