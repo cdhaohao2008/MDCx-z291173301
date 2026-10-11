@@ -38,6 +38,8 @@
   - 回归：离屏实测窄窗 label 宽 == 最长行宽、左右边距 4px/4px，调两次无漂移，窄→宽切回单行并解除限宽，宽→窄回到 4px/4px，太窄回落固定双行不限宽，最小化态保持；`ruff check` 通过，相关 53 项全绿。
 - **演员管理器状态/头像/简介/影片数列宽改为出生日期一半**（`mdcx/tools/emby_actor_manager_ui.py`）：状态 50→55、影片数 60→55（头像/简介本就是 55），四列统一 55（`_BIRTHDAY_W // 2`，新增 `_HALF_BIRTHDAY_W` 常量，改出生日期自动跟随）；两者一加一减 `fixed_sum` 不变，详情列宽逐像素不变，总宽仍铺满。
   - 回归：`tests/test_main_window_startup.py` 窄态/宽态双断言 0/2/3/8 列均为 55；`ruff check` 通过，相关 53 项全绿。
+- **演员管理器列宽新规格：出生日期 100，窄态出生地等宽/标签 2 倍，宽态出生地 2 倍/标签 3 倍**（`mdcx/tools/emby_actor_manager_ui.py`）：出生日期恒 100（`_BIRTHDAY_W` 110→100）；状态/头像/简介取其一半 50（`_HALF_BIRTHDAY_W`），影片数恒 60（新增 `_VIDEO_COUNT_W`）；姓名继续跟随出生地（窄态 100，宽态 200）；出生地窄态等宽 100、宽态 2 倍 200，标签窄态 2 倍 200、宽态 3 倍 300；详情列仍吃剩余视口，总宽铺满。
+  - 回归：`tests/test_main_window_startup.py` 同步更新为窄态 100/100/200 与宽态 200/300 双断言；`ruff check` 通过，相关 53 项全绿。
 - **版本号**：`2.3.3` → `2.3.4`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
 ### 修复
 - **演员管理器最大化获取演员时中间只有 19 行，改成 20 行；获取中/完成后都是 20 整行，运行日志 10 行**（`mdcx/tools/emby_actor_manager_ui.py`）：

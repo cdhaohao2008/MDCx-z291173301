@@ -90,7 +90,7 @@ def test_emby_actor_settings_dialog_startup_no_crash(app):
 
 
 def test_emby_actor_manager_table_has_birthday_and_location_columns(app):
-    """议题 #134/#136 + 新规格：出生日期恒 110，状态/头像/简介/影片数取其一半 55；姓名与出生地同宽，常规等宽/标签×2，最大化 1.5×/2.5×，详情铺满。"""
+    """议题 #134/#136 + 新规格：出生日期恒 100，状态/头像/简介取其一半 50，影片数恒 60；姓名与出生地同宽，常规等宽 100/标签×2=200，最大化 2 倍 200/标签 3 倍 300，详情铺满。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     dlg = EmbyActorManagerDialog()
@@ -99,37 +99,37 @@ def test_emby_actor_manager_table_has_birthday_and_location_columns(app):
         headers = [table.horizontalHeaderItem(i).text() for i in range(table.columnCount())]
         assert headers == ["状态", "姓名", "头像", "简介", "详情", "出生日期", "出生地", "标签", "影片数"]
 
-        # 常规态：出生日期恒定，出生地等宽，标签 2 倍，总宽铺满视口
+        # 常规态：出生日期恒 100，出生地等宽 100，标签 2 倍 200，总宽铺满视口
         dlg.resize(1600, 900)
         dlg.show()
         app.processEvents()
         dlg._is_wide_state = lambda: False
         dlg._apply_column_widths()
         app.processEvents()
-        assert table.columnWidth(5) == 110
-        assert table.columnWidth(6) == 110
-        assert table.columnWidth(7) == 220
+        assert table.columnWidth(5) == 100
+        assert table.columnWidth(6) == 100
+        assert table.columnWidth(7) == 200
         total = sum(table.columnWidth(i) for i in range(table.columnCount()))
         assert total == pytest.approx(table.viewport().width(), abs=4), "各列总宽未铺满视口"
-        # 固定列宽度保持不变（状态/头像/简介/影片数均为出生日期一半 55；姓名列与出生地同宽，随状态切换）
-        assert table.columnWidth(0) == 55
-        assert table.columnWidth(1) == 110
-        assert table.columnWidth(2) == 55
-        assert table.columnWidth(3) == 55
-        assert table.columnWidth(8) == 55
+        # 固定列宽度保持不变（状态/头像/简介均为出生日期一半 50，影片数恒 60；姓名列与出生地同宽，随状态切换）
+        assert table.columnWidth(0) == 50
+        assert table.columnWidth(1) == 100
+        assert table.columnWidth(2) == 50
+        assert table.columnWidth(3) == 50
+        assert table.columnWidth(8) == 60
 
-        # 宽态（最大化）：姓名与出生地同为 1.5 倍，标签 2.5 倍，出生日期不变，总宽仍铺满
+        # 宽态（最大化）：姓名与出生地同为 2 倍 200，标签 3 倍 300，出生日期不变，总宽仍铺满
         dlg._is_wide_state = lambda: True
         dlg._apply_column_widths()
         app.processEvents()
-        assert table.columnWidth(1) == 165
-        assert table.columnWidth(5) == 110
-        assert table.columnWidth(0) == 55
-        assert table.columnWidth(2) == 55
-        assert table.columnWidth(3) == 55
-        assert table.columnWidth(8) == 55
-        assert table.columnWidth(6) == 165
-        assert table.columnWidth(7) == 275
+        assert table.columnWidth(1) == 200
+        assert table.columnWidth(5) == 100
+        assert table.columnWidth(0) == 50
+        assert table.columnWidth(2) == 50
+        assert table.columnWidth(3) == 50
+        assert table.columnWidth(8) == 60
+        assert table.columnWidth(6) == 200
+        assert table.columnWidth(7) == 300
         total = sum(table.columnWidth(i) for i in range(table.columnCount()))
         assert total == pytest.approx(table.viewport().width(), abs=4), "宽态各列总宽未铺满视口"
     finally:

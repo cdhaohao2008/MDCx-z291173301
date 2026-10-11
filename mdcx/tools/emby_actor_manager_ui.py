@@ -1201,14 +1201,14 @@ class EmbyActorManagerDialog(QDialog):
         vertical_header.setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSortingEnabled(True)
-        self.table.setColumnWidth(0, 55)
-        self.table.setColumnWidth(1, 110)
-        self.table.setColumnWidth(2, 55)
-        self.table.setColumnWidth(3, 55)
-        self.table.setColumnWidth(5, 110)
-        self.table.setColumnWidth(6, 110)
-        self.table.setColumnWidth(7, 220)
-        self.table.setColumnWidth(8, 55)
+        self.table.setColumnWidth(0, 50)
+        self.table.setColumnWidth(1, 100)
+        self.table.setColumnWidth(2, 50)
+        self.table.setColumnWidth(3, 50)
+        self.table.setColumnWidth(5, 100)
+        self.table.setColumnWidth(6, 100)
+        self.table.setColumnWidth(7, 200)
+        self.table.setColumnWidth(8, 60)
         self.table.cellDoubleClicked.connect(self._on_table_double_clicked)
         parent_layout.addWidget(self.table)
         # 议题 #160: 纵向滚动条显隐只改 viewport 几何、不触发窗口 resizeEvent;
@@ -1217,18 +1217,20 @@ class EmbyActorManagerDialog(QDialog):
         assert table_viewport is not None
         table_viewport.installEventFilter(self)
 
-    # 出生日期宽恒定 110；状态/头像/简介/影片数取其一半 55；姓名与出生地同宽，
-    # 按窗口状态取相对宽度：还原/常规出生地=出生日期等宽、标签=出生日期×2；
-    # 最大化/全屏姓名=出生地=出生日期×1.5、标签=出生日期×2.5；详情吃掉剩余视口。
-    _BIRTHDAY_W = 110
-    _HALF_BIRTHDAY_W = _BIRTHDAY_W // 2  # 状态/头像/简介/影片数取出生日期一半
+    # 出生日期宽恒定 100；状态/头像/简介取其一半 50，影片数恒定 60；
+    # 姓名与出生地同宽，按窗口状态取相对宽度：
+    # 还原/常规/最小化：出生地=出生日期等宽 100，标签=出生日期×2=200；
+    # 最大化/全屏：出生地=出生日期×2=200，标签=出生日期×3=300；详情吃掉剩余视口。
+    _BIRTHDAY_W = 100
+    _HALF_BIRTHDAY_W = _BIRTHDAY_W // 2  # 状态/头像/简介取出生日期一半
+    _VIDEO_COUNT_W = 60  # 影片数恒定
     _FIXED_COLUMN_WIDTHS = {
         0: _HALF_BIRTHDAY_W,
         2: _HALF_BIRTHDAY_W,
         3: _HALF_BIRTHDAY_W,
-        5: 110,
-        6: 110,
-        8: _HALF_BIRTHDAY_W,
+        5: _BIRTHDAY_W,
+        6: _BIRTHDAY_W,
+        8: _VIDEO_COUNT_W,
     }  # 姓名(1)不再定宽，跟随出生地
     _DETAIL_WIDTH_RATIO = 0.75  # 历史比例（议题 #136），现仅保留兼容，实际按出生日期倍率定宽
 
@@ -1251,15 +1253,15 @@ class EmbyActorManagerDialog(QDialog):
             return
         birthday_w = self._BIRTHDAY_W
         wide = self._is_wide_state()
-        birthplace_w = int(birthday_w * 1.5) if wide else birthday_w
+        birthplace_w = birthday_w * 2 if wide else birthday_w
         name_w = birthplace_w  # 姓名列与出生地同宽
-        tags_w = int(birthday_w * 2.5) if wide else birthday_w * 2
+        tags_w = birthday_w * 3 if wide else birthday_w * 2
         base_fixed = (
-            self._FIXED_COLUMN_WIDTHS.get(0, 55)
+            self._FIXED_COLUMN_WIDTHS.get(0, 50)
             + name_w
-            + self._FIXED_COLUMN_WIDTHS.get(2, 55)
-            + self._FIXED_COLUMN_WIDTHS.get(3, 55)
-            + self._FIXED_COLUMN_WIDTHS.get(8, 55)
+            + self._FIXED_COLUMN_WIDTHS.get(2, 50)
+            + self._FIXED_COLUMN_WIDTHS.get(3, 50)
+            + self._FIXED_COLUMN_WIDTHS.get(8, 60)
         )
         fixed_sum = base_fixed + birthday_w + birthplace_w + tags_w
         detail_w = max(viewport_w - fixed_sum, 120)
