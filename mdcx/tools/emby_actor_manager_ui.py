@@ -39,8 +39,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ..config.enums import Switch
 from ..config.manager import manager
 from ..config.resources import resources
+from ..controllers.main_window.style import build_scrollbar_style
 from ..models.emby import (
     apply_overview_clean_rules,
     normalize_premiere_date,
@@ -881,6 +883,12 @@ class EmbyActorManagerDialog(QDialog):
         # 首条 QWidget 规则统一下发放大后的字号：写在最前且只含 font-size，
         # 下方各控件规则（QGroupBox 加粗 / 按钮配色等）仍照常合并生效。
         # 控件自身样式表里若再写死 font-size 会盖掉本规则（故提示文字只留颜色）。
+        # 滚动条沿用主窗口设置页同款 build_scrollbar_style：竖条宽 16px、直角实心滑块、
+        # 滑块最小 44px，深浅主题跟随配置的 dark_mode 开关（与设置页同值）。
+        try:
+            dark = Switch.DARK_MODE in (manager.config.switch_on or [])
+        except Exception:
+            dark = False
         return f"""
         QWidget {{ font-size: {_ui_font_pt()}; }}
         QGroupBox {{ font-weight: bold; border: 1px solid #cccccc; border-radius: 4px; margin-top: 4px; padding-top: 8px; }}
@@ -893,7 +901,7 @@ class EmbyActorManagerDialog(QDialog):
         QPushButton#btnDanger:hover {{ background-color: #d32f2f; }}
         QPushButton#btnPrimary {{ background-color: #1565c0; color: #ffffff; }}
         QPushButton#btnPrimary:hover {{ background-color: #1976d2; }}
-        """
+        """ + build_scrollbar_style(dark)
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
