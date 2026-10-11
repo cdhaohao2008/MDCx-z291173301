@@ -1312,30 +1312,54 @@ class EmbyActorManagerDialog(QDialog):
         QTimer.singleShot(0, self._update_help_line_break)
         QTimer.singleShot(0, self._fit_visible_rows)
 
+    # Qt 默认最大宽：清除限宽用（与 16777215 字面值同义，写常量免魔法数）。
+    _HELP_MAX_W = 16777215
+
     def _update_help_line_break(self) -> None:
-        """窄窗两行、宽窗一行：按 help_label 实宽切换；窄窗断点按实测字宽动态平衡。
+        """窄窗两行、宽窗一行：按 help_label 实宽切换；窄窗断点动态平衡并限宽贴边。
 
         旧固定断在「获|取」的双行在部分字体下两行不等长，第一行行尾空出一大块
-        （视觉上右边比左边宽）。改按当前字体实测字宽取差值最小的断点，两行等长、
-        右空最小；宽窗（单行放得下）仍用原文单行，最大化渲染与原来逐字相同。
+        （视觉上右边比左边宽）。改按当前字体实测字宽取差值最小的断点，两行等长；
+        可行时再把 label 最大宽度钳到最长行宽——行尾与 label 右缘对齐，右边距只剩
+        一份 layout spacing（4px），与左侧「同步→使用说明」对称，多出的宽度落在
+        行尾（设置按钮右侧空白），各按钮与文字位置不动。宽窗（单行放得下）仍用
+        原文单行且不限宽，最大化渲染与原来逐字相同；窄到两行塞不下回落固定双行
+        且不限宽（保持现状）。
         """
         label = getattr(self, "help_label", None)
         single = getattr(self, "_help_single", None)
         double = getattr(self, "_help_double", None)
         if label is None or single is None or double is None:
             return
+        # 先解除上一轮限宽并同步一次布局，再量 label 真正能拿到的宽度；
+        # 否则加宽窗口后读到的还是被钳住的旧宽，永远切不回单行。
+        if label.maximumWidth() != self._HELP_MAX_W:
+            label.setMaximumWidth(self._HELP_MAX_W)
+            try:
+                lay = label.parentWidget().layout() if label.parentWidget() is not None else None
+                if lay is not None:
+                    lay.activate()
+            except Exception:
+                pass
         avail = label.width()
         if avail <= 0:
             return
-        need = label.fontMetrics().horizontalAdvance(single) + 4
+        fm = label.fontMetrics()
+        need = fm.horizontalAdvance(single) + 4
         if need <= avail:
             if label.text() != single:
                 label.setText(single)
             return
-        balanced = self._balanced_help_text(single, label.fontMetrics(), avail)
-        text = balanced if balanced is not None else double
-        if label.text() != text:
-            label.setText(text)
+        balanced = self._balanced_help_text(single, fm, avail)
+        if balanced is None:
+            if label.text() != double:
+                label.setText(double)
+            return
+        if label.text() != balanced:
+            label.setText(balanced)
+        line_w = max(fm.horizontalAdvance(ln) for ln in balanced.split("\n"))
+        if label.maximumWidth() != line_w:
+            label.setMaximumWidth(line_w)
 
     @staticmethod
     def _balanced_help_text(text: str, fm, avail: int) -> str | None:
