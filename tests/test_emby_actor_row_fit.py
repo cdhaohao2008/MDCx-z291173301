@@ -28,6 +28,9 @@ def test_fit_constants_are_20_and_10():
 
     assert EmbyActorManagerDialog.TABLE_VISIBLE_ROWS == 20
     assert EmbyActorManagerDialog.LOG_VISIBLE_LINES == 10
+    # 普通窗双档：15 演员 + 8 日志
+    assert EmbyActorManagerDialog.NORMAL_TABLE_ROWS == 15
+    assert EmbyActorManagerDialog.NORMAL_LOG_LINES == 8
 
 
 def test_fit_caps_absorb_surplus_not_pad():
@@ -89,7 +92,7 @@ def test_maximized_fit_gives_full_rows_only(app):
         assert log.viewport().height() == 10 * line_h + doc_top  # 10 整行，末行不被盖
         assert log.viewportMargins().bottom() == 0  # 无空白垫
         assert dlg._conn_grid.contentsMargins().top() == 4  # 无富余，连接组保持基准
-        assert log.minimumHeight() >= 10 * line_h
+        assert log.minimumHeight() >= 8 * line_h
         # 长日志行随后冒出横向滚动条：Show 事件重对后 10 行不被盖、表格仍是 20 整行
         for i in range(12):
             log.appendPlainText(f"[{i:02d}] " + "长日志行_" * 120)
