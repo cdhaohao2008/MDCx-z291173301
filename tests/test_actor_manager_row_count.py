@@ -145,3 +145,40 @@ def test_fit_never_freezes_nor_inflates_minhint(app):
     finally:
         dlg.close()
         app.processEvents()
+
+
+def test_user_drag_survives_repopulate(app):
+    """用户拖过分隔条：取数重填/直接重对都不抢回；我们自己的 setSizes 不算拖动。"""
+    from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
+
+    dlg = EmbyActorManagerDialog()
+    dlg.show()
+    try:
+        _populated(app, dlg)
+        dlg.resize(1600, 1100)
+        _pump(app)
+        dlg._fit_visible_rows()
+        _pump(app)
+        assert dlg._user_moved_splitter is False, "我们自己的 setSizes 不得置位"
+        sizes0 = dlg._splitter.sizes()
+        # 模拟用户亲手拖动：发信号 + 落尺寸
+        dlg._splitter.splitterMoved.emit(100, 1)
+        assert dlg._user_moved_splitter is True
+        custom = [sizes0[0] + 60, sizes0[1] - 60]
+        dlg._splitter.setSizes(custom)
+        _pump(app)
+        # QSplitter 会按最小值/手柄归一化几 px：以落定值为准，后续断言"不被抢回"。
+        custom = dlg._splitter.sizes()
+        assert custom != sizes0, "拖动应改变分隔条位置"
+        # 取数重填（_populate_table 末尾排队重对）不得抢回
+        _populated(app, dlg)
+        dlg._populate_table([])
+        _pump(app)
+        assert dlg._splitter.sizes() == custom, "取数后分隔条应保持拖后位置"
+        # 直接重对也不得抢回
+        dlg._fit_visible_rows()
+        _pump(app)
+        assert dlg._splitter.sizes() == custom, "重对不得抢回用户拖动"
+    finally:
+        dlg.close()
+        app.processEvents()

@@ -2,6 +2,10 @@
 # Changelog
 ## v2.3.4 (2026-10-11)
 ### 调整
+- **演员管理器分隔条用户拖动后不再被抢回（本次打开有效，重开回默认）**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 现象：运行日志上下拉动后，重新获取演员数据会恢复到默认位置。
+  - 改法：主分隔条接 `splitterMoved` 置 `_user_moved_splitter`（数据源测试窗 `_result_user_moved` 同款）；`_fit_visible_rows` 入口遇此标记直接返回，取数/缩放都不重排；我们自己的 `setSizes` 用 `_setting_splitter_sizes` 守卫，不算用户拖动（真机实测程序化 setSizes 不发信号，守卫纯兜底）。对话框关闭即销毁、重开是新实例，天然恢复默认行数。
+  - 回归：`tests/test_actor_manager_row_count.py::test_user_drag_survives_repopulate`（自有 setSizes 不置位/拖后取数与重对都不抢回）；真机拖后重填尺寸不变、minHint 恒定。
 - **演员管理器日志行数精确化（普通窗 8 整行，最大化 10 整行）**（`mdcx/tools/emby_actor_manager_ui.py`）：
   - 现象：普通窗日志 8.1 行（第 9 行冒头一点点），最大化日志约 11 行（用户截图）。
   - 根因：①余数（< rows px）堆在日志侧，必然 peek 出下一行行首；② 20 行档在用户机器上直接 bail——行高下限曾保"自然行高 - 2"，高分屏大字体下收不到装得下的行高；且表头 `minimumSectionSize` 会把过小的行高静默钳位（真机实测 21→24），算出的整行数全部作废。

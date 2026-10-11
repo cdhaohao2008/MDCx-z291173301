@@ -49,7 +49,6 @@ def test_no_custom_geometry_machinery(dlg):
         "_on_window_state_change",
         "_after_state_change",
         "_collapsed_sizes",
-        "_on_splitter_moved",
         "_capture_normal_geometry",
         "_schedule_capture_normal_geometry",
         "_visible_rows_target",
@@ -62,6 +61,8 @@ def test_no_custom_geometry_machinery(dlg):
         "_fitting_rows",
     ):
         assert not hasattr(dlg, name), f"定制几何机制残留: {name}"
+    # 用户拖动允许且必须存在（拖后本次打开不再自动重排，数据源测试窗同款）。
+    assert callable(getattr(dlg, "_on_splitter_moved", None))
     assert "changeEvent" not in ui_mod.EmbyActorManagerDialog.__dict__, "changeEvent 不应再被过载"
 
 

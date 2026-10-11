@@ -178,10 +178,20 @@ UI 层 (PyQt6)         → 界面展示、用户操作
 
 - 现象：最大化后点最小化，窗口先跳到左上角再往中间缩；主界面是四周向中间正常收缩。
 - 根因：`_fit_visible_rows` 为整行对齐用 `setFixedHeight` 锁死上下窗格，稳态最大化下 `minimumSizeHint` 被抬到接近最大化高度（真机实测 1120×293 → 1120×793）；另有 `_on_window_state_change` 手动 `setGeometry` 复位普通态矩形。两轮"守卫式"修法（`isMinimized` 检查、切换进行标记、排队时状态快照）全部无效——病根在稳态最小尺寸本身，不在事件时序，守卫拦得住事件、拦不住已胀大的 hint。
-- 改法（`mdcx/tools/emby_actor_manager_ui.py`，-482/+83）：整套机制删除（10 个方法 + 6 个常量 + `changeEvent` 过载）；`resizeEvent`/`showEvent` 只同步内部列宽与提示折行；分隔条 stretch 4:1 自由拖 + `setChildrenCollapsible(False)` 防压没；议题 #160 列宽自适应保留。后续（用户截图要求普通窗 15 行 + 8 行日志、最大化 20 行 + 10 行）：行数对齐以纯内部手段加回——新 `_fit_visible_rows` 只调表行高（整数除法 absorb 全部余量，上浮封顶 +40、下探至硬下限）与 `splitter.setSizes()`，表格侧永远 rows 整行、余数（< rows px）进日志侧底部；真机实测两者均不抬 `minimumSizeHint`（恒 1120×293）。触发点为 `resizeEvent`/`showEvent`/`_populate_table` 末尾 `singleShot(0)`，触发时读 settled 状态定档、最小化跳过；高度不够直接返回（小窗自然布局）。行高下限取 `max(字高+2, minimumSectionSize)`——低于表头最小值会被静默钳位（实测 21→24 的坑，整行数全作废），宁 bail 不留半截状态。
+- 改法（`mdcx/tools/emby_actor_manager_ui.py`，-482/+83）：整套机制删除（10 个方法 + 6 个常量 + `changeEvent` 过载）；`resizeEvent`/`showEvent` 只同步内部列宽与提示折行；分隔条 stretch 4:1 自由拖 + `setChildrenCollapsible(False)` 防压没；议题 #160 列宽自适应保留。后续（用户截图要求普通窗 15 行 + 8 行日志、最大化 20 行 + 10 行）：行数对齐以纯内部手段加回——新 `_fit_visible_rows` 只调表行高（整数除法 absorb 全部余量，上浮封顶 +40、下探至硬下限）与 `splitter.setSizes()`，表格侧永远 rows 整行、余数（< rows px）进日志侧底部；真机实测两者均不抬 `minimumSizeHint`（恒 1120×293）。触发点为 `resizeEvent`/`showEvent`/`_populate_table` 末尾 `singleShot(0)`，触发时读 settled 状态定档、最小化跳过；高度不够直接返回（小窗自然布局）。行高下限取 `max(字高+2, minimumSectionSize)`——低于表头最小值会被静默钳位（实测 21→24 的坑，整行数全作废），宁 bail 不留半截状态。用户亲手拖过分隔条后本次打开不再自动重排（`_user_moved_splitter`，数据源测试窗同款；自有 `setSizes` 用 `_setting_splitter_sizes` 守卫），重开新实例天然回默认。
 - 硬规则：工具窗口**禁止**用 `setFixedHeight`/`setFixedSize` 锁大窗格、**禁止**在 `resizeEvent`/`changeEvent` 里 `setGeometry` 自身、**禁止**为还原/对齐留存几何快照；凡抬 `minimumSizeHint` 的写法，一律先量稳态最大化下的 hint 高度。行数对齐只许纯内部手段（表行高 + `splitter.setSizes()`，余数进日志侧底部），仍禁上三条。
 - 回归：`tests/test_actor_manager_restore_geometry.py` 重写 5 项（无定制机制/窗格永不冻结且 minHint 稳定/resize 保几何/分隔条不被抢回/最小化还原保几何）；`tests/test_emby_actor_row_fit.py` 随功能删除。
 - 教训×2：①以真机实测为准——离屏复现不了最小化动画，`minimumSizeHint` 稳态数字才是决定性证据（本案即靠它定案）；②常驻托盘进程改完代码必须完全退出重进，否则复测跑的是旧代码（前两轮"还是不对"即此坑）。
+
+**分隔条"用户拖过就听用户的"：本次打开不再自动重排（演员管理器主分隔条）**
+
+- 现象：运行日志上下拉动后，重新获取演员数据，分隔条被恢复到默认位置。
+- 总结：自动重排与用户手动位置天然互斥——取数完成必经 `_populate_table` 触发重对，不可能"只在取数时特判"。正确收口是统一的：任何时刻用户拖过，本次打开一律不再自动排（缩放同样不抢回）；默认位置只靠"新实例"保证。
+- 规则：
+  1. 主分隔条接 `splitterMoved` 置 `_user_moved_splitter`，重排入口第一行即检查、有标记直接返回（数据源测试窗 `_result_user_moved` 同款做法，全文件统一）。
+  2. 我们自己的 `setSizes` 必须用 `_setting_splitter_sizes` 守卫包住（`try/finally` 复位），否则第一次自动对齐就把自己锁死、以后永远不再对齐（真机实测程序化 `setSizes` 不发信号，守卫是纯兜底，但缺不得）。
+  3. 禁止持久化记忆拖动位置：对话框 `WA_DeleteOnClose`，关闭即销毁、重开新实例天然回默认行数。
+- 回归：`tests/test_actor_manager_row_count.py::test_user_drag_survives_repopulate`（自有 `setSizes` 不置位/发信号即置位/取数重填与直接重对都不抢回）。注意 QSplitter 会按最小值/手柄归一化几 px，断言必须以落定值为准、不得写死像素。
 
 ### 左下角状态区图标规范
 

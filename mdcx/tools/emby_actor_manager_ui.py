@@ -829,6 +829,10 @@ class EmbyActorManagerDialog(QDialog):
         self._conn_save_timer.setInterval(800)
         self._conn_save_timer.timeout.connect(self._auto_save_connection_fields)
         self._splitter = None
+        # 用户亲手拖过分隔条后，本次打开不再自动重排（取数/缩放都不抢回）；
+        # 对话框关闭即销毁、重开是新实例，天然恢复默认行数（数据源测试窗同款）。
+        self._user_moved_splitter = False
+        self._setting_splitter_sizes = False
         self._list_widget = None
         self._log_widget = None
         self._conn_grid = None
@@ -891,6 +895,8 @@ class EmbyActorManagerDialog(QDialog):
         # 分隔条完全交给用户与 stretch（4:1）：不锁窗格高度，最大化/最小化/还原
         # 全走系统原生行为（主界面同款）。子窗格不可折叠到 0，避免日志被压没。
         splitter.setChildrenCollapsible(False)
+        # 用户亲手拖过后不再自动重排（数据源测试窗 _result_user_moved 同款）。
+        splitter.splitterMoved.connect(self._on_splitter_moved)
 
         # 横向滚动条冒出时按真实视口宽重算列宽（见 eventFilter）。
         try:
@@ -1198,6 +1204,16 @@ class EmbyActorManagerDialog(QDialog):
         finally:
             self._applying_widths = False
 
+    def _on_splitter_moved(self, *_args) -> None:
+        """用户亲手拖动分隔条：本次打开记住，不再自动重排（取数/缩放都不抢回）。
+
+        我们自己 setSizes 时不算（`_setting_splitter_sizes` 守卫）；对话框关闭即
+        销毁、重开是新实例，天然恢复默认行数（数据源测试窗 `_result_user_moved` 同款）。
+        """
+        if getattr(self, "_setting_splitter_sizes", False):
+            return
+        self._user_moved_splitter = True
+
     def eventFilter(self, a0, a1):
         """议题 #160: viewport 尺寸变化(含纵向滚动条显隐/DPI 变化)后重算列宽，
         使各列总宽始终铺满视口、不产生横向滚动条。只做表格内部列宽，
@@ -1251,6 +1267,10 @@ class EmbyActorManagerDialog(QDialog):
         list_widget = getattr(self, "_list_widget", None)
         log_widget = getattr(self, "_log_widget", None)
         if table is None or log is None or splitter is None or list_widget is None or log_widget is None:
+            return
+        # 用户拖过分隔条：本次打开保持拖后位置，取数/缩放都不抢回；
+        # 重开是新实例，天然回到默认行数。
+        if getattr(self, "_user_moved_splitter", False):
             return
         try:
             if self.isMinimized() or (self.windowState() & Qt.WindowState.WindowMinimized):
@@ -1331,19 +1351,25 @@ class EmbyActorManagerDialog(QDialog):
             list_target = table_fixed + rows * int(row_h) + rem
             log_target = log_need
             # 无冻结故一次即中；按实测残差再校，最多 3 轮（仍只是 setSizes）。
+            # 我们自己的 setSizes 不算用户拖动：守卫住 splitterMoved 信号，
+            # 否则第一次对齐就把自己锁死、以后永远不再对齐。
             want_vp = rows * int(row_h) + rem
-            for _ in range(3):
-                try:
-                    splitter.setSizes([int(list_target), int(log_target)])
-                except Exception:
-                    return
-                vp_now = table.viewport().height()
-                if vp_now == want_vp:
-                    break
-                list_target += want_vp - vp_now
-                log_target -= want_vp - vp_now
-                if log_target < 0:
-                    break
+            self._setting_splitter_sizes = True
+            try:
+                for _ in range(3):
+                    try:
+                        splitter.setSizes([int(list_target), int(log_target)])
+                    except Exception:
+                        return
+                    vp_now = table.viewport().height()
+                    if vp_now == want_vp:
+                        break
+                    list_target += want_vp - vp_now
+                    log_target -= want_vp - vp_now
+                    if log_target < 0:
+                        break
+            finally:
+                self._setting_splitter_sizes = False
         except (RuntimeError, AttributeError):
             # C++ 对象已销毁等竞态：纯外观调整，静默放弃
             pass
