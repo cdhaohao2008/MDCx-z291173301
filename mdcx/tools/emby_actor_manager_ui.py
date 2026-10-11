@@ -800,7 +800,7 @@ class EmbyActorManagerDialog(QDialog):
         # 主窗口 hide 会级联隐藏 dialog，最大化 dialog 又会把主窗口带出。
         super().__init__(None)
         self.setWindowTitle("Emby/Jellyfin演员管理器")
-        self.setMinimumSize(1100, 700)
+        self.setMinimumSize(1080, 720)
         self.setWindowFlags(
             self.windowFlags()
             | Qt.WindowType.Window
@@ -810,12 +810,14 @@ class EmbyActorManagerDialog(QDialog):
         # 关闭时由 Qt 销毁 C++ 对象，主窗口侧的 destroyed 信号随之清空引用。
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         # 初始落在最小尺寸上体验局促，默认取屏幕可用区 80%（离屏/无屏环境回退最小尺寸）
-        screen = QGuiApplication.primaryScreen()
-        if screen is not None:
-            geo = screen.availableGeometry()
-            self.resize(max(1100, int(geo.width() * 0.8)), max(700, int(geo.height() * 0.8)))
+        # 启动居中：和软件主界面同款，以外框 frameGeometry 居中到可用区正中央。
+        screen = self.screen() or QGuiApplication.primaryScreen()
+        avail = screen.availableGeometry() if screen is not None else None
+        if avail is not None:
+            self.resize(max(1080, int(avail.width() * 0.8)), max(720, int(avail.height() * 0.8)))
         else:
-            self.resize(1100, 700)
+            self.resize(1080, 720)
+        self._center_on_screen(avail)
         # 最大化/最小化/还原不做任何定制：窗格不锁高度、不记普通态矩形、
         # 不复位几何，全走系统原生行为（主界面同款）。
         self.setSizeGripEnabled(True)
@@ -868,6 +870,32 @@ class EmbyActorManagerDialog(QDialog):
         self._init_ui()
         self._connect_signals()
         self._open_log_file()
+
+    def _center_on_screen(self, avail=None, *, allow_defer: bool = True) -> None:
+        """启动居中：和软件主界面同款，把外框整体放到可用区正中央。
+
+        主界面同款两点：以 frameGeometry（含标题栏/边框）为准而非客户区；
+        move() 收的是边框左上角，无需再补偿边框厚度。窗口比可用区还大时
+        钳到可用区左上角，保证标题栏留在屏内抓得到。
+        """
+        try:
+            if avail is None or not avail.isValid():
+                screen = self.screen() or QGuiApplication.primaryScreen()
+                if screen is None:
+                    return
+                avail = screen.availableGeometry()
+            if allow_defer and self.windowHandle() is None:
+                # 原生窗口尚未创建，frameGeometry 退化为客户区：下一拍再居中一次。
+                QTimer.singleShot(0, lambda: self._center_on_screen(avail, allow_defer=False))
+                return
+            frame = self.frameGeometry()
+            x = avail.x() + (avail.width() - frame.width()) // 2
+            y = avail.y() + (avail.height() - frame.height()) // 2
+            self.move(max(x, avail.x()), max(y, avail.y()))
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
 
     def _begin_session(self, thread) -> None:
         """任务线程发起时颁发代数；与对话框当前值一致才允许写回 UI/状态。"""
@@ -1040,7 +1068,8 @@ class EmbyActorManagerDialog(QDialog):
         self.cmb_fetch_mode.setItemData(7, "不筛缺失，为全部演员 重新获取 头像+简介", Qt.ItemDataRole.ToolTipRole)
         # 议题 #164: 重排后默认项显式锚定并集(index 3)——保持"打开即最通用模式"的既有行为
         self.cmb_fetch_mode.setCurrentIndex(3)
-        self.cmb_fetch_mode.setFixedWidth(220)
+        # 最小宽 1080 预算：下拉 220→210（-10，仍 > sizeHint 199，最长项不裁字）
+        self.cmb_fetch_mode.setFixedWidth(210)
         btn_layout.addWidget(self.cmb_fetch_mode)
         self.btn_preview = QPushButton("根据设定获取数据")
         self.btn_preview.setObjectName("btnPrimary")
@@ -1050,6 +1079,8 @@ class EmbyActorManagerDialog(QDialog):
         self.btn_clean = QPushButton("数据清洗")
         self.btn_clean.setObjectName("btnPrimary")
         self.btn_clean.setEnabled(True)
+        # 最小宽 1080 预算（窄态默认）：数据清洗 80→70（-10，文字 52px+边距仍不裁字，宽态恢复自适应）
+        self.btn_clean.setFixedWidth(70)
         self.btn_clean.setToolTip(
             "原地清洗服务器存量演员数据（不经取数流程）:\n"
             "① 0000-00-00 等非法生日 → 重置为未设置\n"
@@ -1088,6 +1119,8 @@ class EmbyActorManagerDialog(QDialog):
         btn_layout.addWidget(self.btn_clear_cache)
         self.btn_settings = QPushButton("设置")
         self.btn_settings.setObjectName("btnPrimary")
+        # 最小宽 1080 预算（窄态默认）：设置 80→70（-10，文字 26px+边距仍不裁字，宽态恢复自适应）
+        self.btn_settings.setFixedWidth(70)
         btn_layout.addWidget(self.btn_settings)
         grid.addLayout(btn_layout, 1, 0, 1, 4)
         parent_layout.addWidget(group)
@@ -1234,6 +1267,53 @@ class EmbyActorManagerDialog(QDialog):
     }  # 姓名(1)不再定宽，跟随出生地
     _DETAIL_WIDTH_RATIO = 0.75  # 历史比例（议题 #136），现仅保留兼容，实际按出生日期倍率定宽
 
+    # 最小宽 1080 预算（窄态才收窄，宽态/最大化保持原样逐像素不变）：
+    # 下拉 220→210（-10，仍 > sizeHint 199）、数据清洗 80→70（-10）、设置 80→70（-10），合计 -30，
+    # 覆盖窗口 1100→1080 的 -20，多出 10px 让连接按钮/使用说明在 1080 下不再比原来更挤。
+    _FETCH_W_WIDE = 220
+    _FETCH_W_NARROW = 210
+    _CLEAN_W_NARROW = 70
+    _SETTINGS_W_NARROW = 70
+
+    def _apply_button_widths(self) -> None:
+        """按窗口状态切换三处控件宽度：宽态恢复原宽，窄态收窄 30px。
+
+        宽态（最大化/全屏）逐像素不变：下拉 220，清洗/设置恢复自适应（≈80）；
+        窄态（还原/常规/最小化）才收窄到 210/70/70，腾出 30px 给 1080 最小宽。
+        只改三处 min/max，不碰布局、行数、列宽、提示词逻辑；重复调用幂等。
+        """
+        try:
+            wide = self._is_wide_state()
+        except Exception:
+            return
+        try:
+            cmb = getattr(self, "cmb_fetch_mode", None)
+            clean = getattr(self, "btn_clean", None)
+            settings = getattr(self, "btn_settings", None)
+            if cmb is None or clean is None or settings is None:
+                return
+            if wide:
+                if cmb.minimumWidth() != self._FETCH_W_WIDE or cmb.maximumWidth() != self._FETCH_W_WIDE:
+                    cmb.setFixedWidth(self._FETCH_W_WIDE)
+                # 恢复自适应：与改动前一致（无固定宽，布局按 sizeHint≈80 分配）
+                if clean.minimumWidth() != 0 or clean.maximumWidth() != self._HELP_MAX_W:
+                    clean.setMinimumWidth(0)
+                    clean.setMaximumWidth(self._HELP_MAX_W)
+                if settings.minimumWidth() != 0 or settings.maximumWidth() != self._HELP_MAX_W:
+                    settings.setMinimumWidth(0)
+                    settings.setMaximumWidth(self._HELP_MAX_W)
+            else:
+                if cmb.minimumWidth() != self._FETCH_W_NARROW or cmb.maximumWidth() != self._FETCH_W_NARROW:
+                    cmb.setFixedWidth(self._FETCH_W_NARROW)
+                if clean.minimumWidth() != self._CLEAN_W_NARROW or clean.maximumWidth() != self._CLEAN_W_NARROW:
+                    clean.setFixedWidth(self._CLEAN_W_NARROW)
+                if settings.minimumWidth() != self._SETTINGS_W_NARROW or settings.maximumWidth() != self._SETTINGS_W_NARROW:
+                    settings.setFixedWidth(self._SETTINGS_W_NARROW)
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+
     def _is_wide_state(self) -> bool:
         """最大化/全屏即宽态，其余（还原/常规/最小化）即窄态。"""
         try:
@@ -1278,16 +1358,6 @@ class EmbyActorManagerDialog(QDialog):
         finally:
             self._applying_widths = False
 
-    def changeEvent(self, a0):
-        super().changeEvent(a0)
-        try:
-            from PyQt6.QtCore import QEvent as _QE
-
-            if a0 is not None and a0.type() == _QE.Type.WindowStateChange:
-                self._apply_column_widths()
-        except Exception:
-            pass
-
     def _on_splitter_moved(self, *_args) -> None:
         """用户亲手拖动分隔条：本次打开记住，不再自动重排（取数/缩放都不抢回）。
 
@@ -1312,12 +1382,16 @@ class EmbyActorManagerDialog(QDialog):
         # 最大化/最小化/还原全走系统原生行为。行数对齐下一拍排队：触发时状态位
         # 已落定，按 settled 状态定档；只调行高与分隔条分配，不抬 minimumSizeHint。
         super().resizeEvent(a0)
+        self._apply_button_widths()
         self._apply_column_widths()
         self._update_help_line_break()
+        # 状态位若在 resize 时尚未落定（如最大化过渡帧），下一拍按落定状态再对一次
+        QTimer.singleShot(0, self._apply_button_widths)
         QTimer.singleShot(0, self._fit_visible_rows)
 
     def showEvent(self, a0):
         super().showEvent(a0)
+        self._apply_button_widths()
         self._apply_column_widths()
         QTimer.singleShot(0, self._update_help_line_break)
         QTimer.singleShot(0, self._fit_visible_rows)
@@ -2611,19 +2685,23 @@ class EmbyActorSettingsDialog(QDialog):
         self.setStyleSheet(f"QWidget {{ font-size: {_ui_font_pt()}; }}")
         self.setMinimumSize(480, 720)
         self.resize(480, 720)
-        # 打开时默认在屏幕可用区居中；小屏时钳制，避免标题栏移出可视区。
-        _w, _h = 480, 720
+        # 打开时默认在屏幕可用区居中（主界面同款：以 frameGeometry 外框为准，
+        # 原生窗口未创建时延后一次；小屏时钳制，避免标题栏移出可视区）。
+        def _center_dialog(avail_rect):
+            frame = self.frameGeometry()
+            x = avail_rect.x() + max(0, (avail_rect.width() - frame.width()) // 2)
+            y = avail_rect.y() + max(0, (avail_rect.height() - frame.height()) // 2)
+            self.move(max(x, avail_rect.x()), max(y, avail_rect.y()))
+
         try:
-            screen = QGuiApplication.primaryScreen()
+            screen = self.screen() or QGuiApplication.primaryScreen()
             avail = screen.availableGeometry() if screen is not None else None
             if avail is not None and avail.isValid():
-                _w = min(_w, avail.width())
-                _h = min(_h, avail.height())
-                self.resize(_w, _h)
-                self.move(
-                    avail.x() + max(0, (avail.width() - _w) // 2),
-                    avail.y() + max(0, (avail.height() - _h) // 2),
-                )
+                self.resize(min(480, avail.width()), min(720, avail.height()))
+                if self.windowHandle() is not None:
+                    _center_dialog(avail)
+                else:
+                    QTimer.singleShot(0, lambda av=avail: _center_dialog(av))
         except Exception:
             pass
         layout = QVBoxLayout(self)

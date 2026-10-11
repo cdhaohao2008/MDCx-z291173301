@@ -40,6 +40,15 @@
   - 回归：`tests/test_main_window_startup.py` 窄态/宽态双断言 0/2/3/8 列均为 55；`ruff check` 通过，相关 53 项全绿。
 - **演员管理器列宽新规格：出生日期 100，窄态出生地等宽/标签 2 倍，宽态出生地 2 倍/标签 3 倍**（`mdcx/tools/emby_actor_manager_ui.py`）：出生日期恒 100（`_BIRTHDAY_W` 110→100）；状态/头像/简介取其一半 50（`_HALF_BIRTHDAY_W`），影片数恒 60（新增 `_VIDEO_COUNT_W`）；姓名继续跟随出生地（窄态 100，宽态 200）；出生地窄态等宽 100、宽态 2 倍 200，标签窄态 2 倍 200、宽态 3 倍 300；详情列仍吃剩余视口，总宽铺满。
   - 回归：`tests/test_main_window_startup.py` 同步更新为窄态 100/100/200 与宽态 200/300 双断言；`ruff check` 通过，相关 53 项全绿。
+- **演员管理器最小尺寸 1080x720 + 按钮行按态缩宽 + 启动居中**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 最小尺寸 `1100x700` → `1080x720`（`setMinimumSize` + 初始 `resize` 下限同步）。
+  - 窄态按钮行共省 30px：获取模式下拉 `220→210`（仍大于 `sizeHint 199`，最长项不裁字）、数据清洗/设置按钮各 `80→70`（文字实宽 52/26px + 边距仍不裁字）；宽态恢复下拉 `220` + 两按钮自动宽（`_apply_button_widths()` 按 `_is_wide_state()` 切换，`resizeEvent`/`showEvent` 驱动，最大化布局/组件/控件/提示词逐像素不变）。
+  - 启动居中：主界面同款，以 `frameGeometry` 居中到屏幕可用区，`windowHandle` 未建时延迟一拍，超屏时钳到屏内。
+  - 行数档位未动：普通窗 15 行演员 + 8 行日志，最大化 20 行 + 10 行。
+  - 回归：`tests/test_actor_manager_restore_geometry.py` + `tests/test_actor_manager_row_count.py` + `tests/test_actor_manager_font_size.py` 共 20 项全绿；离屏 `800x800` 下窗口 `1080x720` 落在 `(0,38)`，居中钳制正确。
+- **演员管理器设置窗口启动居中（主界面同款）**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 旧逻辑按客户区 `480x720` 算位置且无延后，原生窗口未建好时 `frameGeometry` 退化为客户区，落点偏左上。现与管理器主窗一致：以 `frameGeometry` 外框为准、`self.screen()` 优先、未建好时 `QTimer.singleShot` 延后一拍、小屏钳制，标题栏始终留在屏内。
+  - 回归：离屏 `800x800` 下 `480x720` 落在 `(158,38)`，与外框居中预期一致；`test_actor_manager_font_size` + `restore_geometry` + `row_count` 共 20 项全绿。
 - **版本号**：`2.3.3` → `2.3.4`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
 ### 修复
 - **演员管理器最大化获取演员时中间只有 19 行，改成 20 行；获取中/完成后都是 20 整行，运行日志 10 行**（`mdcx/tools/emby_actor_manager_ui.py`）：
