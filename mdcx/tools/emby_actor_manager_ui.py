@@ -791,8 +791,9 @@ class EmbyActorManagerDialog(QDialog):
     LOG_VISIBLE_LINES = 10
     NORMAL_TABLE_ROWS = 15
     NORMAL_LOG_LINES = 8
-    # 按钮行高度：最大化/全屏统一加高（只加高、宽不动）。
-    BTN_WIDE_EXTRA = 12
+    # 按钮行高度：数据源测试窗 `_sync_panel_stretch` 同款——最大化/全屏时按
+    # 对话框当前高度/基准高度比例拉升，还原恢复；只设 minimumHeight（不锁 max），
+    # 宽度由 `_apply_button_widths` 管——两者正交。
     CONN_BASE_MARGINS = (6, 4, 6, 4)
 
     def __init__(self, parent=None):
@@ -872,6 +873,16 @@ class EmbyActorManagerDialog(QDialog):
         self._init_ui()
         self._connect_signals()
         self._open_log_file()
+        # 按钮比例拉升的基准（数据源测试窗 `_dialog_base_h` 同款）：正常几何下的
+        # 对话框高度 + 各按钮 sizeHint 高；最大化时 target = base × 当前/基准。
+        self._dialog_base_h = max(1, self.height() or 720)
+        self._conn_btn_base_h: dict[str, int] = {}
+        for _name in self._CONN_BUTTON_NAMES:
+            _w = getattr(self, _name, None)
+            try:
+                self._conn_btn_base_h[_name] = max(1, _w.sizeHint().height()) if _w is not None else 0
+            except Exception:
+                self._conn_btn_base_h[_name] = 0
 
     def _center_on_screen(self, avail=None, *, allow_defer: bool = True) -> None:
         """启动居中：和软件主界面同款，把外框整体放到可用区正中央。
@@ -1295,12 +1306,13 @@ class EmbyActorManagerDialog(QDialog):
     )
 
     def _apply_button_heights(self) -> None:
-        """按钮行高度：窄态恢复自适应；宽态统一加高，宽度逐像素不动。
+        """按钮行高度：数据源测试窗 `_sync_panel_stretch` 同款比例拉升。
 
-        只碰高度 min/max（setFixedHeight），`_apply_button_widths` 只碰宽度——
-        两者正交，最大化时按钮变高、combobox/清洗/设置的定宽保持不变。
-        用户拖过分隔条后不碰（本次打开全程 hands-off，免得连接组高度一变、
-        splitter 可用高度跟着变、拖后位置失配）。重复调用结果一致。
+        最大化/全屏时按钮与下拉按「对话框当前高度/基准高度」同步拉升
+        （只设 minimumHeight、不锁 max，数值不变时不重复设置）；
+        还原/常规/最小化时比例回到 1.0（与原来一致，不做任何改动）。
+        宽度由 `_apply_button_widths` 管——两者正交。用户拖过分隔条后不碰
+        （本次打开全程 hands-off）。重复调用结果一致。
         """
         try:
             if getattr(self, "_user_moved_splitter", False):
@@ -1311,25 +1323,30 @@ class EmbyActorManagerDialog(QDialog):
         except Exception:
             return
         try:
-            total = self.BTN_WIDE_EXTRA if wide else 0
+            try:
+                base_h = getattr(self, "_dialog_base_h", 0) or 0
+                cur_h = self.height() or 0
+                ratio = (cur_h / base_h) if (wide and base_h > 0 and cur_h > 0) else 1.0
+            except Exception:
+                ratio = 1.0
+            stored = getattr(self, "_conn_btn_base_h", None) or {}
             for name in self._CONN_BUTTON_NAMES:
                 w = getattr(self, name, None)
                 if w is None:
                     continue
-                if total <= 0:
-                    # 窄态：解除限高、回到自适应（minHint 不被抬高）。
-                    if w.minimumHeight() != 0 or w.maximumHeight() != self._HELP_MAX_W:
-                        w.setMinimumHeight(0)
-                        w.setMaximumHeight(self._HELP_MAX_W)
+                try:
+                    base = stored.get(name, 0) or 0
+                    if base <= 0:
+                        base = w.sizeHint().height()
+                    if base <= 0:
+                        continue
+                    target = max(1, int(round(base * ratio)))
+                    if w.minimumHeight() != target:
+                        w.setMinimumHeight(target)
+                except (RuntimeError, AttributeError):
                     continue
-                base = w.sizeHint().height()
-                if base <= 0:
-                    base = w.height()
-                if base <= 0:
+                except Exception:
                     continue
-                h = base + total
-                if w.minimumHeight() != h or w.maximumHeight() != h:
-                    w.setFixedHeight(h)
         except (RuntimeError, AttributeError):
             pass
         except Exception:
@@ -1338,7 +1355,7 @@ class EmbyActorManagerDialog(QDialog):
     def _deferred_after_resize(self) -> None:
         """resize/show 下一拍： settled 状态定档，先按钮行高、再行数对齐。
 
-        按钮定高会改变连接组高度、进而改变 splitter 可用高度——必须等布局
+        按钮拉升会改变连接组高度、进而改变 splitter 可用高度——必须等布局
         落定后再量 `_fit_visible_rows`，故 fit 在其后再排一拍（两拍链）。
         """
         self._apply_button_widths()
@@ -1515,8 +1532,8 @@ class EmbyActorManagerDialog(QDialog):
 
     def resizeEvent(self, a0):
         # 主界面同款：只同步内部控件几何，从不改窗口自身 min/max/fixed 与几何——
-        # 最大化/最小化/还原全走系统原生行为。按钮定高先行（settled 态下一拍再定一次，盖住最大化过渡帧的旧态），
-        # 行数对齐排在其后（定高改变连接组高度，须等布局落定再量，不抬 minimumSizeHint）。
+        # 最大化/最小化/还原全走系统原生行为。按钮拉升先行（settled 态下一拍再定一次，盖住最大化过渡帧的旧态），
+        # 行数对齐排在其后（拉升改变连接组高度，须等布局落定再量，不抬 minimumSizeHint）。
         super().resizeEvent(a0)
         self._apply_button_widths()
         self._apply_button_heights()

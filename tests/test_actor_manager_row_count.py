@@ -147,8 +147,8 @@ def test_fit_never_freezes_nor_inflates_minhint(app):
         app.processEvents()
 
 
-def test_wide_state_buttons_taller_widths_unchanged(app):
-    """最大化（桩）：按钮行统一加高（hint+12），三处定宽按宽态不变，行数仍精确。"""
+def test_wide_state_buttons_scale_like_source_test_window(app):
+    """最大化（桩）：按钮行按数据源测试窗同款比例拉升，三处定宽按宽态不变，行数仍精确。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     names = [
@@ -171,19 +171,23 @@ def test_wide_state_buttons_taller_widths_unchanged(app):
         dlg.resize(1920, 1040)
         dlg._deferred_after_resize()
         _pump(app, 20)
+        ratio = dlg.height() / dlg._dialog_base_h
+        assert ratio > 1.0, "桩最大化下对话框应高于基准高度"
         for n in names:
             w = getattr(dlg, n)
-            assert w.height() == w.sizeHint().height() + 12, f"{n} 宽态应加高 12px"
+            base = dlg._conn_btn_base_h[n]
+            assert w.minimumHeight() == max(1, round(base * ratio)), f"{n} 宽态应按比例拉升"
+            assert w.maximumHeight() == dlg._HELP_MAX_W, f"{n} 宽态不得锁 max（只抬 min）"
         cmb = dlg.cmb_fetch_mode
         assert (cmb.minimumWidth(), cmb.maximumWidth()) == (220, 220), "宽态下拉定宽 220 不变"
         for b in (dlg.btn_clean, dlg.btn_settings):
             assert b.minimumWidth() == 0 and b.maximumWidth() == dlg._HELP_MAX_W, "宽态恢复自适应"
         t = dlg.table
         count, _vp = _full_table_rows(t)
-        assert count == 20, f"加高按钮后表格仍应 20 整行: 实得 {count}"
+        assert count == 20, f"按钮拉升后表格仍应 20 整行: 实得 {count}"
         log = dlg.log_text
         want_log = 10 * log.fontMetrics().lineSpacing() + int(log.document().documentMargin())
-        assert log.viewport().height() == want_log, "加高按钮后日志仍应 10 整行"
+        assert log.viewport().height() == want_log, "按钮拉升后日志仍应 10 整行"
     finally:
         dlg.isMaximized = real
         dlg.close()

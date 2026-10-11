@@ -2,11 +2,11 @@
 # Changelog
 ## v2.3.4 (2026-10-11)
 ### 调整
-- **演员管理器日志下方空白消除 + 最大化按钮行加高（宽不变）**（`mdcx/tools/emby_actor_manager_ui.py`）：
-  - 现象：最大化/还原态下日志超过 10 条时日志下方留空白（窗格被撑大、内容填不满）；按钮行高度两态一致。
-  - 根因：①巨幅 resize 后内部布局要等事件循环才落定，`_fit_visible_rows` 首轮量到过渡态 chrome，把日志窗格算大，且旧校准环只验表格侧，错值 baked in；②行高封顶后 `setSizes` 总和小于可用高度时 QSplitter 按相对权重重分配，两窗格同时错位；③按钮高度无宽窄态区分。
-  - 改法：fit 每轮重测 chrome/avail 再重算（最多 4 轮）+ 下一拍按存档目标校验（漂移才重对，否则空操作）；行高取消封顶、等比吸收（分配总和恒等于可用高度，不触发重分配）；宽态按钮行统一 +12px（只动高度 min/max，combobox/清洗/设置的定宽逐像素不变），窄态恢复自适应；表格/日志视口变化补排对齐（滚动条冒出不漂移）；resize/show 链改为按钮定高先行、行数对齐后排一拍（等布局落定再量）；用户拖过分隔条后高度与对齐全程 hands-off。minHint 恒定（窄态 350/宽态 356）。
-  - 回归：`tests/test_actor_manager_row_count.py` 新增 2 项（宽态 9 控件 hint+12 且定宽不变、2200 超高窗 25 条日志下 20 整行 + 日志 10 整行 + 分配之和等于可用高度）；row_count 7 项 + restore_geometry/font_size 全绿；`ruff check` 通过。
+- **演员管理器日志下方空白消除 + 最大化按钮与数据源测试窗同款比例拉升**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 现象：最大化/还原态下日志超过 10 条时日志下方留空白（窗格被撑大、内容填不满）；最大化按钮固定 +12px 太高，与数据源测试窗观感不一致。
+  - 根因：①巨幅 resize 后内部布局要等事件循环才落定，`_fit_visible_rows` 首轮量到过渡态 chrome，把日志窗格算大，且旧校准环只验表格侧，错值 baked in；②行高封顶后 `setSizes` 总和小于可用高度时 QSplitter 按相对权重重分配，两窗格同时错位；③按钮高度是写死的绝对增量。
+  - 改法：fit 每轮重测 chrome/avail 再重算（最多 4 轮）+ 下一拍按存档目标校验（漂移才重对，否则空操作）；行高取消封顶、等比吸收（分配总和恒等于可用高度，不触发重分配）；按钮行改成数据源测试窗 `_sync_panel_stretch` 同款——最大化/全屏按对话框当前高度/基准高度比例拉升（只设 minimumHeight、不锁 max，还原回到 1.0），宽度仍由 `_apply_button_widths` 管、逐像素不变；表格/日志视口变化补排对齐（滚动条冒出不漂移）；resize/show 链改为按钮拉升先行、行数对齐后排一拍（等布局落定再量）；用户拖过分隔条后高度与对齐全程 hands-off。minHint 恒定（窄态 350/宽态 354）。
+  - 回归：`tests/test_actor_manager_row_count.py` 宽态项改按比例断言（min==round(base×当前/基准)、max 不锁、定宽不变）+ 2200 超高窗 25 条日志下 20 整行 + 日志 10 整行 + 分配之和等于可用高度；row_count 7 项 + restore_geometry/font_size 全绿；`ruff check` 通过。
 - **演员管理器分隔条用户拖动后不再被抢回（本次打开有效，重开回默认）**（`mdcx/tools/emby_actor_manager_ui.py`）：
   - 现象：运行日志上下拉动后，重新获取演员数据会恢复到默认位置。
   - 改法：主分隔条接 `splitterMoved` 置 `_user_moved_splitter`（数据源测试窗 `_result_user_moved` 同款）；`_fit_visible_rows` 入口遇此标记直接返回，取数/缩放都不重排；我们自己的 `setSizes` 用 `_setting_splitter_sizes` 守卫，不算用户拖动（真机实测程序化 setSizes 不发信号，守卫纯兜底）。对话框关闭即销毁、重开是新实例，天然恢复默认行数。
