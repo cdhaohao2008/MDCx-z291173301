@@ -174,6 +174,15 @@ UI 层 (PyQt6)         → 界面展示、用户操作
 
 回归：`test_ui_structure` / `test_ui_geometry` / `test_window_state_matrix` / `test_main_window_startup`。
 
+**演员管理器最大化/最小化/还原：禁止定制窗口几何，一律走系统原生（主界面同款）**
+
+- 现象：最大化后点最小化，窗口先跳到左上角再往中间缩；主界面是四周向中间正常收缩。
+- 根因：`_fit_visible_rows` 为整行对齐用 `setFixedHeight` 锁死上下窗格，稳态最大化下 `minimumSizeHint` 被抬到接近最大化高度（真机实测 1120×293 → 1120×793）；另有 `_on_window_state_change` 手动 `setGeometry` 复位普通态矩形。两轮"守卫式"修法（`isMinimized` 检查、切换进行标记、排队时状态快照）全部无效——病根在稳态最小尺寸本身，不在事件时序，守卫拦得住事件、拦不住已胀大的 hint。
+- 改法（`mdcx/tools/emby_actor_manager_ui.py`，-482/+83）：整套机制删除（10 个方法 + 6 个常量 + `changeEvent` 过载）；`resizeEvent`/`showEvent` 只同步内部列宽与提示折行；分隔条 stretch 4:1 自由拖 + `setChildrenCollapsible(False)` 防压没；议题 #160 列宽自适应保留。代价：不再保证 20/10、15/8 整行（末行可半截，与主界面一致）。
+- 硬规则：工具窗口**禁止**用 `setFixedHeight`/`setFixedSize` 锁大窗格、**禁止**在 `resizeEvent`/`changeEvent` 里 `setGeometry` 自身、**禁止**为还原/对齐留存几何快照；凡抬 `minimumSizeHint` 的写法，一律先量稳态最大化下的 hint 高度。
+- 回归：`tests/test_actor_manager_restore_geometry.py` 重写 5 项（无定制机制/窗格永不冻结且 minHint 稳定/resize 保几何/分隔条不被抢回/最小化还原保几何）；`tests/test_emby_actor_row_fit.py` 随功能删除。
+- 教训×2：①以真机实测为准——离屏复现不了最小化动画，`minimumSizeHint` 稳态数字才是决定性证据（本案即靠它定案）；②常驻托盘进程改完代码必须完全退出重进，否则复测跑的是旧代码（前两轮"还是不对"即此坑）。
+
 ### 左下角状态区图标规范
 
 主界面左下角状态区（`label_show_version`，`show_scrape_info` 组装文本后经

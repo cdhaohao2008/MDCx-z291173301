@@ -2,6 +2,11 @@
 # Changelog
 ## v2.3.4 (2026-10-11)
 ### 调整
+- **演员管理器最大化/最小化/还原重写为系统原生行为（主界面同款）**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 现象：最大化后点最小化，窗口先跳到左上角再往中间缩；主界面是四周向中间正常收缩。
+  - 根因：`_fit_visible_rows` 为整行对齐用 `setFixedHeight` 锁死上下窗格，稳态最大化下对话框的 `minimumSizeHint` 被抬到接近最大化高度（真机实测 1120×293 → 1120×793）；另有 `_on_window_state_change` 手动 `setGeometry` 复位普通态矩形。两轮"守卫式"修法（`isMinimized` 检查、切换进行标记、排队时状态快照）全部无效——病根在稳态最小尺寸本身，不在事件时序。
+  - 改法：整套机制删除（10 个方法 + `TABLE_VISIBLE_ROWS` 等 6 个常量 + `changeEvent` 过载，-482/+83）；`resizeEvent`/`showEvent` 只同步内部列宽与提示折行；分隔条按 stretch 4:1 自由拖拽（`setChildrenCollapsible(False)` 防压没）；议题 #160 列宽自适应保留。代价：不再保证 20/10、15/8 整行（末行可半截，与主界面一致）。
+  - 回归：`tests/test_actor_manager_restore_geometry.py` 重写为 5 项新不变量（无定制机制/窗格永不冻结且 minHint 稳定/resize 保几何/分隔条不被抢回/最小化还原保几何）；`tests/test_emby_actor_row_fit.py` 随功能删除；`ruff check` 通过。
 - **演员管理器普通窗（未最大化）默认 15 行演员 + 8 行运行日志；最大化/全屏仍是不多不少 20 行演员 + 10 行日志，且布局、组件、控件、提示词全部保持不变**（`mdcx/tools/emby_actor_manager_ui.py`）：
   - 原行为：非最大化时 `_fit_visible_rows` 只会按 20/10 试算、塞不下就整体不干预（小窗 noop），普通窗落到 splitter 4:1 自然分配，实测约 14.5 行演员 + 10 行日志（末行半截）。现新增 `_visible_rows_target()` 按**窗口状态**取双档目标：`isMaximized() or isFullScreen()` → `TABLE_VISIBLE_ROWS(20) + LOG_VISIBLE_LINES(10)`（旧逻辑原样，最大化侧零变化），否则 → `NORMAL_TABLE_ROWS(15) + NORMAL_LOG_LINES(8)`；`_fit_visible_rows` 全程用这一档（`_solve`/`_refit`/日志折叠均取同一目标），高度仍不够才维持小窗 noop 语义。日志最小高度随普通窗档由 10 行改为 8 行（最大化目标 10 行高于该下限，不受影响）。
   - 两处必须配套的时序/布局修复（否则双档会在最大化切换时失效或把布局撑变形）：① `changeEvent` 收到 `WindowStateChange` 后补排一次 `_fit_visible_rows`——窗口管理器可能「先发尺寸、后发状态」，`resizeEvent` 到达时 `isMaximized()` 还是旧值，只靠 resize 排的对齐会停在旧档（放大后 15/8、还原后 20/10），而此事件里 `windowState()` 已是新值；② `resizeEvent` 最前面先 `_collapsed_sizes()` 再让新尺寸落布局——窗格被 `setFixedHeight` 锁死时 QSplitter 的 maximum 被压到「两窗格固定高之和」，窗口拉大分割区也不长，多出的高度被连接组/状态栏吸走（实测连接组 89→206px、状态栏 22→205px 且不自行缩回），与议题 #176 还原路径「先解冻再复位矩形」同一手法；collapse 幂等，随后调度的 fit 会按新状态重新锁。
