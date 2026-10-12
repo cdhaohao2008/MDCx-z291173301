@@ -2,7 +2,8 @@
 # Changelog
 ## v2.3.8 (2026-10-12)
 ### 修复
-- **HTTP 404 日志膨胀（`mdcx/web_async.py` 第 2010 行）**：`body_preview` 对响应体做 `" ".join(...split())` 压缩，去除 nginx 404 HTML 中的多余换行与空白，避免每张失败截图重复输出多行 `404 Not Found` 占据页面。
+- **HTTP 404 日志膨胀（`mdcx/web_async.py` 第 2010 行）**：`body_preview` 对响应体做 `" ".join(...split())` 压缩，去除 nginx 404 HTML、AWS 403 `AccessDenied`、`Error.` 等响应体中的多余换行与空白，避免每张失败截图重复输出多行内容占据页面。
+- **刮削进度分隔线加长（`mdcx/core/scraper.py` 第 707 行）**：分隔线由 `"=" * 40` 改为 `"=" * 108`，与实际内容宽度匹配。
 
 ## v2.3.7 (2026-10-12)
 ### 功能增强
