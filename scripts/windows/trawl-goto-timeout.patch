@@ -1,26 +1,26 @@
-diff --git a/packages/tiers/src/tiers/3.ts b/packages/tiers/src/tiers/3.ts
-index a8d9779..397cba7 100644
---- a/packages/tiers/src/tiers/3.ts
-+++ b/packages/tiers/src/tiers/3.ts
-@@ -73,7 +73,7 @@ export async function runTier3(
+diff --git a/packages/tiers/src/tiers/browser.ts b/packages/tiers/src/tiers/browser.ts
+index e337484..bac4ea1 100644
+--- a/packages/tiers/src/tiers/browser.ts
++++ b/packages/tiers/src/tiers/browser.ts
+@@ -105,7 +105,7 @@ async function runBrowserTierTask<T extends 3 | 4>(
      const gotoErr = await page
        .goto(url, {
          waitUntil: "domcontentloaded",
--        timeout: Math.min(maxTimeout, 30_000),
-+        timeout: Math.min(maxTimeout, 90_000),
+-        timeout: Math.max(1, Math.min(budget.remaining(), 30_000)),
++        timeout: Math.max(1, Math.min(budget.remaining(), 90_000)),
        })
        .catch((e: Error) => e)
- 
-diff --git a/packages/tiers/src/tiers/4.ts b/packages/tiers/src/tiers/4.ts
-index cfb74dd..093cfa0 100644
---- a/packages/tiers/src/tiers/4.ts
-+++ b/packages/tiers/src/tiers/4.ts
-@@ -72,7 +72,7 @@ export async function runTier4(
-     const gotoErr = await page
-       .goto(url, {
-         waitUntil: "domcontentloaded",
--        timeout: Math.min(maxTimeout, 30_000),
-+        timeout: Math.min(maxTimeout, 90_000),
-       })
-       .catch((e: Error) => e)
- 
+     await storageRestore?.dispose()
+diff --git a/packages/tiers/src/utils/metaRefresh.ts b/packages/tiers/src/utils/metaRefresh.ts
+index 102b033..f0beeca 100644
+--- a/packages/tiers/src/utils/metaRefresh.ts
++++ b/packages/tiers/src/utils/metaRefresh.ts
+@@ -172,7 +172,7 @@ export async function followMetaRefresh(
+         try {
+           await page.goto(refresh.url, {
+             waitUntil: "domcontentloaded",
+-            timeout: Math.min(deadline - Date.now(), 30_000),
++            timeout: Math.min(deadline - Date.now(), 90_000),
+           })
+         } catch (error) {
+           if (!interrupted(error)) throw error

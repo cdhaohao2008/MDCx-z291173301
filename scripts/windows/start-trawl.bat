@@ -49,17 +49,17 @@ if exist "apps\api\src\index.ts" (
 
 rem apply MDCx compat patch only for the src clone copy (raises Tier3/4 page-load timeout for challenge stability)
 rem bundled root source was patched at pack time, skip
-if "%SRC_DIR%"=="src" if exist "trawl-goto-timeout.patch" (
-    cd /d "%~dp0src"
-    git apply --check ..\trawl-goto-timeout.patch >nul 2>&1
-    if not errorlevel 1 (
-        echo [INFO] 应用 TRAWL goto 超时补丁...
-        git apply ..\trawl-goto-timeout.patch
-        if errorlevel 1 echo [WARN] 补丁应用失败，继续以原版运行
+rem The .patch file is hand-written for one upstream layout; when trawl refactors its tier code
+rem (v1.8.0 moved the goto logic out of 3.ts/4.ts into tiers/browser.ts) it no longer applies, so
+rem trawl-apply-patch.ps1 falls back to a rule-based rewrite of the tier sources. Best effort only:
+rem an unpatched trawl still runs, so this must never abort startup.
+if "%SRC_DIR%"=="src" (
+    if exist "trawl-apply-patch.ps1" (
+        echo [INFO] 正在应用 TRAWL goto 超时补丁...
+        powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0trawl-apply-patch.ps1" -SrcDir "%~dp0src" -PatchFile "%~dp0trawl-goto-timeout.patch"
     ) else (
-        echo [INFO] 补丁已应用或无法应用，跳过
+        echo [INFO] 未找到补丁应用脚本，跳过补丁
     )
-    cd /d "%~dp0"
 )
 
 rem verify/install deps inside the chosen source dir; bun installs per cwd package.json/bun.lock
