@@ -5068,10 +5068,14 @@ class MyMAinWindow(QMainWindow):
         # 最大化时列表向下延伸到界面底部
         new_tree_h = max(avail_h - 130, 300) if _maxed else max(ui.treeWidget_number.height(), 100)
         ui.treeWidget_number.resize(tree_w, new_tree_h)
-        # 刷子按钮（清空结果列表）：最大化时钉在结果树左缘右侧固定 _MAIN_TREE_CLEAR_DX，
-        # 使它与树内「成功」两字的间距同还原态一致；还原/最小化态沿用贴右缘原位
-        # （设计态 main_w=820 时两者同为 760，双向幂等）。
-        _brush_x = _tree_x + self._MAIN_TREE_CLEAR_DX if _maxed else max(main_w - 20 - 40, 300)
+        # 刷子按钮（清空结果列表）：最大化时向右移动到开始按钮右侧，预留上下拉动条空间；
+        # 还原/最小化态沿用贴右缘原位（设计态 main_w=820 时为 760，双向幂等不变）。
+        if _maxed:
+            start_right = ui.pushButton_start_cap.x() + ui.pushButton_start_cap.width()
+            # 向右移动到开始按钮右侧（保留 10px 间距），并预留滚动条空间（不越过原保留右缘）
+            _brush_x = min(start_right + 10, max(main_w - 20 - 40, 300))
+        else:
+            _brush_x = max(main_w - 20 - 40, 300)
         ui.pushButton_tree_clear.move(min(_brush_x, max(main_w - ui.pushButton_tree_clear.width(), 0)), 110)
         # 选择目录按钮跟随开始按钮左移，保持 14px 视觉间距（设计 666 与 680 之间）
         ui.pushButton_select_media_folder.move(max(ui.pushButton_start_cap.x() - 101 - 14, 20), 13)
