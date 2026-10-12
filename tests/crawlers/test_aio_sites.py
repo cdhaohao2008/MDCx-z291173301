@@ -83,8 +83,8 @@ async def test_run_search_then_get_movie(crawler_cls, site_value, mosaic):
     assert response.data.publisher == "S1 NO.1 STYLE"
     assert response.data.series == "Series"
     assert response.data.directors == ["苺原"]
-    assert response.data.actors == ["Aika Yumeno"]
-    assert response.data.all_actors == ["Aika Yumeno"]
+    assert response.data.actors == ["夢乃あいか"]
+    assert response.data.all_actors == ["夢乃あいか"]
     assert response.data.tags == ["ドラマ", "ギリモザ"]
     assert response.data.thumb == "https://img/pl.jpg"
     assert response.data.poster == "https://img/ps.jpg"

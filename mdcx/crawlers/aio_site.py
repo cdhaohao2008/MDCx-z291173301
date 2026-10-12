@@ -103,9 +103,9 @@ class AioSiteCrawler(BaseCrawler):
         fanhao = str(movie.get("movieFanHao") or input_number or "").strip()
 
         actors = [
-            str((star.get("starName_en") or star.get("starName_ja") or "").strip())
+            str((star.get("starName_ja") or star.get("starName_en") or "").strip())
             for star in (movie.get("star") or [])
-            if (star.get("starName_en") or star.get("starName_ja"))
+            if (star.get("starName_ja") or star.get("starName_en"))
         ]
         actors = list(dict.fromkeys(actors))
 
