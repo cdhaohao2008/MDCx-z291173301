@@ -231,8 +231,12 @@ def Init_Ui(self: "MyMAinWindow"):
     self.Ui.treeWidget_number.setAllColumnsShowFocus(False)  # 关闭默认焦点框，避免与选中边框叠加
     self.Ui.treeWidget_number.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
     self.Ui.treeWidget_number.setStyleSheet(build_tree_widget_style(False))
-    self.Ui.label_poster.setScaledContents(True)  # 图片自适应窗口
-    self.Ui.label_thumb.setScaledContents(True)  # 图片自适应窗口
+    # 图片不得改变原始宽高比：scaledContents 必须保持 False，否则 QLabel 会把已按
+    # KeepAspectRatio 缩放好的 pixmap 再拉伸铺满整个框（正常/分离/视频/更新/读取五种
+    # 模式都走这里，故一处关闭即全局生效）。等比缩放由 _rescale_preview_pixmaps 用
+    # KeepAspectRatio 完成，两个 label 的 alignment 均为 AlignCenter，多余部分留白居中。
+    self.Ui.label_poster.setScaledContents(False)
+    self.Ui.label_thumb.setScaledContents(False)
     self.Ui.pushButton_right_menu.setIcon(QIcon(resources.right_menu))
     self.Ui.pushButton_right_menu.setToolTip(" 右键菜单 ")
     self.Ui.pushButton_play.setIcon(QIcon(resources.play_icon))
