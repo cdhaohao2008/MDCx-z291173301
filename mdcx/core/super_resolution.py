@@ -294,64 +294,36 @@ def build_args(src: Path, dst: Path, preset: SrPreset) -> list[str]:
 
 
 def _run_elevated(cmd: list[str], cwd: str, timeout: float) -> tuple[int, bytes, bytes]:
-    """Windows 专用：隐藏窗口（nShow=0 / SW_HIDE）+ 管理员权限（runas）执行命令，
+    """Windows 专用：隐藏窗口（CREATE_NO_WINDOW / SW_HIDE）执行命令，
     通过临时文件重定向捕获 stdout/stderr。返回 (exit_code, stdout_bytes, stderr_bytes)。"""
-    import ctypes
-    from ctypes import wintypes
-
     stdout_path = tempfile.mktemp(suffix="_sr_stdout.log")
     stderr_path = tempfile.mktemp(suffix="_sr_stderr.log")
-    cmd_line = subprocess.list2cmdline(cmd)
-    redirect_cmd = f'{cmd_line} > "{stdout_path}" 2> "{stderr_path}"'
+    redirect_cmd = f'{subprocess.list2cmdline(cmd)} > "{stdout_path}" 2> "{stderr_path}"'
 
-    class SHELLEXECUTEINFOW(ctypes.Structure):
-        _fields_ = [
-            ("cbSize", wintypes.DWORD),
-            ("fMask", wintypes.c_ulong),
-            ("hwnd", wintypes.HWND),
-            ("lpVerb", wintypes.LPCWSTR),
-            ("lpFile", wintypes.LPCWSTR),
-            ("lpParameters", wintypes.LPCWSTR),
-            ("lpDirectory", wintypes.LPCWSTR),
-            ("nShow", wintypes.c_int),
-            ("hInstApp", wintypes.HINSTANCE),
-            ("lpIDList", wintypes.c_void_p),
-            ("lpClass", wintypes.LPCWSTR),
-            ("hkeyClass", wintypes.HKEY),
-            ("dwHotKey", wintypes.DWORD),
-            ("hIcon", wintypes.HANDLE),
-            ("hProcess", wintypes.HANDLE),
-        ]
+    # 使用 subprocess 的 CREATE_NO_WINDOW 隐藏窗口，避免弹出 CMD
+    # runas 提权由系统处理，不强制要求（避免 UAC 失败导致全部失败）
+    startupinfo = None
+    if sys.platform == "win32":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
 
-    sei = SHELLEXECUTEINFOW()
-    sei.cbSize = ctypes.sizeof(SHELLEXECUTEINFOW)
-    sei.fMask = 0x40  # SEE_MASK_NOCLOSEPROCESS：拿到进程句柄以便等待完成
-    sei.lpVerb = "runas"
-    sei.lpFile = "cmd.exe"
-    sei.lpParameters = f"/c {redirect_cmd}"
-    sei.lpDirectory = cwd
-    sei.nShow = 0  # SW_HIDE：隐藏 CMD 窗口
-
-    if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(sei)):
-        # 提权请求被拒绝（如用户取消 UAC），退化到隐藏窗口普通执行
-        sei.lpVerb = "open"
-        sei.fMask = 0x40  # 仍保留 SEE_MASK_NOCLOSEPROCESS 以便等待
-        if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(sei)):
-            return -1, b"", b"ShellExecuteExW failed"
-
-    # 等待进程完成（带超时）
-    result = ctypes.windll.kernel32.WaitForSingleObject(
-        sei.hProcess, int(timeout * 1000)
-    )
-    exit_code = -1
-    if result == 0:  # WAIT_OBJECT_0
-        exit_code = ctypes.windll.kernel32.GetExitCodeProcess(sei.hProcess) or -1
-    else:
-        # 超时：强制终止进程
-        ctypes.windll.kernel32.TerminateProcess(sei.hProcess, 1)
+    try:
+        proc = subprocess.run(
+            redirect_cmd,
+            cwd=cwd,
+            timeout=timeout,
+            startupinfo=startupinfo,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        # 实际 stdout/stderr 通过重定向文件捕获
+        exit_code = proc.returncode
+    except subprocess.TimeoutExpired:
         exit_code = -1
-
-    ctypes.windll.kernel32.CloseHandle(sei.hProcess)
+    except Exception as e:
+        exit_code = -1
 
     stdout_bytes = b""
     stderr_bytes = b""
@@ -371,7 +343,6 @@ def _run_elevated(cmd: list[str], cwd: str, timeout: float) -> tuple[int, bytes,
         os.unlink(stderr_path)
     except Exception:
         pass
-
     return exit_code, stdout_bytes, stderr_bytes
 
 

@@ -70,4 +70,4 @@ def _format_duration(seconds: float) -> str:
 def append_eta(info: str, estimator: ScrapeRateEstimator) -> str:
     """把估算文本附加到进度串（无估算原样返回）"""
     eta = estimator.eta_text()
-    return f"{info} · 剩余约 {eta}" if eta else info
+    return f"{info}·剩余约{eta}" if eta else info

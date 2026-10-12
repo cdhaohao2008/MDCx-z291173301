@@ -71,4 +71,5 @@ def test_append_eta_appends_when_available():
     assert append_eta("🔎 已刮削 3/100", est) == "🔎 已刮削 3/100"  # 无样本
     _feed(est, 10, 1.0)
     text = append_eta("🔎 已刮削 10/100", est)
-    assert "剩余约" in text
+    assert "·剩余约" in text
+    assert " · 剩余约 " not in text
