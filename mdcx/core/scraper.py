@@ -569,7 +569,7 @@ class Scraper:
         signal.label_result.emit(
             f" 刮削中：{Flags.scrape_started - Flags.succ_count - Flags.fail_count} 成功：{Flags.succ_count} 失败：{Flags.fail_count}"
         )
-        LogBuffer.log().write("\n" + "=" * 40)
+        LogBuffer.log().write("\n" + "=" * 108)
         LogBuffer.log().write("\n 🙈 [file] " + str(file_info.file_path))
         LogBuffer.log().write("\n 🚘 [number] " + number)
 
