@@ -2007,7 +2007,7 @@ class AsyncWebClient:
                         if resp.status_code >= 400:
                             body_preview = ""
                             try:
-                                body_preview = (resp.text or "")[:500]
+                                body_preview = " ".join((resp.text or "").split())[:500]
                             except Exception:
                                 body_preview = ""
                             if body_preview:
