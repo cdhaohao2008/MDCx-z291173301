@@ -1,5 +1,19 @@
 
 # Changelog
+## v2.3.5 (2026-10-12)
+### 调整
+- **版本号**：`2.3.4` → `2.3.5`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
+### 修复
+- **软件界面最大化时「成功/失败」结果列表不向界面底部延伸**（`mdcx/controllers/main_window/main_window.py`）：
+  - 现象：最大化后右侧结果列表停在 `.ui` 设计高度 563px 处，下方留一大片空白，列表再多也铺不到界面最下方（用户截图红框旁注「最大化时失败、成功列表延伸到最下方」）。
+  - 根因：`_sync_page_layouts()` 只同步了结果树的**宽度**（`tree_w = max(int(202 * cover_scale), 202)`），高度写的是 `max(ui.treeWidget_number.height(), 100)` —— 恒等于控件现值（.ui 的 563），**从不按窗口可用高度 `avail_h` 计算**，故最大化时底缘永远停在设计位。
+  - 改法：高度改为按可用高度下缘锚定 —— 最大化态取 `max(avail_h - 130, 100)`（110 是列表顶边的设计 y，130 = 110 + 20px 下边距），底缘随窗口高度下移直到贴近界面最下方；**还原/最小化态保留原公式 `max(height, 100)` 逐像素不变**，缩放往返幂等。
+  - 回归：`tests/test_cover_info_maximize.py` + `tests/test_main_action_row_align.py` 共 12 项全绿（收尾的 `Windows fatal exception: access violation` 是本仓既有的 Qt 析构噪声，与断言结果无关）。
+- **封面图、缩略图显示框内的图片在拉伸/收缩时始终保持原始宽高比（正常/分离/视频/更新/读取五种模式全生效）**（`mdcx/controllers/main_window/init.py`）：
+  - 现象：五种刮削模式下，软件界面的封面图与缩略图在窗口缩放时被压扁/拉长、改变原始宽高比，观感很差（用户截图红框旁注「拉升压缩图片时不要改变图片原始宽高比」）。
+  - 根因：`.ui`（`MDCx.ui` 中 `label_poster` / `label_thumb` 的 `scaledContents=false`）与 pyuic6 产物 `MDCx.py` 里这两个 label 已经是 `setScaledContents(False)`，**但 `Init_Ui()` 在运行时又用 `setScaledContents(True)` 把它打开了**，把 `.ui` 属性完全覆盖 —— 这正是「只改 `.ui` 没有效果」的原因。`scaledContents=True` 会让 QLabel 把已经按 `KeepAspectRatio` 缩放好的 pixmap **再拉伸铺满整个框**，宽高比就此被破坏。
+  - 改法：`Init_Ui()` 里两处改回 `setScaledContents(False)`。等比缩放本就一直由 `_rescale_preview_pixmaps()` 统一负责（按 label 当前几何用 `Qt.AspectRatioMode.KeepAspectRatio` + `SmoothTransformation` 重渲染，缓存的原图 `_poster_src_pixmap` / `_thumb_src_pixmap` 不动），两个 label 的 `alignment` 均为 `AlignCenter`，故多余部分留白居中、不裁切。已确认 `mdcx/image.py` 的 `PreviewImageLoader` 不做任何预缩放（只透传原 pixmap），`_rescale_preview_pixmaps` 是唯一缩放出口。五种模式共用 `page_main` 上这两个 label，故一处关闭即全局生效。
+  - 回归：`tests/test_cover_info_maximize.py` / `tests/test_main_action_row_align.py` / `tests/test_nfo_overlay_maximize.py` 全绿；`tests/test_ui_structure.py::test_mdcx_py_in_sync_with_ui` 通过（`.ui` 与 `MDCx.py` 仍同步）。
 ## v2.3.4 (2026-10-11)
 ### 调整
 - **演员详情与演员管理器改为互不干扰的独立窗口（连接代码未动）**（`mdcx/tools/emby_actor_manager_ui.py`）：
