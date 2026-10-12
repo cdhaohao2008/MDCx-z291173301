@@ -1,25 +1,9 @@
 
 # Changelog
-## v2.3.5 (2026-10-20)
+## v2.3.6 (2026-10-20)
 ### 调整
-- **版本号**：`2.3.4` → `2.3.5`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
-- **18 条既有失败测试按最新代码逐条定性与修正，测试套件首次全绿**：
-  - 范围与定性：改动开始时全量为 `2241 passed / 18 failed`。经 `git stash` 改动前后逐条对照，**这 18 条在本次动手前就全部失败**，是此前若干次提交积累的技术债、与本次功能无关。逐条判定为「**陈旧测试**（产品已改、测试没跟上）」或「**测试正确捕获的真实缺陷**」两类：前者更新测试，且**一律只加强不放宽断言**（保留推导关系、补锁中间量、额外锁住被重构掉的委派关系），绝不靠删断言/放宽阈值让它变绿；后者改产品代码（详见下方 `### 修复` 四条）。
-  - 陈旧测试逐条原因：`test_net_separator_width.py` ×6 —— 产品新增「首屏先预留一个滚动条宽」（`_net_scrollbar_reserve`，实测 16px，避免用户点【开始检测】灌进几十行、滚动条弹出后已发出的分隔线折行）与「打印前统一过 `net_separator_width()` 收敛 `max(n-8, 8)`」，而测试的「铺满」基准仍是「控件宽 − padding」，把这段**刻意预留**误判成「右侧留白」；`test_show_netstatus` 两个用例仍按旧口径断言 `111`/`88`，实为收敛后的 `103`/`80`。测试的 `_usable_width()` 改为与 `_net_separator_chars()` 同口径（再扣滚动条预留），两个 `show_netstatus` 用例改走 `net_separator_width()` 推导而非写死数字。
-  - `test_cf_transport_fallback.py` —— 提交 `67dc430`（晚于写该断言的 `57f3e5c`）把兜底成功文案改成 `连接正常，通过挑战（<模式>）`，旧的 `"CF Bypass"` 字样消失而测试没跟。改后断言 `startswith("连接正常，通过挑战")` **并额外锁住括号里的模式**（取自响应头 `x-mdcx-bypass-mode`），能证明结果来自 bypass 响应而非直连，强度不低于原断言。
-  - `test_bypass_serial.py` —— 用的分组名 `刮削站点` 已不在 `network_check.py` 的 `GROUP_ORDER` 里（`{"基础环境","网络连通","站点检测","账号/API","辅助服务"}`），spec 被分组循环**静默丢弃**故 `results` 为空。改为 `站点检测` 并加注释说明该约束。
-  - `test_actor_manager_session_gen.py` —— AST 哨兵锁的四个「起线程前必须 `_begin_session`」的函数里，`_on_prepare_preview` / `_on_clean_data` 的线程创建已重构为委派 `_start_preview()` / `_start_clean()`，哨兵改为锁这两个共用启动函数，**并补上委派关系本身的断言**（防止将来把启动逻辑搬回调用点时漏掉 `_begin_session`）。
-  - `test_emby_library_dialog_size.py` ×2 —— `initial_size` 里 `target_h = max(320, chrome_h + rows*row_h + slack - 20)` 含一处「整体向上缩进一行汉字高度（约 20px）」的注释，断言改为 `120 + 20*30 + 12 - 20`（**保留推导关系未写死**）；下限用例的宽度本就不是最小宽 420，而是拿**已钳到下限的 320** 按 16:9 反推的 `569`。
-  - `test_type_site_scrape_rows.py` ×2 —— 该文件是 `tests/` 下 49 个 GUI 测试里**唯一没钉 `QT_QPA_PLATFORM=offscreen`** 的：单跑用真实 windows 插件（218 个字族）全绿，与别的文件同跑走 offscreen（字体库 0 个、CJK 全落 `.notdef`、横向 advance 放大约 1.5 倍）则红。补上平台钉死，并按**该环境下实测的折行档位**重划宽窄分档。
-  - ⚠️ **如实说明一处覆盖收窄**：`.ui` 钉死的 `_DESC_ROW_H = 34` 在**真实 Windows 字体下**宽度 1014 时实测 `need 34 == 34` 恰好装下、不截断（产品侧结论成立，非 UI 缺陷）；但离屏平台无任何 CJK 字族（`resources/fonts/` 只有 Consolas 与 Segoe UI Emoji），同宽 `need` 涨到 45 > 34。故 `test_wrapped_desc_text_is_not_clipped` 的断言本体**一字未动**，但适用宽度档从 `[1400, 1014]` 换成 `[1920, 1400]` —— 代价是**离屏环境下 1014 这一档的「不截断」覆盖被摘掉**。若要补回，需让离屏环境能解析 CJK 字形（属环境治理，超出本次范围）。1400 的覆盖未丢，改由 `test_narrow_state_keeps_declared_row_height[1400]` 以「上限 34 / 下边距 0 / 间距 7」严格覆盖。
-  - 回归：全量 `2758 passed / 3 failed`，**18 条既有失败清零**。余下 3 条全是 `tests/crawlers/test_aventertainments.py` 的**真实联网**用例，报 `curl: (35) Recv failure: Connection was reset`（沙箱无出网，与本次无关）。`ruff check` / `ruff format --check` 对本次触碰的 11 个文件零告警。
-- **软件日志 / 软件设置竖向滚动条与软件界面对齐到同一右缘（页宽-18）并同宽**（`mdcx/views/MDCx.ui`、`mdcx/views/MDCx.py` 由 `pyuic6` 重生成、`mdcx/controllers/main_window/main_window.py`、`mdcx/controllers/main_window/init.py`、`mdcx/views/CustomClass.py`）：
-  - 现象（三轮用户截图）：①软件日志的滚动条偏右，与软件界面结果树滚动条不在一条竖线；②软件设置各 TAB 页滚动条偏左 1~4px；③设置页滚动条看着比主界面/日志的更窄。
-  - 改法①（位置·日志左移 16px）：`textBrowser_log_main` / `textBrowser_log_main_2` 宽 `790→774`（x=28 不动）；开始/失败/清空三枚按钮同步左移 16px（`680→664`、`565→549`、`780→764`）。运行时 `_sync_page_layouts()` 里 `log_w` 由 `页宽-28-2` 改为 `页宽-28-18`，按钮偏移同步 `-142→-158`、`-42→-58`、`-257→-273`，失败列表覆盖层 `textBrowser_log_main_3` 右缘同样收到页宽-18。软件界面（结果树右缘页宽-18）保持不动，做对齐基准。
-  - 改法②（位置·设置右移，附带修一次走弯路）：设置页 12 个滚动区（含命名页 `scrollArea_7`）设计宽统一 `796`，运行时 `tab_w` 由 `avail_w-40` 改为 `avail_w-36`（tab 右边距 20→16）、`scroll_w` 保持 `tab_w-4`——4px 从“滚动区留白”挪到“tab 右边距”，滚动条右缘落在页宽-18 与主界面对齐。弯路教训：中间曾试过 `scroll_w=tab_w` 铺满，离屏量几何全对，但 QTabWidget 的 pane 内框约占 4px，滚动条右缘连同 2~4px 被内框裁掉、看着更窄（离屏 Fusion 风格无此内框，故测不出来）；改回 4px 框内余量后整条完整可见。命名页分组宽 720（余页 701）的 19px 差为既有设计，保持不动。
-  - 改法③（宽度·统一 16px）：`_sync_settings_scrollbar_widths()` 取最宽者时，把软件界面结果树与软件日志主栏滚动条一并纳入基准（只读不钉），设置页 12 条统一到三者最宽值；改宽后对各条 `unpolish→polish→update`（`setFixedWidth` 只改几何不改绘制缓存，不抛光则属性对了画面仍窄）；`CustomScrollArea.sync_scrollbar_thickness()` 加“只许加宽、不许钉窄”守卫——已被钉死的宽度不再接受更窄的新读数（休眠页 `resizeEvent` 进来的 `sizeHint` 常是未抛光的平台默认 12px，正是设置页反复变窄的成因），声明更宽时照常钉死。
-  - 连带：设置视口宽 4px 后卡片同步宽 4px，工具页原 `scrollArea_10.set_content_right_trim(4)` 补偿正好抵消，内收取消、两侧自然齐平（机制保留在 `CustomScrollArea` 里备用）；`scrollArea_7` 宽 815 的历史注释、`viewport-796` 门限注释同步订正（NFO 内容宽 796 未变，门限逻辑不动）。
-  - 回归：离屏实测 1170 窗宽下结果树/日志区/设置滚动区右缘同为 940（页宽 958-18）；`test_mdcx_py_in_sync_with_ui`、`test_ui_geometry`、`test_tool_page_right_align`、命名页、滚动条专项（逐页等宽/QSS 声明厚度/show 钉死+抛光）及日志/工具页子集共 50 项全绿；`test_window_state_matrix.py` 里 tab 宽断言 `-40→-36`、滚动区断言恢复 `-4`、日志按钮右缘断言 `22px→38px`。
+- **版本号**：`2.3.5` → `2.3.6`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
+- **演员详情窗口（`ActorDetailDialog`）观感与排版四轮调整**：本版四项用户诉求依次为「字体整体放大一号（标题除外）」「六个功能按钮改蓝底、最大化时等比增高而宽度不变」「本地头像目录输入框与【浏览】按钮上移到按钮行正上方」「头像预览与新头像预览框各占所在栏三分之一高度、头像水平居中」「最大化/还原时缩减简介高度，使信息表五个栏全部可见」。前两项属样式层，根因同为该窗口以 `parent=None` 创建、拿不到管理器 QSS；第三项是控件归属错位（目录行由右栏面板自建、但实际画在中栏）；后两项则是同一个高度分配问题（预览框先占三分之一，剩下的怎么分）。逐条展开下去：
 - **演员详情窗口：字体整体放大一号、六个按钮改蓝底并在最大化时等比增高、「本地头像目录」输入框上移到按钮行正上方**（`mdcx/tools/emby_actor_manager_ui.py`）：
   - 现象（用户截图）：窗口内所有文字偏小；【获取头像】【获取信息】【同步头像+简介】【只同步头像】【只同步简介】【浏览】六个按钮没有主色蓝底；【本地头像目录】输入框孤零零挂在最右侧「快速设置」面板底部，与真正会用它的按钮分属两栏，操作时视线得横跨整窗来回扫。
   - 根因①（字体与蓝底）：`EmbyActorManagerDialog._open_detail_dialog()` 里以 `ActorDetailDialog(actor, None, on_synced=...)` 创建，即 **`parent=None` 的独立顶层窗口**（设计如此：非模态、可与管理器并存、多演员可多开）。而 **QSS 只沿父子关系向下级联，没有父控件就彻底拿不到管理器 `_load_stylesheet()` 里的 `QWidget { font-size }` 与 `QPushButton#btnPrimary`** —— 代码里早已给这六个按钮 `setObjectName("btnPrimary")`，只是没人给这个窗口设 QSS，规则等于空挂，字体便退回应用默认的 9pt。标题栏文字由操作系统窗口框绘制、根本不走 QSS，故用户要求的「标题除外」天然成立，无需任何特判。
@@ -46,6 +30,26 @@
   - 改法③（挂钩）：两个预览框所在栏的事件过滤器 `Resize` 与 `showEvent` 改调 `_sync_column_heights()`；`_info_table_menu()` 在增删行之后立刻补一次同步，免得新行数要等到下一次最大化/还原才显形。
   - 实测：离屏 1080x720 下信息表 107→171px（表头 17 + 5 行 ×30 + 边框 2 + 余量 2），被吃掉的 64px 全部由简介让出（214→150px）；最大化（离屏屏 800×800 → 796×796）、还原、1400×900、1600×1000、1920×1200 五态下 `verticalScrollBar().maximum()` **恒为 0**（五行无需滚动全部可见），中栏余量 free 恒为 18px（无空档），预览框仍精确等于 `栏高 // 3`。
   - 回归：新增 2 例分别锁住「三尺寸 + 最大化 + 还原下表格高 ≥ need 且无竖滚动条，简介不低于自身最小高、预览框仍占三分之一」「插入 3 行→最小高随之上涨、删除 3 行→精确回到原值」。`tests/test_actor_detail_display.py` + `test_actor_manager_font_size.py` 共 25 项全绿；`-k "actor or emby"` 615 passed（唯一失败 `test_actor_narrow_controls_land_on_a2_column` 为改动前既有红）。`ruff check` 对改动文件零告警。
+## v2.3.5 (2026-10-20)
+### 调整
+- **版本号**：`2.3.4` → `2.3.5`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
+- **18 条既有失败测试按最新代码逐条定性与修正，测试套件首次全绿**：
+  - 范围与定性：改动开始时全量为 `2241 passed / 18 failed`。经 `git stash` 改动前后逐条对照，**这 18 条在本次动手前就全部失败**，是此前若干次提交积累的技术债、与本次功能无关。逐条判定为「**陈旧测试**（产品已改、测试没跟上）」或「**测试正确捕获的真实缺陷**」两类：前者更新测试，且**一律只加强不放宽断言**（保留推导关系、补锁中间量、额外锁住被重构掉的委派关系），绝不靠删断言/放宽阈值让它变绿；后者改产品代码（详见下方 `### 修复` 四条）。
+  - 陈旧测试逐条原因：`test_net_separator_width.py` ×6 —— 产品新增「首屏先预留一个滚动条宽」（`_net_scrollbar_reserve`，实测 16px，避免用户点【开始检测】灌进几十行、滚动条弹出后已发出的分隔线折行）与「打印前统一过 `net_separator_width()` 收敛 `max(n-8, 8)`」，而测试的「铺满」基准仍是「控件宽 − padding」，把这段**刻意预留**误判成「右侧留白」；`test_show_netstatus` 两个用例仍按旧口径断言 `111`/`88`，实为收敛后的 `103`/`80`。测试的 `_usable_width()` 改为与 `_net_separator_chars()` 同口径（再扣滚动条预留），两个 `show_netstatus` 用例改走 `net_separator_width()` 推导而非写死数字。
+  - `test_cf_transport_fallback.py` —— 提交 `67dc430`（晚于写该断言的 `57f3e5c`）把兜底成功文案改成 `连接正常，通过挑战（<模式>）`，旧的 `"CF Bypass"` 字样消失而测试没跟。改后断言 `startswith("连接正常，通过挑战")` **并额外锁住括号里的模式**（取自响应头 `x-mdcx-bypass-mode`），能证明结果来自 bypass 响应而非直连，强度不低于原断言。
+  - `test_bypass_serial.py` —— 用的分组名 `刮削站点` 已不在 `network_check.py` 的 `GROUP_ORDER` 里（`{"基础环境","网络连通","站点检测","账号/API","辅助服务"}`），spec 被分组循环**静默丢弃**故 `results` 为空。改为 `站点检测` 并加注释说明该约束。
+  - `test_actor_manager_session_gen.py` —— AST 哨兵锁的四个「起线程前必须 `_begin_session`」的函数里，`_on_prepare_preview` / `_on_clean_data` 的线程创建已重构为委派 `_start_preview()` / `_start_clean()`，哨兵改为锁这两个共用启动函数，**并补上委派关系本身的断言**（防止将来把启动逻辑搬回调用点时漏掉 `_begin_session`）。
+  - `test_emby_library_dialog_size.py` ×2 —— `initial_size` 里 `target_h = max(320, chrome_h + rows*row_h + slack - 20)` 含一处「整体向上缩进一行汉字高度（约 20px）」的注释，断言改为 `120 + 20*30 + 12 - 20`（**保留推导关系未写死**）；下限用例的宽度本就不是最小宽 420，而是拿**已钳到下限的 320** 按 16:9 反推的 `569`。
+  - `test_type_site_scrape_rows.py` ×2 —— 该文件是 `tests/` 下 49 个 GUI 测试里**唯一没钉 `QT_QPA_PLATFORM=offscreen`** 的：单跑用真实 windows 插件（218 个字族）全绿，与别的文件同跑走 offscreen（字体库 0 个、CJK 全落 `.notdef`、横向 advance 放大约 1.5 倍）则红。补上平台钉死，并按**该环境下实测的折行档位**重划宽窄分档。
+  - ⚠️ **如实说明一处覆盖收窄**：`.ui` 钉死的 `_DESC_ROW_H = 34` 在**真实 Windows 字体下**宽度 1014 时实测 `need 34 == 34` 恰好装下、不截断（产品侧结论成立，非 UI 缺陷）；但离屏平台无任何 CJK 字族（`resources/fonts/` 只有 Consolas 与 Segoe UI Emoji），同宽 `need` 涨到 45 > 34。故 `test_wrapped_desc_text_is_not_clipped` 的断言本体**一字未动**，但适用宽度档从 `[1400, 1014]` 换成 `[1920, 1400]` —— 代价是**离屏环境下 1014 这一档的「不截断」覆盖被摘掉**。若要补回，需让离屏环境能解析 CJK 字形（属环境治理，超出本次范围）。1400 的覆盖未丢，改由 `test_narrow_state_keeps_declared_row_height[1400]` 以「上限 34 / 下边距 0 / 间距 7」严格覆盖。
+  - 回归：全量 `2758 passed / 3 failed`，**18 条既有失败清零**。余下 3 条全是 `tests/crawlers/test_aventertainments.py` 的**真实联网**用例，报 `curl: (35) Recv failure: Connection was reset`（沙箱无出网，与本次无关）。`ruff check` / `ruff format --check` 对本次触碰的 11 个文件零告警。
+- **软件日志 / 软件设置竖向滚动条与软件界面对齐到同一右缘（页宽-18）并同宽**（`mdcx/views/MDCx.ui`、`mdcx/views/MDCx.py` 由 `pyuic6` 重生成、`mdcx/controllers/main_window/main_window.py`、`mdcx/controllers/main_window/init.py`、`mdcx/views/CustomClass.py`）：
+  - 现象（三轮用户截图）：①软件日志的滚动条偏右，与软件界面结果树滚动条不在一条竖线；②软件设置各 TAB 页滚动条偏左 1~4px；③设置页滚动条看着比主界面/日志的更窄。
+  - 改法①（位置·日志左移 16px）：`textBrowser_log_main` / `textBrowser_log_main_2` 宽 `790→774`（x=28 不动）；开始/失败/清空三枚按钮同步左移 16px（`680→664`、`565→549`、`780→764`）。运行时 `_sync_page_layouts()` 里 `log_w` 由 `页宽-28-2` 改为 `页宽-28-18`，按钮偏移同步 `-142→-158`、`-42→-58`、`-257→-273`，失败列表覆盖层 `textBrowser_log_main_3` 右缘同样收到页宽-18。软件界面（结果树右缘页宽-18）保持不动，做对齐基准。
+  - 改法②（位置·设置右移，附带修一次走弯路）：设置页 12 个滚动区（含命名页 `scrollArea_7`）设计宽统一 `796`，运行时 `tab_w` 由 `avail_w-40` 改为 `avail_w-36`（tab 右边距 20→16）、`scroll_w` 保持 `tab_w-4`——4px 从“滚动区留白”挪到“tab 右边距”，滚动条右缘落在页宽-18 与主界面对齐。弯路教训：中间曾试过 `scroll_w=tab_w` 铺满，离屏量几何全对，但 QTabWidget 的 pane 内框约占 4px，滚动条右缘连同 2~4px 被内框裁掉、看着更窄（离屏 Fusion 风格无此内框，故测不出来）；改回 4px 框内余量后整条完整可见。命名页分组宽 720（余页 701）的 19px 差为既有设计，保持不动。
+  - 改法③（宽度·统一 16px）：`_sync_settings_scrollbar_widths()` 取最宽者时，把软件界面结果树与软件日志主栏滚动条一并纳入基准（只读不钉），设置页 12 条统一到三者最宽值；改宽后对各条 `unpolish→polish→update`（`setFixedWidth` 只改几何不改绘制缓存，不抛光则属性对了画面仍窄）；`CustomScrollArea.sync_scrollbar_thickness()` 加“只许加宽、不许钉窄”守卫——已被钉死的宽度不再接受更窄的新读数（休眠页 `resizeEvent` 进来的 `sizeHint` 常是未抛光的平台默认 12px，正是设置页反复变窄的成因），声明更宽时照常钉死。
+  - 连带：设置视口宽 4px 后卡片同步宽 4px，工具页原 `scrollArea_10.set_content_right_trim(4)` 补偿正好抵消，内收取消、两侧自然齐平（机制保留在 `CustomScrollArea` 里备用）；`scrollArea_7` 宽 815 的历史注释、`viewport-796` 门限注释同步订正（NFO 内容宽 796 未变，门限逻辑不动）。
+  - 回归：离屏实测 1170 窗宽下结果树/日志区/设置滚动区右缘同为 940（页宽 958-18）；`test_mdcx_py_in_sync_with_ui`、`test_ui_geometry`、`test_tool_page_right_align`、命名页、滚动条专项（逐页等宽/QSS 声明厚度/show 钉死+抛光）及日志/工具页子集共 50 项全绿；`test_window_state_matrix.py` 里 tab 宽断言 `-40→-36`、滚动区断言恢复 `-4`、日志按钮右缘断言 `22px→38px`。
 ### 修复
 - **软件界面最大化时「成功/失败」结果列表不向界面底部延伸**（`mdcx/controllers/main_window/main_window.py`）：
   - 现象：最大化后右侧结果列表停在 `.ui` 设计高度 563px 处，下方留一大片空白，列表再多也铺不到界面最下方（用户截图红框旁注「最大化时失败、成功列表延伸到最下方」）。
