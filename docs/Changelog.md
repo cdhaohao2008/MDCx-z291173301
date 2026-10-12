@@ -79,6 +79,11 @@
   - 根因：规则窗唯一的 Python 持有者是管理器 `_clean_rules_dialog`；管理器关闭后主窗清引用，管理器 wrapper 被 GC，连带拖走其 `__dict__` 里规则窗的唯一引用，规则窗 C++ 对象随 wrapper 一起销毁。
   - 改法：新增模块级 `_OPEN_CLEAN_RULES_DIALOGS` 强引用注册表，建窗即按 id 登记、`destroyed` 按 id 摘除（清理闭包只捕获 int 不成环）；`finished` 改接只弱引管理器的闭包，管理器先死时规则窗仍能独立收尾（确定则保存规则），且连接不再强留管理器。反向（关规则窗）原来已不影响管理器，离屏复测确认。
   - 回归：离屏六项全过「建窗登记→关管理器后规则窗仍可见→孤儿确定照常保存＋注册表排空→关规则窗后管理器仍可见＋引用清空→无脏数据确定弹提示且不起线程」；`session_gen`＋`clean_failures` 11 项全绿；`ruff check` 零告警（首版 `lambda _key=id(dialog)` 触发 B008，已改为先取 `_dialog_key` 变量）。
+- **选择媒体库窗口默认 480x320、20 库时 618x412、打开居于屏幕正中央**（`mdcx/tools/emby_actor_manager_ui.py`、`tests/test_emby_library_dialog_size.py`）：
+  - 现象：旧默认最小 420x320，宽按 16:9 推导（20 库时偏宽，如 732 宽），且打开位置无居中逻辑，随系统默认/父窗口落点。
+  - 改法：新增 `MIN_WIDTH=480`/`MIN_HEIGHT=320`（`setMinimumWidth/Height` 与 `initial_size` 下限同改）；宽高比由 16:9 改为 3:2 —— 库少时 `320*3/2=480` 正好收敛到 480x320，当前行高/边框预算下 20 库正好 618x412，行数多时仍按 `min(库数,20)` 自适应、钳制屏幕可用区 85% 不变；新增与管理器主窗同款口径的 `_center_on_screen()`（以外框 `frameGeometry` 为准，原生窗口未建时 `QTimer` 延后一拍）＋ `showEvent` 首次居中，用户挪过后不再拽回。
+  - 实测（offscreen）：1 库 480x320、20 库 618x412 且视口恰容 20 行，外框中心与可用区中心偏差 0。
+  - 回归：旧的 16:9/`569`/`420` 断言同步为 3:2/`480`（`test_initial_size_20_rows_and_16_by_9` 更名为 `test_initial_size_20_rows_and_3_by_2`），新增 3 例锁住「默认最小 480x320」「20 库 618x412」「打开居中」；`test_emby_library_dialog_size.py`＋`test_actor_manager_font_size.py` 共 24 项全绿，`ruff check` 零告警。
 ## v2.3.5 (2026-10-20)
 ### 调整
 - **版本号**：`2.3.4` → `2.3.5`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）

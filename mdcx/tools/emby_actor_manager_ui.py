@@ -233,42 +233,47 @@ def scan_actor_data_noise(
 
 
 class LibrarySelectDialog(QDialog):
+    # 默认最小 480x320；20 行时约 618x412(宽按 3:2)，不超过屏幕可用区 85%。
     # 议题 #146: 默认最小尺寸只够 ~7 行, 媒体库多时需滚动半屏。
-    # 现按库数自适应初始大小(最多同时展示 20 行, 宽高 16:9, 不超过屏幕可用区 85%)。
+    # 现按库数自适应初始大小(最多同时展示 20 行, 宽高 3:2, 不超过屏幕可用区 85%)。
     # 议题 #156: 行高由 item 显式 sizeHint 钉死为复选框高度, 并预留横向滚动条空间——
     # 此前行高靠估算、与实际渲染行高无确定关系, Windows 上 20 行预算只容得下 19 行。
     MAX_VISIBLE_ROWS = 20
+    MIN_WIDTH = 480
+    MIN_HEIGHT = 320
 
     @staticmethod
     def initial_size(
         row_h: int, visible_rows: int, chrome_h: int, avail_w: int, avail_h: int, slack: int = 12
     ) -> tuple[int, int]:
-        """计算对话框初始宽高: 高 = chrome + 可见行 + slack, 宽按 16:9, 双向钳制到屏幕可用区 85%。
+        """计算对话框初始宽高: 高 = chrome + 可见行 + slack, 宽按 3:2, 双向钳制到屏幕可用区 85%。
 
         纯函数便于测试: chrome_h 为除列表可视区外的窗口内容高度(layout sizeHint 差值);
         slack 覆盖列表边框与可能出现的横向滚动条高度(议题 #156)。
         """
         target_h = chrome_h + visible_rows * row_h + slack
         # 整体向上缩进一行汉族的高度（约 20px）
-        target_h = max(320, target_h - 20)
-        target_w = int(round(target_h * 16 / 9))
-        target_w = max(420, min(target_w, int(avail_w * 0.85)))
-        target_h = max(320, min(target_h, int(avail_h * 0.85)))
+        target_h = max(LibrarySelectDialog.MIN_HEIGHT, target_h - 20)
+        target_w = int(round(target_h * 3 / 2))
+        target_w = max(LibrarySelectDialog.MIN_WIDTH, min(target_w, int(avail_w * 0.85)))
+        target_h = max(LibrarySelectDialog.MIN_HEIGHT, min(target_h, int(avail_h * 0.85)))
         return target_w, target_h
 
     def __init__(self, libraries: list[dict], parent=None):
         super().__init__(parent)
         self.setWindowTitle("选择媒体库")
-        self.setMinimumWidth(420)
-        self.setMinimumHeight(320)
+        self.setMinimumWidth(self.MIN_WIDTH)
+        self.setMinimumHeight(self.MIN_HEIGHT)
         # 议题 #156: 合集(boxsets)是 Emby 自动创建的空壳库(无演员/标签), 默认不展示;
         # 极端情况下全部库都是合集时回退展示原始列表, 避免空对话框
         filtered = [lib for lib in libraries if (lib.get("CollectionType") or "") != "boxsets"]
         self._hidden_boxsets = len(libraries) - len(filtered)
         self._libraries = filtered or list(libraries)
         self._checkboxes: list[QCheckBox] = []
+        self._centered_once = False
         self._init_ui()
-        self._apply_initial_size()
+        avail = self._apply_initial_size()
+        self._center_on_screen(avail)
 
     def _apply_initial_size(self):
         parent = self.parentWidget()
@@ -282,6 +287,38 @@ class LibrarySelectDialog(QDialog):
         # 预留横向滚动条高度: 长库名触发横向滚动条时会吃掉约一行可视高度
         slack = 12 + self.list_widget.horizontalScrollBar().sizeHint().height()
         self.resize(*self.initial_size(row_h, visible, chrome_h, available.width(), available.height(), slack))
+        return available
+
+    def _center_on_screen(self, avail=None, *, allow_defer: bool = True) -> None:
+        """打开默认居于屏幕正中央(与管理器主窗同款口径: 以外框 frameGeometry 为准)。"""
+        try:
+            if avail is None or not hasattr(avail, "isValid") or not avail.isValid():
+                screen = self.screen() or QGuiApplication.primaryScreen()
+                if screen is None:
+                    return
+                avail = screen.availableGeometry()
+            if allow_defer and self.windowHandle() is None:
+                # 原生窗口尚未创建, frameGeometry 退化为客户区: 下一拍再居中一次。
+                QTimer.singleShot(0, lambda: self._center_on_screen(avail, allow_defer=False))
+                return
+            frame = self.frameGeometry()
+            x = avail.x() + (avail.width() - frame.width()) // 2
+            y = avail.y() + (avail.height() - frame.height()) // 2
+            self.move(max(x, avail.x()), max(y, avail.y()))
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # 严格居中只做首次: 用户手动挪过之后再次 show 不拽回正中。
+        try:
+            if not getattr(self, "_centered_once", False):
+                self._centered_once = True
+                self._center_on_screen(allow_defer=False)
+        except Exception:
+            pass
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
