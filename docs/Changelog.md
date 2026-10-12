@@ -66,6 +66,19 @@
   - 根因：上栏日志显示与滚动分离后，内置条（`AlwaysOff`）只作范围数据源、外置独立条负责交互并全量镜像范围；但独立 `QScrollBar` 无 `AsNeeded` 自动隐藏语义，`maximum()==0` 时照样把轨道画满。
   - 改法：`_mirror_log_scrollbar()` 镜像范围后加一句 `outer.setVisible(inner.maximum() > inner.minimum())` —— 无需滚动时隐藏、有范围时显示；几何保持不动（隐藏件仍保留 `(文本右缘,57,16,上栏高-57)`，恢复显示时无需重摆）。调用链天然覆盖：追加/清空走 `rangeChanged` 信号，缩放/切页走 `_sync_page_layouts` 末尾的显式 `_mirror`。
   - 回归：`tests/test_window_state_matrix.py` 新增 `test_log_external_scrollbar_hidden_when_no_scroll_needed`，锁住「清空→`inner.maximum()==0` 且外置隐藏」「追加 200 行→有范围且对外可见」「再清空→恢复隐藏」；`-k log` 7 项全绿（含既有 6 项：几何/镜像/复制/置顶等不断言可见性、不受影响）。
+- **数据清洗规则默认加载/完成后默认保存，两条 minnano 占位规则始终保留**（`mdcx/tools/emby_actor_manager_ui.py`、`mdcx/config/models.py`）：
+  - 现象：首开规则窗时配置为空则表格全空，用户得手动点「恢复默认」才能看到两条占位规则；存量配置里缺默认条目时下次打开仍缺；用户误删默认条目后不再回来。
+  - 改法：新增 `DEFAULT_CLEAN_RULES`（半角/全角逗号两条占位文案，替换均为空）＋`_ensure_default_clean_rules()`（缺失的默认原始数值追加到末尾，已有条目保持原顺序与用户修改值不变）；`load_clean_rules()` 无配置/非法返回默认、缺项自动补齐，弹窗打开即见两条；`save_clean_rules()` 保存时同样补齐，删掉也会补回；`actor_clean_rules` 的模型默认值由空改为两条默认；`_start_clean` 点确定即保存用户编辑后规则并缓存到 `_clean_rules`，`_on_clean_finished` 完成后默认再保存一次。
+  - 回归：`test_emby_actor_data_clean`＋`test_emby_clean_failures`＋`test_emby_actor_stats_163`＋`test_actor_manager_close_threads` 43 项全绿。
+- **数据清洗规则窗口独立于演员管理器窗口，两者互不影响**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 现象：规则窗以管理器为 `parent`＋`exec()` 模态阻塞，管理器最小化/关闭/遮挡级联影响规则窗，规则窗开着时管理器完全不可操作。
+  - 改法：`ActorCleanRulesDialog.__init__` 改为 `super().__init__(None)`（`parent` 参数仅兼容保留不再传入）＋显式 `NonModal`＋`WA_DeleteOnClose`＋自带字号 QSS＋`showEvent` 首次屏幕居中（与详情窗同款口径）；管理器新增 `_clean_rules_dialog` 单例引用（设置/测试窗同款，`destroyed` 清引用，已存在则提前台）；`_start_clean(rules=None)` 拆为两阶段——无规则时非模态 `show()` 开窗即返回，有规则时才扫描并起 `CleanDataThread`（`CleanDataThread`＋`_begin_session` 仍在 `_start_clean` 内，会话哨兵不断）；`finished` 回调确定则保存规则并回切 `_start_clean(rules)`，取消/X 直接丢弃；全程 `RuntimeError` 守卫，管理器先关时仅持久化规则不起线程。
+  - 回归：`test_actor_manager_session_gen`＋`test_emby_actor_data_clean`＋`test_emby_clean_failures`＋`test_actor_manager_close_threads`＋`test_actor_manager_font_size` 40 项全绿；离屏实测「`parent() is None`、非模态、单例复用、确定（无脏数据）弹提示＋引用清空＋规则已保存、取消不触发保存」。
+- **数据清洗规则窗口关闭真正互不影响：补上 Python 引用链解耦**（`mdcx/tools/emby_actor_manager_ui.py`）：
+  - 现象：上一条改完后，关闭演员管理器仍会连带关闭规则窗口。`parent=None` 只切断 Qt 层级联，切不断 Python 引用链——离屏复现（主窗按 `tool_handlers` 口径在 `destroyed` 后清引用，再 `del`＋`gc.collect()`）：管理器与规则窗 wrapper 双双死亡。
+  - 根因：规则窗唯一的 Python 持有者是管理器 `_clean_rules_dialog`；管理器关闭后主窗清引用，管理器 wrapper 被 GC，连带拖走其 `__dict__` 里规则窗的唯一引用，规则窗 C++ 对象随 wrapper 一起销毁。
+  - 改法：新增模块级 `_OPEN_CLEAN_RULES_DIALOGS` 强引用注册表，建窗即按 id 登记、`destroyed` 按 id 摘除（清理闭包只捕获 int 不成环）；`finished` 改接只弱引管理器的闭包，管理器先死时规则窗仍能独立收尾（确定则保存规则），且连接不再强留管理器。反向（关规则窗）原来已不影响管理器，离屏复测确认。
+  - 回归：离屏六项全过「建窗登记→关管理器后规则窗仍可见→孤儿确定照常保存＋注册表排空→关规则窗后管理器仍可见＋引用清空→无脏数据确定弹提示且不起线程」；`session_gen`＋`clean_failures` 11 项全绿；`ruff check` 零告警（首版 `lambda _key=id(dialog)` 触发 B008，已改为先取 `_dialog_key` 变量）。
 ## v2.3.5 (2026-10-20)
 ### 调整
 - **版本号**：`2.3.4` → `2.3.5`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）

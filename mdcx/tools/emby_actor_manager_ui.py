@@ -108,6 +108,29 @@ def _child_dialog_qss() -> str:
     )
 
 
+DEFAULT_CLEAN_RULES: list[tuple[str, str]] = [
+    ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
+    ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
+]
+"""数据清洗默认替换规则: 两条 minnano 占位文案(半角/全角逗号)替换为空, 始终保留。"""
+
+
+def _ensure_default_clean_rules(
+    cleaned: list[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    """补齐默认规则: 缺失的默认原始数值追加到末尾, 已有条目保持原顺序与替换值不变。
+
+    保证「两条 minnano 占位规则始终保留」——用户误删后下次加载/保存自动补回。
+    """
+    existing = {original for original, _ in cleaned}
+    result = list(cleaned)
+    for original, replacement in DEFAULT_CLEAN_RULES:
+        if original not in existing:
+            result.append((original, replacement))
+            existing.add(original)
+    return result
+
+
 def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
     """清洗规则归一化: config 存盘形态(list[list[str]])/用户输入统一成有效 (原始, 替换) 序列。
 
@@ -135,16 +158,22 @@ def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
 
 
 def load_clean_rules() -> list[tuple[str, str]]:
-    """读出上次保存的清洗替换规则(无配置/非法时返回空列表, 调用方叠加内置清洗)。"""
+    """读出上次保存的清洗替换规则; 无配置/非法时返回默认规则, 缺失的默认条目自动补齐。
+
+    数据清洗窗口弹出时默认加载本函数返回值, 故首开即见两条 minnano 占位规则。
+    """
     try:
-        return _sanitize_clean_rules(manager.config.actor_clean_rules)
+        return _ensure_default_clean_rules(_sanitize_clean_rules(manager.config.actor_clean_rules))
     except Exception:
-        return []
+        return list(DEFAULT_CLEAN_RULES)
 
 
 def save_clean_rules(rules: object) -> list[tuple[str, str]]:
-    """持久化用户确认的清洗替换规则, 返回归一化后的规则。失败时静默返回归一化结果。"""
-    cleaned = _sanitize_clean_rules(rules)
+    """持久化用户确认的清洗替换规则, 返回归一化后的规则。失败时静默返回归一化结果。
+
+    保存时自动补齐缺失的默认规则, 保证两条 minnano 占位规则始终保留。
+    """
+    cleaned = _ensure_default_clean_rules(_sanitize_clean_rules(rules))
     try:
         cfg = manager.config.model_copy(deep=True)
         cfg.actor_clean_rules = [[o, r] for o, r in cleaned]
@@ -638,27 +667,45 @@ def _future_result_or(future, default):
         return default
 
 
+_OPEN_CLEAN_RULES_DIALOGS: dict = {}
+"""存活的数据清洗规则独立窗(强引用注册表)。
+
+`parent=None` 只切断 Qt 层级联, 切不断 Python 引用链——规则窗唯一的 Python
+持有者原本是管理器 `_clean_rules_dialog`, 管理器关闭后被 GC 时会连带销毁
+规则窗(离屏实测: 双双 `wrapper alive: False`)。注册表多持一份强引用,
+随 `destroyed` 按 id 摘除(清理闭包只捕获 int, 不形成引用环), 保证两窗
+关闭互不影响。"""
+
+
 class ActorCleanRulesDialog(QDialog):
     """数据清洗规则编辑窗: 全局 (原始数值 → 替换数值) 字面替换表, 确定后才实际清洗。
 
-    每次点击「数据清洗」都弹出本窗(含无待清洗数据时), 打开时装载上次保存的规则;
-    用户可编辑单元格、添加行、删除选中行, 窗口可拉伸缩小; 点确定则保存规则并
-    关闭, 调用方据此执行实际清洗, 点取消则不做任何改动。
+    独立顶层窗口(与演员管理器互不影响): 无父级、非模态, 可与管理器并存操作;
+    最小化/关闭/移动不再级联影响对方。每次点击「数据清洗」都弹出本窗
+    (含无待清洗数据时), 打开时装载上次保存的规则; 用户可编辑单元格、添加行、
+    删除选中行, 窗口可拉伸缩小; 点确定则保存规则并关闭, 调用方据此执行实际清洗,
+    点取消则不做任何改动。
     """
 
     def __init__(self, actors: list[ActorInfo] | None = None, parent=None):
-        super().__init__(parent)
+        # 独立顶层窗口: parent 参数仅为兼容旧调用而保留, 不再传入——管理器
+        # 最小化/关闭/遮挡不再级联影响规则窗口; 调用方用 show() 单例复用。
+        super().__init__(None)
         self.setWindowTitle("数据清洗规则")
         self.setMinimumSize(640, 420)
         self.resize(720, 480)
         self.setSizeGripEnabled(True)
+        self.setWindowModality(Qt.WindowModality.NonModal)
         self.setWindowFlags(
             self.windowFlags()
             | Qt.WindowType.Window
             | Qt.WindowType.WindowMinimizeButtonHint
             | Qt.WindowType.WindowMaximizeButtonHint
         )
+        # 独立窗口随关闭销毁, 管理器侧 destroyed 信号随之清空引用。
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setStyleSheet(f"QWidget {{ font-size: {_ui_font_pt()}; }}")
+        self._centered_once = False
         self._actors = list(actors or [])
         layout = QVBoxLayout(self)
 
@@ -754,12 +801,7 @@ class ActorCleanRulesDialog(QDialog):
             self._resume_refresh()
 
     def _on_restore_default(self):
-        self.set_rules(
-            [
-                ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
-                ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
-            ]
-        )
+        self.set_rules(list(DEFAULT_CLEAN_RULES))
 
     def set_rules(self, rules: object):
         cleaned = _sanitize_clean_rules(rules)
@@ -794,6 +836,33 @@ class ActorCleanRulesDialog(QDialog):
             self.status_label.setText(f"按当前规则将清洗 {count} 个演员(共 {len(self._actors)} 个)")
         except Exception:
             self.status_label.setText("")
+
+    def _center_on_screen(self, avail=None) -> None:
+        """把窗口外框放到所在屏幕可用区的正中央(与演员详情窗同款口径)。"""
+        try:
+            if avail is None or not avail.isValid():
+                screen = self.screen() or QGuiApplication.primaryScreen()
+                if screen is None:
+                    return
+                avail = screen.availableGeometry()
+            frame = self.frameGeometry()
+            x = avail.x() + (avail.width() - frame.width()) // 2
+            y = avail.y() + (avail.height() - frame.height()) // 2
+            self.move(max(x, avail.x()), max(y, avail.y()))
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # 严格居中只做首次: 用户手动挪过之后再次 show 不拽回正中。
+        try:
+            if not getattr(self, "_centered_once", False):
+                self._centered_once = True
+                self._center_on_screen()
+        except Exception:
+            pass
 
 
 class EmbyActorManagerDialog(QDialog):
@@ -851,11 +920,13 @@ class EmbyActorManagerDialog(QDialog):
         self._clean_thread = None
         self._clean_items: dict[str, tuple[str, bool]] = {}
         self._clean_failed: list[tuple[str, str]] = []  # 议题 #162: (actor_id, 失败消息)
+        self._clean_rules: list[tuple[str, str]] = []
         self._fetch_thread = None
         self._refresh_thread = None
-        # 独立子窗口单例引用（设置/数据源测试）：destroyed 信号负责清空
+        # 独立子窗口单例引用（设置/数据源测试/数据清洗规则）：destroyed 信号负责清空
         self._settings_dialog = None
         self._test_dialog = None
+        self._clean_rules_dialog = None
         # 演员详情独立窗口（与管理器互不干扰）：按 actor_id 常驻，可多开、
         # 随各自关闭销毁；destroyed 信号负责从字典摘除。
         self._detail_dialogs: dict[str, ActorDetailDialog] = {}
@@ -2302,21 +2373,75 @@ class EmbyActorManagerDialog(QDialog):
             return
         self._start_clean()
 
-    def _start_clean(self):
-        """数据清洗: 每次点击都先弹规则编辑窗(可增删改、可缩放), 确定后才实际清洗。
+    def _start_clean(self, rules=None):
+        """数据清洗: 无规则时先弹独立规则编辑窗, 有规则时直接按规则扫描执行。
 
-        对话框打开时装载上次保存的规则; 点确定即保存规则并按该规则扫描执行,
-        点取消则直接返回。按当前规则无待清洗数据时仅提示, 不启动线程。
+        规则窗与管理器互相独立: 无父级、非模态, 可与管理器并存操作,
+        最小化/关闭/移动互不级联。单例复用——已存在则提前台。
+        对话框打开时默认加载上次保存的规则(缺省时为两条 minnano 占位规则);
+        点确定经 finished 回调保存用户编辑后的规则并回调用本函数执行,
+        点取消/X 则直接返回。按当前规则无待清洗数据时仅提示, 不启动线程(规则已保存)。
         """
-        if not self._actors:
+        if rules is None:
+            if not self._actors:
+                return
+            try:
+                existing = self._clean_rules_dialog
+                if existing is not None:
+                    if existing.isMinimized():
+                        existing.showNormal()
+                    else:
+                        existing.show()
+                    existing.raise_()
+                    existing.activateWindow()
+                    return
+            except RuntimeError:
+                # C++ 对象已被销毁(WA_DeleteOnClose 释放), 换新的
+                self._clean_rules_dialog = None
+            dialog = ActorCleanRulesDialog(list(self._actors))
+            _self_ref = weakref.ref(self)
+
+            def _forget(*_a, _ref=_self_ref):
+                mgr = _ref()
+                if mgr is None:
+                    return
+                try:
+                    mgr._clean_rules_dialog = None
+                except (RuntimeError, AttributeError):
+                    pass
+
+            dialog.destroyed.connect(_forget)
+            # finished 接到闭包而非管理器 bound method: 闭包只弱引管理器,
+            # 管理器先被回收时规则窗仍能独立收尾(确定则保存规则), 且连接本身
+            # 不再强留管理器, 两窗生命周期彻底解耦。
+            def _on_done(result, _ref=_self_ref, _dlg=dialog):
+                mgr = _ref()
+                if mgr is None:
+                    if result == QDialog.DialogCode.Accepted:
+                        try:
+                            save_clean_rules(_dlg.rules())
+                        except Exception:
+                            pass
+                    return
+                try:
+                    mgr._on_clean_rules_finished(result)
+                except RuntimeError:
+                    pass
+
+            dialog.finished.connect(_on_done)
+            # 注册表多持一份强引用, 随 destroyed 按 id 摘除, 详见模块级说明。
+            _dialog_key = id(dialog)
+            _OPEN_CLEAN_RULES_DIALOGS[_dialog_key] = dialog
+            dialog.destroyed.connect(lambda *_a, _key=_dialog_key: _OPEN_CLEAN_RULES_DIALOGS.pop(_key, None))
+            self._clean_rules_dialog = dialog
+            dialog.show()
             return
-        dialog = ActorCleanRulesDialog(self._actors, self)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-        rules = save_clean_rules(dialog.rules())
         dirty = scan_actor_data_noise(self._actors, rules)
         if not dirty:
-            QMessageBox.information(self, "数据清洗", "✅ 按当前规则未发现需要清洗的数据")
+            try:
+                QMessageBox.information(self, "数据清洗", "✅ 按当前规则未发现需要清洗的数据")
+            except RuntimeError:
+                pass
             return
         self._set_buttons_enabled(False)
         self._set_status("数据清洗中...")
@@ -2331,6 +2456,45 @@ class EmbyActorManagerDialog(QDialog):
         self._clean_thread.clean_done.connect(self._on_clean_finished)
         self._clean_thread.error.connect(self._on_thread_error)
         self._clean_thread.start()
+
+    def _on_clean_rules_finished(self, result):
+        """独立规则窗 finished 回调: 确定则保存规则并回切清洗执行, 取消则丢弃。
+
+        规则窗已独立于管理器——管理器先关导致 UI 已销毁时, 仅持久化规则不再起线程,
+        避免撞上已销毁的 C++ 对象。
+        """
+        try:
+            dialog = self._clean_rules_dialog
+        except (RuntimeError, AttributeError):
+            return
+        if dialog is None:
+            return
+        try:
+            accepted = result == QDialog.DialogCode.Accepted
+            rules_data = dialog.rules() if accepted else None
+        except RuntimeError:
+            try:
+                self._clean_rules_dialog = None
+            except (RuntimeError, AttributeError):
+                pass
+            return
+        # 先摘除引用再销毁: 规则窗关闭不影响管理器, 管理器清洗也不影响规则窗。
+        try:
+            self._clean_rules_dialog = None
+            dialog.deleteLater()
+        except RuntimeError:
+            pass
+        if not accepted or rules_data is None:
+            return
+        try:
+            rules = save_clean_rules(rules_data)
+        except Exception:
+            return
+        self._clean_rules = list(rules)
+        try:
+            self._start_clean(rules)
+        except RuntimeError:
+            pass
 
     def _on_clean_actor_done(self, actor_id: str, success: bool, msg: str):
         if self._is_stale_session():
@@ -2359,6 +2523,11 @@ class EmbyActorManagerDialog(QDialog):
         self._set_buttons_enabled(True)
         self._set_status("数据清洗完成")
         self._clean_items = {}
+        # 数据清洗完成后默认保存用户修改编辑后的规则(本次实际使用的规则, 含两条常驻默认)。
+        _pending_rules = getattr(self, "_clean_rules", None)
+        if _pending_rules:
+            save_clean_rules(_pending_rules)
+            self._clean_rules = []
         self.log(f"🧹 数据清洗完成！成功: {success}, 失败: {fail}")
         # 议题 #162: 清洗是直接改写服务器的, 无"待同步"残留——完成提示讲清这一点,
         # 并列出失败者名单与重试指引, 避免用户误以为还要点「开始全部更新同步」。
@@ -4317,14 +4486,14 @@ class ActorDetailDialog(QDialog):
         self.new_avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.new_avatar_label.setStyleSheet("border: 1px solid #ccc; color: #888;")
         right_layout.addWidget(self.new_avatar_label)
-        right_layout.addWidget(QLabel("简介（可编辑）:"))
+        right_layout.addWidget(QLabel("新简介（可编辑）:"))
         self.overview_edit = QTextEdit()
         self.overview_edit.setPlainText(actor.new_overview)
         # stretch 2 / 1：新头像预览拿走的那份高度由下方两个可伸缩控件让出，简介占大头
         # （「新头像预览多占的空间从简介获取」）。窗口太矮、让到最小高还不够时，
         # 预览框那边会自动退让（见 _sync_preview_heights），两栏都不会被挤出可视区。
         right_layout.addWidget(self.overview_edit, stretch=2)
-        right_layout.addWidget(QLabel("信息（右键增删行，可编辑）:"))
+        right_layout.addWidget(QLabel("新信息（右键增删行，可编辑）:"))
         self.info_table = QTableWidget(0, 2)
         self.info_table.setHorizontalHeaderLabels(["字段", "值"])
         h_header = self.info_table.horizontalHeader()

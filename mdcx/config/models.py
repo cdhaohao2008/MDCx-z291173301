@@ -722,7 +722,11 @@ class Config(BaseModel):
     actor_deduplicate: bool = Field(default=True, title="重复演员去重")
     actor_count_mode: int = Field(default=0, title="演员计数方式 0=原始条目数 1=唯一名字数")
     actor_clean_rules: list[list[str]] = Field(
-        default_factory=list, title="演员数据清洗替换规则(原始数值/替换数值)"
+        default_factory=lambda: [
+            ["无维基百科信息, 从 minnano-av 数据库补全女优信息", ""],
+            ["无维基百科信息，从 minnano-av 数据库补全女优信息", ""],
+        ],
+        title="演员数据清洗替换规则(原始数值/替换数值)",
     )
     actor_photo_kodi_auto: bool = Field(default=False, title="演员照片Kodi自动")
     # endregion
