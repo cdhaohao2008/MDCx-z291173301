@@ -14,6 +14,7 @@ from PyQt6.QtGui import QColor, QGuiApplication, QKeySequence
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QBoxLayout,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -92,6 +93,19 @@ def _ui_font_pt(step: int | None = None) -> str:
         px = font.pixelSize()
         pt = px * 72.0 / 96.0 if px > 0 else 9.0
     return f"{pt + step:g}pt"
+
+
+def _child_dialog_qss() -> str:
+    """无父独立子窗口自带的 QSS：放大一号字号 + 蓝色主按钮。
+
+    与 `EmbyActorManagerDialog._load_stylesheet()` 的同名规则同值。数据源测试窗与演员详情窗
+    都是 parent=None 的独立顶层窗口，收不到管理器的样式表级联，故各自必须带一份。
+    """
+    return (
+        f"QWidget {{ font-size: {_ui_font_pt()}; }}"
+        "QPushButton#btnPrimary { background-color: #1565c0; color: #ffffff; }"
+        "QPushButton#btnPrimary:hover { background-color: #1976d2; }"
+    )
 
 
 def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
@@ -2799,12 +2813,14 @@ INFO_SOURCE_NAMES = {
 
 
 class _SourceQuickSettingsPanel(QGroupBox):
-    """快速设置面板：头像/信息数据源拖拽排序 + 本地头像目录，改动即自动保存。
+    """快速设置面板：头像/信息数据源拖拽排序，改动即自动保存。
 
-    数据源测试窗口与演员详情窗口共用，避免两处重复实现。
+    数据源测试窗口与演员详情窗口共用，避免两处重复实现。面板只管两个数据源列表，
+    「本地头像目录」行由各窗口自建（数据源测试窗放在底部标题行、演员详情窗放在中列
+    按钮行上方），因此本地头像目录的改动保存统一走各窗口自己的槽函数。
     """
 
-    def __init__(self, parent=None, show_folder_row: bool = True, fixed_width: int | None = 300):
+    def __init__(self, parent=None, fixed_width: int | None = 300):
         super().__init__("快速设置", parent)
         if fixed_width is not None:
             self.setFixedWidth(fixed_width)
@@ -2821,20 +2837,6 @@ class _SourceQuickSettingsPanel(QGroupBox):
         layout.addWidget(self.info_list)
         layout.addStretch()
         self._lists_expanded = False
-        if show_folder_row:
-            layout.addWidget(QLabel("本地头像目录:"))
-            folder_row = QHBoxLayout()
-            folder_row.setContentsMargins(-460, 0, 0, 0)
-            folder_row.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            self.folder_edit = QLineEdit(manager.config.actor_photo_folder)
-            # 详情窗快速设置栏按总宽 1:2:1 精确分配（最小窗下约 260px）：输入框
-            # 最小宽须让位，Browse 行才塞得下；数据源测试窗面板更宽，不受影响。
-            self.folder_edit.setMinimumWidth(120)
-            browse_btn = QPushButton("浏览")
-            browse_btn.clicked.connect(self._browse_folder)
-            folder_row.addWidget(self.folder_edit)
-            folder_row.addWidget(browse_btn)
-            layout.addLayout(folder_row)
 
         img_model = self.image_list.model()
         if img_model:
@@ -2842,8 +2844,6 @@ class _SourceQuickSettingsPanel(QGroupBox):
         info_model = self.info_list.model()
         if info_model:
             info_model.rowsMoved.connect(self._save)
-        if getattr(self, "folder_edit", None) is not None:
-            self.folder_edit.textChanged.connect(self._save)
 
     def set_lists_expanded(self, expanded: bool) -> None:
         """最大化时头像/信息两列表 1:1 分配面板纵向富余高度；还原时恢复默认效果。
@@ -2871,14 +2871,6 @@ class _SourceQuickSettingsPanel(QGroupBox):
             item.setData(Qt.ItemDataRole.UserRole, src)
             list_widget.addItem(item)
 
-    def _browse_folder(self):
-        folder_edit = getattr(self, "folder_edit", None)
-        if folder_edit is None:
-            return
-        path = QFileDialog.getExistingDirectory(self, "选择本地头像目录", folder_edit.text())
-        if path:
-            folder_edit.setText(path)
-
     def _save(self, *args):
         cfg = manager.config.model_copy(deep=True)
         cfg.actor_image_sources = [
@@ -2887,10 +2879,9 @@ class _SourceQuickSettingsPanel(QGroupBox):
         cfg.actor_info_sources = [
             self.info_list.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.info_list.count())
         ]
-        folder_edit = getattr(self, "folder_edit", None)
-        cfg.actor_photo_folder = (
-            folder_edit.text().strip() if folder_edit is not None else manager.config.actor_photo_folder
-        )
+        # 本地头像目录由各窗口自建的输入框保存（数据源测试窗 / 演员详情窗），
+        # 面板只改数据源顺序，原样带回当前值，不覆盖。
+        cfg.actor_photo_folder = manager.config.actor_photo_folder
         manager._replace_config(cfg)
         manager.save()
 
@@ -3225,13 +3216,8 @@ class ActorSourceTestDialog(QDialog):
         # 关闭时由 Qt 销毁 C++ 对象（closeEvent 已先取消后台线程），
         # 管理器侧的 destroyed 信号随之清空引用。
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        # 无父独立窗口收不到管理器的 QSS 级联，字号规则自带一条，与管理器同值；
-        # 蓝色主按钮样式也自带（与管理器 QPushButton#btnPrimary 同值）。
-        self.setStyleSheet(
-            f"QWidget {{ font-size: {_ui_font_pt()}; }}"
-            "QPushButton#btnPrimary { background-color: #1565c0; color: #ffffff; }"
-            "QPushButton#btnPrimary:hover { background-color: #1976d2; }"
-        )
+        # 无父独立窗口收不到管理器的 QSS 级联，字号规则与蓝色主按钮样式自带一份（与管理器同值）。
+        self.setStyleSheet(_child_dialog_qss())
         self.setMinimumSize(1080, 720)
         self.resize(1080, 720)
         # 打开时默认在屏幕可用区居中；小屏时钳制，避免标题栏移出可视区。
@@ -3351,9 +3337,9 @@ class ActorSourceTestDialog(QDialog):
         self._btn_info_base_h = self.btn_info.sizeHint().height()
         main_row.addLayout(info_col, stretch=2)
 
-        # 右列：快速设置面板（改即自动保存；本地头像目录移到底部与结果同行，此处隐藏；
-        # 释放固定 300 宽，按 1:2:1 的 1 份随窗口缩放）
-        panel = _SourceQuickSettingsPanel(self, show_folder_row=False, fixed_width=None)
+        # 右列：快速设置面板（改即自动保存；本地头像目录由本窗口自建、放在底部标题行，
+        # 面板内不建目录行；释放固定 300 宽，按 1:2:1 的 1 份随窗口缩放）
+        panel = _SourceQuickSettingsPanel(self, fixed_width=None)
         panel.setMinimumWidth(200)
         self._panel = panel
         # 面板自身尺寸变化后同步底部盒：面板 Resize 事件里读到的已是布局后的最终宽度，
@@ -4210,6 +4196,35 @@ class ActorSourceTestDialog(QDialog):
             pass
 
 
+# 演员详情窗口头像预览框的最小高（原固定 130x180 的高，保留作首次布局前的下限；
+# 实际高度由 ActorDetailDialog._sync_preview_heights 按 _AVATAR_PREVIEW_COL_RATIO 同步）。
+_AVATAR_PREVIEW_MIN_H = 180
+# 预览框占所在栏外框高的几分之一（3 = 三分之一）。写成常量而非裸 //3：
+# 这个比例同时决定中栏下方「简介/信息」各让出多少高度，改比例时只动这一处。
+_AVATAR_PREVIEW_COL_RATIO = 3
+
+
+def _layout_min_h_excluding(lay: QBoxLayout, skip) -> int:
+    """QBoxLayout 的最小高（contentsMargins + spacing + 各项 minimumSize 之和），
+    跳过 `skip` 那个控件自身的那一份。
+
+    供「预览框之外的内容至少还得留多少高」使用：预览框按栏高一半取高，若这份
+    一半挤得其余控件放不下，就退到「栏高 − 其余最小高」——否则预览框的 minimumSize
+    会把整栏最小高顶破，窗口被迫长高、预览框跟着再长高，形成死循环。
+    """
+    try:
+        margins = lay.contentsMargins()
+        total = margins.top() + margins.bottom() + max(0, lay.count() - 1) * lay.spacing()
+        for i in range(lay.count()):
+            item = lay.itemAt(i)
+            if item is None or item.widget() is skip:
+                continue
+            total += max(0, item.minimumSize().height())
+        return max(0, total)
+    except Exception:
+        return 0
+
+
 class ActorDetailDialog(QDialog):
     """演员详情编辑对话框：左栏现有数据，右栏新数据（可编辑），右侧快速设置面板。"""
 
@@ -4231,6 +4246,10 @@ class ActorDetailDialog(QDialog):
         # 独立窗口：无父级、非模态打开，关闭即销毁 C++ 对象（无 QThread 子对象，
         # 后台回写全经信号 + _emit_done 守卫，关窗中途回写不炸）。
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        # 无父级独立顶层窗口收不到管理器的 QSS 级联，字号与蓝色主按钮样式自带一份
+        # （与管理器同值）：窗内所有控件比应用默认字号大一号；窗口标题栏文字由系统
+        # 窗口框绘制、不受 QSS 影响，即「除演员详情标题外全部加大一号」。
+        self.setStyleSheet(_child_dialog_qss())
         self._log_lines: list[str] = []
         # 默认宽高与数据源测试窗口一致（1080x720），小屏钳制。
         self.setMinimumSize(1080, 720)
@@ -4243,6 +4262,9 @@ class ActorDetailDialog(QDialog):
                 self.resize(1080, 720)
         except Exception:
             self.resize(1080, 720)
+        # 记录默认高度：最大化时按钮高度按 当前高度/默认高度 等比拉升、还原时恢复
+        # （见 _sync_button_stretch）。最小化/普通窗口不做任何改动。
+        self._dialog_base_h = max(1, self.height() or 720)
         root = QHBoxLayout(self)
 
         # 左栏：现有数据（Emby 当前）
@@ -4253,7 +4275,10 @@ class ActorDetailDialog(QDialog):
         left.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         left_layout = QVBoxLayout(left)
         self.existing_avatar_label = QLabel("头像预览")
-        self.existing_avatar_label.setFixedSize(130, 180)
+        # 预览框占本栏 1/3 高度（由 _sync_preview_heights 按栏高同步）、横向铺满整栏，
+        # 头像在框内水平居中。原本 setFixedSize(130, 180) 把框钉死在栏左上角：
+        # 宽度被 maximumWidth 卡住不铺栏、高度写死 180 不随窗口变，两个问题一起消失。
+        self.existing_avatar_label.setMinimumHeight(_AVATAR_PREVIEW_MIN_H)
         self.existing_avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.existing_avatar_label.setStyleSheet("border: 1px solid #ccc; color: #888;")
         left_layout.addWidget(self.existing_avatar_label)
@@ -4279,14 +4304,20 @@ class ActorDetailDialog(QDialog):
         right.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         right_layout = QVBoxLayout(right)
         self.new_avatar_label = QLabel("新头像预览")
-        self.new_avatar_label.setFixedSize(130, 180)
+        # 与左栏同款：占本栏 1/3 高度、横向铺满、头像水平居中（见 _sync_preview_heights）。
+        # 新增的这份高度不从窗口长出来，而是从下方内容里挤——
+        # overview_edit stretch=2 / info_table stretch=1，即多出来的高度优先由「简介」让出。
+        self.new_avatar_label.setMinimumHeight(_AVATAR_PREVIEW_MIN_H)
         self.new_avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.new_avatar_label.setStyleSheet("border: 1px solid #ccc; color: #888;")
         right_layout.addWidget(self.new_avatar_label)
         right_layout.addWidget(QLabel("简介（可编辑）:"))
         self.overview_edit = QTextEdit()
         self.overview_edit.setPlainText(actor.new_overview)
-        right_layout.addWidget(self.overview_edit)
+        # stretch 2 / 1：新头像预览拿走的那份高度由下方两个可伸缩控件让出，简介占大头
+        # （「新头像预览多占的空间从简介获取」）。窗口太矮、让到最小高还不够时，
+        # 预览框那边会自动退让（见 _sync_preview_heights），两栏都不会被挤出可视区。
+        right_layout.addWidget(self.overview_edit, stretch=2)
         right_layout.addWidget(QLabel("信息（右键增删行，可编辑）:"))
         self.info_table = QTableWidget(0, 2)
         self.info_table.setHorizontalHeaderLabels(["字段", "值"])
@@ -4300,7 +4331,21 @@ class ActorDetailDialog(QDialog):
         self.info_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.info_table.customContextMenuRequested.connect(self._info_table_menu)
         self._populate_info_table()
-        right_layout.addWidget(self.info_table)
+        right_layout.addWidget(self.info_table, stretch=1)
+
+        # 本地头像目录行：原先挂在右侧快速设置面板底部，按用户要求移到中列、
+        # 置于「获取头像/获取信息…」按钮行正上方（整体左移一栏、上移一行）。
+        # 输入框改由本窗口自建，改动即自动保存（与数据源测试窗同款 _save_folder）。
+        folder_row = QHBoxLayout()
+        folder_row.addWidget(QLabel("本地头像目录:"))
+        self.folder_edit = QLineEdit(manager.config.actor_photo_folder)
+        self.folder_edit.setCursorPosition(0)
+        self.folder_browse_btn = QPushButton("浏览")
+        self.folder_browse_btn.setObjectName("btnPrimary")
+        self.folder_browse_btn.clicked.connect(self._browse_folder)
+        folder_row.addWidget(self.folder_edit, stretch=1)
+        folder_row.addWidget(self.folder_browse_btn)
+        right_layout.addLayout(folder_row)
 
         btn_row = QHBoxLayout()
         self.btn_fetch_image = QPushButton("获取头像")
@@ -4320,12 +4365,20 @@ class ActorDetailDialog(QDialog):
         right_layout.addLayout(btn_row)
         root.addWidget(right, stretch=2)
 
+        # 两个头像预览框的高度跟着所在栏走（各占 1/3，见 _sync_preview_heights）。
+        # 挂在左右两栏的 Resize 上而不是对话框的 resizeEvent：栏的 Resize 事件送达时
+        # 栏高已是新值（布局尚未重排子控件），读到的就是准数，不依赖 Qt 重排顺序。
+        self._preview_boxes = (left, right)
+        self._in_preview_sync = False
+        for _box in self._preview_boxes:
+            _box.installEventFilter(self)
+
         # 右侧快速设置面板（改即保存）：不限定宽，与左右两栏按 1:2:1 分配
         #（数据源测试窗口同款 fixed_width=None，定宽会卡死 stretch）。
-        panel = _SourceQuickSettingsPanel(self, show_folder_row=True, fixed_width=None)
+        panel = _SourceQuickSettingsPanel(self, fixed_width=None)
         panel.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         # 头像/信息两列表 1:1 占据面板高度：详情窗常开（数据源测试窗是最大化才开，
-        # 此处按用户要求始终平分，底部弹簧分不到富余、目录行贴底）。
+        # 此处按用户要求始终平分，底部弹簧分不到富余、两列表铺满面板）。
         panel.set_lists_expanded(True)
         root.addWidget(panel, stretch=1)
 
@@ -4334,11 +4387,189 @@ class ActorDetailDialog(QDialog):
         self.btn_sync_both.clicked.connect(lambda: self._run_sync("both"))
         self.btn_sync_image.clicked.connect(lambda: self._run_sync("image"))
         self.btn_sync_info.clicked.connect(lambda: self._run_sync("info"))
+        self.folder_edit.textChanged.connect(self._save_folder)
+
+        # 记住六枚按钮的默认高度：最大化时按对话框高度比例等比拉升高度、宽度不动
+        #（见 _sync_button_stretch）。按控件直接存引用——六枚都是 btnPrimary，
+        # 用 objectName / 文案当键会互相顶掉。
+        self._stretch_base_h: list[tuple[QPushButton, int]] = []
+        for b in (
+            self.btn_fetch_image,
+            self.btn_fetch_info,
+            self.btn_sync_both,
+            self.btn_sync_image,
+            self.btn_sync_info,
+            self.folder_browse_btn,
+        ):
+            try:
+                self._stretch_base_h.append((b, b.sizeHint().height()))
+            except Exception:
+                pass
 
         self._detail_done.connect(self._on_detail_done)
         self._load_existing_avatar()
         if actor.new_image_path:
             self._show_new_avatar(actor.new_image_path)
+
+    def _browse_folder(self):
+        path = QFileDialog.getExistingDirectory(self, "选择本地头像目录", self.folder_edit.text())
+        if path:
+            self.folder_edit.setText(path)
+            self.folder_edit.setCursorPosition(0)
+
+    def _save_folder(self):
+        cfg = manager.config.model_copy(deep=True)
+        cfg.actor_photo_folder = self.folder_edit.text().strip()
+        manager._replace_config(cfg)
+        manager.save()
+
+    def _sync_button_stretch(self) -> None:
+        """最大化时按钮高度随对话框高度等比拉升（宽度不变），还原时恢复默认。
+
+        比例 = 当前对话框高度 / 默认高度（默认高度取 __init__ 里 resize 后的
+        `_dialog_base_h`），只写 `minimumHeight`——不碰宽度，最大化时按钮变高不变宽。
+        数值相同即跳过，避免反复触发布局；普通/最小化窗口比例恒为 1.0，等于不改动。
+        """
+        try:
+            try:
+                _max = self.isMaximized()
+            except Exception:
+                _max = False
+            _base_h = getattr(self, "_dialog_base_h", 0) or 0
+            _cur_h = self.height() or 0
+            _ratio = (_cur_h / _base_h) if (_max and _base_h > 0 and _cur_h > 0) else 1.0
+            for _btn, _base in getattr(self, "_stretch_base_h", None) or []:
+                try:
+                    if _base <= 0:
+                        continue
+                    _target = max(1, int(round(_base * _ratio)))
+                    if _btn.minimumHeight() != _target:
+                        _btn.setMinimumHeight(_target)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        try:
+            if event is not None and event.type() == QEvent.Type.WindowStateChange:
+                self._sync_button_stretch()
+        except Exception:
+            pass
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._sync_button_stretch()
+
+    def _sync_info_table_min_h(self) -> None:
+        """信息表至少要能完整显示全部行：下限 = 表头 + 逐行 rowHeight 之和 + 边框 + 2px。
+
+        不设这个下限的话，栏内空间被「简介」分走时表格只剩表头加一两行，
+        「标签/年份/生日/出生地/外部ID」得拖着滚动条才看得全（实测 1080x720 下
+        表格只剩 107px，够看 2 行半）。多留的 2px 是取整余量：viewport 高 =
+        控件高 − 边框 − 表头，正好等于行高之和时差 1px 就会冒出一条竖滚动条。
+        行数随「右键增删行」变化，故每次同步都按当前 rowCount 重算。
+        栏内实在不够（窗口很矮或行数很多）时不会硬撑：最小高只作下限，
+        预览框那边另有退让，实在仍不够表格照常滚动，不会把窗口顶大。
+        """
+        try:
+            table = self.info_table
+            header = table.horizontalHeader()
+            head_h = header.height() if header is not None and not header.isHidden() else 0
+            rows_h = sum(max(0, table.rowHeight(i)) for i in range(table.rowCount()))
+            need = head_h + rows_h + 2 * table.frameWidth() + 2
+            if table.minimumHeight() != need:
+                table.setMinimumHeight(need)
+        except Exception:
+            pass
+
+    def _sync_column_heights(self) -> None:
+        """栏高变化的统一出口：先给信息表定下限，再同步两个头像预览框的取高。
+
+        顺序有讲究：信息表的下限会计进所在栏的最小高，预览框的退让量必须按
+        定完下限之后的余量算，否则这一轮算出的预览框会偏高。
+        """
+        try:
+            self._sync_info_table_min_h()
+        except Exception:
+            pass
+        try:
+            self._sync_preview_heights()
+        except Exception:
+            pass
+
+    def _sync_preview_heights(self) -> None:
+        """两个头像预览框各占所在栏 1/3 高度，头像在框内水平居中并按新框宽重绘。
+
+        目标高 = 栏高 // _AVATAR_PREVIEW_COL_RATIO；若这一份会把其余控件挤出栏外
+        （栏太矮），退到「栏高 − 栏内其余控件最小高之和」。这个退让是防死循环的关键：
+        预览框一旦写死高度，它的 minimumSize 就算进栏的最小高，栏被顶大 → 栏高变 →
+        目标高又变大 → 窗口继续被顶大，来回不停。限定「其余控件永远放得下」即已截断。
+        """
+        if getattr(self, "_in_preview_sync", False):
+            return
+        self._in_preview_sync = True
+        try:
+            for label in (self.existing_avatar_label, self.new_avatar_label):
+                try:
+                    box = label.parentWidget()
+                    if box is None or box.layout() is None:
+                        continue
+                    col_h = box.height()
+                    if col_h <= 0:
+                        continue
+                    target = col_h // _AVATAR_PREVIEW_COL_RATIO
+                    rest_h = _layout_min_h_excluding(box.layout(), label)
+                    if col_h - target < rest_h:
+                        target = col_h - rest_h
+                    target = max(1, target)
+                    if label.height() != target:
+                        label.setFixedHeight(target)
+                    self._rescale_preview_pixmap(label)
+                except Exception:
+                    pass
+        finally:
+            self._in_preview_sync = False
+
+    @staticmethod
+    def _rescale_preview_pixmap(label: QLabel) -> None:
+        """预览框尺寸变了就按新尺寸重绘头像（_show_pixmap 存下的原图，KeepAspectRatio）。
+
+        文字态（无头像/加载中/加载失败）不动 —— QLabel 的 setText 会清掉 pixmap，
+        此时 pixmap 为空，据此判断即可，无需在各 setText 处额外清标记。
+        """
+        try:
+            src = label.property("avatarSrcPixmap")
+            if src is None:
+                return
+            shown = label.pixmap()
+            if shown is None or shown.isNull():
+                return
+            label.setPixmap(src.scaled(label.size(), Qt.AspectRatioMode.KeepAspectRatio))
+        except Exception:
+            pass
+
+    def eventFilter(self, obj, event):
+        try:
+            if (
+                event is not None
+                and event.type() == QEvent.Type.Resize
+                and obj in getattr(self, "_preview_boxes", ())
+            ):
+                self._sync_column_heights()
+        except Exception:
+            pass
+        return super().eventFilter(obj, event)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # 首帧两栏才拿到真实几何，事件过滤器多半已触发过；这里补一次，
+        # 保证「尺寸恰好没变、没发出 Resize」时预览框高度与信息表下限也都是对的。
+        try:
+            self._sync_column_heights()
+        except Exception:
+            pass
 
     def _populate_info_table(self):
         actor = self.actor
@@ -4369,6 +4600,12 @@ class ActorDetailDialog(QDialog):
             self.info_table.setItem(row, 1, QTableWidgetItem(""))
         elif chosen == del_action:
             self.info_table.removeRow(self.info_table.currentRow())
+        # 行数变了，「全部行完整显示」所需高度随之改变：立刻重算下限，
+        # 免得增删行后要等到下次最大化/还原才生效（_sync_info_table_min_h）。
+        try:
+            self._sync_column_heights()
+        except Exception:
+            pass
 
     def log(self, msg: str):
         """详情窗口本地日志：只记不弹窗（独立窗口不碰管理器的日志框）。
@@ -4556,4 +4793,7 @@ class ActorDetailDialog(QDialog):
 
         pix = QPixmap(path)
         if not pix.isNull():
+            # 存一份未缩放的原图：预览框高度随窗口变（_sync_preview_heights），
+            # 框一变就得按新尺寸重绘，只在首次缩一次的话框大了头像不会跟着大。
+            label.setProperty("avatarSrcPixmap", pix)
             label.setPixmap(pix.scaled(label.size(), Qt.AspectRatioMode.KeepAspectRatio))
