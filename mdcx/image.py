@@ -181,13 +181,13 @@ def cut_pic(pic_path: Path):
         img = Image.open(pic_path)  # 返回一个Image对象
 
         w, h = img.size
-        prop = h / w
+        prop = h / w if w > 0 else 0.0
 
         # 判断裁剪方式
         if prop < 1.4:  # 胖，裁剪左右
             ax = int((w - h / 1.5) / 2)
             ay = 0
-            bx = int(ax + h / 1.5)
+            bx = int(ax + h / 1.5) if w > 0 else w
             by = int(h)
         elif prop > 1.6:  # 瘦，裁剪上下
             ax = 0
@@ -224,7 +224,7 @@ def fix_pic(pic_path: Path, new_path: Path):
     try:
         pic = Image.open(pic_path)
         (w, h) = pic.size
-        prop = w / h
+        prop = w / h if h > 0 else 0.0
         if prop < 1.156:  # 左右居中
             backdrop_w = int(1.156 * h)  # 背景宽度
             backdrop_h = int(h)  # 背景宽度

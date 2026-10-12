@@ -330,21 +330,21 @@ class CutWindow(QDialog):
             self.show_image_path = img_path
             # 显示背景
             pic = QPixmap(img_path.as_posix())
-            self.pic_w = pic.width()
-            self.pic_h = pic.height()
+            self.pic_w = max(pic.width(), 1)
+            self.pic_h = max(pic.height(), 1)
             self.Ui.label_origin_size.setText(str(f"{self.pic_w!s}, {self.pic_h!s}"))  # 显示原图尺寸
-            self.pic_h_w_ratio = self.pic_h / self.pic_w  # 原图高宽比
+            self.pic_h_w_ratio = self.pic_h / self.pic_w if self.pic_w > 0 else 1.5  # 原图高宽比
             # abc = int((self.rect_h_w_ratio - 1) * 10000)
             # self.Ui.horizontalSlider_left.setValue(abc)  # 裁剪框左侧调整条的值（最大10000）
             # self.Ui.horizontalSlider_right.setValue(10000 - abc)  # 裁剪框右侧调整条的值（最大10000）和左侧的值反过来
 
             # 背景图片等比缩放并显示
-            if self.pic_h_w_ratio <= self.show_h / self.show_w:  # 水平撑满（图片高/宽 <= 显示区域高/显示区域宽）
+            if self.pic_h_w_ratio <= self.show_h / self.show_w if self.show_w > 0 else False:  # 水平撑满（图片高/宽 <= 显示区域高/显示区域宽）
                 self.pic_new_w = self.show_w  # 图片显示的宽度=显示区域宽度
-                self.pic_new_h = int(self.pic_new_w * self.pic_h / self.pic_w)  # 计算出图片显示的高度
+                self.pic_new_h = int(self.pic_new_w * self.pic_h / self.pic_w) if self.pic_w > 0 else self.show_h  # 计算出图片显示的高度
             else:  # 垂直撑满
                 self.pic_new_h = self.show_h  # 图片显示的高度=显示区域高度
-                self.pic_new_w = int(self.pic_new_h * self.pic_w / self.pic_h)  # 计算出图片显示的宽度
+                self.pic_new_w = int(self.pic_new_h * self.pic_w / self.pic_h) if self.pic_h > 0 else self.show_w  # 计算出图片显示的宽度
 
             pic = QPixmap.scaled(
                 pic, self.pic_new_w, self.pic_new_h, aspectRatioMode=Qt.AspectRatioMode.KeepAspectRatio
@@ -413,7 +413,7 @@ class CutWindow(QDialog):
         if self.pic_h_w_ratio <= 1.5:  # 高宽比小时，固定高度，水平移动
             self.keep_side = "height"
             self.rect_h = self.pic_new_h  # 裁剪框的高度 = 图片缩放显示的高度
-            self.rect_w = int(self.rect_h / self.rect_h_w_ratio)  # 计算裁剪框的宽度
+            self.rect_w = int(self.rect_h / self.rect_h_w_ratio) if self.rect_h_w_ratio > 0 else self.rect_h  # 计算裁剪框的宽度
             self.rect_x = self.pic_new_w - self.rect_w  # 裁剪框左上角位置的x值
             self.rect_y = 0  # 裁剪框左上角位置的y值
         else:  # 高宽比大时，固定宽度，竖向移动

@@ -24,7 +24,7 @@ class Computed:
             base_url=config.translate_config.llm_url.unicode_string(),
             proxy=proxy,
             timeout=httpx.Timeout(config.timeout, read=config.translate_config.llm_read_timeout),
-            rate=(max(config.translate_config.llm_max_req_sec, 1), max(1, 1 / config.translate_config.llm_max_req_sec)),
+            rate=(max(config.translate_config.llm_max_req_sec, 1), max(1, 1 / max(config.translate_config.llm_max_req_sec, 0.001))),
         )
 
         self.async_client = AsyncWebClient(
