@@ -281,6 +281,10 @@ class CutWindow(QDialog):
 
         to_cut 会把未裁剪的完整原图直接写成 thumb/fanart，所以把 img_path 换成
         poster 大图后，裁剪保存出来的 thumb/fanart 自然也是大尺寸图。
+
+        判据与 core/image.py 的替换逻辑保持一致：poster 的**宽和高都严格大于**
+        当前图才换，不能用像素面积代替 —— poster 1000x2000 面积大于 1500x1000，
+        但宽度更窄，拿它当「大缩略图」反而会让缩略图变小。
         """
         if DownloadableFile.POSTER_REPLACE_THUMB not in manager.config.download_files:
             return img_path
@@ -289,10 +293,10 @@ class CutWindow(QDialog):
             if not poster_path.exists() or poster_path == img_path:
                 return img_path
             with Image.open(img_path) as img:
-                img_area = img.size[0] * img.size[1]
+                img_w, img_h = img.size
             with Image.open(poster_path) as poster:
-                poster_area = poster.size[0] * poster.size[1]
-            if poster_area <= img_area:
+                poster_w, poster_h = poster.size
+            if not (poster_w > img_w and poster_h > img_h):
                 return img_path
         except Exception:
             return img_path

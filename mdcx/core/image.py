@@ -129,7 +129,15 @@ async def _replace_if_poster_bigger(
     target_path: Path | None,
     label: str,
 ) -> bool:
-    """poster 像素面积严格大于 target 时用 poster 覆盖 target，成功返回 True。"""
+    """poster **宽和高都严格大于** target 时用 poster 覆盖 target，成功返回 True。
+
+    判据刻意不用像素面积：面积大 ≠ 每一维都大。例如 poster 1000x2000（面积 200 万）
+    大于 thumb 1500x1000（面积 150 万），但 poster 的宽度反而更窄 —— 这种「竖图覆盖
+    横图」并不是真正的「更大的缩略图」，用它替换会让 thumb 变小。按面积判会误替换，
+    故必须是 poster_w > target_w **且** poster_h > target_h 两个条件同时成立。
+
+    target 缺失或读不出尺寸（损坏）时无从比较，直接用 poster 补上/修复。
+    """
     if not poster_path or not target_path:
         return False
     try:
@@ -141,14 +149,19 @@ async def _replace_if_poster_bigger(
     if not poster_size:
         return False
     target_size = await _image_size_async(target_path)
-    if target_size and poster_size[0] * poster_size[1] <= target_size[0] * target_size[1]:
-        return False  # poster 不比 target 大，保持原样
+    if target_size and not (poster_size[0] > target_size[0] and poster_size[1] > target_size[1]):
+        LogBuffer.log().write(
+            f"\n 🍀 封面替换{label}跳过: poster {poster_size[0]}x{poster_size[1]}"
+            f" 未同时大于 {target_path.name} {target_size[0]}x{target_size[1]}"
+        )
+        return False
     ok, err = await copy_file_async(poster_path, target_path)
     if not ok:
         LogBuffer.log().write(f"\n 🍀 封面替换{label}失败: {err}")
         return False
     LogBuffer.log().write(
         f"\n 🍀 封面替换{label}: poster {poster_size[0]}x{poster_size[1]} → {label} {target_path.name}"
+        + (f" {target_size[0]}x{target_size[1]}" if target_size else "")
     )
     return True
 
@@ -159,7 +172,7 @@ async def replace_thumb_fanart_with_poster(
     fanart_path: Path | None,
     poster_path: Path | None,
 ):
-    """「封面替换缩略图」：勾选后，若 poster 像素面积大于 thumb/fanart，则用 poster 覆盖之。
+    """「封面替换缩略图」：勾选后，若 poster **宽和高都严格大于** thumb/fanart，则用 poster 覆盖之。
 
     仅当对应文件类型本身也勾选了「下载」时才替换，否则 replace 出来的文件会被
     pic_some_deal 之类的清理逻辑当成「不下载的中间产物」删掉。替换放在加水印之前，
