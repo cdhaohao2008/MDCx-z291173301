@@ -88,7 +88,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "下载 Camoufox Firefox (~663MB)..."
-          $CamoufoxVersion = "152.0.4-beta.28"
+          $CamoufoxVersion = "152.0.4-beta.30"
           $CamoufoxUrl = "https://github.com/daijro/camoufox/releases/download/v${CamoufoxVersion}/camoufox-${CamoufoxVersion}-win.x86_64.zip"
           $CacheDir = "$HOME\.cache\camoufox"
           New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
@@ -99,7 +99,7 @@ jobs:
           # 写成无 BOM UTF-8，避免 JSON.parse 被 BOM 字符打断
           [IO.File]::WriteAllText(
             (Join-Path $CacheDir "version.json"),
-            '{"version":"0.1.0","release":"0.1.0"}',
+            '{"version":"152.0.4","release":"beta.30"}',
             (New-Object System.Text.UTF8Encoding($false))
           )
           Write-Host "下载完成，已缓存到 $CacheDir"
@@ -227,7 +227,7 @@ jobs:
             Copy-Item -Path "$CamoufoxCache\*" -Destination "$PACKAGE\.cache\camoufox\" -Recurse -Force
             [IO.File]::WriteAllText(
               (Join-Path "$PACKAGE\.cache\camoufox" "version.json"),
-              '{"version":"0.1.0","release":"0.1.0"}',
+              '{"version":"152.0.4","release":"beta.30"}',
               (New-Object System.Text.UTF8Encoding($false))
             )
             Write-Host "已包含 Camoufox 缓存"
