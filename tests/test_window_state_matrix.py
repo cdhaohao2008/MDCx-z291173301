@@ -170,7 +170,7 @@ def test_resize_first_then_switch_log_page_layout(win, app):
     upper = win.Ui.textBrowser_log_main
     lower = win.Ui.textBrowser_log_main_2
     # 上栏日志显示从顶端 y=0 开始，按 61%/39% 分栏；滚动条是独立控件，
-    # 其轨道从清空按钮下方 y=85 开始，显示与滚动分离
+    # 其轨道上延到开始按钮下方 y=57（开始按钮底部 53 + 4px 间隙），显示与滚动分离
     assert upper.y() == 0
     assert upper.height() == pytest.approx(page.height() * 0.61, abs=2)
     assert lower.isVisibleTo(page)
@@ -179,11 +179,14 @@ def test_resize_first_then_switch_log_page_layout(win, app):
     # 显示区 + 外置滚动条总宽与原日志区同宽（右缘页宽-18 不变）
     bar = win.Ui.verticalScrollBar_log_main
     assert upper.width() + bar.width() == page.width() - 28 - 18
-    assert (bar.x(), bar.y(), bar.width()) == (28 + upper.width(), 85, 16)
-    assert bar.height() == upper.height() - 85
-    # 外置滚动条矩形不得与清空显示按钮相交；滚动范围与内置滚动条一致
+    assert (bar.x(), bar.y(), bar.width()) == (28 + upper.width(), 57, 16)
+    assert bar.height() == upper.height() - 57
+    # 外置滚动条矩形不得与清空显示按钮相交；清空按钮在其左侧，
+    # 且 x 与软件界面清空结果列表按钮一致
     clear_btn = win.Ui.pushButton_clear_logs
     assert not bar.geometry().intersects(clear_btn.geometry())
+    assert clear_btn.x() + clear_btn.width() <= bar.x()
+    assert clear_btn.x() == win.Ui.pushButton_tree_clear.x()
     inner = upper.verticalScrollBar()
     assert not inner.isVisible()
     assert (bar.minimum(), bar.maximum(), bar.value()) == (inner.minimum(), inner.maximum(), inner.value())
@@ -223,17 +226,18 @@ def test_log_external_scrollbar_mirrors_inner_and_avoids_clear_button(win, app):
     inner = upper.verticalScrollBar()
     clear_btn = win.Ui.pushButton_clear_logs
 
-    # 日志显示从顶端开始，清空按钮位置不变（780,61,20,20）
+    # 日志显示从顶端开始；清空按钮移到滚动条左侧，x 与软件界面清空按钮一致
     assert upper.y() == 0
     assert (clear_btn.x(), clear_btn.y(), clear_btn.width(), clear_btn.height()) == (
-        page.width() - 40,
+        page.width() - 60,
         61,
         20,
         20,
     )
-    # 外置滚动条轨道从按钮下方开始，矩形不相交
-    assert outer.y() == 85
-    assert outer.y() >= clear_btn.y() + clear_btn.height()
+    assert clear_btn.x() == win.Ui.pushButton_tree_clear.x()
+    # 外置滚动条轨道上延到开始按钮下方，矩形不相交
+    assert outer.y() == 57
+    assert clear_btn.x() + clear_btn.width() <= outer.x()
     assert not outer.geometry().intersects(clear_btn.geometry())
 
     # 写入足够多日志使出现滚动范围：外置条范围与内置一致（滚动范围保持不变）

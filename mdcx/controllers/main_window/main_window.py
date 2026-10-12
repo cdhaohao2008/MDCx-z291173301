@@ -5319,10 +5319,11 @@ class MyMAinWindow(QMainWindow):
         log_w = max(log_page.width() - 28 - 18, 300)
         log_h_total = log_page.height()
         # 上栏日志显示从顶端 y=0 开始；滚动条是独立控件 verticalScrollBar_log_main，
-        # 其轨道从清空按钮下方 y=85 开始（清空按钮 y61+h20 底部 81，留 4px 间隙），
-        # 显示与滚动分离：滚动范围与内置滚动条一致，只是轨道不再与按钮重合。
+        # 其轨道上延到开始按钮下方 y=57（开始按钮 y13+h40 底部 53，留 4px 间隙），
+        # 下缘贴上栏底；清空按钮移至滚动条左侧、x 与软件界面清空按钮同值。
+        # 显示与滚动分离：滚动范围与内置滚动条一致，轨道与按钮矩形不相交。
         log_bar_w = 16
-        log_bar_top = 85
+        log_bar_top = 57
         # 下栏隐藏时上栏铺满整页；显示时上下按原比例 (421:271 ≈ 61%:39%) 分高
         lower_browser = ui.textBrowser_log_main_2
         if lower_browser.isHidden():
@@ -5340,9 +5341,10 @@ class MyMAinWindow(QMainWindow):
             lower_browser.setGeometry(28, upper_h + 1, upper_w, lower_h)
         # 覆盖性日志视图 (失败列表) 铺满整个日志页（右缘同样收到页宽-18，与上下日志区滚动条对齐）
         ui.textBrowser_log_main_3.setGeometry(0, 0, max(log_page.width() - 18, 300), max(log_page.height() - 2, 300))
-        # 设计基准页面宽 822/高 692：按钮右缘锚定右侧、底部按钮锚定下缘（与软件界面开始按钮同右缘）
+        # 设计基准页面宽 822/高 692：按钮右缘锚定右侧、底部按钮锚定下缘（与软件界面开始按钮同右缘）；
+        # 清空按钮 x 取页宽-60，与软件界面清空结果列表按钮（pushButton_tree_clear，非最大化同为页宽-60）左右一致
         ui.pushButton_start_cap2.move(max(log_page.width() - 120 - 20, 20), 13)
-        ui.pushButton_clear_logs.move(max(log_page.width() - 40, 20), 61)
+        ui.pushButton_clear_logs.move(max(log_page.width() - 60, 20), 61)
         ui.pushButton_view_failed_list.move(max(log_page.width() - 255, 20), 13)
         ui.pushButton_show_hide_logs.move(0, max(log_page.height() - 42, 13))
         ui.pushButton_save_failed_list.move(0, max(log_page.height() - 42, 13))
