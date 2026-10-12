@@ -105,9 +105,11 @@ class CustomScrollArea(QScrollArea):
     def set_content_right_trim(self, trim: int) -> None:
         """按实例设置内容右侧内收量（默认 0）。
 
-        软件工具页卡片右缘比软件设置页同类卡片宽出 4px（800~2200 窗宽下
-        离线实测恒定，与 DPI 无关），左缘不动：extra 统一减去该值，
-        容器与内部跟随项整体左收，内部控件相对位置不变。
+        历史：软件工具页卡片右缘曾比软件设置页同类卡片宽出 4px（800~2200 窗宽下
+        离线实测恒定，与 DPI 无关），当时以 scrollArea_10 内收 4px 对齐（左缘不动）。
+        设置页滚动区加宽 4px（tab 右边距 20→16，滚动条右缘收到页宽-18、与主界面
+        对齐）后两侧视口差消失、自然齐平，内收已取消（置 0 即默认）。机制保留，
+        后续若再出现恒定右缘差可重新启用。
         """
         self._content_right_trim = max(trim, 0)
 
@@ -369,6 +371,12 @@ class CustomScrollArea(QScrollArea):
         好了"，还原后也保持——完全对得上用户现象。
 
         厚度来源仍是 QSS 声明的 sizeHint()，不硬编码 16：改 QSS 即改这里。
+
+        守卫（只许加宽、不许钉窄）：若本条已被控制器统一钉死（min==max 落在
+        合理区间），而本次读到的声明值比钉死值更窄，则直接返回、保持钉死宽度。
+        休眠页 resizeEvent 进来的 sizeHint 常是未抛光的平台默认 12px，用它会把
+        已统一到 16px（与主界面/日志同宽）的设置页滚动条又打回 12px，正是
+        「设置页滚动条比主界面窄」的成因。加宽诉求不受影响（声明更宽时照常钉）。
         """
         try:
             bar = self.verticalScrollBar()
@@ -377,6 +385,13 @@ class CustomScrollArea(QScrollArea):
             bar.ensurePolished()
             declared = bar.sizeHint().width()
             if not (self._SCROLLBAR_SANE_MIN <= declared <= self._SCROLLBAR_SANE_MAX):
+                return
+            pinned = bar.minimumWidth()
+            if (
+                bar.minimumWidth() == bar.maximumWidth()
+                and self._SCROLLBAR_SANE_MIN <= pinned <= self._SCROLLBAR_SANE_MAX
+                and declared < pinned
+            ):
                 return
             changed = False
             if bar.minimumWidth() != declared or bar.maximumWidth() != declared:

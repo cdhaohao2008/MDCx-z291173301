@@ -5188,7 +5188,12 @@ class MyMAinWindow(QMainWindow):
         # ============ page_setting: tabWidget + 内部12个 scrollArea ============
         # tabWidget 设计参考几何(20,10,800,682) → scrollArea(0,0,796,658)
         # 保持 tabWidget 固定 X/Y=20,10，宽高跟随主窗口
-        tab_w = max(avail_w - 40, 200)
+        # tab 右边距收到 16（20-4）：QTabWidget 的 pane 内框约占 4px（左右各 ~2），
+        # 滚动区若铺满 tab 页宽（上一版 scroll_w=tab_w），右缘连同滚动条会被内框
+        # 裁掉 2~4px——几何量对、画面被吃，看着比主界面窄。4px 从"滚动区留白"挪到
+        # "tab 右边距"：滚动区保留 4px 框内余量（右缘不被裁、整条完整可见），
+        # 滚动条右缘仍落在 20+内缩2+scroll_w=页宽-18，与软件界面结果树右缘对齐。
+        tab_w = max(avail_w - 36, 200)
         tab_h = max(avail_h - 20, 150)
         scroll_w = max(tab_w - 4, 396)
         scroll_h = max(tab_h - 24, 326)  # tab栏约占24px + 4px 边框
@@ -5305,8 +5310,9 @@ class MyMAinWindow(QMainWindow):
             )
 
         # ============ page_log: textBrowser_log_main (上) / textBrowser_log_main_2 (下) / log_main_3(失败列表) ============
+        # 日志区右缘与软件界面结果树右缘对齐（同为页宽-18）：x=28，宽=页宽-28-18
         log_page = ui.page_log
-        log_w = max(log_page.width() - 28 - 2, 300)
+        log_w = max(log_page.width() - 28 - 18, 300)
         log_h_total = log_page.height()
         # 下栏（失败日志）隐藏时上栏铺满整页；显示时上下按原比例 (421:271 ≈ 61%:39%) 分高
         lower_browser = ui.textBrowser_log_main_2
@@ -5319,12 +5325,12 @@ class MyMAinWindow(QMainWindow):
         ui.textBrowser_log_main.setGeometry(28, 0, upper_w, upper_h)
         if not lower_browser.isHidden():
             lower_browser.setGeometry(28, upper_h + 1, upper_w, lower_h)
-        # 覆盖性日志视图 (失败列表) 铺满整个日志页
-        ui.textBrowser_log_main_3.setGeometry(0, 0, max(log_page.width() - 2, 300), max(log_page.height() - 2, 300))
-        # 设计基准页面宽 822/高 692：按钮右缘锚定右侧、底部按钮锚定下缘
-        ui.pushButton_start_cap2.move(max(log_page.width() - 142, 20), 13)
-        ui.pushButton_clear_logs.move(max(log_page.width() - 42, 20), 61)
-        ui.pushButton_view_failed_list.move(max(log_page.width() - 257, 20), 13)
+        # 覆盖性日志视图 (失败列表) 铺满整个日志页（右缘同样收到页宽-18，与上下日志区滚动条对齐）
+        ui.textBrowser_log_main_3.setGeometry(0, 0, max(log_page.width() - 18, 300), max(log_page.height() - 2, 300))
+        # 设计基准页面宽 822/高 692：按钮右缘锚定右侧、底部按钮锚定下缘（随日志区同步左移16px）
+        ui.pushButton_start_cap2.move(max(log_page.width() - 158, 20), 13)
+        ui.pushButton_clear_logs.move(max(log_page.width() - 58, 20), 61)
+        ui.pushButton_view_failed_list.move(max(log_page.width() - 273, 20), 13)
         ui.pushButton_show_hide_logs.move(0, max(log_page.height() - 42, 13))
         ui.pushButton_save_failed_list.move(0, max(log_page.height() - 42, 13))
 
@@ -6168,6 +6174,8 @@ class MyMAinWindow(QMainWindow):
         其中最宽者为准，把其余一律 setFixedWidth 对齐；已一致时完全 no-op
         （幂等）；除滚动条自身厚度外不改任何几何，组框与行列宽由末尾的全量
         同步按新视口重排。
+        基准含软件界面结果树与软件日志主栏的滚动条（只读不钉）：设置页各页签
+        的目标厚度与这两处取最宽者，保证设置页滚动条与主界面/日志页同宽。
         读数来源（离屏整窗实测，勿再改回 width()）：厚度取 **sizeHint()** 而非
         width()。QSS 里 `QScrollBar:vertical{width:16px}` 是权威厚度，它落在
         sizeHint 上；width() 只是控件当前几何，未 polish / 未被布局过的页签停在
@@ -6203,11 +6211,20 @@ class MyMAinWindow(QMainWindow):
                 return
             # 只采信合理区间读数：未布局页可能报出荒唐值（Qt 默认 100px 那种），
             # 必须滤掉，否则会把所有页签错钉成 100px（离屏实测教训）
-            declared = [bar.sizeHint().width() for bar in bars]
+            # 软件界面/软件日志的滚动条只做宽度基准（只读不钉），保证设置页与之同宽
+            ref_bars = []
+            for ref in (ui.treeWidget_number, ui.textBrowser_log_main):
+                try:
+                    ref_bar = ref.verticalScrollBar()
+                    ref_bar.ensurePolished()
+                    ref_bars.append(ref_bar)
+                except Exception:
+                    continue
+            declared = [bar.sizeHint().width() for bar in bars + ref_bars]
             sane = [width for width in declared if 8 <= width <= 48]
             if not sane:
-                # sizeHint 全不可信时退回几何读数，仍取最宽者兜底
-                sane = [bar.width() for bar in bars if 8 <= bar.width() <= 48]
+                # sizeHint 全不可信时退回几何读数，仍取最宽者兜底（含主界面/日志基准）
+                sane = [bar.width() for bar in bars + ref_bars if 8 <= bar.width() <= 48]
                 if not sane:
                     return
             target = max(sane)
@@ -6222,6 +6239,16 @@ class MyMAinWindow(QMainWindow):
                     bar.setFixedWidth(target)
                     corrected = True
             if corrected:
+                # 改宽只改几何不改绘制：抛光时缓存的 groove/handle 矩形仍是旧值，
+                # 必须重新抛光让绘制跟上，否则属性对了画面仍是窄的（逐像素实测教训）。
+                # 抛光不改几何，不会自激成 resize 回环。
+                for bar in bars:
+                    try:
+                        bar.style().unpolish(bar)
+                        bar.style().polish(bar)
+                        bar.update()
+                    except Exception:
+                        continue
                 # 视口随之变化，立刻按新视口重排（否则组框按旧视口定格）
                 self._sync_page_layouts()
         except Exception:
@@ -6942,7 +6969,7 @@ class MyMAinWindow(QMainWindow):
         d_set=W_cell/6，随宽度线性漂移（离屏实测 1000→+41/+82、
         1900→+116/+232，逐值吻合）。
         做法（条件左移单向、宽态门控）：宽态门 extra=viewport-796>200
-        （scrollArea_13 即 NFO 设置滚动区，设计宽 796；不用 isMaximized，
+        （extra 按 NFO 内容设计宽 796 计算；滚动区设计宽已改为 800，不用 isMaximized，
         因离屏不可测；1400 中宽 extra≈334 同样开门，属宽向无害）。
         关门（窄态）时复位 genre/actor_set 约束并直接返回，窄态逐像素不动。
         开门后 3 遍有界迭代（两钉串行：先钉 genre、重排后用新鲜位置再算
@@ -7020,7 +7047,7 @@ class MyMAinWindow(QMainWindow):
         做法（窄态门控、单快照增量、四钉原子）：宽态门 extra>200 即复位
         studio/maker/publisher/label 约束（最小宽 0、最大宽默认）后直接返回，
         宽态逐像素不动（门限与 _sync_nfo_set_align 同源互补：
-        scrollArea_13 设计宽 796，不用 isMaximized，因离屏不可测；
+        extra 按 NFO 内容设计宽 796 计算，不用 isMaximized，因离屏不可测；
         1089 窄态 extra≈23 关门排布，1400/1900 宽态开门复位）。
         关门后 3 遍有界迭代，每遍从同一快照算出四个增量、原子应用：
         d1=系列.x-maker.x（整条尾巴的位移）→ studio 钉现宽+d1；

@@ -173,10 +173,10 @@ def test_resize_first_then_switch_log_page_layout(win, app):
     assert lower.isVisibleTo(page)
     assert lower.height() == pytest.approx(page.height() - upper.height() - 1, abs=2)
     assert lower.y() == upper.height() + 1
-    # 按钮右缘距页面右缘约 22px（设计 822-800），且不出界
+    # 按钮右缘距页面右缘约 38px（随日志区同步左移16px后：158-120），且不出界
     btn = win.Ui.pushButton_start_cap2
     assert btn.geometry().right() <= page.width()
-    assert page.width() - btn.geometry().right() <= 30
+    assert page.width() - btn.geometry().right() <= 45
 
 
 def test_log_lower_hidden_upper_fills_page(win, app):
@@ -457,8 +457,8 @@ def test_maximize_content_follow_all_pages(win, app):
     assert tool_scroll.width() == pytest.approx(win.Ui.page_tool.width() - 40, abs=4), (
         f"工具页 scrollArea 宽未跟随: {tool_scroll.width()} != {win.Ui.page_tool.width() - 40}"
     )
-    assert setting_tab.width() == pytest.approx(win.Ui.page_setting.width() - 40, abs=4), (
-        f"设置页 tabWidget 宽未跟随: {setting_tab.width()} != {win.Ui.page_setting.width() - 40}"
+    assert setting_tab.width() == pytest.approx(win.Ui.page_setting.width() - 36, abs=4), (
+        f"设置页 tabWidget 宽未跟随: {setting_tab.width()} != {win.Ui.page_setting.width() - 36}"
     )
 
 
@@ -681,7 +681,7 @@ def test_switch_to_pages_after_maximize_content_visible(win, app):
     # 软件设置页
     setting_page = _goto(win, app, "page_setting")
     assert win.Ui.tabWidget.width() > 700, f"设置页 tabWidget 未跟随: {win.Ui.tabWidget.width()}"
-    assert win.Ui.tabWidget.width() == pytest.approx(setting_page.width() - 40, abs=4)
+    assert win.Ui.tabWidget.width() == pytest.approx(setting_page.width() - 36, abs=4)
     # 当前 tab 的 scrollArea 内容同样必须拉伸
     current_tab = win.Ui.tabWidget.currentWidget()
     tab_scroll = current_tab.findChild(CustomScrollArea)

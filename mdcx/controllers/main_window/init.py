@@ -345,9 +345,9 @@ def Init_Ui(self: "MyMAinWindow"):
     # 是给设置页浮框带留的），否则小窗时多余留白把「保存当前nfo文件」挤出视口、
     # 凭空多出一条垂直滚动条，滚动条还会盖住输入框右侧圆角。
     self.Ui.scrollArea_nfo_lib_form.set_content_bottom_margin(8)
-    # 软件工具页卡片右缘向左收到与软件设置页齐平：左缘不动，内部相对位置不变。
-    # 差值 800~2200 窗宽下实测恒定 4px（见 tests/test_tool_page_right_align.py）。
-    self.Ui.scrollArea_10.set_content_right_trim(4)
+    # 软件工具页卡片与软件设置页卡片右缘齐平：设置页滚动区加宽 4px（tab 右边距
+    # 20→16，滚动条右缘收到页宽-18）后，两侧视口差消失、自然齐平，不再需要内收
+    #（曾用 scrollArea_10.set_content_right_trim(4) 补偿恒定 4px 差，见测试文件说明）。
     # 软件工具页滚动区底部无浮框遮挡（页脚在滚动区外单独留了 75px），默认 72px
     # 底部余量（给设置页浮框带留的）会变成刮削缓存管理下方的空白滚动区。
     # 收紧到 20px（= 设计内容高 2309 - 末组框底边 2289），保留设计呼吸感。

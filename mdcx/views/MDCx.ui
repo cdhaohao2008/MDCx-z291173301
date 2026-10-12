@@ -1241,7 +1241,7 @@
                <rect>
                  <x>28</x>
                  <y>421</y>
-                 <width>790</width>
+                 <width>774</width>
                  <height>271</height>
                </rect>
              </property>
@@ -1273,7 +1273,7 @@
           <widget class="QPushButton" name="pushButton_start_cap2">
             <property name="geometry">
               <rect>
-                <x>680</x>
+                <x>664</x>
                 <y>13</y>
                 <width>120</width>
                 <height>40</height>
@@ -1286,7 +1286,7 @@
           <widget class="QPushButton" name="pushButton_clear_logs">
             <property name="geometry">
               <rect>
-                <x>780</x>
+                <x>764</x>
                 <y>61</y>
                 <width>20</width>
                 <height>20</height>
@@ -1319,7 +1319,7 @@
                <rect>
                  <x>28</x>
                  <y>0</y>
-                 <width>790</width>
+                 <width>774</width>
                  <height>421</height>
                </rect>
              </property>
@@ -1387,7 +1387,7 @@
           <widget class="QPushButton" name="pushButton_view_failed_list">
             <property name="geometry">
               <rect>
-                <x>565</x>
+                <x>549</x>
                 <y>13</y>
                 <width>101</width>
                 <height>40</height>
@@ -11943,7 +11943,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                   <rect>
                     <x>0</x>
                     <y>0</y>
-                    <width>815</width>
+                    <width>796</width>
                     <height>658</height>
                   </rect>
                 </property>
@@ -13882,9 +13882,10 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       </layout>
                     </widget>
                   </widget>
-                  <!-- 命名页 9 个规则分组（含 groupBox_8 视频命名规则）宽度 720 = 下载/翻译页分组宽 701 + 19：
-                       本页 scrollArea_7 设计宽 815，比其它页的 796 宽 19，运行时按「设计宽+extra」拉伸后恰好
-                       使右缘与下载页「保留旧文件/下载高清图」、翻译页「翻译引擎」等对齐（左缘同为 30）。 -->
+                  <!-- 命名页 9 个规则分组（含 groupBox_8 视频命名规则）宽度 720 = 下载/翻译页分组宽 701 + 19。
+                       12 个设置页滚动区设计宽统一 796：tab 页 pane 内框约占 4px，滚动区须留 4px
+                       框内余量，否则右缘滚动条会被内框裁掉 2~4px、看着比主界面窄（右缘对齐靠
+                       tabWidget 右边距收到 16 实现，见 _sync_page_layouts）。 -->
                   <widget class="QGroupBox" name="groupBox_40">
                     <property name="geometry">
                       <rect>
