@@ -10125,15 +10125,15 @@ class MyMAinWindow(QMainWindow):
             before_info = before_info.strip()
             if Flags.file_mode == FileMode.Single:
                 website_label = self.Ui.comboBox_website_all.currentData() or self.Ui.comboBox_website_all.currentText()
-                scrape_info = f"💡 单文件刮削\n💠 {Flags.main_mode_text} · {website_label}"
+                scrape_info = f"💡 单文件刮削\n💠 {Flags.main_mode_text}·{website_label}"
             else:
-                scrape_info = f"💠 {Flags.main_mode_text} · {Flags.scrape_like_text}"
+                scrape_info = f"💠 {Flags.main_mode_text}·{Flags.scrape_like_text}"
                 if manager.config.scrape_like == "single":
                     scrape_info = f"💡 {manager.config.website_single} 刮削\n" + scrape_info
             if manager.config.soft_link == 1:
-                scrape_info = "🍯 软链接 · 开\n" + scrape_info
+                scrape_info = "🍯 软链接·开\n" + scrape_info
             elif manager.config.soft_link == 2:
-                scrape_info = "🍯 硬链接 · 开\n" + scrape_info
+                scrape_info = "🍯 硬链接·开\n" + scrape_info
             after_info = f"\n{scrape_info}\n🛠 {manager.file}\n🐰 MDCx {self.localversion}"
             text = before_info + after_info + self.new_version
             if "<font" in text or "<span" in text:

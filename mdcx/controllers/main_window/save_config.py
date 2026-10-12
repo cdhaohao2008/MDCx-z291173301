@@ -826,17 +826,17 @@ def save_config(self: "MyMAinWindow"):
     try:
         scrape_like_text = Flags.scrape_like_text
         if manager.config.scrape_like == "single":
-            scrape_like_text += f" · {manager.config.website_single.value}"
+            scrape_like_text += f"·{manager.config.website_single.value}"
         if manager.config.soft_link == 1:
-            scrape_like_text += " · 软连接开"
+            scrape_like_text += "·软连接开"
         elif manager.config.soft_link == 2:
-            scrape_like_text += " · 硬连接开"
+            scrape_like_text += "·硬连接开"
         movie_path_text = ";".join(str(path) for path in get_movie_path_setting().movie_paths)
         signal_qt.show_log_text(
             f" 🛠 当前配置：{manager.path} 保存完成！\n "
             f"📂 程序目录：{manager.data_folder} \n "
             f"📂 刮削目录：{movie_path_text} \n "
-            f"💠 刮削模式：{Flags.main_mode_text} · {scrape_like_text} \n "
+            f"💠 刮削模式：{Flags.main_mode_text}·{scrape_like_text} \n "
             f"🖥️ 系统信息：{SYSTEM_INFO} \n "
             f"🐰 软件版本：{VERSION_NAME} ({LOCAL_VERSION}) \n"
         )
