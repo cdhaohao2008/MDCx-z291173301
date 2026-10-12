@@ -256,6 +256,59 @@ def test_log_external_scrollbar_mirrors_inner_and_avoids_clear_button(win, app):
     assert inner.value() == inner.maximum()
 
 
+def test_log_copy_button_layout_and_copies_visible_logs(win, app, monkeypatch):
+    """复制日志按钮在失败按钮左侧 14px、与检测网络页复制按钮同尺寸 110x40；点击复制当前显示的日志。"""
+    from PyQt6.QtWidgets import QApplication
+
+    from mdcx.controllers.main_window import main_window as mw_mod
+
+    win.resize(1032, 737)
+    app.processEvents()
+    page = _goto(win, app, "page_log")
+    copy_btn = win.Ui.pushButton_copy_logs
+    failed_btn = win.Ui.pushButton_view_failed_list
+
+    # 几何：失败左侧 14px 间距、与检测网络页复制按钮同尺寸 110x40；层级在失败覆盖层之下（覆盖显示时被盖住）
+    assert (copy_btn.width(), copy_btn.height()) == (110, 40)
+    assert copy_btn.y() == failed_btn.y() == 13
+    assert copy_btn.x() + copy_btn.width() + 14 == failed_btn.x()
+    stack = [w.objectName() for w in page.children() if w.isWidgetType()]
+    assert stack.index("pushButton_copy_logs") < stack.index("textBrowser_log_main_3")
+
+    # 功能：复制上栏（＋可见下栏）当前显示文本
+    for i in range(3):
+        win.main_logs_show.emit(f"copy-probe-upper-{i}")
+    app.processEvents()
+    win.pushButton_copy_logs_clicked()
+    clip = QApplication.clipboard().text()
+    assert "copy-probe-upper-0" in clip and "copy-probe-upper-2" in clip
+    assert "copy-probe-lower" not in clip
+    win.main_req_logs_show.emit("copy-probe-lower-0")
+    app.processEvents()
+    win.pushButton_copy_logs_clicked()
+    clip = QApplication.clipboard().text()
+    assert "copy-probe-upper-0" in clip and "copy-probe-lower-0" in clip
+
+    # 失败覆盖层显示时复制其文本
+    win.show_hide_failed_list(True)
+    app.processEvents()
+    win.Ui.textBrowser_log_main_3.setPlainText("copy-probe-failed-list")
+    win.pushButton_copy_logs_clicked()
+    assert QApplication.clipboard().text() == "copy-probe-failed-list"
+    win.show_hide_failed_list(False)
+    app.processEvents()
+
+    # 两栏都空时给提示且不动剪贴板（反馈走全局信号总线，测试桩下录制断言）
+    win.Ui.textBrowser_log_main.clear()
+    win.Ui.textBrowser_log_main_2.clear()
+    QApplication.clipboard().setText("sentinel")
+    feedback = []
+    monkeypatch.setattr(mw_mod.signal_qt, "show_log_text", lambda text: feedback.append(text))
+    win.pushButton_copy_logs_clicked()
+    assert QApplication.clipboard().text() == "sentinel"
+    assert feedback and "暂无可复制" in feedback[-1]
+
+
 def test_log_append_keeps_scrollbar_at_top(win, app):
     """产生新日志时滚动条默认保持在最上方，不自动拉到底；用户位置也不被抢占。"""
     win.resize(1032, 737)
@@ -3874,10 +3927,12 @@ def test_zimu_download_link_aligns_to_filename_when_narrow(win, app):
 
     # (窗口宽, 窗口高) -> 链接可见文字左缘 - 「视频文件名」左缘（px，0 即严格对齐）
     # 注意 1059 宽时 extra 已 > 0 转入宽态（宽态由 test_zimu_rows_align_to_filename_when_wide 覆盖）
+    # 残差随字体度量浮动（提示词自然宽变了残差跟着变），以下为当前环境
+    #（Sans Serif 9pt / offscreen 96dpi，800 档提示词自然宽 187）实测值
     expected_residual = {
-        (800, 640): 49,
-        (900, 680): 44,
-        (950, 700): 19,
+        (800, 640): 51,
+        (900, 680): 42,
+        (950, 700): 17,
         (1000, 700): 0,
         (1014, 730): 0,
         (1030, 700): 0,

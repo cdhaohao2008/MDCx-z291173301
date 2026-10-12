@@ -334,6 +334,7 @@ def Init_Ui(self: "MyMAinWindow"):
     self.Ui.pushButton_save_failed_list.setIcon(QIcon(resources.save_failed_list_icon))
     self.Ui.pushButton_clear_logs.setIcon(QIcon(resources.clear_tree_icon))
     self.Ui.pushButton_clear_logs.setToolTip("清空显示（不删除日志文件）")
+    self.Ui.pushButton_copy_logs.setToolTip("复制当前显示的日志到剪贴板")
     # 上栏日志显示与滚动条分离：内置滚动条隐藏（.ui 里 AlwaysOff），只作滚动范围数据源；
     # 外置独立滚动条负责交互，双向镜像同步（内置值变→外置跟随，外置拖动→驱动内置）
     inner_log_bar = self.Ui.textBrowser_log_main.verticalScrollBar()
@@ -460,6 +461,7 @@ def Init_Singal(self: "MyMAinWindow"):
     self.Ui.pushButton_start_cap2.clicked.connect(self.pushButton_start_scrape_clicked)
     self.Ui.pushButton_show_hide_logs.clicked.connect(self.pushButton_show_hide_logs_clicked)
     self.Ui.pushButton_clear_logs.clicked.connect(self.pushButton_clear_logs_clicked)
+    self.Ui.pushButton_copy_logs.clicked.connect(self.pushButton_copy_logs_clicked)
     self.Ui.pushButton_view_failed_list.clicked.connect(self.pushButton_show_hide_failed_list_clicked)
     self.Ui.pushButton_save_new_config.clicked.connect(self.pushButton_save_new_config_clicked)
     self.Ui.pushButton_save_new_config_tool.clicked.connect(self.pushButton_save_new_config_clicked)

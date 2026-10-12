@@ -5346,6 +5346,11 @@ class MyMAinWindow(QMainWindow):
         ui.pushButton_start_cap2.move(max(log_page.width() - 120 - 20, 20), 13)
         ui.pushButton_clear_logs.move(max(log_page.width() - 60, 20), 61)
         ui.pushButton_view_failed_list.move(max(log_page.width() - 255, 20), 13)
+        # 复制日志按钮：与检测网络页复制结果按钮同尺寸 110x40，
+        # 失败按钮左侧 14px 间距（链式锚定，窄窗钳位后间距依然成立）
+        ui.pushButton_copy_logs.setGeometry(
+            max(ui.pushButton_view_failed_list.x() - 14 - 110, 20), 13, 110, 40
+        )
         ui.pushButton_show_hide_logs.move(0, max(log_page.height() - 42, 13))
         ui.pushButton_save_failed_list.move(0, max(log_page.height() - 42, 13))
         # 外置滚动条跟随几何变化后，重新镜像内置滚动条的范围与位置
@@ -10179,6 +10184,21 @@ class MyMAinWindow(QMainWindow):
     # endregion
 
     # region 日志页
+    # 日志页复制当前显示的日志到剪贴板（上栏＋可见的下栏；失败列表覆盖显示时复制其文本）
+    def pushButton_copy_logs_clicked(self):
+        if not self.Ui.textBrowser_log_main_3.isHidden():
+            text = self.Ui.textBrowser_log_main_3.toPlainText()
+        else:
+            parts = [self.Ui.textBrowser_log_main.toPlainText()]
+            if not self.Ui.textBrowser_log_main_2.isHidden():
+                parts.append(self.Ui.textBrowser_log_main_2.toPlainText())
+            text = "\n".join(part for part in parts if part.strip())
+        if not text.strip():
+            signal_qt.show_log_text("⛔️ 暂无可复制内容")
+            return
+        QApplication.clipboard().setText(text)
+        signal_qt.show_log_text("✅ 当前显示的日志已复制到剪贴板")
+
     # 日志页清空显示（仅清界面，不动日志文件）
     def pushButton_clear_logs_clicked(self):
         self.main_log_queue.clear()

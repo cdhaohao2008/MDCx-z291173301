@@ -1403,6 +1403,19 @@
               <bool>false</bool>
             </property>
           </widget>
+          <widget class="QPushButton" name="pushButton_copy_logs">
+            <property name="geometry">
+              <rect>
+                <x>441</x>
+                <y>13</y>
+                <width>110</width>
+                <height>40</height>
+              </rect>
+            </property>
+            <property name="text">
+              <string>复制日志</string>
+            </property>
+          </widget>
           <widget class="QPushButton" name="pushButton_view_failed_list">
             <property name="geometry">
               <rect>
@@ -1513,6 +1526,7 @@
           <zorder>pushButton_start_cap2</zorder>
           <zorder>pushButton_clear_logs</zorder>
           <zorder>pushButton_show_hide_logs</zorder>
+          <zorder>pushButton_copy_logs</zorder>
           <zorder>textBrowser_log_main_3</zorder>
           <zorder>pushButton_view_failed_list</zorder>
           <zorder>pushButton_scraper_failed_list</zorder>
