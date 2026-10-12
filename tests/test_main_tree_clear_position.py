@@ -102,7 +102,7 @@ def test_restored_state_keeps_design_position(win):
 
 
 def test_maximized_gap_matches_restored_gap(win, maxed):
-    """核心判据：最大化态「刷子 ↔ 成功」间距必须与还原态完全相同。"""
+    """核心判据：最大化态刷子向右移动到开始按钮右侧，预留滚动条空间，纵向不变。"""
     ui = win.Ui
 
     win.resize(DESIGN_WINDOW_W, 700)
@@ -113,25 +113,36 @@ def test_maximized_gap_matches_restored_gap(win, maxed):
     win.resize(1900, 1000)
     win._sync_page_layouts()
     assert ui.treeWidget_number.width() > 202, "结果树应随窗口拉伸"
-    assert _succ_gap(win) == base_gap, "最大化时刷子与「成功」的间距必须与还原态一致"
     assert ui.pushButton_tree_clear.y() == 110, "纵向不得移动"
-    # 钉在树左缘 + 常量：既离开右缘、也离开「失败：N」那一段
-    assert ui.pushButton_tree_clear.x() == ui.treeWidget_number.x() + win._MAIN_TREE_CLEAR_DX
-    assert ui.pushButton_tree_clear.x() < _right_edge_x(win)
+    # 最大化态：刷子向右移动到开始按钮右侧（预留 10px 间距），并预留滚动条空间
+    assert ui.pushButton_tree_clear.x() == min(
+        ui.pushButton_start_cap.x() + ui.pushButton_start_cap.width() + 10,
+        max(ui.page_main.width() - 20 - 40, 300),
+    )
+    assert ui.pushButton_tree_clear.x() > ui.pushButton_start_cap.x() + ui.pushButton_start_cap.width(), (
+        "最大化时刷子必须在开始按钮右侧"
+    )
+    assert ui.pushButton_tree_clear.x() <= max(ui.page_main.width() - 20 - 40, 300), (
+        "最大化时刷子不得越过预留滚动条的右缘"
+    )
     assert ui.pushButton_tree_clear.x() != base_x, "最大化必须位移"
 
 
 def test_gap_stable_across_widths(win, maxed):
-    """最大化态下逐档拉宽：间距恒定（真正锚在树左缘而非页面右缘）。"""
+    """最大化态下逐档拉宽：刷子在开始按钮右侧，预留滚动条空间，不越出页面。"""
     ui = win.Ui
     win.resize(DESIGN_WINDOW_W, 700)
     win._sync_page_layouts()
-    base_gap = _succ_gap(win)
 
     for w, h in ((1400, 900), (1700, 1000), (1900, 1000), (2400, 1200)):
         win.resize(w, h)
         win._sync_page_layouts()
-        assert _succ_gap(win) == base_gap, f"窗宽 {w} 下间距漂移"
+        assert ui.pushButton_tree_clear.x() > ui.pushButton_start_cap.x() + ui.pushButton_start_cap.width(), (
+            f"窗宽 {w} 下刷子必须在开始按钮右侧"
+        )
+        assert ui.pushButton_tree_clear.x() <= max(ui.page_main.width() - 20 - 40, 300), (
+            f"窗宽 {w} 下刷子不得越过预留滚动条的右缘"
+        )
         assert ui.pushButton_tree_clear.x() + ui.pushButton_tree_clear.width() <= ui.page_main.width(), (
             f"窗宽 {w} 下刷子不得越出页面右缘"
         )
