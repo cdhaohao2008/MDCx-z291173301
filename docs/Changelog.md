@@ -57,6 +57,15 @@
   - 诉求⑥（复制日志按钮）：失败按钮左侧加一个「复制日志」按钮，一键复制当前显示的日志。改法：`.ui` 新增 `pushButton_copy_logs`（与检测网络页复制结果按钮同尺寸 110x40，设计 `(441,13)`，失败左侧 14px 间距；`zorder` 在失败覆盖层之下，覆盖显示时被盖住、与开始/清空行为一致，平时与隐藏的一键刮削按钮 footprint 重叠但互不可见）；`_sync` 里链式锚定 `view_failed.x-14-80`（窄窗钳位后间距仍成立）；`init.py` 接信号＋提示语；新增 `pushButton_copy_logs_clicked` —— 覆盖层显示时复制其文本，否则复制上栏＋可见下栏的 `toPlainText`，空时走 `show_log_text` 提示而不碰剪贴板（与 `pushButton_net_copy_clicked` 同款 `QApplication.clipboard().setText`＋反馈）。默认灰样式随主题走，无需加 QSS。
   - 回归：`test_window_state_matrix.py` 新增 `test_log_copy_button_layout_and_copies_visible_logs`，锁住「80x40、失败左侧 14px、层级在覆盖层之下」「复制上栏、含可见下栏」「覆盖层显示时复制其文本」「两栏皆空时剪贴板不动且收到暂无可复制反馈」（反馈走全局信号总线，测试桩下录制断言；此间查明 `conftest` 把 `mdcx.signals` 换成 `_DummySignals` 空桩，直接断言队列不可行）。相关 9 项全绿；`ruff check` 对改动文件零告警。
   - 回归：`test_window_state_matrix.py` 日志几何断言改回顶端模式＋外置条断言（显示区＋滚动条总宽不变、轨道上延到开始按钮下方 y=57、与清空按钮不相交、内外范围一致）；新增 3 例分别锁住「外置条镜像＋可驱动＋不相交」「走真实信号追加 50 条内外条都在顶部、置中后追加位置不变」「遗留到底态首次打开置顶＋光标归首、置中后切走切回保留」。相关用例全绿；`ruff check` 对改动文件零告警。另：`test_zimu_download_link_aligns_to_filename_when_narrow` 曾因字体度量漂移在干净树上同样失败（800x640：51 vs 49），后按最新实测把三档残差期望更新为 51/42/17（对齐机制断言本身一直成立），现全文件 88 项全绿。
+- **软件工具页演员库维护组顶部多余空白删掉（组整体上移 20px，后续各组整链跟进）**（`mdcx/views/MDCx.ui`＋重编译 `MDCx.py`、`mdcx/controllers/main_window/main_window.py`、`tests/test_actor_db_sync_row_align.py`）：
+  - 现象（用户截图红框）：软件工具页首个分组 `groupBox_actor_db_maintenance` 顶边 y=40，顶部留出约 40px 空白；同为滚动页首分组的刮削目录页（`groupBox_16`）、演员页（`groupBox_43`）顶边均为 y=20，本页多出 20px。
+  - 改法：演员库组 `(30,40,701,412)`→`(30,20,701,412)`，后续 7 个组各上移 20 保持 20px 常态间隙（`groupBox_7` 472→452、`groupBox_13` 733→713、`cover_backfill` 894→874、`groupBox_21` 1114→1094、`groupBox_6` 1375→1355、`groupBox_19` 1566→1546、`scrape_cache` 1827→1807），滚动内容高 2187→2167（末组底边 2147＋20 底部余量）；`_ACTOR_DB_TOOL_BOX_DESIGN` 同步为 `(30,20,701,412)`、`_TOOL_SINGLE_FILE_DESIGN_Y` 472→452，相关注释里的底边/顶边推导同步订正（20+412=432→452、452+241=693→713）。通用宽幅同步只改组宽不改 y，窄态分支本就按常量复位单文件组顶边，故两态行为一致。
+  - 回归：`test_actor_db_sync_row_align` 锁 `box.y()==20`、`single.y()==452`（间距仍为 20）及注释同步；`test_actor_db_sync_row_align`＋`test_tool_page_right_align`＋`test_ui_geometry` 20 项、`test_ui_structure`＋`hint_height`＋`button_consistency` 30 项全绿。
+- **软件日志页日志不足一页时隐藏右侧外置滚动条（不留滑动轨道）**（`mdcx/controllers/main_window/main_window.py`、`tests/test_window_state_matrix.py`）：
+  - 现象（用户截图）：日志只有十几行、无需滚动时，右侧仍立着一条完整的滚动轨道（`verticalScrollBar_log_main` 全高显示），看着像页面缺了一块。
+  - 根因：上栏日志显示与滚动分离后，内置条（`AlwaysOff`）只作范围数据源、外置独立条负责交互并全量镜像范围；但独立 `QScrollBar` 无 `AsNeeded` 自动隐藏语义，`maximum()==0` 时照样把轨道画满。
+  - 改法：`_mirror_log_scrollbar()` 镜像范围后加一句 `outer.setVisible(inner.maximum() > inner.minimum())` —— 无需滚动时隐藏、有范围时显示；几何保持不动（隐藏件仍保留 `(文本右缘,57,16,上栏高-57)`，恢复显示时无需重摆）。调用链天然覆盖：追加/清空走 `rangeChanged` 信号，缩放/切页走 `_sync_page_layouts` 末尾的显式 `_mirror`。
+  - 回归：`tests/test_window_state_matrix.py` 新增 `test_log_external_scrollbar_hidden_when_no_scroll_needed`，锁住「清空→`inner.maximum()==0` 且外置隐藏」「追加 200 行→有范围且对外可见」「再清空→恢复隐藏」；`-k log` 7 项全绿（含既有 6 项：几何/镜像/复制/置顶等不断言可见性、不受影响）。
 ## v2.3.5 (2026-10-20)
 ### 调整
 - **版本号**：`2.3.4` → `2.3.5`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）

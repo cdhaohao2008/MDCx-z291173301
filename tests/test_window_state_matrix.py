@@ -256,6 +256,38 @@ def test_log_external_scrollbar_mirrors_inner_and_avoids_clear_button(win, app):
     assert inner.value() == inner.maximum()
 
 
+def test_log_external_scrollbar_hidden_when_no_scroll_needed(win, app):
+    """日志不足一页时外置滚动条隐藏（不留右侧滑动轨道）；日志增多后恢复显示。"""
+    win.resize(1032, 737)
+    app.processEvents()
+    page = _goto(win, app, "page_log")
+    upper = win.Ui.textBrowser_log_main
+    outer = win.Ui.verticalScrollBar_log_main
+    inner = upper.verticalScrollBar()
+
+    upper.clear()
+    app.processEvents()
+    win._mirror_log_scrollbar()
+    app.processEvents()
+    assert inner.maximum() == 0
+    assert outer.isHidden()
+
+    for i in range(200):
+        upper.append(f"scroll-visibility-probe-{i}")
+    app.processEvents()
+    win._mirror_log_scrollbar()
+    app.processEvents()
+    assert inner.maximum() > 0
+    assert outer.isVisibleTo(page)
+
+    upper.clear()
+    app.processEvents()
+    win._mirror_log_scrollbar()
+    app.processEvents()
+    assert inner.maximum() == 0
+    assert outer.isHidden()
+
+
 def test_log_copy_button_layout_and_copies_visible_logs(win, app, monkeypatch):
     """复制日志按钮在失败按钮左侧 14px、与检测网络页复制按钮同尺寸 110x40；点击复制当前显示的日志。"""
     from PyQt6.QtWidgets import QApplication

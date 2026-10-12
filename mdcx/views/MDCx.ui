@@ -1635,7 +1635,7 @@
                   <x>0</x>
                   <y>0</y>
                   <width>860</width>
-                  <height>2187</height>
+                  <height>2167</height>
                 </rect>
               </property>
               <property name="autoFillBackground">
@@ -1645,7 +1645,7 @@
                 <property name="geometry">
                   <rect>
                     <x>30</x>
-                    <y>472</y>
+                    <y>452</y>
                     <width>701</width>
                     <height>241</height>
                   </rect>
@@ -1781,7 +1781,7 @@
                 <property name="geometry">
                   <rect>
                     <x>30</x>
-                    <y>733</y>
+                    <y>713</y>
                     <width>701</width>
                     <height>141</height>
                   </rect>
@@ -1832,7 +1832,7 @@
                 <property name="geometry">
                   <rect>
                     <x>30</x>
-                    <y>1566</y>
+                    <y>1546</y>
                     <width>701</width>
                     <height>241</height>
                   </rect>
@@ -2008,7 +2008,7 @@
                 <property name="geometry">
                   <rect>
                     <x>30</x>
-                    <y>1375</y>
+                    <y>1355</y>
                     <width>701</width>
                     <height>171</height>
                   </rect>
@@ -2087,7 +2087,7 @@
                 <property name="geometry">
                   <rect>
                     <x>30</x>
-                    <y>1114</y>
+                    <y>1094</y>
                     <width>701</width>
                     <height>241</height>
                   </rect>
@@ -2341,7 +2341,7 @@
                  <property name="geometry">
                    <rect>
                      <x>30</x>
-                     <y>40</y>
+                     <y>20</y>
                      <width>701</width>
                      <height>412</height>
                    </rect>
@@ -2807,7 +2807,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                 <property name="geometry">
                   <rect>
                     <x>30</x>
-                    <y>894</y>
+                    <y>874</y>
                     <width>701</width>
                     <height>200</height>
                   </rect>
@@ -2971,7 +2971,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                   <property name="geometry">
                     <rect>
                       <x>30</x>
-                      <y>1827</y>
+                      <y>1807</y>
                       <width>701</width>
                       <height>340</height>
                     </rect>

@@ -241,11 +241,13 @@ def test_top_desc_removed_note_on_top(win, app):
 
     背景：演员库维护组顶部「来源TMDB需配置TMDB API KEY；…」与底部「补全别名」
     说明同文案，删除第一次出现（顶部），保留第二次（底部）；组内其余控件整体
-    上移一行（22px），组框由 434 收窄到 412，单文件组顶边由 494 上移到 472。
+    上移一行（22px），组框由 434 收窄到 412，单文件组顶边由 494 上移到 452。
+    本轮顶部空白收紧：演员库组由 y=40 上移到 y=20，后续各组整链上移 20 保持 20 间隙。
     """
     ui = win.Ui
     _resize(win, app, 1080)
     box = ui.groupBox_actor_db_maintenance
+    assert box.y() == 20, f"演员库组顶边被改动: {box.y()}"
     assert getattr(ui, "label_actor_db_desc", None) is None, "顶部说明控件应已删除"
     note = ui.label_actor_db_note
     # 提示语顶到组内 30，紧贴组标题下方
@@ -265,7 +267,7 @@ def test_top_desc_removed_note_on_top(win, app):
     assert "Minnano" in bottom.text() and "全量更新" in bottom.text()
     # 单文件组同步上移，组间距保持设计值 20
     single = ui.groupBox_7
-    assert single.y() == 472, f"单文件组顶边被改动: {single.y()}"
+    assert single.y() == 452, f"单文件组顶边被改动: {single.y()}"
     assert single.y() - (box.y() + box.height()) == 20
 
 
@@ -314,9 +316,9 @@ def test_maximized_state_unchanged(win, app, monkeypatch):
     assert getattr(ui, "label_actor_db_desc", None) is None, "顶部说明控件应已删除"
     # 412 是两态统一的设计值，同时写死在三处，改任何一处本用例都会红：
     #   mdcx/views/MDCx.ui 的 groupBox_actor_db_maintenance geometry 声明高、
-    #   pyuic6 产物 mdcx/views/MDCx.py 的 setGeometry(30, 40, 701, 412)、
+    #   pyuic6 产物 mdcx/views/MDCx.py 的 setGeometry(30, 20, 701, 412)、
     #   main_window.py 的 _ACTOR_DB_TOOL_BOX_DESIGN。
-    # 该值同时是下方位移计算的基准：组底边 40+412=452，下一组 groupBox_7 顶边 472，间隙 20px。
+    # 该值同时是下方位移计算的基准：组底边 20+412=432，下一组 groupBox_7 顶边 452，间隙 20px。
     # 曾经 .ui 漂成 434，使最大化态底边 474 压到 groupBox_7 的 472 上（重叠 2px），
     # 现已改回 412，故本用例恢复锁 412。
     assert ui.groupBox_actor_db_maintenance.height() == 412, "最大化态组框高度被改动"

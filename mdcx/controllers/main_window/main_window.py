@@ -1170,16 +1170,16 @@ class MyMAinWindow(QMainWindow):
         "label_actor_db_sync_aliases_desc": (40, 356, 621, 42),
     }
 
-    # groupBox_actor_db_maintenance 的 .ui 设计几何（30, 40, 701, 412）。
+    # groupBox_actor_db_maintenance 的 .ui 设计几何（30, 20, 701, 412）。
     # 通用逻辑每遍把组框高复位到此值，本方法窄态分支绝对设值、双向幂等。
-    _ACTOR_DB_TOOL_BOX_DESIGN = (30, 40, 701, 412)
+    _ACTOR_DB_TOOL_BOX_DESIGN = (30, 20, 701, 412)
     # 最小化/还原态：单文件刮削组（groupBox_7）整体下移量（顶部说明删除后不再需要增高，
     # 保留为 0 以保持组间距与设计一致）。
-    # 设计几何：演员库组底边 40+412=452，单文件组顶边 472（常态间隙 20）；
-    # 单文件组底边 472+241=713，裁剪组（groupBox_13）顶边
-    # 733，间隙 20。绝对设值（设计顶边 472 + 位移），双向幂等；
-    # 最大化分支不动（通用逻辑每遍把组顶边复位到设计值，宽态自然回到 472）。
-    _TOOL_SINGLE_FILE_DESIGN_Y = 472
+    # 设计几何：演员库组底边 20+412=432，单文件组顶边 452（常态间隙 20）；
+    # 单文件组底边 452+241=693，裁剪组（groupBox_13）顶边
+    # 713，间隙 20。绝对设值（设计顶边 452 + 位移），双向幂等；
+    # 最大化分支不动（通用逻辑每遍把组顶边复位到设计值，宽态自然回到 452）。
+    _TOOL_SINGLE_FILE_DESIGN_Y = 452
     _TOOL_SINGLE_FILE_SHIFT = 0
     # 演员库维护组底部的别名分片行控件（按设计横排顺序，从左到右）。
     # 最小化/还原态整行顺排时按此顺序取设计宽度依次摆放，且首项「全量更新并入」
@@ -1623,7 +1623,7 @@ class MyMAinWindow(QMainWindow):
                 current_x += w
             # 最小化/还原态：单文件刮削组顶边按设计值绝对设值、双向幂等。
             # （顶部说明删除后不再需要下移一行，_TOOL_SINGLE_FILE_SHIFT 保留为 0。）
-            # 最大化分支不执行，宽态仍停在设计顶边 472。
+            # 最大化分支不执行，宽态仍停在设计顶边 452。
             single = getattr(ui, "groupBox_7", None)
             if single is not None:
                 _sx, _, _sw, _sh = single.geometry().getRect()
@@ -10208,7 +10208,8 @@ class MyMAinWindow(QMainWindow):
         self.Ui.textBrowser_log_main_2.clear()
 
     # 上栏日志显示与滚动条分离：内置滚动条隐藏，仅作滚动范围数据源；
-    # 外置独立滚动条 verticalScrollBar_log_main 负责交互，二者范围与位置镜像同步
+    # 外置独立滚动条 verticalScrollBar_log_main 负责交互，二者范围与位置镜像同步；
+    # 日志不足一页（无需滚动）时外置条隐藏，不留右侧滑动轨道
     def _mirror_log_scrollbar(self) -> None:
         inner = self.Ui.textBrowser_log_main.verticalScrollBar()
         outer = self.Ui.verticalScrollBar_log_main
@@ -10220,6 +10221,7 @@ class MyMAinWindow(QMainWindow):
             outer.setValue(inner.value())
         finally:
             outer.blockSignals(False)
+        outer.setVisible(inner.maximum() > inner.minimum())
 
     def _on_inner_log_scroll_changed(self, value: int) -> None:
         outer = self.Ui.verticalScrollBar_log_main
