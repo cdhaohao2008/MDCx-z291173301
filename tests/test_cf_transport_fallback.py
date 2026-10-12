@@ -188,7 +188,12 @@ async def test_check_falls_back_to_bypass_on_transport_failure(monkeypatch):
     result = await run_network_check_item(spec, client=client)
 
     assert result.status == NetworkCheckStatus.OK
-    assert "CF Bypass" in result.message
+    # 直连传输层失败后确实是由 CF Bypass 兜底成功的。67dc430「优化网络检测页面」把兜底成功的
+    # 文案改成了「连接正常，通过挑战（<bypass 模式>）」，旧断言里的 "CF Bypass" 字样随之消失；
+    # 这里跟着新文案锁，并额外锁住括号里的模式——它取自响应头 x-mdcx-bypass-mode，
+    # 能证明该结果来自 bypass 响应而非直连，强度不低于原断言。
+    assert result.message.startswith("连接正常，通过挑战")
+    assert "（mirror）" in result.message
     assert len(client.bypass_calls) == 1
 
 

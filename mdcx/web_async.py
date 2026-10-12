@@ -1729,7 +1729,11 @@ class AsyncWebClient:
                         return bypass_response, ""
                     html_bypass_cache = False
 
-                mirror_status = self._extract_http_status_from_bypass_error(mirror_error, prefix="mirror HTTP")
+                # 必须用 _extract_terminal_bypass_status（内部先试 "mirror HTTP" 再退回 "HTTP"）：
+                # _call_bypass_mirror 实际返回的终态错误串是裸的 "HTTP 404"（见本方法 _call_bypass_mirror
+                # 内的 f"HTTP {status}"），直接按 prefix="mirror HTTP" 匹配永远匹配不上，
+                # 会让 mirror 拿到 4xx/5xx 终态后仍继续回退 /html，把已确定失败的请求再打一次。
+                mirror_status = self._extract_terminal_bypass_status(mirror_error)
                 skip_html_fallback = mirror_status is not None and not self._is_retryable_status_code(mirror_status)
                 if skip_html_fallback:
                     error = f"mirror 返回终态 HTTP {mirror_status}，跳过 /html 回退"
@@ -2000,6 +2004,14 @@ class AsyncWebClient:
                         # 4xx/5xx 响应体常含服务器具体错误（如 Emby 400 的字段校验 JSON）。
                         # 原只取状态码导致上层无从定位根因（议题 #88：演员同步 400 只见 "HTTP 400"）。
                         # 追加截断后的响应体，保留 "HTTP {status}" 前缀以兼容既有匹配/分类逻辑。
+                        if resp.status_code >= 400:
+                            body_preview = ""
+                            try:
+                                body_preview = (resp.text or "")[:500]
+                            except Exception:
+                                body_preview = ""
+                            if body_preview:
+                                error_msg = f"{error_msg} body={body_preview}"
                         retry = self._is_retryable_status_code(resp.status_code)
                         if retry and attempt < retry_count - 1:
                             await self._record_retryable_response_failure(error_msg, pool_key=pool_key)

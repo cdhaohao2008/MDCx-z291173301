@@ -31,7 +31,10 @@ def test_initial_size_20_rows_and_16_by_9():
     from mdcx.tools.emby_actor_manager_ui import LibrarySelectDialog
 
     w, h = LibrarySelectDialog.initial_size(row_h=30, visible_rows=20, chrome_h=120, avail_w=1920, avail_h=1080)
-    assert h == 120 + 20 * 30 + 12
+    # 高度预算 = chrome_h(120，除列表可视区外的窗口内容) + 20 行 × 行高 30 + slack 12(列表边框/横向滚动条)
+    # = 732，再按 initial_size 里「整体向上缩进一行汉字高度」的 -20 收成 712（712 同时高于 320 下限、
+    # 低于 int(1080*0.85)=918 的屏幕上限，两个钳制都不生效）。
+    assert h == 120 + 20 * 30 + 12 - 20
     assert abs(w - round(h * 16 / 9)) <= 1
 
 
@@ -48,7 +51,10 @@ def test_initial_size_floors_to_minimum():
     from mdcx.tools.emby_actor_manager_ui import LibrarySelectDialog
 
     w, h = LibrarySelectDialog.initial_size(row_h=10, visible_rows=1, chrome_h=40, avail_w=1920, avail_h=1080)
-    assert (w, h) == (420, 320)
+    # 高度预算 40 + 1*10 + 12 - 20 = 42 低于 320 下限 → 高被钉在最小值 320；
+    # 宽是拿「已钳到下限的 320」按 16:9 反推出来的 round(320*16/9)=569（再经
+    # max(420, min(569, int(1920*0.85)=1632)) 仍是 569），故宽不是最小宽 420。
+    assert (w, h) == (569, 320)
 
 
 def test_initial_size_fewer_rows_shrinks_height():

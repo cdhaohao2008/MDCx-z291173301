@@ -312,6 +312,13 @@ def test_maximized_state_unchanged(win, app, monkeypatch):
     assert ui.checkBox_cover_backfill_overwrite.x() == OVERWRITE_DESIGN_X
     # 最大化态顶部说明已删除、组框为收窄后设计值（本次改动两态统一）
     assert getattr(ui, "label_actor_db_desc", None) is None, "顶部说明控件应已删除"
+    # 412 是两态统一的设计值，同时写死在三处，改任何一处本用例都会红：
+    #   mdcx/views/MDCx.ui 的 groupBox_actor_db_maintenance geometry 声明高、
+    #   pyuic6 产物 mdcx/views/MDCx.py 的 setGeometry(30, 40, 701, 412)、
+    #   main_window.py 的 _ACTOR_DB_TOOL_BOX_DESIGN。
+    # 该值同时是下方位移计算的基准：组底边 40+412=452，下一组 groupBox_7 顶边 472，间隙 20px。
+    # 曾经 .ui 漂成 434，使最大化态底边 474 压到 groupBox_7 的 472 上（重叠 2px），
+    # 现已改回 412，故本用例恢复锁 412。
     assert ui.groupBox_actor_db_maintenance.height() == 412, "最大化态组框高度被改动"
 
     # 还原后立即回到对齐态，无残留漂移

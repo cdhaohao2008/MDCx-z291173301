@@ -7,6 +7,12 @@
 实现要点（main_window.py::_net_separator_chars）：
 - 字符数 = 文本区可视宽 ÷ 等宽字宽（QSS 里 #textBrowser_net_main 为 Consolas 13px，
   实测单字宽 7px），只量一次并缓存，故最大化/还原两态数量一致；
+- 首屏竖向滚动条尚未出现，但产品一律先扣掉一个滚动条宽（_net_scrollbar_reserve，
+  实测 16）再取整除，避免用户点【开始检测】灌进几十行、滚动条弹出后已发出的
+  分隔线超出可视宽被折行。故本文件的「铺满」基准也必须扣掉这段预留；
+- 实际打印前统一过 handlers.net_separator_width 收敛（max(长度 - 8, 8)）：面板横幅
+  与检测报告里的「=」共用它，两边才永远同长。故断言里「量出的字符数」与「打印的
+  长度」是两个数，相差这次收敛；
 - 量的时机是首帧之后（showEvent 里 singleShot(0)）。窗口在 __init__ 内即触发
   showEvent 并 resize 到自适应默认尺寸，但 resize 只把 resizeEvent 排进队列，
   文本区几何要等该事件派发（resizeEvent → _sync_page_layouts 同步 setGeometry）
@@ -85,10 +91,21 @@ def _settle(win, app, width: int) -> None:
 
 
 def _usable_width(win) -> int:
-    """文本区可用文字宽：控件宽扣掉 QSS `padding: 2px, 2px`。"""
+    """文本区可用文字宽，口径必须与 _net_separator_chars 完全一致。
+
+    产品侧在首屏（竖向滚动条尚未出现）也先扣掉一个滚动条宽，见 main_window.py::
+    _net_separator_chars 的 docstring：等用户点【开始检测】把几十行灌进来、滚动条弹出后，
+    可视宽会再窄掉一个滚动条宽，此前发出的分隔线就会超出可视宽被折行。所以「铺满」的
+    基准是「控件宽 − padding − 滚动条预留」，不是「控件宽 − padding」；测试口径不跟着
+    扣的话，会把这段刻意的预留误判成「右侧留白」。
+    """
     from mdcx.controllers.main_window.main_window import _NET_SEP_TEXT_PADDING
 
-    return max(win.Ui.textBrowser_net_main.width() - _NET_SEP_TEXT_PADDING, 0)
+    browser = win.Ui.textBrowser_net_main
+    base = max(browser.width() - _NET_SEP_TEXT_PADDING, 0)
+    bar = browser.verticalScrollBar()
+    reserve = 0 if bar.isVisible() else win._net_scrollbar_reserve(bar)
+    return max(base - reserve, 0)
 
 
 def _adv(win) -> float:
@@ -155,8 +172,12 @@ def test_both_separator_lines_use_the_same_width(win, app):
     assert len(stamped) == 1, f"顶部分隔线应恰好一条，实际 {len(stamped)} 条"
 
     chars = win._net_separator_chars_cache
-    assert len(pure[0]) == chars
-    assert len(stamped[0]) == chars
+    # 实际打印的长度要先过 net_separator_width 收敛（减 8 余量、下限 8），
+    # 见 handlers.net_separator_width：横幅与检测报告里的「=」共用它，两边才永远同长。
+    printed = handlers_mod.net_separator_width(chars)
+    assert len(pure[0]) == printed
+    assert len(stamped[0]) == printed
+    assert printed == max(chars - 8, 8)
     # 时间戳居中：左右两段「=」长度差不超过 1（str.center 的取整规则）
     stamped_line = stamped[0]
     left = len(stamped_line) - len(stamped_line.lstrip("="))
@@ -207,7 +228,11 @@ def test_measurement_falls_back_when_viewport_not_settled(win, app):
 
 
 def test_show_netstatus_accepts_sep_width():
-    """handlers.show_netstatus(sep_width) 两条分隔线都按传入宽度生成。"""
+    """handlers.show_netstatus(sep_width) 两条分隔线都按传入宽度生成。
+
+    传入的是「量出来的字符数」，实际打印前统一过 net_separator_width 收敛（减 8 余量、
+    下限 8），所以 111 → 103 而不是 111。
+    """
     from mdcx.controllers.main_window import handlers as handlers_mod
 
     emitted: list[str] = []
@@ -218,14 +243,16 @@ def test_show_netstatus_accepts_sep_width():
     finally:
         handlers_mod.signal_qt.show_net_info = original
 
+    expected = handlers_mod.net_separator_width(111)
+    assert expected == 103
     pure = [t for t in emitted if t and set(t.strip()) == {"="}]
     stamped = [t for t in emitted if t.startswith("=") and ":" in t]
-    assert len(pure) == 1 and len(pure[0]) == 111
-    assert len(stamped) == 1 and len(stamped[0]) == 111
+    assert len(pure) == 1 and len(pure[0]) == expected
+    assert len(stamped) == 1 and len(stamped[0]) == expected
 
 
 def test_show_netstatus_default_and_floor():
-    """默认仍是 88（兼容旧调用）；非法宽度被夹到下限 8，不产生空行。"""
+    """默认入参仍是 88（兼容旧调用），打印长度按收敛式走；非法宽度被夹到下限 8，不产生空行。"""
     from mdcx.controllers.main_window import handlers as handlers_mod
 
     emitted: list[str] = []
@@ -237,7 +264,10 @@ def test_show_netstatus_default_and_floor():
     finally:
         handlers_mod.signal_qt.show_net_info = original
 
+    # 默认 88 经收敛后是 80（88 - 8）；0 / 负数被 max(·, 8) 夹到 8，不会塌成空行。
+    assert handlers_mod.net_separator_width(88) == 80
+    assert handlers_mod.net_separator_width(0) == 8
     pure = [t for t in emitted if t and set(t.strip()) == {"="}]
     assert len(pure) == 2
-    assert len(pure[0]) == 88
-    assert len(pure[1]) == 8
+    assert len(pure[0]) == handlers_mod.net_separator_width(88)
+    assert len(pure[1]) == handlers_mod.net_separator_width(0)

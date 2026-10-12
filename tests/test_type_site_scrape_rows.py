@@ -31,15 +31,23 @@
 本文件锁死：19 行的行号表、verticalSpacing、三个 spacer 的高度与 Fixed 策略、
 说明标签不再有 84px 硬最小高、声明几何，以及真实主窗口在各窗口宽度下量到的间隙。
 
-已知取舍：窗口窄于约 980 时三段换行说明需要三行（51px），而行高被钉在 34px，会截掉
-第三行——这是为了让默认宽度下的紧凑布局稳定；同样地，窗口很宽时三段说明只有一行，
-34px 的行高会在文字下方留下约 19px 死白，块间视觉间隙相应变大。宽态的死白已由
-运行期收敛处理（见文末「宽态单行收敛」一节）。
+已知取舍：窗口窄到三段换行说明需要三行时（真实 Windows 字体下约窄于 980，本文件的离屏测试
+环境下约窄于 1400——离屏平台无任何字族、CJK 全部落 .notdef，横向 advance 约为真实字体的
+1.5 倍），而行高被钉在 34px，会截掉第三行——这是为了让默认宽度下的紧凑布局稳定；同样地，
+窗口很宽时三段说明只有一行，34px 的行高会在文字下方留下约 19px 死白，块间视觉间隙相应变大。
+宽态的死白已由运行期收敛处理（见文末「宽态单行收敛」一节）。
 """
 
+import os
 import re
 import sys
 from pathlib import Path
+
+# 与本目录其余 48 个 GUI 测试文件一致，先把 Qt 平台钉死再导入 Qt：
+# 本文件此前漏了这行，单跑时用真实 windows 插件（QFontDatabase 有 218 个字族），
+# 与别的文件同跑时用 offscreen 插件（QFontDatabase 为空、全部字形落 .notdef、CJK
+# 横向 advance 约为真实字体的 1.5 倍），同一组宽度断言在两种环境下结论相反。
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PyQt6.QtWidgets import QApplication
@@ -477,12 +485,19 @@ def test_group_keeps_declared_height_and_does_not_overlap_next_group(win, app, w
     assert inner_bottom <= next_y, f"类型刮削网站内容底 {inner_bottom} 压到下一组（y={next_y}）"
 
 
-@pytest.mark.parametrize("width", [1400, 1014])
+# 断言宽度取本测试环境（offscreen，见文件头平台钉死）实测「三段说明都只需 ≤34px」的档位：
+#   1920 / 1400 → label_232/318/323 的 heightForWidth 实测 15 / 30 / 30，钉死的 34px 装得下；
+#   1014        → label_323（124 字）在 495px 列宽下折三行 need=45 > 34，已进入下面的「窄态截断」取舍；
+#   860         → 三段全部 need=45~60，远超 34。
+# 真实 Windows 字体下的门槛要低一档（1014 宽 label_323 正好 need=34 == 34 装得下），那是产品侧的真实
+# 保证；此处退到 1400 纯属离屏平台 QFontDatabase 为空、全部 CJK 落 .notdef 后横向 advance 被放大所致，
+# 与 .ui 的 34px 设计值本身无关（见 test_wrapped_desc_labels_anchored_at_desc_row_height）。
+@pytest.mark.parametrize("width", [1920, 1400])
 def test_wrapped_desc_text_is_not_clipped(win, app, width):
     """三段换行说明的行高要装得下真实排版高度（钉 34px = 两行文字后不能截字）。
 
-    窗口窄于约 980 时三段说明需要三行（51px），被钉在 34px 会截掉第三行——这是让默认
-    宽度下布局稳定的刻意取舍，因此只在用户常用的 ≥1014 宽下断言不截断。
+    窗口窄到三段说明需要三行时，行高被钉在 34px 会截掉第三行——这是让默认宽度下布局稳定的
+    刻意取舍，故只在「三段都放得下」的宽度档断言不截断（适用档位见上方参数处注释）。
     """
     _show_at_width(win, app, width)
 
@@ -514,8 +529,15 @@ _GUOCHAN_TIP = "label_232"
 _DONGMAN_LABEL = "label_316"  # 「动漫里番：」块标签，用户要求上移的那一行
 # 收敛只允许动这一行下方的东西；这三项必须在宽窄两态保持一致（间距不得变化）
 _STATE_INVARIANTS = ("lineEdit_website_youma", "label_154", "lineEdit_website_guochan")
-_NARROW_WIDTHS = [860, 1014]  # 说明仍需两行 → 不收敛
-_WIDE_SINGLE_LINE_WIDTHS = [1400, 1920]  # 说明只需一行 → 收敛
+# 宽窄分档按「本测试环境（offscreen，QFontDatabase 为空、CJK 落 .notdef）实测
+# label_232 折几行」划分，而非按真实 Windows 字体的折行结果划分：
+#   860 / 1014 / 1400 → heightForWidth 实测 45 / 30 / 30（两行），单行高 fontMetrics().height()=13，
+#                        13 + _SITE_TYPE_SINGLE_LINE_SLACK(3) = 16 < 30，故不收敛，maxH 保持 .ui 的 34；
+#   1920              → 实测 15（=一行高 13 + 零头），15 <= 16 成立，才发生收敛。
+# 故 1400 由「宽态」改列入「窄态」：_sync_site_type_tip_single_line 的前置条件在 1400 宽下本来就不成立，
+# 该宽度的覆盖改由 test_narrow_state_keeps_declared_row_height[1400] 以「上限 34 / 下边距 0」严格断言。
+_NARROW_WIDTHS = [860, 1014, 1400]  # 说明仍需两行 → 不收敛
+_WIDE_SINGLE_LINE_WIDTHS = [1920]  # 说明只需一行 → 收敛
 
 
 def _tip_state(win):

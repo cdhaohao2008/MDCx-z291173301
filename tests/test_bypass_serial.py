@@ -95,7 +95,11 @@ async def test_run_mounts_and_clears_serial_lock(monkeypatch):
     from mdcx.core.network_check import run_network_check
 
     client = _RunFakeClient()
-    spec = NetworkCheckSpec(name="t", group="刮削站点", url="https://t.test", enable_cf_bypass=False)
+    # group 必须用当前 GROUP_ORDER 里真实存在的组名：run_network_check 按
+    # `grouped_specs = {group: [...] for group in GROUP_ORDER}` 分组，组名不在
+    # GROUP_ORDER("基础环境","网络连通","站点检测","账号/API","辅助服务") 里的 spec
+    # 会被静默丢弃、results 直接为空。旧用例写的「刮削站点」是该组 811d809 之前的旧名。
+    spec = NetworkCheckSpec(name="t", group="站点检测", url="https://t.test", enable_cf_bypass=False)
 
     results = await run_network_check(specs=[spec], client=client, emit_header=False, progress=lambda line: None)
 

@@ -136,9 +136,14 @@ def test_thread_starts_begin_session():
     fns = {n.name: ast.unparse(n) for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
     for fn_name, marker in (
         ("_on_media_folders_result", "FetchActorsThread"),
-        ("_on_prepare_preview", "PreparePreviewThread"),
-        ("_on_clean_data", "CleanDataThread"),
+        ("_start_preview", "PreparePreviewThread"),
+        ("_start_clean", "CleanDataThread"),
         ("_on_sync", "SyncThread"),
     ):
         body = fns.get(fn_name, "")
         assert marker in body and "_begin_session" in body, f"{fn_name} 未颁发会话代数"
+    # preview 与 clean 的线程创建/代数颁发已下沉到 _start_preview / _start_clean
+    # （多入口共用同一条启动路径），_on_prepare_preview / _on_clean_data 只做前置判定后委派。
+    # 哨兵跟着下沉，并额外锁住委派关系本身，避免以后有人把启动逻辑搬回调用点时漏掉 _begin_session。
+    for entry, starter in (("_on_prepare_preview", "_start_preview"), ("_on_clean_data", "_start_clean")):
+        assert starter in fns.get(entry, ""), f"{entry} 不再委派 {starter}"
