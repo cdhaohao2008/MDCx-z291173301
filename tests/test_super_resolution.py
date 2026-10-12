@@ -97,7 +97,8 @@ async def test_maybe_upscale_replaces_atomically(tmp_path, monkeypatch):
     original = poster.read_bytes()
 
     async def fake_upscale(src, dst, preset):
-        Image.new("RGB", (1200, 1800), (0, 0, 0)).save(dst, "JPEG")
+        # 非纯黑图片（避免被 _is_all_black 误判为失败）
+        Image.new("RGB", (1200, 1800), (120, 60, 200)).save(dst, "JPEG")
         return True
 
     monkeypatch.setattr(sr, "upscale_image", fake_upscale)
@@ -268,10 +269,12 @@ async def test_upscale_failure_reports_vulkan_unavailable(tmp_path, monkeypatch)
         async def wait(self):
             return 1
 
-    async def fake_exec(*args, **kwargs):
-        return _FailProc()
+    # Windows 平台使用 _run_elevated，同步函数无法直接 monkeypatch async 执行器；
+    # 直接 monkeypatch _run_elevated 模拟失败返回（带 Vulkan 错误输出）。
+    def fake_elevated(cmd, cwd, timeout):
+        return 1, b"", b"vkCreateInstance failed -9"
 
-    monkeypatch.setattr(sr.asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setattr(sr, "_run_elevated", fake_elevated)
 
     src = tmp_path / "a.jpg"
     dst = tmp_path / "b.jpg"

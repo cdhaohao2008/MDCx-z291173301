@@ -15,6 +15,7 @@ import hashlib
 import os
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -113,6 +114,9 @@ _SR_DOWNLOAD_ATTEMPTS = 2
 # 输出尺寸/耗时护栏：低清海报超分正常 <60s；给足余量防卡死批刮任务
 _SR_TIMEOUT_SECONDS = 300.0
 _SR_MAX_INPUT_BYTES = 8 * 1024 * 1024
+
+# 同一时间只对一张图片进行超分，完成后再进行下一张
+_SR_LOCK = asyncio.Lock()
 
 
 def _tools_dir() -> Path:
@@ -289,37 +293,160 @@ def build_args(src: Path, dst: Path, preset: SrPreset) -> list[str]:
     return cli
 
 
+def _run_elevated(cmd: list[str], cwd: str, timeout: float) -> tuple[int, bytes, bytes]:
+    """Windows 专用：隐藏窗口（nShow=0 / SW_HIDE）+ 管理员权限（runas）执行命令，
+    通过临时文件重定向捕获 stdout/stderr。返回 (exit_code, stdout_bytes, stderr_bytes)。"""
+    import ctypes
+    from ctypes import wintypes
+
+    stdout_path = tempfile.mktemp(suffix="_sr_stdout.log")
+    stderr_path = tempfile.mktemp(suffix="_sr_stderr.log")
+    cmd_line = subprocess.list2cmdline(cmd)
+    redirect_cmd = f'{cmd_line} > "{stdout_path}" 2> "{stderr_path}"'
+
+    class SHELLEXECUTEINFOW(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.DWORD),
+            ("fMask", wintypes.c_ulong),
+            ("hwnd", wintypes.HWND),
+            ("lpVerb", wintypes.LPCWSTR),
+            ("lpFile", wintypes.LPCWSTR),
+            ("lpParameters", wintypes.LPCWSTR),
+            ("lpDirectory", wintypes.LPCWSTR),
+            ("nShow", wintypes.c_int),
+            ("hInstApp", wintypes.HINSTANCE),
+            ("lpIDList", wintypes.c_void_p),
+            ("lpClass", wintypes.LPCWSTR),
+            ("hkeyClass", wintypes.HKEY),
+            ("dwHotKey", wintypes.DWORD),
+            ("hIcon", wintypes.HANDLE),
+            ("hProcess", wintypes.HANDLE),
+        ]
+
+    sei = SHELLEXECUTEINFOW()
+    sei.cbSize = ctypes.sizeof(SHELLEXECUTEINFOW)
+    sei.fMask = 0x40  # SEE_MASK_NOCLOSEPROCESS：拿到进程句柄以便等待完成
+    sei.lpVerb = "runas"
+    sei.lpFile = "cmd.exe"
+    sei.lpParameters = f"/c {redirect_cmd}"
+    sei.lpDirectory = cwd
+    sei.nShow = 0  # SW_HIDE：隐藏 CMD 窗口
+
+    if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(sei)):
+        # 提权请求被拒绝（如用户取消 UAC），退化到隐藏窗口普通执行
+        sei.lpVerb = "open"
+        sei.fMask = 0x40  # 仍保留 SEE_MASK_NOCLOSEPROCESS 以便等待
+        if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(sei)):
+            return -1, b"", b"ShellExecuteExW failed"
+
+    # 等待进程完成（带超时）
+    result = ctypes.windll.kernel32.WaitForSingleObject(
+        sei.hProcess, int(timeout * 1000)
+    )
+    exit_code = -1
+    if result == 0:  # WAIT_OBJECT_0
+        exit_code = ctypes.windll.kernel32.GetExitCodeProcess(sei.hProcess) or -1
+    else:
+        # 超时：强制终止进程
+        ctypes.windll.kernel32.TerminateProcess(sei.hProcess, 1)
+        exit_code = -1
+
+    ctypes.windll.kernel32.CloseHandle(sei.hProcess)
+
+    stdout_bytes = b""
+    stderr_bytes = b""
+    try:
+        stdout_bytes = Path(stdout_path).read_bytes()
+    except Exception:
+        pass
+    try:
+        stderr_bytes = Path(stderr_path).read_bytes()
+    except Exception:
+        pass
+    try:
+        os.unlink(stdout_path)
+    except Exception:
+        pass
+    try:
+        os.unlink(stderr_path)
+    except Exception:
+        pass
+
+    return exit_code, stdout_bytes, stderr_bytes
+
+
 async def upscale_image(src: Path, dst: Path, preset: SrPreset) -> bool:
-    """超分单图。任何失败返回 False，不抛出。"""
+    """超分单图。任何失败返回 False，不抛出。
+    Windows 平台默认隐藏 CMD 窗口（CREATE_NO_WINDOW / SW_HIDE）并以管理员权限（runas）执行；
+    其余平台保持原行为。"""
     tool = str(_PRESET_META[preset]["tool"])
     exe = await ensure_binary(tool)
     if exe is None:
         return False
     dst.parent.mkdir(parents=True, exist_ok=True)
     try:
-        proc = await asyncio.create_subprocess_exec(
-            str(exe),
-            *build_args(src, dst, preset),
-            cwd=str(exe.parent),  # realesrgan 按 CWD 解析模型路径
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=_SR_TIMEOUT_SECONDS)
-        except TimeoutError:
-            proc.kill()
-            await proc.wait()
-            signal.show_traceback_log(f"🔶 超分超时（保持原图）: {src.name}")
-            _sr_report_skip(tool, [f"超分执行超过 {int(_SR_TIMEOUT_SECONDS)} 秒"])
-            return False
-        if proc.returncode != 0 or not dst.is_file() or dst.stat().st_size == 0:
-            output = stderr.decode(errors="replace")
-            signal.show_traceback_log(f"🔶 超分失败（保持原图）: {src.name} {output[:120]}")
-            _sr_report_skip(tool, [_classify_upscale_failure(output)])
-            return False
-        return True
+        async with _SR_LOCK:
+            if sys.platform == "win32":
+                # Windows：隐藏窗口 + 管理员权限执行，通过同步函数封装在异步中
+                loop = asyncio.get_running_loop()
+                exit_code, stdout_bytes, stderr_bytes = await loop.run_in_executor(
+                    None,
+                    lambda: _run_elevated(
+                        [str(exe), *build_args(src, dst, preset)],
+                        str(exe.parent),
+                        _SR_TIMEOUT_SECONDS,
+                    ),
+                )
+                stderr_text = stderr_bytes.decode(errors="replace") if stderr_bytes else ""
+                stdout_text = stdout_bytes.decode(errors="replace") if stdout_bytes else ""
+            else:
+                proc = await asyncio.create_subprocess_exec(
+                    str(exe),
+                    *build_args(src, dst, preset),
+                    cwd=str(exe.parent),  # realesrgan 按 CWD 解析模型路径
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                try:
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                        proc.communicate(), timeout=_SR_TIMEOUT_SECONDS
+                    )
+                except TimeoutError:
+                    proc.kill()
+                    await proc.wait()
+                    signal.show_traceback_log(f"🔶 超分超时（保持原图）: {src.name}")
+                    _sr_report_skip(tool, [f"超分执行超过 {int(_SR_TIMEOUT_SECONDS)} 秒"])
+                    return False
+                exit_code = proc.returncode
+                stderr_text = stderr_bytes.decode(errors="replace") if stderr_bytes else ""
+                stdout_text = stdout_bytes.decode(errors="replace") if stdout_bytes else ""
+            if exit_code != 0 or not dst.is_file() or dst.stat().st_size == 0:
+                output = stderr_text or stdout_text
+                signal.show_traceback_log(f"🔶 超分失败（保持原图）: {src.name} {output[:120]}")
+                _sr_report_skip(tool, [_classify_upscale_failure(output)])
+                return False
+            return True
     except Exception as e:
         signal.show_traceback_log(f"🔶 超分异常（保持原图）: {src.name}: {e}")
+        return False
+
+
+def _is_all_black(path: Path) -> bool:
+    """检查图片是否全黑（像素平均值接近 0），用于判断超分产物是否失败。"""
+    try:
+        with Image.open(path) as img:
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            # 使用缩小图快速判断，避免大图耗时
+            thumb = img.resize((32, 32))
+            pixels = list(thumb.getdata())
+            if not pixels:
+                return False
+            total = sum(sum(p) for p in pixels)
+            avg = total / (len(pixels) * 3)
+            # 平均值小于 5 视为全黑（允许微小噪声）
+            return avg < 5
+    except Exception:
         return False
 
 
@@ -353,7 +480,8 @@ def _sr_trigger_ok(path: Path) -> bool:
 
 
 async def maybe_upscale_poster(poster_path: Path) -> bool:
-    """刮削收尾钩子：符合条件时对海报超分并原子替换；否则原样返回 False。"""
+    """刮削收尾钩子：符合条件时对海报超分并原子替换；否则原样返回 False。
+    超分完成后检查是否全黑：若全黑则重新超分一次；若仍全黑则删除超分图片直接使用原图片。"""
     if not _sr_trigger_ok(poster_path):
         return False
     preset_raw = str(getattr(manager.config, "poster_sr_preset", SrPreset.REALESR_PHOTO_4X))
@@ -362,9 +490,47 @@ async def maybe_upscale_poster(poster_path: Path) -> bool:
     except ValueError:
         preset = SrPreset.REALESR_PHOTO_4X
     tmp = poster_path.with_name(poster_path.stem + ".[SR].jpg")
+    retry_tmp = poster_path.with_name(poster_path.stem + ".[SR].retry.jpg")
     try:
+        # 第一次超分
         if not await upscale_image(poster_path, tmp, preset):
             return False
+        # 检查是否全黑
+        if _is_all_black(tmp):
+            signal.show_traceback_log(f"🔶 超分产物全黑（可能失败），尝试重新超分一次: {poster_path.name}")
+            # 重新超分到不同临时文件
+            if await upscale_image(poster_path, retry_tmp, preset):
+                if _is_all_black(retry_tmp):
+                    # 仍然全黑：删除超分图片，直接使用原图片
+                    signal.show_traceback_log(f"🔶 超分重试仍全黑，删除超分产物直接使用原图: {poster_path.name}")
+                    try:
+                        retry_tmp.unlink(missing_ok=True)
+                        tmp.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    return False
+                else:
+                    # 重试成功且非全黑：使用重试结果
+                    # 先检查尺寸
+                    if _image_max_dim(retry_tmp) <= _image_max_dim(poster_path):
+                        signal.show_traceback_log(f"🔶 超分重试产物尺寸未增大，弃用: {poster_path.name}")
+                        try:
+                            retry_tmp.unlink(missing_ok=True)
+                        except OSError:
+                            pass
+                        return False
+                    # 替换原图
+                    os.replace(retry_tmp, poster_path)
+                    signal.show_log_text(f"✨ 海报超分重试完成: {poster_path.name}")
+                    return True
+            else:
+                # 重试失败
+                signal.show_traceback_log(f"🔶 超分重试失败（保持原图）: {poster_path.name}")
+                return False
+        else:
+            # 第一次成功且非全黑：继续正常流程
+            pass
+
         # 校验产物确为放大图，防二进制输出异常覆盖原图
         if _image_max_dim(tmp) <= _image_max_dim(poster_path):
             signal.show_traceback_log(f"🔶 超分产物尺寸未增大，弃用: {poster_path.name}")
@@ -375,5 +541,9 @@ async def maybe_upscale_poster(poster_path: Path) -> bool:
     finally:
         try:
             tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        try:
+            retry_tmp.unlink(missing_ok=True)
         except OSError:
             pass
