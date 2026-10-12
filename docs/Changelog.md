@@ -6,6 +6,7 @@
 - **超分并发控制**：新增全局 `asyncio.Lock()`（`_SR_LOCK`），确保同一时间只处理一张图片，完成后再处理下一张。
 - **超分产物全黑检查与重试**：新增 `_is_all_black()` 检查超分后图片是否全黑；`maybe_upscale_poster()` 在检测到全黑时自动重试一次，若重试仍全黑则删除超分图片并直接使用原图。
 - **版本号**：`2.3.6` → `2.3.7`（`mdcx/consts.py` `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首段；`LOCAL_VERSION` 保持 `20261020`）。
+- **主页状态行文案**：去除模式与字段间的空格（`正常模式 · 字段优先` → `正常模式·字段优先`），同步修改 `main_window.py`、`save_config.py`、`load_config.py` 及相关状态字符串构造，其他模式一并处理。
 
 ## v2.3.6 (2026-10-20)
 ### 调整
