@@ -1,6 +1,6 @@
 
 # Changelog
-## v2.3.5 (2026-10-12)
+## v2.3.5 (2026-10-20)
 ### 调整
 - **版本号**：`2.3.4` → `2.3.5`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
 ### 修复
