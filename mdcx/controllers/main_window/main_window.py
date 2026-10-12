@@ -26,6 +26,7 @@ from PyQt6.QtGui import (
     QKeySequence,
     QPixmap,
     QShortcut,
+    QTextCursor,
     QTextDocument,
 )
 from PyQt6.QtWidgets import (
@@ -236,6 +237,7 @@ class MyMAinWindow(QMainWindow):
         self.m_DragPosition: QPoint | None = None  # 鼠标拖动位置
         self.logs_counts = 0  # 日志次数（每1w次清屏）
         self.req_logs_counts = 0  # 日志次数（每1w次清屏）
+        self._log_page_opened = False  # 日志页是否被打开过：首次打开滚动条默认置顶，后续保留上次位置
         self.main_log_queue: deque[str] = deque()
         self.main_log_batch_size = 80
         self.main_log_max_count = 10000
@@ -425,6 +427,8 @@ class MyMAinWindow(QMainWindow):
         # 切页后必须重新同步一次内部几何，否则"先改窗口尺寸再切页"时页面内容全部按陈旧尺寸布局
         self.Ui.stackedWidget.currentChanged.connect(self._sync_page_layouts)
         self.Ui.stackedWidget.currentChanged.connect(self._on_page_change_nfo_panel)
+        # 日志页首次打开滚动条默认置顶，后续打开保留上次位置（此处只处理首次）
+        self.Ui.stackedWidget.currentChanged.connect(self._on_stacked_page_changed)
         # 命名页在设置页 tab 内：切到该 tab 时滚动区视口宽变化（滚动条占位）会重排
         # 内部网格，需在事件循环下一拍按最新宽度重算模板预览区（见 _sync_naming_template_section）。
         self.Ui.tabWidget.currentChanged.connect(
@@ -10204,6 +10208,42 @@ class MyMAinWindow(QMainWindow):
             finally:
                 outer.blockSignals(False)
 
+    # 日志追加时保持滚动条位置不变（默认最上方），不自动拉到底；
+    # 同时保住用户文本光标：append() 会把光标甩到末尾，后续窗口缩放/重排会
+    # ensureCursorVisible 跳到底部，这里一并恢复，之后打开保留的才是上次位置
+    @staticmethod
+    def _append_log_preserve_scroll(browser, html: str) -> None:
+        view_cursor = browser.textCursor()
+        saved_pos = view_cursor.position()
+        saved_anchor = view_cursor.anchor()
+        bar = browser.verticalScrollBar()
+        scroll_pos = bar.value()
+        browser.append(html)
+        doc_end = max(browser.document().characterCount() - 1, 0)
+        restored = browser.textCursor()
+        restored.setPosition(min(saved_anchor, doc_end), QTextCursor.MoveMode.MoveAnchor)
+        restored.setPosition(min(saved_pos, doc_end), QTextCursor.MoveMode.KeepAnchor)
+        browser.setTextCursor(restored)
+        bar.setValue(scroll_pos)
+
+    def _on_main_logs_show(self, html: str) -> None:
+        self._append_log_preserve_scroll(self.Ui.textBrowser_log_main, html)
+
+    def _on_main_req_logs_show(self, html: str) -> None:
+        self._append_log_preserve_scroll(self.Ui.textBrowser_log_main_2, html)
+
+    # 切页：日志页首次打开时滚动条默认置顶（含光标归位），后续打开保留上次位置不动
+    def _on_stacked_page_changed(self, index: int) -> None:
+        if self.Ui.stackedWidget.widget(index) is not self.Ui.page_log:
+            return
+        if self._log_page_opened:
+            return
+        self._log_page_opened = True
+        for browser in (self.Ui.textBrowser_log_main, self.Ui.textBrowser_log_main_2):
+            browser.moveCursor(QTextCursor.MoveOperation.Start)
+            browser.verticalScrollBar().setValue(browser.verticalScrollBar().minimum())
+        self._mirror_log_scrollbar()
+
     # 日志页点展开折叠日志
     def pushButton_show_hide_logs_clicked(self):
         if self.Ui.textBrowser_log_main_2.isHidden():
@@ -10216,14 +10256,9 @@ class MyMAinWindow(QMainWindow):
         if show:
             self.Ui.pushButton_show_hide_logs.setIcon(QIcon(resources.hide_logs_icon))
             self.Ui.textBrowser_log_main_2.show()
-            # 硬编码 resize 会覆盖窗口缩放同步结果（议题 #68），统一交给 _sync_page_layouts
+            # 硬编码 resize 会覆盖窗口缩放同步结果（议题 #68），统一交给 _sync_page_layouts；
+            # 展开/收起不抢滚动条位置（默认最上方），不再强制拉到底
             self._sync_page_layouts()
-            self.Ui.textBrowser_log_main.verticalScrollBar().setValue(
-                self.Ui.textBrowser_log_main.verticalScrollBar().maximum()
-            )
-            self.Ui.textBrowser_log_main_2.verticalScrollBar().setValue(
-                self.Ui.textBrowser_log_main_2.verticalScrollBar().maximum()
-            )
 
             # self.Ui.textBrowser_log_main_2.moveCursor(self.Ui.textBrowser_log_main_2.textCursor().End)
 
@@ -10231,9 +10266,6 @@ class MyMAinWindow(QMainWindow):
             self.Ui.pushButton_show_hide_logs.setIcon(QIcon(resources.show_logs_icon))
             self.Ui.textBrowser_log_main_2.hide()
             self._sync_page_layouts()
-            self.Ui.textBrowser_log_main.verticalScrollBar().setValue(
-                self.Ui.textBrowser_log_main.verticalScrollBar().maximum()
-            )
 
     # 日志页点展开折叠失败列表
     def pushButton_show_hide_failed_list_clicked(self):
@@ -10316,7 +10348,7 @@ class MyMAinWindow(QMainWindow):
             self.main_logs_show.emit(add_html("\n".join(logs)))
         except Exception:
             signal_qt.show_traceback_log(traceback.format_exc())
-            self.Ui.textBrowser_log_main.append(traceback.format_exc())
+            self._append_log_preserve_scroll(self.Ui.textBrowser_log_main, traceback.format_exc())
 
     # 显示详细日志
     def show_detail_log(self):

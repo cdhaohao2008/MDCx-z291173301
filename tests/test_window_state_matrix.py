@@ -252,6 +252,69 @@ def test_log_external_scrollbar_mirrors_inner_and_avoids_clear_button(win, app):
     assert inner.value() == inner.maximum()
 
 
+def test_log_append_keeps_scrollbar_at_top(win, app):
+    """产生新日志时滚动条默认保持在最上方，不自动拉到底；用户位置也不被抢占。"""
+    win.resize(1032, 737)
+    app.processEvents()
+    _goto(win, app, "page_log")
+    upper = win.Ui.textBrowser_log_main
+    outer = win.Ui.verticalScrollBar_log_main
+    inner = upper.verticalScrollBar()
+
+    # 默认在最上方：走真实信号链路批量追加日志，内外滚动条都不被拉动
+    assert inner.value() == inner.minimum()
+    for i in range(50):
+        win.main_logs_show.emit(f"stay-top-probe-{i}")
+    app.processEvents()
+    assert inner.maximum() > 0
+    assert inner.value() == inner.minimum()
+    assert outer.value() == outer.minimum()
+
+    # 用户手动滚动到中间后追加日志，位置保持不变
+    mid = inner.maximum() // 2
+    inner.setValue(mid)
+    app.processEvents()
+    win.main_logs_show.emit("stay-top-probe-tail")
+    app.processEvents()
+    assert inner.value() == mid
+    assert outer.value() == mid
+
+
+def test_log_first_open_pins_to_top_then_reopen_keeps_position(win, app):
+    """首次打开日志页滚动条默认置顶（含光标归位），后续打开保留上次位置。"""
+    win.resize(1032, 737)
+    app.processEvents()
+    upper = win.Ui.textBrowser_log_main
+    inner = upper.verticalScrollBar()
+    outer = win.Ui.verticalScrollBar_log_main
+
+    # 先切入日志页激活文档布局，再用直接追加模拟“遗留到底”状态
+    _goto(win, app, "page_log")
+    for i in range(100):
+        upper.append(f"legacy-{i}")
+    app.processEvents()
+    assert inner.maximum() > 0
+    assert inner.value() == inner.maximum()
+    # 复位“已打开”标记，模拟从未打开过
+    win._log_page_opened = False
+
+    _goto(win, app, "page_main")
+    _goto(win, app, "page_log")
+    app.processEvents()
+    assert inner.value() == inner.minimum()
+    assert outer.value() == outer.minimum()
+    assert upper.textCursor().atStart()
+
+    mid = inner.maximum() // 2
+    inner.setValue(mid)
+    app.processEvents()
+    _goto(win, app, "page_main")
+    _goto(win, app, "page_log")
+    app.processEvents()
+    assert inner.value() == mid
+    assert outer.value() == mid
+
+
 def test_nav_gap_uniform_when_entries_hidden(win, app, monkeypatch):
     """议题 #74：原生边框下开启隐藏入口后，剩余导航按钮间隙必须一致且等于 spacing。
 

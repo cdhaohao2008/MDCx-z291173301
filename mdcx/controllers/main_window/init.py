@@ -628,10 +628,11 @@ def Init_Singal(self: "MyMAinWindow"):
     # endregion
 
     # region 控件更新
-    self.main_logs_show.connect(self.Ui.textBrowser_log_main.append)
+    # 上栏/下栏日志追加不抢滚动条：保持用户当前位置（默认最上方），不自动拉到底
+    self.main_logs_show.connect(self._on_main_logs_show)
     self.main_logs_clear.connect(self.Ui.textBrowser_log_main.clear)
     self.req_logs_clear.connect(self.Ui.textBrowser_log_main_2.clear)
-    self.main_req_logs_show.connect(self.Ui.textBrowser_log_main_2.append)
+    self.main_req_logs_show.connect(self._on_main_req_logs_show)
     self.net_logs_show.connect(self.Ui.textBrowser_net_main.append)
     self.set_javdb_cookie.connect(self.Ui.plainTextEdit_cookie_javdb.setPlainText)
     self.set_javdb_status.connect(self.Ui.label_javdb_cookie_result.setText)
