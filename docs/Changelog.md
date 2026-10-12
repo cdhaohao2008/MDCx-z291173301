@@ -2,6 +2,7 @@
 # Changelog
 ## v2.3.8 (2026-10-12)
 ### 修复
+- **运行时防御性加固（防卡顿/崩溃/内存错误）**：修复 `mdcx/config/computed.py` (`1 / llm_max_req_sec` 在值为 0 时 `ZeroDivisionError`)；`mdcx/controllers/cut_window.py`（图片宽高为 0 时的多处除零崩溃、缩放计算守卫、裁剪框比例守卫）；`mdcx/image.py`（`cut_pic()` / `fix_pic()` 中 `w == 0` / `h == 0` 除零风险）。不修改功能、布局或提示词内容。
 - **HTTP 404 日志膨胀（`mdcx/web_async.py` 第 2010 行）**：`body_preview` 对响应体做 `" ".join(...split())` 压缩，去除 nginx 404 HTML、AWS 403 `AccessDenied`、`Error.` 等响应体中的多余换行与空白，避免每张失败截图重复输出多行内容占据页面。
 - **刮削进度分隔线加长（`mdcx/core/scraper.py` 第 707 行）**：分隔线由 `"=" * 40` 改为 `"=" * 108`，与实际内容宽度匹配。
 
