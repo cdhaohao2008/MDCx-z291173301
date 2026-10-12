@@ -1,5 +1,12 @@
 
 # Changelog
+## v2.3.7 (2026-10-12)
+### 功能增强
+- **超分工具（`core/super_resolution.py`）**：Windows 平台隐藏 CMD 窗口（`SW_HIDE`）、默认以管理员权限（`runas`）执行超分命令；非 Windows 平台保持原行为。
+- **超分并发控制**：新增全局 `asyncio.Lock()`（`_SR_LOCK`），确保同一时间只处理一张图片，完成后再处理下一张。
+- **超分产物全黑检查与重试**：新增 `_is_all_black()` 检查超分后图片是否全黑；`maybe_upscale_poster()` 在检测到全黑时自动重试一次，若重试仍全黑则删除超分图片并直接使用原图。
+- **版本号**：`2.3.6` → `2.3.7`（`mdcx/consts.py` `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首段；`LOCAL_VERSION` 保持 `20261020`）。
+
 ## v2.3.6 (2026-10-20)
 ### 调整
 - **版本号**：`2.3.5` → `2.3.6`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`、`docs/Changelog.md` 首个版本段；`LOCAL_VERSION` 保持 `20261020`）
