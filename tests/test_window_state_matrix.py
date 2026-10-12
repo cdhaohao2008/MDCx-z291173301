@@ -169,11 +169,25 @@ def test_resize_first_then_switch_log_page_layout(win, app):
     page = _goto(win, app, "page_log")
     upper = win.Ui.textBrowser_log_main
     lower = win.Ui.textBrowser_log_main_2
+    # 上栏日志显示从顶端 y=0 开始，按 61%/39% 分栏；滚动条是独立控件，
+    # 其轨道从清空按钮下方 y=85 开始，显示与滚动分离
+    assert upper.y() == 0
     assert upper.height() == pytest.approx(page.height() * 0.61, abs=2)
     assert lower.isVisibleTo(page)
     assert lower.height() == pytest.approx(page.height() - upper.height() - 1, abs=2)
     assert lower.y() == upper.height() + 1
-    # 按钮右缘距页面右缘约 38px（随日志区同步左移16px后：158-120），且不出界
+    # 显示区 + 外置滚动条总宽与原日志区同宽（右缘页宽-18 不变）
+    bar = win.Ui.verticalScrollBar_log_main
+    assert upper.width() + bar.width() == page.width() - 28 - 18
+    assert (bar.x(), bar.y(), bar.width()) == (28 + upper.width(), 85, 16)
+    assert bar.height() == upper.height() - 85
+    # 外置滚动条矩形不得与清空显示按钮相交；滚动范围与内置滚动条一致
+    clear_btn = win.Ui.pushButton_clear_logs
+    assert not bar.geometry().intersects(clear_btn.geometry())
+    inner = upper.verticalScrollBar()
+    assert not inner.isVisible()
+    assert (bar.minimum(), bar.maximum(), bar.value()) == (inner.minimum(), inner.maximum(), inner.value())
+    # 按钮右缘距页面右缘约 20px（与软件界面开始按钮同右缘），且不出界
     btn = win.Ui.pushButton_start_cap2
     assert btn.geometry().right() <= page.width()
     assert page.width() - btn.geometry().right() <= 45
@@ -189,12 +203,53 @@ def test_log_lower_hidden_upper_fills_page(win, app):
     win.show_hide_logs(False)
     app.processEvents()
     assert win.Ui.textBrowser_log_main_2.isHidden()
+    assert upper.y() == 0
     assert upper.height() == pytest.approx(page.height(), abs=2)
 
     win.show_hide_logs(True)
     app.processEvents()
     assert win.Ui.textBrowser_log_main_2.isVisibleTo(page)
+    assert upper.y() == 0
     assert upper.height() == pytest.approx(page.height() * 0.61, abs=2)
+
+
+def test_log_external_scrollbar_mirrors_inner_and_avoids_clear_button(win, app):
+    """上栏显示与滚动分离：文本从顶端显示，外置滚动条范围与内置一致且不与清空按钮相交。"""
+    win.resize(1032, 737)
+    app.processEvents()
+    page = _goto(win, app, "page_log")
+    upper = win.Ui.textBrowser_log_main
+    outer = win.Ui.verticalScrollBar_log_main
+    inner = upper.verticalScrollBar()
+    clear_btn = win.Ui.pushButton_clear_logs
+
+    # 日志显示从顶端开始，清空按钮位置不变（780,61,20,20）
+    assert upper.y() == 0
+    assert (clear_btn.x(), clear_btn.y(), clear_btn.width(), clear_btn.height()) == (
+        page.width() - 40,
+        61,
+        20,
+        20,
+    )
+    # 外置滚动条轨道从按钮下方开始，矩形不相交
+    assert outer.y() == 85
+    assert outer.y() >= clear_btn.y() + clear_btn.height()
+    assert not outer.geometry().intersects(clear_btn.geometry())
+
+    # 写入足够多日志使出现滚动范围：外置条范围与内置一致（滚动范围保持不变）
+    for i in range(200):
+        upper.append(f"scroll-sync-probe-{i}")
+    app.processEvents()
+    assert inner.maximum() > 0
+    assert (outer.minimum(), outer.maximum()) == (inner.minimum(), inner.maximum())
+    assert outer.value() == inner.value()
+    # 外置条可驱动显示：拉到顶内置跟随到顶
+    outer.setValue(outer.minimum())
+    app.processEvents()
+    assert inner.value() == inner.minimum()
+    outer.setValue(outer.maximum())
+    app.processEvents()
+    assert inner.value() == inner.maximum()
 
 
 def test_nav_gap_uniform_when_entries_hidden(win, app, monkeypatch):
@@ -260,6 +315,7 @@ def test_maximized_window_layout_sync(win, app):
         assert page.height() == stacked.height(), f"{page.objectName()} 最大化后未跟随高度"
     page = _goto(win, app, "page_log")
     upper = win.Ui.textBrowser_log_main
+    assert upper.y() == 0
     assert upper.height() == pytest.approx(page.height() * 0.61, abs=2)
     assert win.Ui.pushButton_start_cap2.geometry().right() <= page.width()
 
@@ -364,6 +420,7 @@ def test_layout_correct_under_both_border_modes(win, app, border):
     app.processEvents()
     page = _goto(win, app, "page_log")
     upper = win.Ui.textBrowser_log_main
+    assert upper.y() == 0
     assert upper.height() == pytest.approx(page.height() * 0.61, abs=2)
     assert win.Ui.pushButton_start_cap2.geometry().right() <= page.width()
     mw_mod.manager.config.window_title = "show"

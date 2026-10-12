@@ -334,6 +334,12 @@ def Init_Ui(self: "MyMAinWindow"):
     self.Ui.pushButton_save_failed_list.setIcon(QIcon(resources.save_failed_list_icon))
     self.Ui.pushButton_clear_logs.setIcon(QIcon(resources.clear_tree_icon))
     self.Ui.pushButton_clear_logs.setToolTip("清空显示（不删除日志文件）")
+    # 上栏日志显示与滚动条分离：内置滚动条隐藏（.ui 里 AlwaysOff），只作滚动范围数据源；
+    # 外置独立滚动条负责交互，双向镜像同步（内置值变→外置跟随，外置拖动→驱动内置）
+    inner_log_bar = self.Ui.textBrowser_log_main.verticalScrollBar()
+    inner_log_bar.rangeChanged.connect(self._mirror_log_scrollbar)
+    inner_log_bar.valueChanged.connect(self._on_inner_log_scroll_changed)
+    self.Ui.verticalScrollBar_log_main.valueChanged.connect(inner_log_bar.setValue)
     self.Ui.widget_show_success.resize(811, 511)
     self.Ui.widget_show_success.hide()
     self.Ui.widget_show_tips.resize(811, 511)

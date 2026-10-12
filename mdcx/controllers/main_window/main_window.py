@@ -5314,7 +5314,12 @@ class MyMAinWindow(QMainWindow):
         log_page = ui.page_log
         log_w = max(log_page.width() - 28 - 18, 300)
         log_h_total = log_page.height()
-        # 下栏（失败日志）隐藏时上栏铺满整页；显示时上下按原比例 (421:271 ≈ 61%:39%) 分高
+        # 上栏日志显示从顶端 y=0 开始；滚动条是独立控件 verticalScrollBar_log_main，
+        # 其轨道从清空按钮下方 y=85 开始（清空按钮 y61+h20 底部 81，留 4px 间隙），
+        # 显示与滚动分离：滚动范围与内置滚动条一致，只是轨道不再与按钮重合。
+        log_bar_w = 16
+        log_bar_top = 85
+        # 下栏隐藏时上栏铺满整页；显示时上下按原比例 (421:271 ≈ 61%:39%) 分高
         lower_browser = ui.textBrowser_log_main_2
         if lower_browser.isHidden():
             upper_h = max(log_h_total, 100)
@@ -5322,17 +5327,23 @@ class MyMAinWindow(QMainWindow):
             upper_h = max(int(log_h_total * 0.61), 100)
         lower_h = max(log_h_total - upper_h - 1, 100)
         upper_w = max(log_w, 300)
-        ui.textBrowser_log_main.setGeometry(28, 0, upper_w, upper_h)
+        text_w = max(upper_w - log_bar_w, 200)
+        ui.textBrowser_log_main.setGeometry(28, 0, text_w, upper_h)
+        ui.verticalScrollBar_log_main.setGeometry(
+            28 + text_w, log_bar_top, log_bar_w, max(upper_h - log_bar_top, log_bar_w)
+        )
         if not lower_browser.isHidden():
             lower_browser.setGeometry(28, upper_h + 1, upper_w, lower_h)
         # 覆盖性日志视图 (失败列表) 铺满整个日志页（右缘同样收到页宽-18，与上下日志区滚动条对齐）
         ui.textBrowser_log_main_3.setGeometry(0, 0, max(log_page.width() - 18, 300), max(log_page.height() - 2, 300))
-        # 设计基准页面宽 822/高 692：按钮右缘锚定右侧、底部按钮锚定下缘（随日志区同步左移16px）
-        ui.pushButton_start_cap2.move(max(log_page.width() - 158, 20), 13)
-        ui.pushButton_clear_logs.move(max(log_page.width() - 58, 20), 61)
-        ui.pushButton_view_failed_list.move(max(log_page.width() - 273, 20), 13)
+        # 设计基准页面宽 822/高 692：按钮右缘锚定右侧、底部按钮锚定下缘（与软件界面开始按钮同右缘）
+        ui.pushButton_start_cap2.move(max(log_page.width() - 120 - 20, 20), 13)
+        ui.pushButton_clear_logs.move(max(log_page.width() - 40, 20), 61)
+        ui.pushButton_view_failed_list.move(max(log_page.width() - 255, 20), 13)
         ui.pushButton_show_hide_logs.move(0, max(log_page.height() - 42, 13))
         ui.pushButton_save_failed_list.move(0, max(log_page.height() - 42, 13))
+        # 外置滚动条跟随几何变化后，重新镜像内置滚动条的范围与位置
+        self._mirror_log_scrollbar()
 
         # ============ widget_nfo（「编辑 NFO」覆盖层）随主窗口缩放（议题 #152/#154/#166）============
         # 可见时作为主页伴侣面板：左贴导航右缘、右收到缩略图/结果树之间，不盖住番号树。
@@ -10169,6 +10180,29 @@ class MyMAinWindow(QMainWindow):
         self.req_logs_counts = 0
         self.Ui.textBrowser_log_main.clear()
         self.Ui.textBrowser_log_main_2.clear()
+
+    # 上栏日志显示与滚动条分离：内置滚动条隐藏，仅作滚动范围数据源；
+    # 外置独立滚动条 verticalScrollBar_log_main 负责交互，二者范围与位置镜像同步
+    def _mirror_log_scrollbar(self) -> None:
+        inner = self.Ui.textBrowser_log_main.verticalScrollBar()
+        outer = self.Ui.verticalScrollBar_log_main
+        outer.blockSignals(True)
+        try:
+            outer.setRange(inner.minimum(), inner.maximum())
+            outer.setPageStep(inner.pageStep())
+            outer.setSingleStep(inner.singleStep())
+            outer.setValue(inner.value())
+        finally:
+            outer.blockSignals(False)
+
+    def _on_inner_log_scroll_changed(self, value: int) -> None:
+        outer = self.Ui.verticalScrollBar_log_main
+        if outer.value() != value:
+            outer.blockSignals(True)
+            try:
+                outer.setValue(value)
+            finally:
+                outer.blockSignals(False)
 
     # 日志页点展开折叠日志
     def pushButton_show_hide_logs_clicked(self):
