@@ -10724,7 +10724,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       <x>0</x>
                       <y>0</y>
                       <width>860</width>
-                      <height>1690</height>
+                      <height>1720</height>
                     </rect>
                   </property>
                   <widget class="QGroupBox" name="groupBox_24">
@@ -10733,7 +10733,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         <x>30</x>
                         <y>20</y>
                         <width>701</width>
-                        <height>481</height>
+                        <height>511</height>
                       </rect>
                     </property>
                     <property name="minimumSize">
@@ -10815,7 +10815,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           <x>60</x>
                           <y>210</y>
                           <width>621</width>
-                          <height>238</height>
+                          <height>268</height>
                         </rect>
                       </property>
                       <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -11125,7 +11125,46 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   <string notr="true">color: rgb(8, 128, 128);</string>
                                 </property>
                                 <property name="text">
-                                  <string> 有时网络返回值不正确，校验会导致预告片下载失败</string>
+                                  <string> 有时候网络返回值不正确，校验导致预告片下载失败</string>
+                                </property>
+                              </widget>
+                            </item>
+                          </layout>
+                        </item>
+                        <item>
+                          <layout class="QHBoxLayout" name="horizontalLayout_poster_replace_thumb">
+                            <item>
+                              <widget class="QCheckBox" name="checkBox_poster_replace_thumb">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="minimumSize">
+                                  <size>
+                                    <width>10</width>
+                                    <height>0</height>
+                                  </size>
+                                </property>
+                                <property name="text">
+                                  <string>替换缩略图图片，封面替换缩略图</string>
+                                </property>
+                              </widget>
+                            </item>
+                            <item>
+                              <widget class="QLabel" name="label_poster_replace_thumb">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="styleSheet">
+                                  <string notr="true">color: rgb(8, 128, 128);</string>
+                                </property>
+                                <property name="text">
+                                  <string> 封面图尺寸大于缩略图时，封面图直接替换掉缩略图</string>
                                 </property>
                               </widget>
                             </item>
@@ -11200,7 +11239,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       <property name="geometry">
                         <rect>
                           <x>60</x>
-                          <y>440</y>
+                          <y>470</y>
                           <width>621</width>
                           <height>41</height>
                         </rect>
@@ -11242,7 +11281,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>520</y>
+                        <y>550</y>
                         <width>701</width>
                         <height>131</height>
                       </rect>
@@ -11361,7 +11400,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1424</y>
+                        <y>1454</y>
                         <width>701</width>
                         <height>211</height>
                       </rect>
@@ -11456,7 +11495,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1144</y>
+                        <y>1174</y>
                         <width>701</width>
                         <height>261</height>
                       </rect>
@@ -11591,7 +11630,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>670</y>
+                        <y>700</y>
                         <width>701</width>
                         <height>235</height>
                       </rect>
@@ -11801,7 +11840,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>924</y>
+                        <y>954</y>
                         <width>701</width>
                         <height>201</height>
                       </rect>
@@ -15930,9 +15969,13 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                             <property name="text">
                               <string>&lt;p style='line-height:20px'&gt;
-                                素人和个摄番号的演员姓名非常多都是素人之类的假名字，当勾选使用AV-Wiki获取到演员真实&lt;br&gt名字后，可以请求AV-Wiki获取演员的真实日文名字，之后可以使用演员映射表翻译为简体中文&lt;br&gt;
-                                演员名称的来源比较复杂，不能简单使用翻译引擎翻译，主要的问题是：演员名翻译不准确、同&lt;br&gt一个演员有多个名字、同一个演员不同番号的演员名不统一、各网站使用的演员名不统一等，不&lt;br&gt过通过演员名映射翻译表可以有效的解决以上这些问题，使刮削后的演员名称整齐统一没有错误&lt;br&gt;
-                                实现逻辑：网站获取演员名后，通过查询映射表中的匹配词来映射对应输出词，演员名映射翻译&lt;br&gt文件名是：actor_database.xlsx，文件在:\配置文件目录\userdata\actor_database.xlsx&lt;br&gt;
+                                素人和个摄番号的演员姓名非常多都是素人之类的假名字，当勾选使用AV-Wiki获取到演员真实&lt;br&gt;
+                                名字后，可以请求AV-Wiki获取演员的真实日文名字，之后可以使用演员映射表翻译为简体中文&lt;br&gt;
+                                演员名称的来源比较复杂，不能简单使用翻译引擎翻译，主要的问题是：演员名翻译不准确、同&lt;br&gt;
+                                一个演员有多个名字、同一个演员不同番号的演员名不统一、各网站使用的演员名不统一等，不&lt;br&gt;
+                                过通过演员名映射翻译表可以有效的解决以上这些问题，使刮削后的演员名称整齐统一没有错误&lt;br&gt;
+                                实现逻辑：网站获取演员名后，通过查询映射表中的匹配词来映射对应输出词，演员名映射翻译&lt;br&gt;
+                                文件名是：actor_database.xlsx，文件在:\配置文件目录\userdata\actor_database.xlsx&lt;br&gt;
                                 Windows：\配置文件目录\userdata\actor_database.xlsx，配置在「设置」--「高级」修改&lt;br&gt;
                                 MAC系统：/配置文件目录/userdata/actor_database.xlsx，同样在「设置」--「高级」修改&lt;br&gt;
                                 你可使用文件编辑工具打开演员映射翻译表后自定义修改和添加，演员映射表中的字段含义如下&lt;br&gt;

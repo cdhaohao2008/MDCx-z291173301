@@ -2,6 +2,7 @@
 刮削过程所需图片操作
 """
 
+import asyncio
 import os
 import time
 import traceback
@@ -17,7 +18,7 @@ from ..models.log_buffer import LogBuffer
 from ..models.model_types import CrawlersResult, FileInfo, OtherInfo
 from ..signals import signal
 from ..utils import executor, get_used_time
-from ..utils.file import check_pic_async, copy_file_sync, delete_file_sync
+from ..utils.file import check_pic_async, copy_file_async, copy_file_sync, delete_file_sync
 from .mosaic import has_leak_mark, has_umr_mark, has_uncensored_mark, is_censored_mosaic
 
 YOUMA_RIGHT_CROP_TYPES = {FixedScrapingType.YOUMA}
@@ -101,6 +102,93 @@ async def add_mark(json_data: OtherInfo, file_info: FileInfo, mosaic: str):
         ):
             await add_mark_thread(fanart_path, mark_list)
             LogBuffer.log().write(f"\n 🍀 Fanart add watermark: {mark_show_type}!")
+
+
+def _image_size_blocking(pic_path: str | Path) -> tuple[int, int] | None:
+    """同步读取图片像素尺寸，失败时返回 None（只读、不删文件）。"""
+    try:
+        with Image.open(pic_path) as img:  # 损坏/非图片文件在此抛异常
+            width, height = img.size
+        return int(width), int(height)
+    except Exception:
+        return None
+
+
+async def _image_size_async(pic_path: str | Path) -> tuple[int, int] | None:
+    """异步读取图片像素尺寸：仅取尺寸，区别于 check_pic_async 的「损坏即删除」。"""
+    try:
+        if not await asyncio.to_thread(os.path.exists, pic_path):
+            return None
+    except (OSError, TypeError, ValueError):
+        return None
+    return await asyncio.to_thread(_image_size_blocking, pic_path)
+
+
+async def _replace_if_poster_bigger(
+    poster_path: Path | None,
+    target_path: Path | None,
+    label: str,
+) -> bool:
+    """poster 像素面积严格大于 target 时用 poster 覆盖 target，成功返回 True。"""
+    if not poster_path or not target_path:
+        return False
+    try:
+        if await asyncio.to_thread(os.path.samefile, poster_path, target_path):
+            return False  # 同一个文件，无需替换
+    except OSError:
+        pass
+    poster_size = await _image_size_async(poster_path)
+    if not poster_size:
+        return False
+    target_size = await _image_size_async(target_path)
+    if target_size and poster_size[0] * poster_size[1] <= target_size[0] * target_size[1]:
+        return False  # poster 不比 target 大，保持原样
+    ok, err = await copy_file_async(poster_path, target_path)
+    if not ok:
+        LogBuffer.log().write(f"\n 🍀 封面替换{label}失败: {err}")
+        return False
+    LogBuffer.log().write(
+        f"\n 🍀 封面替换{label}: poster {poster_size[0]}x{poster_size[1]} → {label} {target_path.name}"
+    )
+    return True
+
+
+async def replace_thumb_fanart_with_poster(
+    json_data: OtherInfo,
+    thumb_path: Path | None,
+    fanart_path: Path | None,
+    poster_path: Path | None,
+):
+    """「封面替换缩略图」：勾选后，若 poster 像素面积大于 thumb/fanart，则用 poster 覆盖之。
+
+    仅当对应文件类型本身也勾选了「下载」时才替换，否则 replace 出来的文件会被
+    pic_some_deal 之类的清理逻辑当成「不下载的中间产物」删掉。替换放在加水印之前，
+    这样替换后的 thumb/fanart 仍能正常打上水印。
+    """
+    download_files = manager.config.download_files
+    if DownloadableFile.POSTER_REPLACE_THUMB not in download_files:
+        return
+    if DownloadableFile.POSTER not in download_files:
+        return
+    if not poster_path:
+        return
+
+    thumb_done = False
+    fanart_done = False
+    if DownloadableFile.THUMB in download_files:
+        thumb_done = await _replace_if_poster_bigger(poster_path, thumb_path, "缩略图")
+    if DownloadableFile.FANART in download_files:
+        fanart_done = await _replace_if_poster_bigger(poster_path, fanart_path, "背景图")
+
+    # 替换后文件内容已变，需复位 marked 标记，否则 add_mark 会跳过加水印
+    if thumb_done:
+        json_data.thumb_marked = False
+        if thumb_path:
+            json_data.thumb_path = thumb_path
+    if fanart_done:
+        json_data.fanart_marked = False
+        if fanart_path:
+            json_data.fanart_path = fanart_path
 
 
 def _right_crop_box(width: int, height: int) -> tuple[int, int, int, int]:

@@ -215,6 +215,7 @@ class DownloadableFile(Enum):
     IGNORE_FC2 = "ignore_fc2"
     IGNORE_GUOCHAN = "ignore_guochan"
     IGNORE_SIZE = "ignore_size"
+    POSTER_REPLACE_THUMB = "poster_replace_thumb"
 
     @classmethod
     def names(cls):
@@ -236,6 +237,7 @@ class DownloadableFile(Enum):
             "忽略FC2",
             "忽略国产",
             "忽略大小",
+            "封面替换缩略图",
         ]
 
 

@@ -263,6 +263,41 @@ class CutWindow(QDialog):
         if img_path:
             self.showimage(Path(img_path))
 
+    def _poster_path_of(self, img_path: Path, pic_name: bool) -> Path:
+        """按 MDCx 命名规则推导同目录下的 poster 路径（与 showimage 原有推导一致）。"""
+        poster_path = img_path.with_name("poster.jpg")
+        if not pic_name and "-" in img_path.stem:  # 文件名-poster.jpg
+            poster_path = img_path.with_name(
+                img_path.name.replace("-fanart", "")
+                .replace("-thumb", "")
+                .replace("-poster", "")
+                .replace(img_path.suffix, "")
+                + "-poster.jpg"
+            )
+        return poster_path
+
+    def _prefer_larger_poster(self, img_path: Path, pic_name: bool) -> Path:
+        """「封面替换缩略图」勾选时，裁剪改用更大的 poster 大尺寸图作为原始图。
+
+        to_cut 会把未裁剪的完整原图直接写成 thumb/fanart，所以把 img_path 换成
+        poster 大图后，裁剪保存出来的 thumb/fanart 自然也是大尺寸图。
+        """
+        if DownloadableFile.POSTER_REPLACE_THUMB not in manager.config.download_files:
+            return img_path
+        try:
+            poster_path = self._poster_path_of(img_path, pic_name)
+            if not poster_path.exists() or poster_path == img_path:
+                return img_path
+            with Image.open(img_path) as img:
+                img_area = img.size[0] * img.size[1]
+            with Image.open(poster_path) as poster:
+                poster_area = poster.size[0] * poster.size[1]
+            if poster_area <= img_area:
+                return img_path
+        except Exception:
+            return img_path
+        return poster_path
+
     # 显示要裁剪的图片
     def showimage(self, img_path: Path | None = None, json_data: "FileInfo | None" = None):
         self.Ui.label_backgroud_pic.setText(" ")  # 清空背景
@@ -286,6 +321,9 @@ class CutWindow(QDialog):
 
         # 显示图片及水印情况
         if img_path and os.path.exists(img_path):
+            # 「封面替换缩略图」：勾选且 poster 更大时，裁剪直接以 poster 大尺寸图为原图
+            img_path = self._prefer_larger_poster(img_path, pic_name)
+            self.show_image_path = img_path
             # 显示背景
             pic = QPixmap(img_path.as_posix())
             self.pic_w = pic.width()
@@ -312,7 +350,7 @@ class CutWindow(QDialog):
 
             # 获取nfo文件名，用来设置裁剪后图片名称和裁剪时的水印状态
             img_folder = img_path.parent
-            img_name, img_ex = img_path.stem, img_path.suffix
+            img_name = img_path.stem
 
             # 如果没有json_data，则通过图片文件名或nfo文件名获取，目的是用来获取水印
             if not json_data:
@@ -334,15 +372,7 @@ class CutWindow(QDialog):
             mosaic = json_data.mosaic
             definition = json_data.definition
             # 获取裁剪后的的poster和thumb路径
-            poster_path = img_path.with_name("poster.jpg")
-            if not pic_name and "-" in img_name:  # 文件名-poster.jpg
-                poster_path = img_path.with_name(
-                    img_path.name.replace("-fanart", "")
-                    .replace("-thumb", "")
-                    .replace("-poster", "")
-                    .replace(img_ex, "")
-                    + "-poster.jpg"
-                )
+            poster_path = self._poster_path_of(img_path, pic_name)
             poster_name = poster_path.name
             thumb_path = img_path.with_name(poster_name.replace("poster.", "thumb."))
             fanart_path = img_path.with_name(poster_name.replace("poster.", "fanart."))

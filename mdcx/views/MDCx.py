@@ -5016,10 +5016,10 @@ class Ui_MDCx(object):
         self.scrollArea_6.setWidgetResizable(True)
         self.scrollArea_6.setObjectName("scrollArea_6")
         self.scrollAreaWidgetContents_xiazai = QtWidgets.QWidget()
-        self.scrollAreaWidgetContents_xiazai.setGeometry(QtCore.QRect(0, 0, 860, 1690))
+        self.scrollAreaWidgetContents_xiazai.setGeometry(QtCore.QRect(0, 0, 860, 1720))
         self.scrollAreaWidgetContents_xiazai.setObjectName("scrollAreaWidgetContents_xiazai")
         self.groupBox_24 = QtWidgets.QGroupBox(parent=self.scrollAreaWidgetContents_xiazai)
-        self.groupBox_24.setGeometry(QtCore.QRect(30, 20, 701, 481))
+        self.groupBox_24.setGeometry(QtCore.QRect(30, 20, 701, 511))
         self.groupBox_24.setMinimumSize(QtCore.QSize(500, 0))
         self.groupBox_24.setObjectName("groupBox_24")
         self.horizontalLayoutWidget_14 = QtWidgets.QWidget(parent=self.groupBox_24)
@@ -5050,7 +5050,7 @@ class Ui_MDCx(object):
         self.checkBox_compress_downloaded_images.setObjectName("checkBox_compress_downloaded_images")
         self.horizontalLayout_16.addWidget(self.checkBox_compress_downloaded_images)
         self.layoutWidget3 = QtWidgets.QWidget(parent=self.groupBox_24)
-        self.layoutWidget3.setGeometry(QtCore.QRect(60, 210, 621, 238))
+        self.layoutWidget3.setGeometry(QtCore.QRect(60, 210, 621, 268))
         self.layoutWidget3.setObjectName("layoutWidget3")
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.layoutWidget3)
         self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
@@ -5223,6 +5223,27 @@ class Ui_MDCx(object):
         self.label_272.setObjectName("label_272")
         self.horizontalLayout_42.addWidget(self.label_272)
         self.verticalLayout_2.addLayout(self.horizontalLayout_42)
+        self.horizontalLayout_poster_replace_thumb = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_poster_replace_thumb.setObjectName("horizontalLayout_poster_replace_thumb")
+        self.checkBox_poster_replace_thumb = QtWidgets.QCheckBox(parent=self.layoutWidget3)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.checkBox_poster_replace_thumb.sizePolicy().hasHeightForWidth())
+        self.checkBox_poster_replace_thumb.setSizePolicy(sizePolicy)
+        self.checkBox_poster_replace_thumb.setMinimumSize(QtCore.QSize(10, 0))
+        self.checkBox_poster_replace_thumb.setObjectName("checkBox_poster_replace_thumb")
+        self.horizontalLayout_poster_replace_thumb.addWidget(self.checkBox_poster_replace_thumb)
+        self.label_poster_replace_thumb = QtWidgets.QLabel(parent=self.layoutWidget3)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.label_poster_replace_thumb.sizePolicy().hasHeightForWidth())
+        self.label_poster_replace_thumb.setSizePolicy(sizePolicy)
+        self.label_poster_replace_thumb.setStyleSheet("color: rgb(8, 128, 128);")
+        self.label_poster_replace_thumb.setObjectName("label_poster_replace_thumb")
+        self.horizontalLayout_poster_replace_thumb.addWidget(self.label_poster_replace_thumb)
+        self.verticalLayout_2.addLayout(self.horizontalLayout_poster_replace_thumb)
         self.layoutWidget4 = QtWidgets.QWidget(parent=self.groupBox_24)
         self.layoutWidget4.setGeometry(QtCore.QRect(60, 70, 621, 131))
         self.layoutWidget4.setObjectName("layoutWidget4")
@@ -5249,7 +5270,7 @@ class Ui_MDCx(object):
         self.label_85.setObjectName("label_85")
         self.verticalLayout_3.addWidget(self.label_85)
         self.label_310 = QtWidgets.QLabel(parent=self.groupBox_24)
-        self.label_310.setGeometry(QtCore.QRect(60, 440, 621, 41))
+        self.label_310.setGeometry(QtCore.QRect(60, 470, 621, 41))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -5267,7 +5288,7 @@ class Ui_MDCx(object):
         self.label_310.setWordWrap(True)
         self.label_310.setObjectName("label_310")
         self.groupBox_33 = QtWidgets.QGroupBox(parent=self.scrollAreaWidgetContents_xiazai)
-        self.groupBox_33.setGeometry(QtCore.QRect(30, 520, 701, 131))
+        self.groupBox_33.setGeometry(QtCore.QRect(30, 550, 701, 131))
         self.groupBox_33.setMinimumSize(QtCore.QSize(500, 0))
         self.groupBox_33.setObjectName("groupBox_33")
         self.horizontalLayoutWidget_18 = QtWidgets.QWidget(parent=self.groupBox_33)
@@ -5315,7 +5336,7 @@ class Ui_MDCx(object):
         self.label_79.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.NoTextInteraction)
         self.label_79.setObjectName("label_79")
         self.groupBox_51 = QtWidgets.QGroupBox(parent=self.scrollAreaWidgetContents_xiazai)
-        self.groupBox_51.setGeometry(QtCore.QRect(30, 1424, 701, 211))
+        self.groupBox_51.setGeometry(QtCore.QRect(30, 1454, 701, 211))
         self.groupBox_51.setStyleSheet('font:"Courier New";')
         self.groupBox_51.setObjectName("groupBox_51")
         self.label_87 = QtWidgets.QLabel(parent=self.groupBox_51)
@@ -5349,7 +5370,7 @@ class Ui_MDCx(object):
         self.pushButton_del_all_theme_videos.setGeometry(QtCore.QRect(340, 140, 181, 40))
         self.pushButton_del_all_theme_videos.setObjectName("pushButton_del_all_theme_videos")
         self.groupBox_34 = QtWidgets.QGroupBox(parent=self.scrollAreaWidgetContents_xiazai)
-        self.groupBox_34.setGeometry(QtCore.QRect(30, 1144, 701, 261))
+        self.groupBox_34.setGeometry(QtCore.QRect(30, 1174, 701, 261))
         self.groupBox_34.setMinimumSize(QtCore.QSize(500, 0))
         self.groupBox_34.setObjectName("groupBox_34")
         self.horizontalLayoutWidget_19 = QtWidgets.QWidget(parent=self.groupBox_34)
@@ -5404,7 +5425,7 @@ class Ui_MDCx(object):
         self.pushButton_del_all_extrafanart_copy.setGeometry(QtCore.QRect(340, 190, 181, 40))
         self.pushButton_del_all_extrafanart_copy.setObjectName("pushButton_del_all_extrafanart_copy")
         self.groupBox_52 = QtWidgets.QGroupBox(parent=self.scrollAreaWidgetContents_xiazai)
-        self.groupBox_52.setGeometry(QtCore.QRect(30, 670, 701, 235))
+        self.groupBox_52.setGeometry(QtCore.QRect(30, 700, 701, 235))
         self.groupBox_52.setMinimumSize(QtCore.QSize(500, 0))
         self.groupBox_52.setObjectName("groupBox_52")
         self.horizontalLayoutWidget_24 = QtWidgets.QWidget(parent=self.groupBox_52)
@@ -5508,7 +5529,7 @@ class Ui_MDCx(object):
         self.label_super_resolution_poster.setObjectName("label_super_resolution_poster")
         self.horizontalLayout_sr.addWidget(self.label_super_resolution_poster)
         self.groupBox_66 = QtWidgets.QGroupBox(parent=self.scrollAreaWidgetContents_xiazai)
-        self.groupBox_66.setGeometry(QtCore.QRect(30, 924, 701, 201))
+        self.groupBox_66.setGeometry(QtCore.QRect(30, 954, 701, 201))
         self.groupBox_66.setStyleSheet('font:"Courier New";')
         self.groupBox_66.setObjectName("groupBox_66")
         self.label_333 = QtWidgets.QLabel(parent=self.groupBox_66)
@@ -13575,7 +13596,9 @@ class Ui_MDCx(object):
         self.checkBox_ignore_guochan.setText(_translate("MDCx", "国产封面不裁剪，直接复制缩略图"))
         self.label_305.setText(_translate("MDCx", " 国产封面人脸位置不固定，建议手动裁剪或直接复制"))
         self.checkBox_ignore_size.setText(_translate("MDCx", "预告片下载完成，不校验文件大小"))
-        self.label_272.setText(_translate("MDCx", " 有时网络返回值不正确，校验会导致预告片下载失败"))
+        self.label_272.setText(_translate("MDCx", " 有时候网络返回值不正确，校验导致预告片下载失败"))
+        self.checkBox_poster_replace_thumb.setText(_translate("MDCx", "替换缩略图图片，封面替换缩略图"))
+        self.label_poster_replace_thumb.setText(_translate("MDCx", " 封面图尺寸大于缩略图时，封面图直接替换掉缩略图"))
         self.label_85.setText(
             _translate(
                 "MDCx",
@@ -13958,9 +13981,13 @@ class Ui_MDCx(object):
             _translate(
                 "MDCx",
                 "<p style='line-height:20px'>\n"
-                "                                素人和个摄番号的演员姓名非常多都是素人之类的假名字，当勾选使用AV-Wiki获取到演员真实<br>\n名字后，可以请求AV-Wiki获取演员的真实日文名字，之后可以使用演员映射表翻译为简体中文<br>\n"
-                "                                演员名称的来源比较复杂，不能简单使用翻译引擎翻译，主要的问题是：演员名翻译不准确、同<br>\n一个演员有多个名字、同一个演员不同番号的演员名不统一、各网站使用的演员名不统一等，不<br>\n过通过演员名映射翻译表可以有效的解决以上这些问题，使刮削后的演员名称整齐统一没有错误<br>\n"
-                "                                实现逻辑：网站获取演员名后，通过查询映射表中的匹配词来映射对应输出词，演员名映射翻译<br>\n文件名是：actor_database.xlsx，文件在:\\配置文件目录\\userdata\\actor_database.xlsx<br>\n"
+                "                                素人和个摄番号的演员姓名非常多都是素人之类的假名字，当勾选使用AV-Wiki获取到演员真实<br>\n"
+                "                                名字后，可以请求AV-Wiki获取演员的真实日文名字，之后可以使用演员映射表翻译为简体中文<br>\n"
+                "                                演员名称的来源比较复杂，不能简单使用翻译引擎翻译，主要的问题是：演员名翻译不准确、同<br>\n"
+                "                                一个演员有多个名字、同一个演员不同番号的演员名不统一、各网站使用的演员名不统一等，不<br>\n"
+                "                                过通过演员名映射翻译表可以有效的解决以上这些问题，使刮削后的演员名称整齐统一没有错误<br>\n"
+                "                                实现逻辑：网站获取演员名后，通过查询映射表中的匹配词来映射对应输出词，演员名映射翻译<br>\n"
+                "                                文件名是：actor_database.xlsx，文件在:\\配置文件目录\\userdata\\actor_database.xlsx<br>\n"
                 "                                Windows：\\配置文件目录\\userdata\\actor_database.xlsx，配置在「设置」--「高级」修改<br>\n"
                 "                                MAC系统：/配置文件目录/userdata/actor_database.xlsx，同样在「设置」--「高级」修改<br>\n"
                 "                                你可使用文件编辑工具打开演员映射翻译表后自定义修改和添加，演员映射表中的字段含义如下<br>\n"

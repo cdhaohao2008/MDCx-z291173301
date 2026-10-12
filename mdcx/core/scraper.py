@@ -75,7 +75,7 @@ from .file import (
     move_movie,
 )
 from .file_crawler import FileScraper, classify_existing_scrape_result, classify_scrape_task
-from .image import add_mark
+from .image import add_mark, replace_thumb_fanart_with_poster
 from .media_resource import MediaResourceContext
 from .nfo import get_nfo_data, write_nfo
 from .super_resolution import maybe_upscale_poster
@@ -817,6 +817,12 @@ class Scraper:
         # 议题 #26: 海报超分增强（开关默认开；失败静默保持原图，不影响刮削结果）
         with contextlib.suppress(Exception):
             await maybe_upscale_poster(poster_final_path)
+
+        # 「封面替换缩略图」：poster 大尺寸图覆盖 thumb/fanart。
+        # 放在超分之后以拿到最大 poster，放在 pic_some_deal / add_mark 之前，
+        # 既避免刚替换的文件被清理逻辑删掉，也让替换后的图能正常打水印。
+        with contextlib.suppress(Exception):
+            await replace_thumb_fanart_with_poster(other, thumb_final_path, fanart_final_path, poster_final_path)
 
         await pic_some_deal(res.number, thumb_final_path, fanart_final_path)
         await add_mark(other, file_info, res.mosaic)

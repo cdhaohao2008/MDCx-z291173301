@@ -435,6 +435,7 @@ def save_config(self: "MyMAinWindow"):
         (self.Ui.checkBox_ignore_fc2, DownloadableFile.IGNORE_FC2),
         (self.Ui.checkBox_ignore_guochan, DownloadableFile.IGNORE_GUOCHAN),
         (self.Ui.checkBox_ignore_size, DownloadableFile.IGNORE_SIZE),
+        (self.Ui.checkBox_poster_replace_thumb, DownloadableFile.POSTER_REPLACE_THUMB),
     )
     manager.config.compress_downloaded_images = self.Ui.checkBox_compress_downloaded_images.isChecked()
     manager.config.poster_sr_enabled = self.Ui.checkBox_super_resolution_poster.isChecked()
