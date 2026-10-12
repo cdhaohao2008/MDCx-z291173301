@@ -2596,11 +2596,10 @@ class EmbyActorManagerDialog(QDialog):
                 self._detail_dialogs.pop(key, None)
         dialog = ActorDetailDialog(actor, None, on_synced=self._make_detail_synced())
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        try:
-            mg = self.frameGeometry()
-            dialog.move(mg.center().x() - dialog.width() // 2, mg.center().y() - dialog.height() // 2)
-        except Exception:
-            pass
+        # 定位交给 ActorDetailDialog.showEvent 里的 _center_on_screen()：严格居中于
+        # 屏幕可用区。原先这里按「管理器窗口中心」定位，既会随管理器被拖动而偏移，
+        # 又用客户区尺寸配 move()（move 收的是外框左上角），整体偏下偏右一个标题栏。
+        # 重复打开时复用已有窗口：它已被用户挪过位置，保持原样、不再强制拉回正中。
         _self_ref = weakref.ref(self)
 
         def _forget(*_a, _key=key, _ref=_self_ref):
@@ -4265,6 +4264,9 @@ class ActorDetailDialog(QDialog):
         # 记录默认高度：最大化时按钮高度按 当前高度/默认高度 等比拉升、还原时恢复
         # （见 _sync_button_stretch）。最小化/普通窗口不做任何改动。
         self._dialog_base_h = max(1, self.height() or 720)
+        # 初始焦点留给窗口本身：一开窗就把焦点高亮描在某个输入框上（Windows11 风格
+        # 的 accent 蓝边框）既抢眼又没意义，用户点别处就消失，看着像多出一条蓝条。
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         root = QHBoxLayout(self)
 
         # 左栏：现有数据（Emby 当前）
@@ -4284,6 +4286,10 @@ class ActorDetailDialog(QDialog):
         left_layout.addWidget(self.existing_avatar_label)
         self.existing_info = QTextEdit()
         self.existing_info.setReadOnly(True)
+        # 只读展示框不占焦点：Windows11 风格会给「有焦点的文本框」描一圈强调色
+        # （accent 蓝）边框，本框无内容可编辑、描了纯属误导，还会在左栏最底部
+        # 留下一条用户以为多余的蓝条。顺带把它从 Tab 链里摘掉，Tab 直接落到可编辑处。
+        self.existing_info.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         # 议题 #180: Emby 简介以 <br> 分行(服务器端渲染需要, 数据本身正确),
         # MDCx 详情展示把 <br> 还原为换行——仅此处替换, 不回写数据。
         self.existing_info.setPlainText(
@@ -4424,11 +4430,16 @@ class ActorDetailDialog(QDialog):
         manager.save()
 
     def _sync_button_stretch(self) -> None:
-        """最大化时按钮高度随对话框高度等比拉升（宽度不变），还原时恢复默认。
+        """最大化时按钮高度随对话框高度等比拉升（宽度不变），还原时恢复默认；
+        同时按窗口状态调整【浏览】按钮宽度。
 
-        比例 = 当前对话框高度 / 默认高度（默认高度取 __init__ 里 resize 后的
+        高度：比例 = 当前对话框高度 / 默认高度（默认高度取 __init__ 里 resize 后的
         `_dialog_base_h`），只写 `minimumHeight`——不碰宽度，最大化时按钮变高不变宽。
         数值相同即跳过，避免反复触发布局；普通/最小化窗口比例恒为 1.0，等于不改动。
+
+        宽度：【浏览】跟着【只同步简介】走 —— 最小化时与它等宽，最大化时收成它的一半。
+        基准取兄弟按钮的当前宽（而非写死数值）：五个功能按钮本身会在栏宽变化时伸缩，
+        写死会在别的分辨率下对不齐。
         """
         try:
             try:
@@ -4449,6 +4460,30 @@ class ActorDetailDialog(QDialog):
                     pass
         except Exception:
             pass
+        try:
+            self._sync_browse_width(_max)
+        except Exception:
+            pass
+
+    def _sync_browse_width(self, maximized: bool) -> None:
+        """【浏览】按钮宽度 = 【只同步简介】宽度（最大化时为其一半）。
+
+        最小化窗口不参与：最小化时窗口不可见、尺寸不变，按钮保持还原态宽度即可，
+        而 Qt 在最小化时也照发 `WindowStateChange`，故只按 isMaximized() 分支。
+        """
+        btn = getattr(self, "folder_browse_btn", None)
+        ref = getattr(self, "btn_sync_info", None)
+        if btn is None or ref is None:
+            return
+        try:
+            ref_w = ref.width() or ref.sizeHint().width()
+            if ref_w <= 0:
+                return
+            target = max(1, int(round(ref_w / 2.0))) if maximized else int(ref_w)
+            if btn.width() != target:
+                btn.setFixedWidth(target)
+        except Exception:
+            pass
 
     def changeEvent(self, event):
         super().changeEvent(event)
@@ -4461,6 +4496,13 @@ class ActorDetailDialog(QDialog):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._sync_button_stretch()
+        # 兄弟按钮的宽度在 resizeEvent 里还是上一帧的旧值（本方法由窗口尺寸变化驱动，
+        # 此刻子控件尚未重排），【浏览】的对齐基准会差上一两像素。事件跑完后补一次，
+        # 那时 btn_row 已重排、基准才准。QTimer 会自动合并同一轮里的多次调用。
+        try:
+            QTimer.singleShot(0, self._sync_button_stretch)
+        except Exception:
+            pass
 
     def _sync_info_table_min_h(self) -> None:
         """信息表至少要能完整显示全部行：下限 = 表头 + 逐行 rowHeight 之和 + 边框 + 2px。
@@ -4532,6 +4574,29 @@ class ActorDetailDialog(QDialog):
         finally:
             self._in_preview_sync = False
 
+    def _center_on_screen(self, avail=None) -> None:
+        """把窗口外框放到所在屏幕可用区的正中央（严格居中）。
+
+        与管理器 `_center_on_screen()` 同款口径：以 **frameGeometry**（含标题栏/边框）
+        为准而非客户区 —— `move()` 收的是外框左上角，用客户区算会整体偏下偏右一个
+        标题栏的高度（本机实测 30px）。窗口比可用区还大时钳到可用区左上角，
+        保证标题栏留在屏内抓得到。
+        """
+        try:
+            if avail is None or not avail.isValid():
+                screen = self.screen() or QGuiApplication.primaryScreen()
+                if screen is None:
+                    return
+                avail = screen.availableGeometry()
+            frame = self.frameGeometry()
+            x = avail.x() + (avail.width() - frame.width()) // 2
+            y = avail.y() + (avail.height() - frame.height()) // 2
+            self.move(max(x, avail.x()), max(y, avail.y()))
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+
     @staticmethod
     def _rescale_preview_pixmap(label: QLabel) -> None:
         """预览框尺寸变了就按新尺寸重绘头像（_show_pixmap 存下的原图，KeepAspectRatio）。
@@ -4564,10 +4629,30 @@ class ActorDetailDialog(QDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
+        # 严格居中：必须等首帧 —— showEvent 之前窗口还没创建原生 handle，
+        # frameGeometry 会退化成客户区，据此算出来会整体偏下一个标题栏的高度。
+        # 只做首次：用户手动挪过之后再次 show（复用已有窗口）不该被拽回正中。
+        try:
+            if not getattr(self, "_centered_once", False):
+                self._centered_once = True
+                self._center_on_screen()
+        except Exception:
+            pass
         # 首帧两栏才拿到真实几何，事件过滤器多半已触发过；这里补一次，
         # 保证「尺寸恰好没变、没发出 Resize」时预览框高度与信息表下限也都是对的。
         try:
             self._sync_column_heights()
+        except Exception:
+            pass
+        # 首帧才激活窗口，此时才抢得到初始焦点；见 __init__ 里 setFocusPolicy 的说明。
+        try:
+            self.setFocus()
+        except Exception:
+            pass
+        # 首帧按钮行才有真实宽度：【浏览】的对齐基准取自【只同步简介】的当前宽，
+        # 首帧之前读到的还是 sizeHint，对不齐（见 _sync_button_stretch）。
+        try:
+            self._sync_button_stretch()
         except Exception:
             pass
 

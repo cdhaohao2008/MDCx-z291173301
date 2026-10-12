@@ -255,6 +255,8 @@ def test_detail_dialog_primary_buttons_and_max_height_stretch():
         assert "QPushButton#btnPrimary" in qss and "#1565c0" in qss, "详情窗须自带蓝色主按钮样式"
 
         # 离屏平台没有真正的最大化窗口，强制 isMaximized 为真驱动 _sync_button_stretch
+        # 注意：宽度不变只对五个「功能按钮」成立；【浏览】按用户要求随窗口状态改宽
+        # （最小化/还原 = 【只同步简介】宽，最大化 = 其一半），由下一个用例单独锁。
         normal = {b.text(): (b.width(), b.height(), b.minimumHeight()) for b in _detail_buttons(dlg)}
         dlg.isMaximized = lambda: True
         try:
@@ -267,15 +269,135 @@ def test_detail_dialog_primary_buttons_and_max_height_stretch():
                 want = max(1, int(round(base * ratio)))
                 assert btn.minimumHeight() == want, f"[{btn.text()}] 高度未按比例 {ratio:.2f} 拉升"
                 assert btn.height() >= want, f"[{btn.text()}] 实际高度未跟上"
+                if btn is dlg.folder_browse_btn:
+                    continue
                 assert btn.width() == normal[btn.text()][0], f"[{btn.text()}] 宽度不应被改动"
         finally:
             dlg.isMaximized = lambda: False
         dlg.resize(1600, 1000)
         for _ in range(10):
             _ensure_app().processEvents()
-        assert {b.text(): (b.width(), b.height(), b.minimumHeight()) for b in _detail_buttons(dlg)} == normal, (
-            "还原后应回到普通态几何"
+        restored = {b.text(): (b.width(), b.height(), b.minimumHeight()) for b in _detail_buttons(dlg)}
+        for btn in _detail_buttons(dlg):
+            if btn is dlg.folder_browse_btn:
+                continue
+            assert restored[btn.text()] == normal[btn.text()], f"[{btn.text()}] 还原后应回到普通态几何"
+        assert restored[dlg.folder_browse_btn.text()][1:] == normal[dlg.folder_browse_btn.text()][1:], (
+            "【浏览】还原后高度应复原"
         )
+    finally:
+        dlg.deleteLater()
+
+
+def test_detail_dialog_browse_width_follows_sync_info():
+    """【浏览】宽度跟着【只同步简介】走：还原/最小化时等宽，最大化时为其一半。
+
+    基准取兄弟按钮的当前宽而非写死数值 —— 五个功能按钮本身会随栏宽伸缩，
+    写死会在别的分辨率/窗口尺寸下对不齐。
+    """
+    _ensure_app()
+    from mdcx.tools.emby_actor_manager_ui import ActorDetailDialog
+
+    dlg = ActorDetailDialog(_make_actor())
+    try:
+        dlg.show()
+        for size in ((1080, 720), (1600, 1000), (1920, 1200)):
+            dlg.resize(*size)
+            _pump()
+            ref = dlg.btn_sync_info.width()
+            assert dlg.folder_browse_btn.width() == ref, f"{size} 下【浏览】应与【只同步简介】等宽"
+
+        dlg.isMaximized = lambda: True
+        try:
+            dlg.resize(1920, 1000)  # 必须换尺寸，否则不发出 Resize、驱动不到 _sync_browse_width
+            _pump()
+            ref = dlg.btn_sync_info.width()
+            # 产品侧取 round（奇数宽四舍五入到最近的一半），不是截断
+            half = max(1, int(round(ref / 2.0)))
+            assert dlg.folder_browse_btn.width() == half, f"最大化时【浏览】应为【只同步简介】的一半 ({half})"
+        finally:
+            dlg.isMaximized = lambda: False
+        dlg.resize(1920, 1200)
+        _pump()
+        assert dlg.folder_browse_btn.width() == dlg.btn_sync_info.width(), "还原后【浏览】应回到等宽"
+    finally:
+        dlg.deleteLater()
+
+
+def test_detail_dialog_existing_info_has_no_focus_frame():
+    """左栏只读简介框不占焦点，开窗即无强调色（蓝）边框。
+
+    根因：Qt 的 windows11 风格会给「有焦点的文本框」描一圈强调色边框，而详情窗
+    的第一个可聚焦控件恰是这个**只读**框，用户在左栏最底部看到一条蓝线，既不能
+    点进去改、又像多出来的装饰。故令其 NoFocus（顺带移出 Tab 链），并把初始焦点
+    留给窗口本身，免得蓝框只是挪到中间的「简介」框上去。
+    """
+    _ensure_app()
+    from PyQt6.QtCore import Qt
+
+    from mdcx.tools.emby_actor_manager_ui import ActorDetailDialog
+
+    dlg = ActorDetailDialog(_make_actor(existing_overview="旧简介<br>line2"))
+    try:
+        assert dlg.existing_info.isReadOnly(), "本用例针对只读展示框"
+        assert dlg.existing_info.focusPolicy() == Qt.FocusPolicy.NoFocus, "只读框不应占焦点"
+        assert dlg.focusPolicy() == Qt.FocusPolicy.StrongFocus, "窗口须能接住初始焦点"
+
+        dlg.show()
+        _pump()
+        focused = _ensure_app().focusWidget()
+        assert focused is dlg, f"开窗后焦点应留在窗口上，实则落在 {type(focused).__name__}"
+        assert focused is not dlg.existing_info and focused is not dlg.overview_edit, "不应有输入框被描上焦点框"
+        # NoFocus 的控件既不在 Tab 链里、点击也不会聚焦它，焦点只能由程序 setFocus()
+        # 直接塞进来 —— 正常交互路径下这个只读框拿不到焦点，蓝框也就无从产生。
+    finally:
+        dlg.deleteLater()
+
+
+def test_detail_dialog_is_strictly_centered_on_screen():
+    """窗口外框严格居于屏幕可用区正中央（且不随管理器位置漂移）。
+
+    两处旧毛病：①按「管理器窗口中心」定位，管理器一被拖动详情窗就跟着偏；
+    ②用客户区尺寸配 move()（move 收的是外框左上角），整体偏下偏右一个标题栏。
+    故断言的是 **frameGeometry**（含标题栏/边框）与可用区中心的偏差，允许 1px 取整余量。
+    """
+    _ensure_app()
+    from mdcx.tools.emby_actor_manager_ui import ActorDetailDialog
+
+    avail = _ensure_app().primaryScreen().availableGeometry()
+
+    dlg = ActorDetailDialog(_make_actor())
+    try:
+        dlg.show()
+        _pump()
+        frame = dlg.frameGeometry()
+        dx = frame.center().x() - avail.center().x()
+        dy = frame.center().y() - avail.center().y()
+        if frame.width() <= avail.width() and frame.height() <= avail.height():
+            # 客户区尺寸 ≠ 外框尺寸：断言外框居中才是「视觉上居中」
+            assert abs(dx) <= 1 and abs(dy) <= 1, f"外框中心应落在可用区正中央，实则偏 ({dx}, {dy})"
+        else:
+            # 某一维比可用区还大（离屏平台固定 800 宽，而详情窗最小 1080 宽）：
+            # 该维按设计钳到可用区左上/上缘，保证标题栏留在屏内抓得到。
+            if frame.width() > avail.width():
+                assert frame.x() == avail.x(), f"宽度放不下时应贴可用区左缘，实则 x={frame.x()}"
+            if frame.height() > avail.height():
+                assert frame.y() == avail.y(), f"高度放不下时应贴可用区上缘，实则 y={frame.y()}"
+
+        # 只居中一次：用户挪过之后重新 show 不该被拽回正中（否则每次开关都被重置位置）
+        dlg.move(10, 10)
+        dlg.hide()
+        _pump()
+        dlg.show()
+        _pump()
+        assert dlg.frameGeometry().x() == 10, "复用已有窗口时应保留用户挪动的位置"
+
+        # 最大化/还原走系统原生几何，不该被居中逻辑改写
+        dlg.showMaximized()
+        _pump()
+        dlg.showNormal()
+        _pump()
+        assert dlg.frameGeometry().x() == 10, "最大化往返后仍应保留原位置"
     finally:
         dlg.deleteLater()
 
