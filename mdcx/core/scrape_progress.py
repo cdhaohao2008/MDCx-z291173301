@@ -57,14 +57,14 @@ def _format_duration(seconds: float) -> str:
     """把秒数格式化为可读时长"""
     seconds = max(int(seconds), 0)
     if seconds < 60:
-        return f"{seconds} 秒"
+        return f"{seconds}秒"
     minutes = seconds // 60
     if minutes < 60:
-        return f"{minutes} 分钟"
+        return f"{minutes}分钟"
     hours = minutes // 60
     if hours < 24:
-        return f"{hours} 小时 {minutes % 60} 分"
-    return f"{hours // 24} 天 {hours % 24} 小时"
+        return f"{hours}小时{minutes % 60}分"
+    return f"{hours // 24}天{hours % 24}小时"
 
 
 def append_eta(info: str, estimator: ScrapeRateEstimator) -> str:

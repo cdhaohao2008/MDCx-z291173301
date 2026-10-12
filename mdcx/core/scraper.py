@@ -718,9 +718,9 @@ class Scraper:
             estimator = getattr(self, "_rate_estimator", None)
             if estimator is not None:
                 estimator.record_done()
-                signal.show_scrape_info(append_eta(f"🔎 已刮削 {count}/{count_all}", estimator))
+                signal.show_scrape_info(append_eta(f"🔎 已刮削{count}/{count_all}", estimator))
             else:
-                signal.show_scrape_info(f"🔎 已刮削 {count}/{count_all}")
+                signal.show_scrape_info(f"🔎 已刮削{count}/{count_all}")
         except Exception as e:
             self._check_stop(show_name)
             signal.show_traceback_log(traceback.format_exc())
