@@ -1,5 +1,9 @@
 
 # Changelog
+## v2.3.8 (2026-10-12)
+### 修复
+- **HTTP 404 日志膨胀（`mdcx/web_async.py` 第 2010 行）**：`body_preview` 对响应体做 `" ".join(...split())` 压缩，去除 nginx 404 HTML 中的多余换行与空白，避免每张失败截图重复输出多行 `404 Not Found` 占据页面。
+
 ## v2.3.7 (2026-10-12)
 ### 功能增强
 - **超分工具（`core/super_resolution.py`）**：Windows 平台隐藏 CMD 窗口（`SW_HIDE`）、默认以管理员权限（`runas`）执行超分命令；非 Windows 平台保持原行为。
