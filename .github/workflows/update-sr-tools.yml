@@ -44,7 +44,7 @@ jobs:
 
       - name: Install locked dependencies
         shell: bash
-        run: uv sync --locked --all-extras --dev
+        run: uv sync --all-extras --dev
 
       # Linux 上 import 链（scripts.fetch_sr_tools → mdcx.core.super_resolution →
       # mdcx.signals/resources → PyQt6）需要 Qt 系统库；与 ci.yaml 的 Linux 依赖对齐
