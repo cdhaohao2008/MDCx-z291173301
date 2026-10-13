@@ -42,18 +42,21 @@ jobs:
         with:
           activate-environment: true
 
-      - name: Install locked dependencies
-        shell: bash
-        run: uv sync --all-extras --dev
-
       # Linux 上 import 链（scripts.fetch_sr_tools → mdcx.core.super_resolution →
-      # mdcx.signals/resources → PyQt6）需要 Qt 系统库；与 ci.yaml 的 Linux 依赖对齐
-      - name: Install Qt runtime libs (Linux)
+      # mdcx.signals/resources → PyQt6）需要 Qt 系统库；av 包（pyav/pyav）源码编译
+      # 需要 FFmpeg 开发库（libavformat-dev/libavcodec-dev 等）与 pkg-config。
+      - name: Install Linux system dependencies
         if: matrix.build == 'linux'
         shell: bash
         run: |
           sudo apt-get update -y && sudo apt-get install -y \
-            libglib2.0-0 libegl1 libgl1 libfontconfig1
+            libglib2.0-0 libegl1 libgl1 libfontconfig1 \
+            pkg-config libavformat-dev libavcodec-dev libavdevice-dev \
+            libavutil-dev libavfilter-dev libswscale-dev libswresample-dev
+
+      - name: Install locked dependencies
+        shell: bash
+        run: uv sync --all-extras --dev
 
       - name: Cache SR tools
         uses: actions/cache@v6
