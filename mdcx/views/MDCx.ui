@@ -25415,7 +25415,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;目录命名&lt;/b&gt;：存放视频的文件夹名，支持多层目录与自定义符号，例：[actor]/studio/number-【title】。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;标题命名（媒体库）&lt;/b&gt;：NFO中的标题，例：number-[title]。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;标题命名（本地文件）&lt;/b&gt;：本地视频与图片的命名，例：number-[title]。&lt;/li&gt;
-&lt;li&gt;可用变量：number（番号）、title（标题）、originaltitle（原标题）、actor（演员）、first_actor（首位演员）、all_actor（全部演员）、letters（番号前缀）、first_letter（番号首字符）、outline（简介）、director（导演）、series（系列）、studio（片商）、publisher（发行商）、release（发行日期）、year（年份）、runtime（时长）、mosaic（有码/无码）、definition（清晰度）、cnword（字幕标识）、moword（版本标识）、filename（原文件名）、wanted（想看人数）、score（评分）、four_k（4K标识）。支持Jinja2模板与自定义符号。&lt;/li&gt;
+&lt;li&gt;可用变量：number番号、title标题、originaltitle原标题、actor演员、first_actor首位演员、all_actor全部演员、letters番号前缀、first_letter番号首字符、outline简介、director导演、definition清晰度、publisher发行商、series系列、studio片商、year年份、mosaic有码/无码、runtime时长、score评分、release发行日期、cnword字幕标识、wanted想看人数、four_k（4K标识）、filename原文件名、moword版本标识，支持Jinja2模板与自定义符号。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;四、网站选择&lt;/h4&gt;
 &lt;p&gt;网站下拉框由已注册的爬虫自动生成（当前36个），可按需选用全部网站或指定网站。主要来源包括：&lt;/p&gt;
@@ -25428,7 +25428,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;欧美&lt;/b&gt;：THEPORNDB、AVHEAT&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;&lt;b&gt;Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：S1S1S1、Moodyz、Madonna-av、Wanz-Factory、IdeaPocket、Kirakira-av、E-Body、Bi-av、Premium-Beauty、Miman、Tameikegoro、Fitch-av、Kawaii、BeeFree、Muku.tv、Attackers、MKO-Labo、Dasdas、MVG、AV-Opera、Oppai-av、V-av、To-Satsu、Bibian-av、Honnaka、Rookie-av、Nanpa-Japan、HajimeKikaku、HHH-av、Prestige&lt;br/&gt;
-无码官网5站，JSONAPI直连：Caribbeancom、Heyzo、1Pondo、Pacopacomama、10Musume&lt;br/&gt;
+无码官网5站，JSON API直连：Caribbeancom、Heyzo、1Pondo、Pacopacomama、10Musume&lt;br/&gt;
 番号前缀DLDSS/FNS/JIMMY还分别路由到Dahlia/Faleno官网，官网前缀表维护在代码manual.py的OFFICIAL字典中，增减不影响使用说明。&lt;/p&gt;
 &lt;h4&gt;五、Cloudflare绕过（CFBypass）&lt;/h4&gt;
 &lt;p&gt;MDCx提供多种Cloudflare绕过能力，遇到受Cloudflare保护的站点时自动尝试绕过：&lt;/p&gt;
@@ -25436,7 +25436,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;外部CF服务&lt;/b&gt;：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址（如http://127.0.0.1:8191），并在右侧选择后端类型：TRAWL（走/scrape原生API）或FlareSolverr（走/v1兼容API）。MDCx自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;SeleniumCFBypass&lt;/b&gt;（JavLibrary专用）：JavLibrary遇CloudflareJSchallenge时自动fallback到Selenium+Edgeheadless获取页面HTML。默认开启（cf_selenium_bypass），需要Windows10/11+Edge浏览器，首次使用自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;Bypass落地白名单&lt;/b&gt;：可填写可信落地域名白名单（逗号分隔，支持*.example.com子域通配），用于校验Bypass服务落地/重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据；留空表示不校验（默认）。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;免CF通道&lt;/b&gt;：部分站点提供免CF的数据接口（javdb_api、javdb_app、missav_api、r18dev、thejavdb_api），默认已加入网站源，可直接选用获得更稳定的抓取。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;免CF通道&lt;/b&gt;：部分站点提供免CF的数据接口javdb_api、javdb_app、missav_api、r18dev、thejavdb_api，默认已加入网站源，可直接选用获得更稳定的抓取。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;六、代理设置&lt;/h4&gt;
 &lt;p&gt;在"设置→网络"中配置：&lt;/p&gt;
