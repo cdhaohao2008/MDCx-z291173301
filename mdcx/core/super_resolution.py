@@ -402,23 +402,79 @@ async def upscale_image(src: Path, dst: Path, preset: SrPreset) -> bool:
         return False
 
 
-def _is_all_black(path: Path) -> bool:
-    """检查图片是否全黑（像素平均值接近 0），用于判断超分产物是否失败。"""
+def _image_gray_stats(path: Path) -> tuple[float, float, int] | None:
+    """64x64 缩略图灰度统计 (mean, std, max)，读失败返回 None。"""
     try:
         with Image.open(path) as img:
-            if img.mode != "RGB":
-                img = img.convert("RGB")
-            # 使用缩小图快速判断，避免大图耗时
-            thumb = img.resize((32, 32))
+            gray = img.convert("L")
+            try:
+                thumb = gray.resize((64, 64), Image.Resampling.BILINEAR)
+            except AttributeError:  # Pillow < 9.1 兼容
+                thumb = gray.resize((64, 64), Image.BILINEAR)
             pixels = list(thumb.getdata())
             if not pixels:
-                return False
-            total = sum(sum(p) for p in pixels)
-            avg = total / (len(pixels) * 3)
-            # 平均值小于 5 视为全黑（允许微小噪声）
-            return avg < 5
+                return None
+            n = len(pixels)
+            mean = sum(pixels) / n
+            var = sum((p - mean) ** 2 for p in pixels) / n
+            return mean, var**0.5, max(pixels)
     except Exception:
+        return None
+
+
+def _is_all_black(path: Path) -> bool:
+    """检查图片是否全黑/近黑（单文件绝对亮度判定，无原图对照时用）。
+
+    旧阈值 avg<5 只能抓住纯黑，漏掉“接近纯黑（肉眼看不出差别，均值 5~15）”的
+    失败产物——这正是线上仍有黑图落盘的原因。现放宽到均值 <16。
+    有原图对照的完整判定见 `_upscale_failure_reason`。
+    """
+    stats = _image_gray_stats(path)
+    if stats is None:
         return False
+    mean, _, _ = stats
+    return mean < 16
+
+
+def _upscale_failure_reason(src: Path, dst: Path) -> str | None:
+    """对照原图判定超分产物是否失败。返回 None 表示通过，否则为失败原因。
+
+    ncnn-vulkan 工具偶发 exit 0 但输出纯黑/近黑（驱动/Vulkan 异常所致，
+    重试同工具大概率复现），单靠绝对阈值会漏检“均值略高于旧阈值但相对原图
+    亮度崩塌”的情况，故同时做相对亮度/纹理/高光对照；原图本身就很暗时
+    不误判（相对规则要求原图先达到亮度下限）。
+    """
+    try:
+        if _image_max_dim(dst) <= _image_max_dim(src):
+            return "产物尺寸未增大"
+    except Exception:
+        return "产物无法读取"
+    src_stats = _image_gray_stats(src)
+    dst_stats = _image_gray_stats(dst)
+    if dst_stats is None:
+        return "产物无法读取"
+    if src_stats is None:
+        # 原图都读不出（极端情况）：只做绝对黑判定，避免误替换
+        return "产物绝对黑" if dst_stats[0] < 16 else None
+    mean_src, std_src, max_src = src_stats
+    mean_dst, std_dst, max_dst = dst_stats
+    if mean_dst < 8:
+        return "产物绝对黑"
+    if mean_dst < 18 and mean_src > 35:
+        return "产物近黑"
+    if mean_src > 30 and mean_dst < 0.35 * mean_src:
+        return "产物亮度崩塌"
+    if std_dst < 6 and std_src > 18:
+        return "产物纹理丢失"
+    if max_dst < 24 and max_src > 80:
+        return "产物高光丢失"
+    return None
+
+
+_FALLBACK_PRESET: dict[SrPreset, SrPreset] = {
+    SrPreset.REALESR_PHOTO_4X: SrPreset.WAIFU_PHOTO_2X,
+    SrPreset.WAIFU_PHOTO_2X: SrPreset.REALESR_PHOTO_4X,
+}
 
 
 def _image_max_dim(path: Path) -> int:
@@ -452,7 +508,10 @@ def _sr_trigger_ok(path: Path) -> bool:
 
 async def maybe_upscale_poster(poster_path: Path) -> bool:
     """刮削收尾钩子：符合条件时对海报超分并原子替换；否则原样返回 False。
-    超分完成后检查是否全黑：若全黑则重新超分一次；若仍全黑则删除超分图片直接使用原图片。"""
+
+    失败产物（纯黑/近黑/亮度崩塌）直接弃用保原图；首选预设产物无效时换
+    另一款工具重试一次（同工具重试大概率复现黑图），仍无效则保持原图。
+    """
     if not _sr_trigger_ok(poster_path):
         return False
     preset_raw = str(getattr(manager.config, "poster_sr_preset", SrPreset.REALESR_PHOTO_4X))
@@ -460,54 +519,29 @@ async def maybe_upscale_poster(poster_path: Path) -> bool:
         preset = SrPreset(preset_raw)
     except ValueError:
         preset = SrPreset.REALESR_PHOTO_4X
+    fallback = _FALLBACK_PRESET[preset]
     tmp = poster_path.with_name(poster_path.stem + ".[SR].jpg")
     retry_tmp = poster_path.with_name(poster_path.stem + ".[SR].retry.jpg")
     try:
-        # 第一次超分
+        # 第一次超分（二进制失败直接保原图，不换工具重试，避免超时翻倍）
         if not await upscale_image(poster_path, tmp, preset):
             return False
-        # 检查是否全黑
-        if _is_all_black(tmp):
-            signal.show_traceback_log(f"🔶 超分产物全黑（可能失败），尝试重新超分一次: {poster_path.name}")
-            # 重新超分到不同临时文件
-            if await upscale_image(poster_path, retry_tmp, preset):
-                if _is_all_black(retry_tmp):
-                    # 仍然全黑：删除超分图片，直接使用原图片
-                    signal.show_traceback_log(f"🔶 超分重试仍全黑，删除超分产物直接使用原图: {poster_path.name}")
-                    try:
-                        retry_tmp.unlink(missing_ok=True)
-                        tmp.unlink(missing_ok=True)
-                    except OSError:
-                        pass
-                    return False
-                else:
-                    # 重试成功且非全黑：使用重试结果
-                    # 先检查尺寸
-                    if _image_max_dim(retry_tmp) <= _image_max_dim(poster_path):
-                        signal.show_traceback_log(f"🔶 超分重试产物尺寸未增大，弃用: {poster_path.name}")
-                        try:
-                            retry_tmp.unlink(missing_ok=True)
-                        except OSError:
-                            pass
-                        return False
-                    # 替换原图
-                    os.replace(retry_tmp, poster_path)
-                    signal.show_log_text(f"✨ 海报超分重试完成: {poster_path.name}")
-                    return True
-            else:
-                # 重试失败
-                signal.show_traceback_log(f"🔶 超分重试失败（保持原图）: {poster_path.name}")
-                return False
-        else:
-            # 第一次成功且非全黑：继续正常流程
-            pass
-
-        # 校验产物确为放大图，防二进制输出异常覆盖原图
-        if _image_max_dim(tmp) <= _image_max_dim(poster_path):
-            signal.show_traceback_log(f"🔶 超分产物尺寸未增大，弃用: {poster_path.name}")
+        reason = _upscale_failure_reason(poster_path, tmp)
+        if reason is None:
+            os.replace(tmp, poster_path)
+            signal.show_log_text(f"✨ 海报超分完成: {poster_path.name}")
+            return True
+        signal.show_traceback_log(f"🔶 超分产物异常（{reason}），换工具重试一次: {poster_path.name}")
+        # 换另一款工具重试（同工具黑图多为确定性驱动问题，重试无意义）
+        if not await upscale_image(poster_path, retry_tmp, fallback):
+            signal.show_traceback_log(f"🔶 超分重试失败（保持原图）: {poster_path.name}")
             return False
-        os.replace(tmp, poster_path)
-        signal.show_log_text(f"✨ 海报超分完成: {poster_path.name}")
+        retry_reason = _upscale_failure_reason(poster_path, retry_tmp)
+        if retry_reason is not None:
+            signal.show_traceback_log(f"🔶 超分重试仍异常（{retry_reason}），弃用并保持原图: {poster_path.name}")
+            return False
+        os.replace(retry_tmp, poster_path)
+        signal.show_log_text(f"✨ 海报超分重试完成: {poster_path.name}")
         return True
     finally:
         try:
