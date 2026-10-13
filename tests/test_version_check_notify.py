@@ -111,6 +111,7 @@ def test_periodic_recheck_notifies_once_per_version(win, app, monkeypatch):
     app.processEvents()
     assert win._notified_new_version == _remote(local + 100, "v9.9.9 (99999999)")
     assert "有新版本" in win.new_version
+    assert any("基于MDC-GUI修改·当前版本：" in t for t in log_calls)
     assert _red_count(log_calls) == 1
 
     # 同一版本再查：不再刷屏。

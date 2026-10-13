@@ -8536,7 +8536,7 @@ class MyMAinWindow(QMainWindow):
             signal_qt.show_log_text(traceback.format_exc())
 
     def _show_version_thread(self):
-        version_info = f"基于MDC-GUI修改·当前版本： {self.version_display}"
+        version_info = f"基于MDC-GUI修改·当前版本：{self.version_display}"
         download_link = ""
         has_new_version = False
         latest_version = check_version()
