@@ -1,5 +1,14 @@
 
 # Changelog
+## v2.3.9 (2026-10-13)
+### 修复
+- **版本号**：`2.3.8` → `2.3.9`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`；`LOCAL_VERSION` 保持 `20261020`）。
+- **超分黑图/近黑图漏检（`mdcx/core/super_resolution.py`）**：旧 `_is_all_black` 只拦灰度均值 `<5` 的纯黑，均值 8~15 的近黑图（肉眼全黑）会通过尺寸校验直接覆盖原图。现改用 64x64 灰度统计（`_image_gray_stats`），单文件阈值放宽到均值 `<16`，并新增原图对照判定 `_upscale_failure_reason`（绝对黑/近黑/亮度崩塌到原图 0.35 倍以下/纹理丢失/高光丢失，原图本身暗时不误判）；首超失败改换另一款工具重试一次（同工具黑图多为确定性驱动问题，重试无意义），仍失败则删产物保原图。
+- **超分相似度兜底**：新增无依赖全局 SSIM 相似度 `_similarity`（产物缩回原尺寸后比较，正常超分约 1.0，黑/白/噪声图约 0.0x）。首超相似度 `<0.5` 视为失败删除并换工具重试；二次相似度仍低但非黑/非纯色按策略保留，只有纯黑/近黑/纯色才弃用（`_hard_failure_reason` + `_is_near_solid`）。
+- **超分模拟审计出的 4 处 bug**：①批刮并发时 `ensure_binary` 无锁，5 并发实测下载 10 次且 `rmtree/copytree` 互踩，加 `_SR_INSTALL_LOCK` + 双重检查后只下载 1 次；②两处 `os.replace` 落盘无保护，被锁定时异常外泄，现捕获 `OSError` 记日志并返回 False 保原图；③Windows 超时杀不掉 ncnn 子进程（`shell=True` 只杀掉 cmd 外壳，孤儿进程继续占 GPU/写文件），超时改返回独立码 `_TIMEOUT_EXIT_CODE` 并尽力 `taskkill`，上报文案与 POSIX 分支对齐为"超分超时"（此前误报"工具执行失败"）；④`_extract_zip` 对 `..` 开头包会把父目录整树复制进目标目录，重写为校验成员路径防 zip-slip + 空包抛错。另顺手将 `mktemp` 换 `mkstemp`、修未使用变量与 `_image_max_dim` 无效 try。两次超分全黑/纯色/近黑（黑→黑、黑→白、白→白混合）一律删除 `[SR]` 产物、字节级保持原始下载图。
+- **回归**：`tests/test_super_resolution.py` 新增 10 例（相似度高/低、首坏重试换工具、二次低相似保留、纯色二次弃用、混合失败保原图、落盘失败降级、并发单下载、超时独立码、zip-slip 拒解），`tests/test_super_resolution.py` + `tests/test_sr_bundling.py` 共 36 项全绿；`ruff check` 仅剩 `_run_elevated` 一处旧代码 UP022 告警。
+- **GitHub Actions Linux 工作流系统依赖缺失（`.github/workflows/update-sr-tools.yml`、`build-py314.yml`、`ci.yaml`）**：Linux runner 执行 `uv sync --all-extras --dev` 时 `av==16.0.1`（FFmpeg 开发库缺失）与 `lxml==6.1.1`（`libxml2`/`libxslt` 开发库与 Python 头文件缺失）均源码编译失败。修复为在三个文件的 Linux `apt-get install` 步骤中追加：`pkg-config` + `libavformat-dev`/`libavcodec-dev`/`libavdevice-dev`/`libavutil-dev`/`libavfilter-dev`/`libswscale-dev`/`libswresample-dev`（`av` 编译）；`libxml2-dev`/`libxslt1-dev`/`libxslt-dev`/`python3-dev`/`zlib1g-dev`/`gcc`（`lxml` 编译）。
+
 ## v2.3.8 (2026-10-12)
 ### 修复
 - **运行时防御性加固（防卡顿/崩溃/内存错误）**：修复 `mdcx/config/computed.py` (`1 / llm_max_req_sec` 在值为 0 时 `ZeroDivisionError`)；`mdcx/controllers/cut_window.py`（图片宽高为 0 时的多处除零崩溃、缩放计算守卫、裁剪框比例守卫）；`mdcx/image.py`（`cut_pic()` / `fix_pic()` 中 `w == 0` / `h == 0` 除零风险）。不修改功能、布局或提示词内容。
