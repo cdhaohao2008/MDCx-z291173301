@@ -323,29 +323,46 @@ class JavlibraryCrawler(BaseCrawler):
         )
 
     async def _selenium_bypass(self, ctx: Context, url: str) -> str | None:
-        """Selenium+Edge CF bypass fallback。
+        """浏览器 CF bypass fallback：Selenium+Edge 第一顺位，Playwright+Edge 第二顺位。
 
-        配置开关关闭或环境不可用时返回 None。
+        配置开关关闭或双后端都不可用时返回 None。
         """
         if not manager.config.cf_selenium_bypass:
             ctx.debug("Selenium bypass 已在配置中关闭")
             return None
 
-        from ..cf_bypass.selenium_adapter import get_html, is_available
+        from ..cf_bypass.selenium_adapter import get_html as selenium_get_html
+        from ..cf_bypass.selenium_adapter import is_available as selenium_available
+        from ..cf_bypass.selenium_adapter import is_cf_html
 
-        if not is_available():
-            ctx.debug("Selenium bypass 不可用（无 Edge 或 selenium 未安装）")
+        if selenium_available():
+            try:
+                html = await selenium_get_html(url)
+                if html and not is_cf_html(html):
+                    ctx.debug("Selenium bypass 成功")
+                    return html
+                ctx.debug("Selenium bypass 后仍含 CF 标记，换 Playwright 再试")
+            except Exception as e:
+                ctx.debug(f"Selenium bypass 异常: {e}，换 Playwright 再试")
+        else:
+            ctx.debug("Selenium bypass 不可用（无 Edge 或 selenium 未安装），换 Playwright 再试")
+
+        from ..cf_bypass.playwright_adapter import get_html as playwright_get_html
+        from ..cf_bypass.playwright_adapter import is_available as playwright_available
+
+        if not playwright_available():
+            ctx.debug("Playwright bypass 不可用（无 Edge 或 playwright 未安装）")
             return None
 
         try:
-            html = await get_html(url)
-            if html and not is_selenium_cf_html(html):
-                ctx.debug("Selenium bypass 成功")
+            html = await playwright_get_html(url)
+            if html and not is_cf_html(html):
+                ctx.debug("Playwright bypass 成功")
                 return html
-            ctx.debug("Selenium bypass 后仍含 CF 标记")
+            ctx.debug("Playwright bypass 后仍含 CF 标记")
             return None
         except Exception as e:
-            ctx.debug(f"Selenium bypass 异常: {e}")
+            ctx.debug(f"Playwright bypass 异常: {e}")
             return None
 
     @override

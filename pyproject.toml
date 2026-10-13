@@ -29,6 +29,7 @@ dependencies = [
     "pillow>=12.2.0",  # GHSA-pwv6-vv43-88gr / whj4-6x5x-4v2j / cfh3-3jmp-rvhc / r73j-pqj5-w3x7 等 12 条告警; 处理不可信封面/缩略图
     "pydantic-settings>=2.14.2",  # GHSA-4xgf-cpjx-pc3j 符号链接越权读 secrets
     "pyqt6==6.11.0",
+    "tenacity>=9.0.0",  # 爬虫重试/退避统一（cf_bypass 浏览器后端等）；纯 Python 无二进制依赖
     "zhconv==1.4.3",
     "opencv-contrib-python-headless==4.13.0.92",
     "jinja2>=3.1.6",
@@ -37,6 +38,13 @@ dependencies = [
     # --- 外部CF服务适配层依赖 (TRAWL/FlareSolverr 协议翻译) ---
     # 内置 CF Bypass (cloakbrowser + cf_bypasser) 已移除, 过 CF 统一走外部服务。
     "uvicorn>=0.15.0",
+]
+
+[project.optional-dependencies]
+# 浏览器 CF bypass 后端：Playwright + 系统 Edge（msedge 通道，免下浏览器包）。
+# selenium 仍走首次使用自动安装；本 extra 供打包/预装：pip install mdcx[browser]
+browser = [
+    "playwright>=1.49.0",
 ]
 
 [project.scripts]
@@ -62,6 +70,7 @@ dev = [
     "tornado>=6.5.8",  # GHSA-8423-8fgw-73vq / mpf4-983q-p7j4 / wwv5-g3v4-889x (ipykernel 传递依赖)
     "pytest-asyncio>=1.1.0",
     "pytest-cov>=6.2.1",
+    "respx>=0.22.0",  # httpx 传输层 mock：替代手写 FakeAsyncClient（tests/test_emby_respx.py 示例）
     "rich>=14.1.0",
     "ruff>=0.15.0,<0.16.0",
     "typer>=0.16.0",
