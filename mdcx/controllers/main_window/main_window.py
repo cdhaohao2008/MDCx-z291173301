@@ -201,7 +201,7 @@ class MyMAinWindow(QMainWindow):
     pushButton_actor_db_translate = pyqtSignal(str)
     pushButton_actor_db_link = pyqtSignal(str)
     pushButton_actor_db_sync_aliases = pyqtSignal(str)
-    pushButton_actor_db_fill_minnano = pyqtSignal(str)
+    pushButton_actor_db_fill_Minnano = pyqtSignal(str)
     pushButton_actor_db_fill_zh_javdb = pyqtSignal(str)
     pushButton_actor_db_clean_male = pyqtSignal(str)
     pushButton_actor_db_verify_tmdbid = pyqtSignal(str)
@@ -1153,7 +1153,7 @@ class MyMAinWindow(QMainWindow):
         "pushButton_actor_db_open": (40, 90, 200, 28),
         "pushButton_actor_db_stop": (260, 90, 200, 28),
         "pushButton_actor_db_clean_male": (40, 118, 200, 30),
-        "pushButton_actor_db_fill_minnano": (260, 118, 200, 30),
+        "pushButton_actor_db_fill_Minnano": (260, 118, 200, 30),
         "pushButton_actor_db_verify_tmdbid": (40, 148, 200, 30),
         "pushButton_actor_db_check": (260, 148, 200, 30),
         "pushButton_actor_db_update_nfo_tmdbid": (40, 184, 200, 30),
@@ -1644,7 +1644,7 @@ class MyMAinWindow(QMainWindow):
         widgets["pushButton_actor_db_open"].setGeometry(40, 90, left_w, 28)
         widgets["pushButton_actor_db_stop"].setGeometry(right_x, 90, right_w, 28)
         widgets["pushButton_actor_db_clean_male"].setGeometry(40, 118, left_w, 30)
-        widgets["pushButton_actor_db_fill_minnano"].setGeometry(right_x, 118, right_w, 30)
+        widgets["pushButton_actor_db_fill_Minnano"].setGeometry(right_x, 118, right_w, 30)
         widgets["pushButton_actor_db_verify_tmdbid"].setGeometry(40, 148, left_w, 30)
         widgets["pushButton_actor_db_check"].setGeometry(right_x, 148, right_w, 30)
         widgets["pushButton_actor_db_update_nfo_tmdbid"].setGeometry(40, 184, left_w, 30)
@@ -10718,7 +10718,7 @@ class MyMAinWindow(QMainWindow):
 
         pushButton_actor_db_sync_aliases_clicked(self)
 
-    def pushButton_actor_db_fill_minnano_clicked(self):
+    def pushButton_actor_db_fill_Minnano_clicked(self):
         self._run_actor_db_tool("fill_minnano")
 
     def pushButton_actor_db_fill_zh_javdb_clicked(self):
@@ -12237,7 +12237,7 @@ class MyMAinWindow(QMainWindow):
         self.Ui.pushButton_actor_db_translate.setEnabled(False)
         self.Ui.pushButton_actor_db_link.setEnabled(False)
         self.Ui.pushButton_actor_db_sync_aliases.setEnabled(False)
-        self.Ui.pushButton_actor_db_fill_minnano.setEnabled(False)
+        self.Ui.pushButton_actor_db_fill_Minnano.setEnabled(False)
         self.Ui.pushButton_actor_db_fill_zh_javdb.setEnabled(False)
 
     def reset_buttons_status(self):

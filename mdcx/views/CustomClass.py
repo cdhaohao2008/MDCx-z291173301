@@ -205,7 +205,7 @@ class CustomScrollArea(QScrollArea):
             "label_actor_db_note",
             "pushButton_actor_db_open",
             "pushButton_actor_db_clean_male",
-            "pushButton_actor_db_fill_minnano",
+            "pushButton_actor_db_fill_Minnano",
             "pushButton_actor_db_verify_tmdbid",
             "pushButton_actor_db_check",
             "label_actor_db_update_nfo_desc",
