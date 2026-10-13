@@ -132,7 +132,7 @@ def test_periodic_recheck_notifies_once_per_version(win, app, monkeypatch):
     win._show_version_thread()
     app.processEvents()
     assert win._notified_new_version == _remote(local + 101, "v9.9.10 (99999999)")
-    assert any("最新版本" in t for t in log_calls)
+    assert any("你使用的是最新版本！" in t for t in log_calls)
 
 
 def test_new_version_prompt_shows_release_display_name(win, app, monkeypatch):
