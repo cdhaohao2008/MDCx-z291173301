@@ -63,7 +63,7 @@ def _site_combo_item_tooltip(value: str, description: str) -> str:
         if label:
             route = {"proxy": "走代理", "direct": "直连"}.get(str(entry.get("route") or ""), "")
             when = str(entry.get("checked_at") or "")[:16].replace("T", " ")
-            tip += (f"\n上次检测（{when}）：{label}" + (f" · {route}" if route else "")) if when else ""
+            tip += (f"\n上次检测（{when}）：{label}" + (f"·{route}" if route else "")) if when else ""
     return tip
 
 

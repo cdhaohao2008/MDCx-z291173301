@@ -120,13 +120,12 @@ def _create_driver():
 
 
 def _wait_cf_pass(driver, max_wait: int = 60) -> str:
-    """等待 CF 挑战通过，返回页面 HTML。"""
-    driver.get(driver.current_url if driver.current_url else "")
-    for _ in range(max_wait // 3):
-        time.sleep(3)
+    """等待 CF 挑战通过，返回页面 HTML（先检查、未过再等，避免冗余导航）。"""
+    for _ in range(max(1, max_wait // 3)):
         html = driver.page_source
         if not is_cf_html(html):
             return html
+        time.sleep(3)
     return driver.page_source
 
 
@@ -137,7 +136,7 @@ def _fetch_html_and_cookies_sync(url: str, timeout: int = 90) -> tuple[str | Non
         driver = _create_driver()
         driver.set_page_load_timeout(timeout)
         driver.get(url)
-        html = _wait_cf_pass(driver)
+        html = _wait_cf_pass(driver, max_wait=timeout)
         if is_cf_html(html):
             logger.warning("Selenium bypass: CF 挑战未通过")
             return None, {}
@@ -159,26 +158,6 @@ def _fetch_html_and_cookies_sync(url: str, timeout: int = 90) -> tuple[str | Non
                 driver.quit()
             except Exception:
                 pass
-
-
-def _get_html_sync(url: str, timeout: int = 90) -> str | None:
-    """同步获取页面 HTML，自动过 CF。"""
-    if not is_available():
-        return None
-
-    global _consecutive_failures, _cooldown_until
-
-    now = time.monotonic()
-    if now < _cooldown_until:
-        logger.debug("Selenium bypass 冷却中，跳过")
-        return None
-
-    html, _ = _fetch_html_and_cookies_sync(url, timeout)
-    if not html:
-        _incr_failures()
-        return None
-    _reset_failures()
-    return html
 
 
 def _incr_failures() -> None:

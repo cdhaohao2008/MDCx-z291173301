@@ -259,7 +259,7 @@ def test_selenium_cf_detection():
 
 
 @pytest.mark.asyncio
-async def test_selenium_bypass_disabled_when_config_off(monkeypatch):
+async def test_browser_bypass_disabled_when_config_off(monkeypatch):
     """配置关闭时浏览器 bypass 不触发，遇 CF 直接报错。"""
     monkeypatch.setattr(manager.config, "cf_selenium_bypass", False)
 

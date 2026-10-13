@@ -620,12 +620,15 @@ class AsyncWebClient:
         self._retry_sleep_jitter = 0.4
         self._fingerprint_states_by_pool_base: dict[str, _FingerprintState] = {}
         self._excluded_fingerprint_by_pool_base: dict[str, str] = {}
-        # solver-cookie jar：bypass 成功后 solver 响应 Set-Cookie 按 host 存，
-        # 后续同 host 直连经 _merge_cookies 合并带上（此前 solver cookie 从未回灌直连池）。
+        # solver-cookie jar：bypass 成功后 solver 响应 Set-Cookie 按 pool_base_key 存
+        # （一池一 jar；此前 solver cookie 从未回灌直连池）。
+        # 键用 pool_base_key 而非裸 host：同 host 不同 scheme/port/proxy 分池隔离，
+        # 轮换/重置时按池精确丢弃，互不误伤。
         self._solver_cookie_jar: dict[str, dict[str, str]] = {}
         # 指纹钉住：pool_base_key -> (host, fingerprint_id)。bypass/浏览器解挑战成功后
-        # 钉住当前指纹（与 jar/透传 cookie 配对使用），lifetime 过期不再轮换；
-        # 下次再遇挑战（cookie 失效信号）由 _force_rotate_fingerprint 显式丢弃 jar + 解钉后轮换。
+        # 钉住当前指纹（与 jar/透传 cookie 配对使用），钉住期间跳过 lifetime 过期轮换；
+        # 钉住 TTL 与正常 lifetime 同界（过期解钉丢 jar），下次再遇挑战
+        # （cookie 失效信号）由 _force_rotate_fingerprint 显式丢弃 jar + 解钉后轮换。
         self._pinned_fingerprint_by_pool_base: dict[str, tuple[str, str]] = {}
         self._fingerprint_default_lifetime_range = (20 * 60.0, 45 * 60.0)
         self._fingerprint_default_request_range = (120, 240)
@@ -801,12 +804,17 @@ class AsyncWebClient:
         if pool_key is None:
             self._fingerprint_states_by_pool_base.clear()
             self._excluded_fingerprint_by_pool_base.clear()
+            # 传输层重建时 state 已失效：钉住/jar 与其配对，一并丢弃防孤儿错配（B4）
+            self._pinned_fingerprint_by_pool_base.clear()
+            self._solver_cookie_jar.clear()
             await self._pool_manager.reset_all(reason)
         else:
             pool_base_key, _, failed_fingerprint_id = pool_key.partition("|fp=")
             if failed_fingerprint_id:
                 self._excluded_fingerprint_by_pool_base[pool_base_key] = failed_fingerprint_id
             self._fingerprint_states_by_pool_base.pop(pool_base_key, None)
+            self._pinned_fingerprint_by_pool_base.pop(pool_base_key, None)
+            self._solver_cookie_jar.pop(pool_base_key, None)
             await self._pool_manager.reset(pool_key, reason)
 
     async def _record_transport_failure(self, error_msg: str, *, pool_key: str) -> None:
@@ -837,10 +845,18 @@ class AsyncWebClient:
             and state is not None
             and state.fingerprint.fingerprint_id == pinned[1]
         ):
-            # 钉住中：与 jar/透传 cookie 配对的指纹跳过 lifetime 过期轮换，保持配对稳定；
-            # cookie 失效（再遇挑战）时由 _force_rotate_fingerprint 显式解钉。
-            state.request_count += 1
-            return state.fingerprint
+            if self._is_fingerprint_state_expired(state, now=now):
+                # 钉住也有 TTL（与正常 lifetime 同界）：过期说明 cookie 很可能同步失效，
+                # 解钉并丢 jar，走正常轮换，避免永久用坏 cookie 请求（B7）
+                self._pinned_fingerprint_by_pool_base.pop(pool_base_key, None)
+                self._solver_cookie_jar.pop(pool_base_key, None)
+                self._log_cf("🧹 钉住指纹已过期，解钉并丢弃 jar，正常轮换", pinned[0])
+                state = None
+            else:
+                # 钉住中：与 jar/透传 cookie 配对的指纹跳过 lifetime 过期轮换，保持配对稳定；
+                # cookie 失效（再遇挑战）时由 _force_rotate_fingerprint 显式解钉。
+                state.request_count += 1
+                return state.fingerprint
         if state is not None and allow_lifetime_rotation and self._is_fingerprint_state_expired(state, now=now):
             self._excluded_fingerprint_by_pool_base[pool_base_key] = state.fingerprint.fingerprint_id
             self._fingerprint_states_by_pool_base.pop(pool_base_key, None)
@@ -898,7 +914,8 @@ class AsyncWebClient:
         pinned = self._pinned_fingerprint_by_pool_base.pop(pool_base_key, None)
         if pinned is not None:
             pinned_host, _ = pinned
-            dropped = self._solver_cookie_jar.pop(pinned_host, None)
+            # jar 按池键隔离：只丢本池的，不影响同 host 其他池（B9）
+            dropped = self._solver_cookie_jar.pop(pool_base_key, None)
             self._log_cf(
                 f"🧹 解钉并丢弃失效 cookie（{len(dropped or {})} 个），轮换指纹重试",
                 pinned_host,
@@ -911,18 +928,21 @@ class AsyncWebClient:
         """浏览器 bypass 成功后调用：钉住该 URL 当前池指纹。
 
         调用方（如 javlibrary）把浏览器解出的 cookie 透传给后续直连时，
-        配对同一指纹可最大程度避免再触发挑战；lifetime 过期不再轮换，
-        下次再遇挑战由 _force_rotate_fingerprint 显式解钉丢 jar。
+        配对同一指纹可最大程度避免再触发挑战；钉住期间跳过 lifetime 过期轮换，
+        但 TTL 与正常 lifetime 同界（过期自动解钉），下次再遇挑战由
+        _force_rotate_fingerprint 显式解钉丢 jar。
         无状态（如 FakeClient 测试桩）返回 False，调用方忽略即可。
         """
         try:
-            request_proxy = self.proxy if use_proxy else None
+            host = (httpx.URL(url).host or "").lower()
+            if not host:
+                return False
+            # 代理判定必须与 request() 主循环一致（use_proxy 且 host 在代理名单才走代理），
+            # 否则池键错位导致钉住永不命中（B3）
+            request_proxy = self.proxy if (use_proxy and self._is_proxy_host(host)) else None
             pool_base_key = HostPoolManager.key_for_url(url, request_proxy)
             state = self._fingerprint_states_by_pool_base.get(pool_base_key)
             if state is None:
-                return False
-            host = (httpx.URL(url).host or "").lower()
-            if not host:
                 return False
             self._pinned_fingerprint_by_pool_base[pool_base_key] = (host, state.fingerprint.fingerprint_id)
             self._log_cf("📌 当前池指纹已钉住，后续直连沿用同一指纹", host)
@@ -1151,9 +1171,10 @@ class AsyncWebClient:
         cookies: dict[str, str] | None,
         bypass_cookies: dict[str, str] | None = None,
     ) -> dict[str, str] | None:
-        base = dict(cookies or {})
-        if bypass_cookies:
-            base.update(bypass_cookies)
+        # 调用方显式 cookies 优先：同名时覆盖 jar/旧值（此前 jar 反向覆盖调用方，B1）。
+        base = dict(bypass_cookies or {})
+        if cookies:
+            base.update(cookies)
         return base or None
 
     @staticmethod
@@ -1164,6 +1185,8 @@ class AsyncWebClient:
         if callable(get_list):
             try:
                 for item in get_list("set-cookie") or []:
+                    if item is None:
+                        continue
                     if str(item).strip():
                         values.append(str(item))
             except Exception:
@@ -1208,7 +1231,7 @@ class AsyncWebClient:
             return 0
         if not header_values:
             return 0
-        jar = self._solver_cookie_jar.setdefault(host, {})
+        jar = self._solver_cookie_jar.setdefault(pool_base_key, {})
         for raw in header_values:
             try:
                 parsed = SimpleCookie()
@@ -1216,14 +1239,64 @@ class AsyncWebClient:
             except Exception:
                 continue
             for name, morsel in parsed.items():
-                if morsel.value:
+                if self._is_cookie_deleted(morsel):
+                    # 服务端删除语义（空值 / Max-Age<=0 / Expires 过期）：清 jar 旧值
+                    jar.pop(name, None)
+                    stored += 1
+                elif morsel.value:
                     jar[name] = morsel.value
                     stored += 1
         if stored:
             if fingerprint is not None:
+                # 钉住 + 重建 state：bypass 前 _force_rotate 已清 state 并 exclude 了该指纹，
+                # 不重建则钉住永不命中（B2）。重建后配对立即生效。
+                if self._excluded_fingerprint_by_pool_base.get(pool_base_key) == fingerprint.fingerprint_id:
+                    self._excluded_fingerprint_by_pool_base.pop(pool_base_key, None)
+                self._fingerprint_states_by_pool_base[pool_base_key] = self._fresh_fingerprint_state(
+                    host, fingerprint
+                )
                 self._pinned_fingerprint_by_pool_base[pool_base_key] = (host, fingerprint.fingerprint_id)
-            self._log_cf(f"🍪 solver cookie 已存 jar（{stored} 个），同池指纹已钉住", host)
+                self._log_cf(f"🍪 solver cookie 已存 jar（{stored} 个），同池指纹已钉住", host)
+            else:
+                self._log_cf(f"🍪 solver cookie 已存 jar（{stored} 个），本次无指纹可钉", host)
         return stored
+
+    def _fresh_fingerprint_state(self, host: str, fingerprint: BrowserFingerprint) -> _FingerprintState:
+        """用指定指纹重建池 state（钉住时调用）：lifetime 与正常新建一致。"""
+        now = time.monotonic()
+        lifetime_min, lifetime_max = self._fingerprint_default_lifetime_range
+        request_min, request_max = self._fingerprint_default_request_range
+        if host.lower().endswith("amazon.co.jp"):
+            lifetime_min, lifetime_max = self._fingerprint_amazon_lifetime_range
+            request_min, request_max = self._fingerprint_amazon_request_range
+        lifetime = random.uniform(max(lifetime_min, 1.0), max(lifetime_max, lifetime_min, 1.0))
+        max_requests = random.randint(max(int(request_min), 1), max(int(request_max), int(request_min), 1))
+        return _FingerprintState(
+            fingerprint=fingerprint,
+            created_at=now,
+            expires_at=now + lifetime,
+            request_count=0,
+            max_requests=max_requests,
+        )
+
+    @staticmethod
+    def _is_cookie_deleted(morsel: Any) -> bool:
+        """服务端删 cookie 语义：空值 / Max-Age<=0 / Expires 已过期。"""
+        try:
+            if not morsel.value:
+                return True
+            max_age = morsel["max-age"]
+            if max_age and int(max_age) <= 0:
+                return True
+            expires = morsel["expires"]
+            if expires:
+                from email.utils import parsedate_to_datetime
+
+                if parsedate_to_datetime(expires).timestamp() <= time.time():
+                    return True
+        except Exception:
+            pass
+        return False
 
     def _extract_header_case_insensitive(self, headers: dict[str, Any], key: str) -> str:
         key_lower = key.lower()
@@ -1987,8 +2060,8 @@ class AsyncWebClient:
                 pool_base_key = HostPoolManager.key_for_url(url, request_proxy)
                 try:
                     req_headers = dict(prepared_headers)
-                    # solver-cookie jar：同 host 后续直连自动带上 bypass 解出的 cookie
-                    req_cookies = self._merge_cookies(cookies, self._solver_cookie_jar.get(host))
+                    # solver-cookie jar：同池后续直连自动带上 bypass 解出的 cookie
+                    req_cookies = self._merge_cookies(cookies, self._solver_cookie_jar.get(pool_base_key))
                     host_retry_semaphore = None
                     if host and self._cf_host_challenge_hits.get(host, 0) > 0:
                         host_retry_semaphore = await self._get_cf_host_retry_semaphore(host)
@@ -2234,6 +2307,10 @@ class AsyncWebClient:
                         self._log_cf(
                             f"✅ bypass 兜底成功（模式: {bypass_mode or 'unknown'}），直接使用 bypass 响应",
                             host,
+                        )
+                        # 与主路径一致：solver cookie 存 jar + 钉住（B8；fingerprint 取末轮值）
+                        self._store_solver_response_cookies(
+                            host, pool_base_key, fingerprint, bypass_response
                         )
                         return bypass_response, ""
                     self._log_cf(

@@ -94,10 +94,18 @@ def is_available() -> bool:
     return _available
 
 
-@_retry_twice()
-async def _goto(page, url: str, timeout_ms: int) -> None:
-    """打开页面；导航层瞬时异常（超时/连接重置）由 tenacity 重放一次。"""
+async def _goto_once(page, url: str, timeout_ms: int) -> None:
+    """打开页面（单次，不重试）。"""
     await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+
+
+async def _goto(page, url: str, timeout_ms: int) -> None:
+    """打开页面；导航层瞬时异常（超时/连接重置）由 tenacity 重放一次。
+
+    重试装饰器每次调用时解析：tenacity 若在模块 import 后才装上（如自动安装），
+    同进程后续调用同样生效（import 时固化的装饰器则不行，Bug 1）。
+    """
+    await _retry_twice()(_goto_once)(page, url, timeout_ms)
 
 
 async def _get_html_async(url: str, timeout: int) -> tuple[str | None, dict[str, str]]:
@@ -117,13 +125,19 @@ async def _get_html_async(url: str, timeout: int) -> tuple[str | None, dict[str,
                 locale="ja-JP",
             )
             page = await context.new_page()
+            # 总超时从导航开始起算：goto 与 CF 等待共享 timeout 预算（Bug 3）
+            deadline = time.monotonic() + timeout
             try:
-                await _goto(page, url, timeout * 1000)
+                remaining_ms = max(int(deadline - time.monotonic()) * 1000, 1000)
+                await _goto(page, url, remaining_ms)
             except Exception as e:
                 logger.debug("Playwright goto 失败: %s", e)
                 return None, {}
-            deadline = time.monotonic() + timeout
-            html = await page.content()
+            try:
+                html = await page.content()
+            except Exception as e:
+                logger.debug("Playwright 首屏读取失败: %s", e)
+                return None, {}
             while is_cf_html(html) and time.monotonic() < deadline:
                 await asyncio.sleep(3)
                 try:
