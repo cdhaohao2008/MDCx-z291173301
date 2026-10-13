@@ -4,7 +4,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/katbyte/embyfin-mcp?color=00ADD8)](https://github.com/katbyte/embyfin-mcp/blob/main/go.mod)
 [![License](https://img.shields.io/github/license/katbyte/embyfin-mcp?color=blue)](https://github.com/katbyte/embyfin-mcp/blob/main/LICENSE)
 ![build](https://github.com/katbyte/embyfin-mcp/actions/workflows/build.yaml/badge.svg)
-![tests](https://github.com/katbyte/embyfin-mcp/actions/workflows/pr-integration.yaml/badge.svg)
+![tests](https://github.com/katbyte/embyfin-mcp/actions/workflows/pr-acceptance.yaml/badge.svg)
 ![lint](https://github.com/katbyte/embyfin-mcp/actions/workflows/pr-golangci-lint.yaml/badge.svg)
 [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/katbyte/embyfin-mcp/badges/coverage.json)](https://github.com/katbyte/embyfin-mcp/actions/workflows/coverage.yaml)
 
@@ -27,7 +27,7 @@ differences between them live in one package, and every tool is tested against b
 
 ### What else is in the box
 
-- **89 tools, in toolsets.** Search, browse and inspect, read a whole library's episodes at once, resolve a release name to a series, identify and re-identify, batch edits and renames, artwork, subtitles, watch state, people, playlists, collections, remote control, scans, tasks, logs and libraries. Each sits in a toolset a session can load on its own, so a client spends about two thousand tokens of context by default rather than thirty-five thousand.
+- **92 tools, in toolsets.** Search, browse and inspect, read a whole library's episodes at once, resolve a release name to a series, identify and re-identify, batch edits and renames, artwork, subtitles, watch state, people, playlists, collections, remote control, scans, tasks, logs, libraries and accounts. Each sits in a toolset a session can load on its own, so a client spends about two thousand tokens of context by default rather than thirty-six thousand.
 - **Three Go SDKs.** `sdk/emby`, `sdk/jf` and `sdk/tmdb` are complete typed clients for the Emby, Jellyfin and TMDB APIs - all 499, 346 and 152 operations, generated from their own OpenAPI documents (each package's `APIVersion` says which), standard library only, no knowledge of MCP. Useful on their own, whether or not you care about AI. `sdk/embyfin` is the thin layer that makes the two servers answer alike.
 - **Tested against real servers.** Every tool runs against a real Emby and a real Jellyfin in Docker, the suite fails if a registered tool has no test, and the servers' calls out to TMDB and TheTVDB are recorded once and replayed, so CI needs no network.
 
@@ -211,18 +211,18 @@ back as an error listing what exists. Timeframe-taking tools default to the last
 | artwork | `item_artwork` (current images plus remote candidates) → `item_artwork_set` (on Emby this deletes the poster file beside the media it replaces) |
 | subtitles | `item_subtitle_search` → `item_subtitle_download` |
 | shows | `show_seasons` (a show's episodes come from `library_episodes`), `show_episodes_exist` (does it have these episodes? up to 50 series a call, with the match score and any duplicate entries), `show_missing` (what a series is missing, and whether it could tell), `show_resolve` (a release name to a series, scored) |
-| users | `user_list`, `user_get` (permissions, libraries, playback preferences), `user_history`, `user_next_up` (the next episode of each series, and everything part way through, with positions), `user_stats` (films and episodes watched, in progress and favourited, hours, series finished, top genres and series, in one pass) |
+| users | `user_list`, `user_get` (permissions, libraries, playback preferences), `user_history`, `user_next_up` (the next episode of each series, and everything part way through, with positions), `user_stats` (films and episodes watched, in progress and favourited, hours, series finished, top genres and series, in one pass), `user_create` (an ordinary account, always with a password, seeing every library or only the ones named), `user_edit` (a new password, or which libraries it sees) |
 | quality | `quality_compare` (which of two copies is better, by how much, and why) |
 | plan | `plan_check` (before writing files: what is at each destination path now, which series it would join, which entries collide) |
 | sessions | `session_list` (what each device plays and how; `details` for the file and the transcode), `session_play`, `session_command`, `session_message` |
 | playlists | `playlist_list`, `playlist_get`, `playlist_create`, `playlist_edit` (rename, `add_items`, `remove_entries`, move an entry; a removal and a move name an entry by its entry id and the item it holds, plus the playlist's `fingerprint` when an item is held twice), `playlist_delete` |
 | collections | `collection_list`, `collection_get`, `collection_create`, `collection_edit` (rename, sort name, overview, `add_items`, `remove_items`), `collection_delete` |
 
-`item_delete` (permanently removes the item's files - a film alone in its folder or a series goes with the whole folder, and a film sharing a folder takes every sidecar whose name starts with its file's name, another film's too - and without `confirm` says what it would remove; it refuses collections, playlists, libraries, genres, studios, people and artists, naming the tool that removes each), `item_orphans_delete` (what a removed library left behind, once its folder is gone), `library_delete`, `playlist_delete` and `collection_delete` are only registered when `--enable-delete` / `EMBYFIN_ENABLE_DELETE` is set: none of them can be undone. `--read-only` registers the 55 read tools and nothing else, so a write tool is absent from `tools/list` rather than refused when called.
+`item_delete` (permanently removes the item's files - a film alone in its folder or a series goes with the whole folder, and a film sharing a folder takes every sidecar whose name starts with its file's name, another film's too - and without `confirm` says what it would remove; it refuses collections, playlists, libraries, genres, studios, people and artists, naming the tool that removes each), `item_orphans_delete` (what a removed library left behind, once its folder is gone), `library_delete`, `playlist_delete`, `collection_delete` and `user_delete` (never the last administrator; the account's playlists stay; on Jellyfin it waits three seconds first and refuses an account that is playing, because Jellyfin 12.2 stops when an account is deleted in the half second after its watch state changes) are only registered when `--enable-delete` / `EMBYFIN_ENABLE_DELETE` is set: none of them can be undone. `--read-only` registers the 62 read tools and nothing else, so a write tool is absent from `tools/list` rather than refused when called.
 
 ### Choosing which tools load
 
-**The default is `core`: six read-only tools, about 2,000 tokens.** The whole surface is around 35,600 tokens of tool definitions before anyone asks a question, which is a poor way to spend a client's context by default. `--toolsets` / `EMBYFIN_TOOLSETS` loads the groups a session actually needs, and `core` comes along with whatever else is asked for, because nothing else can find a library or open an item.
+**The default is `core`: six read-only tools, about 2,000 tokens.** The whole surface is around 36,600 tokens of tool definitions before anyone asks a question, which is a poor way to spend a client's context by default. `--toolsets` / `EMBYFIN_TOOLSETS` loads the groups a session actually needs, and `core` comes along with whatever else is asked for, because nothing else can find a library or open an item.
 
 **Curating a library needs `EMBYFIN_TOOLSETS=curation`** - every audit but `audit_orphans`, and everything that fixes what they find. Cleaning up after a removed library is in `admin` ([below](#cleaning-up-after-a-removed-library)). `EMBYFIN_TOOLSETS=all` restores every tool.
 
@@ -230,13 +230,13 @@ back as an error listing what exists. Timeframe-taking tools default to the last
 |---|---|---|---|
 | `core` *(default)* | 6 | 6 | 2,000 |
 | `remote` | 4 | 10 | 2,700 |
-| `admin` | 22 | 28 | 9,400 |
+| `admin` | 25 | 31 | 10,400 |
 | `watching` | 8 | 14 | 3,800 |
 | `organise` | 10 | 16 | 5,100 |
 | `curation` | 39 | 45 | 22,500 |
-| `all` | 89 | 89 | 35,600 |
+| `all` | 92 | 92 | 36,600 |
 
-Tokens are what the model sees: each tool's name, description and input schema, measured over a real `tools/list` at four bytes a token, with `--enable-delete`. Every tool also carries an output schema, another 59,000 tokens across `all`, but clients keep that to themselves to validate results rather than sending it to the model.
+Tokens are what the model sees: each tool's name, description and input schema, measured over a real `tools/list` at four bytes a token, with `--enable-delete`. Every tool also carries an output schema, another 66,000 tokens across `all`, but clients keep that to themselves to validate results rather than sending it to the model.
 
 `--toolsets` also takes a resource family - `library`, `item`, `audit`, `show`, `user`,
 `person`, `metadata`, `session`, `playlist`, `collection`, `server`, `task` - which is every
@@ -302,31 +302,37 @@ It refuses a folder inside a library or holding one, a folder the server can sti
 
 ## Using the clients on their own
 
-`sdk/emby` and `sdk/jf` are complete Go clients for the Emby and Jellyfin APIs that depend on
-nothing but the standard library, [pandorest](https://github.com/katbyte/pandorest)'s base
-client and `go-kt`, and know nothing of MCP. If you only want to talk to one of the servers from
-Go, take the package and ignore the rest:
+`sdk/emby` and `sdk/jf` are complete Go clients for the Emby and Jellyfin APIs that depend on nothing but the standard library, [pandorest](https://github.com/katbyte/pandorest)'s base client and `go-kt`, and know nothing of MCP. Each sits in a folder named for the version of the server's document it was generated from, so the import path says exactly which API you are using. Under it, `client` makes the client, the package named for the server holds every type, and each group of operations is a field on the client. If you only want to talk to one of the servers from Go, take the packages and ignore the rest:
 
 ```go
-import "github.com/katbyte/embyfin-mcp/sdk/jf"
+import (
+    "github.com/katbyte/embyfin-mcp/sdk/jf/12.1.0/client"
+    "github.com/katbyte/embyfin-mcp/sdk/jf/12.1.0/jf"
+)
 
-c, err := jf.New("http://nas:8096", os.Getenv("EMBYFIN_TOKEN"))
-res, err := c.GetItems(ctx, jf.GetItemsOperationOptions{
+c, err := client.New("http://nas:8096", os.Getenv("EMBYFIN_TOKEN"))
+res, err := c.Library.GetItems(ctx, jf.GetItemsOptions{
     Recursive: new(true), IncludeItemTypes: []jf.BaseItemKind{jf.BaseItemKindMovie}, Limit: 50,
 })
-for _, it := range res.Model.Items { ... }
+for _, it := range res.Answer.Items { ... }
 
-all, err := c.GetItemsComplete(ctx, jf.GetItemsOperationOptions{Recursive: new(true)}) // every page
+all, err := c.Library.GetItemsComplete(ctx, jf.GetItemsOptions{Recursive: new(true)}) // every page
+sessions, err := c.Session.GetSessions(ctx)                                        // options can be left out when none is required
 ```
 
-`sdk/tmdb` is the same for TMDB, generated from TMDB's own OpenAPI document; it takes an API Read Access Token or the older API Key:
+An id says what it is the id of (`jf.ItemID`, `jf.UserID`), so a user's id where an item's goes does not compile, and a date is a `jf.Time`, read in every form the server writes.
+
+`sdk/tmdb` is the same for TMDB, generated from TMDB's own OpenAPI document and named for the day that document was taken; it takes an API Read Access Token or the older API Key:
 
 ```go
-import "github.com/katbyte/embyfin-mcp/sdk/tmdb"
+import (
+    "github.com/katbyte/embyfin-mcp/sdk/tmdb/2026.09.22/client"
+    "github.com/katbyte/embyfin-mcp/sdk/tmdb/2026.09.22/tmdb"
+)
 
-c, err := tmdb.New(tmdb.DefaultBaseURL, os.Getenv("EMBYFIN_TMDB_TOKEN"))
-film, err := c.MovieDetails(ctx, 550, tmdb.MovieDetailsOperationOptions{AppendToResponse: "credits"})
-found, err := c.FindById(ctx, "tt0137523", tmdb.FindByIdOperationOptions{ExternalSource: "imdb_id"})
+c, err := client.New(tmdb.DefaultBaseURL, os.Getenv("EMBYFIN_TMDB_TOKEN"))
+film, err := c.Movie.MovieDetails(ctx, 550, tmdb.MovieDetailsOptions{AppendToResponse: "credits"})
+found, err := c.Find.FindById(ctx, "tt0137523", tmdb.FindByIdOptions{ExternalSource: "imdb_id"})
 ```
 
 They are generated from the servers' own OpenAPI documents (`docs/`, see
@@ -336,13 +342,13 @@ importer normalises each spec into checked-in definitions (`api-defs/<service>-<
 tag) through named workarounds for the spec's known bugs, a differ reports what a spec
 refresh changes, and a generator writes one file per operation and model from the
 definitions. That is **a method for every one of Emby's 499 operations, Jellyfin's 346 and
-TMDB's 152**, each with typed options, a typed body, a `{Model, HttpResponse}` result, the
+TMDB's 152**, each with typed options, a typed body, an `{Answer, HttpResponse}` result, the
 status codes the operation documents (anything else is an error), and a `Complete` pager on
 every paged list. `make apicheck` proves the coverage claim against the spec, `make gencheck`
-(and the unit tests) fail when the generated code is stale, and the integration suite proves
+(and the unit tests) fail when the generated code is stale, and the SDK acceptance suites prove
 the shapes **against a running server** - which is the only thing that catches the server
 changing shape underneath a spec that says otherwise. This repository's part of it, the
-services and the workarounds for their documents, is in [sdk/pandorest](sdk/pandorest/README.md).
+services and the workarounds for their documents, is described in [sdk/README.md](sdk/README.md).
 
 `sdk/embyfin` is the backend-neutral layer the tools use: the handful of item, library, user,
 session and provider operations a curation session needs, answering the same way on both
@@ -366,27 +372,27 @@ both specs and regenerates both SDKs to check the checked-in code is current, an
 importer workaround twice to prove each one notices when its bug is fixed.
 
 Everything else runs against **a real Emby and a real Jellyfin in Docker**, because a stub can
-only confirm what you already believed. Two suites, each in its own container, each run
-against both servers; the environment, the proxy and the way the tools are driven as a client drives them (calls that count their coverage, readers of the answers, put-backs, files laid out for the container) are go-kt's `test/env`, `test/replayproxy` and `mcp/acctest`, shared with the other MCP servers; `lib/testenv` holds this suite's settings for them and `lib/acceptance` adds the waits on scans:
+only confirm what you already believed. It all lives under `acceptance/`: a suite for each generated SDK and one for the tools, each in its own container; the environment, the proxy and the way the tools are driven as a client drives them (calls that count their coverage, readers of the answers, put-backs, files laid out for the container) are go-kt's `test/env`, `test/replayproxy` and `mcp/acctest`, shared with the other MCP servers; `lib/testenv` holds this suite's settings for them and `lib/acceptance` adds the waits on scans:
 
 | | Covers | Command |
 |---|---|---|
-| `integration/` | the `sdk/emby` and `sdk/jf` clients: bespoke tests that the calls the tools rely on decode with their fields populated and do what they say, and a sweep that calls every GET in each document against the server and classifies the ones that cannot answer in a container. `sdk/tmdb` gets the same sweep against the real TMDB API, recorded once with a token and replayed with none (`make test-tmdb`, `make record-tmdb`) | `make testacc-integration` |
-| `acceptance/` | the tools: name resolution, projections, audits, provider flows, and journeys that chain them (edits during a library scan and through a refresh, every fixable audit fixed and re-audited, the fixes each audit names with the fetchers on and off, a client's playback reaching the history tools, a series watched through, a user restricted to one library, a library's whole life, deletes letting go of what held their items, writes repeated and made in parallel, copies of a film watched, a genre added, renamed and removed, lookups that must change nothing), and the built binary itself over stdio and HTTP (flags and environment reaching the server, nothing but protocol on stdout, the bearer check, clean shutdown, refusing to start without a token) | `make testacc-acceptance` |
+| `acceptance/emby`, `acceptance/jf` | the `sdk/emby` and `sdk/jf` clients: bespoke tests that the calls the tools rely on decode with their fields populated and do what they say, and a sweep that calls every GET in each document against the server and classifies the ones that cannot answer in a container. `sdk/tmdb` gets the same sweep against the real TMDB API, recorded once with a token and replayed with none (`make test-tmdb`, `make record-tmdb`) | `make testacc-sdk` |
+| `acceptance/embyfin` | the hand-written `sdk/embyfin` layer, whose promise is the same answer from either server: each test is written once and must pass on both, over libraries, items, watch state, collections, playlists, episodes, accounts and tasks | `make testacc-embyfin` |
+| `acceptance/tools` | the tools: name resolution, projections, audits, provider flows, and journeys that chain them (one from nothing to audited to fixed and back to nothing: an account, a library over its own folder, every finding fixed with the tools, a collection, a playlist, watch state, and all of it removed again; edits during a library scan and through a refresh, every fixable audit fixed and re-audited, the fixes each audit names with the fetchers on and off, a client's playback reaching the history tools, a series watched through, a user restricted to one library, a library's whole life, deletes letting go of what held their items, writes repeated and made in parallel, copies of a film watched, a genre added, renamed and removed, lookups that must change nothing), and the built binary itself over stdio and HTTP (flags and environment reaching the server, nothing but protocol on stdout, the bearer check, clean shutdown, refusing to start without a token) | `make testacc-tools` |
 
 ```bash
 make testacc                        # both suites on both servers, each in a throwaway container
-make testacc-acceptance-jellyfin    # one suite on one server
+make testacc-tools-jellyfin         # one suite on one server (testacc-sdk-jellyfin for the SDK's)
 make check-all                      # build + unit + live suites + every linter
 make cover                          # every suite merged into one coverage number
 ```
 
 Coverage has to span every suite or it lies: `go test -cover ./...` reports a fraction for
-`tools/`, because almost everything real happens in the live suites behind the `integration`
+`tools/`, because almost everything real happens in the live suites behind the `acceptance`
 tag. `make cover` runs each into its own binary coverage directory and merges them with
 `go tool covdata` - stdlib tooling, no third-party merger - which is what the badge reports.
 The generated `sdk/emby`, `sdk/jf` and `sdk/tmdb` are left out of the number and reported on a line of
-their own: they are one method per operation, and the integration suite exercises the ones
+their own: they are one method per operation, and the SDK suites exercise the ones
 the tools rely on rather than all 997.
 
 **Every tool is exercised on both servers.** Tool coverage is enforced rather than claimed: the
@@ -405,7 +411,7 @@ make record-check   # check the cassettes still match, without rewriting them
 vanished fields, changed types - and ignores values, so it goes red when a provider changes its
 contract rather than when a poster changes.
 
-Fixtures are generated, never committed: `scripts/testenv.sh` writes videos with
+Fixtures are generated, never committed: `.scripts/testenv.sh` writes videos with
 `ffmpeg` - every film and episode runs TMDB's length for it, a still frame joined end to end so it costs a few megabytes - under `~/.cache/embyfin-mcp` (`EMBYFIN_TEST_DATA` to move them - not `$TMPDIR`, which
 Docker Desktop does not share), each with a Kodi-style `.nfo` carrying the real film's ids,
 completes the server's setup wizard, mints an API key and a second user, and prints the
@@ -420,7 +426,7 @@ test against them. A fifth library holds music - four artists, five albums, twen
 tracks tagged with the real MusicBrainz ids, art beside and inside them - so the mixes have
 something to work with and the audits can be pointed at albums; it too keeps the providers
 off, and it carries a rip with no art and a genre spelled two ways.
-`scripts/testenv.sh fixtures` writes just the media tree if you want to look at the layout.
+`.scripts/testenv.sh fixtures` writes just the media tree if you want to look at the layout.
 Requires docker, ffmpeg, jq and openssl; the suites skip when `EMBYFIN_SERVER` and
 `EMBYFIN_TOKEN` are unset, so they never fail for want of a daemon.
 

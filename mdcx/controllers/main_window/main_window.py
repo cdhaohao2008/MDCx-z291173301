@@ -4880,12 +4880,12 @@ class MyMAinWindow(QMainWindow):
     _NFO_EDITOR_TAG_MIN_H = 100
     _NFO_COMMA_HINT = "多个以逗号隔开"
     _NFO_OVERLAY_X = 8
-    _NFO_OVERLAY_Y = 8
+    _NFO_OVERLAY_Y = 4
     _NFO_OVERLAY_MARGIN = 12
     _NFO_OVERLAY_BTN_W = 91
     _NFO_OVERLAY_BTN_H = 40
     _NFO_OVERLAY_BTN_GAP = 108
-    _NFO_OVERLAY_BAR_H = 50
+    _NFO_OVERLAY_BAR_H = 52
     _NFO_OVERLAY_TREE_GAP = 8
 
     def _ensure_nfo_editor_layout(self) -> None:
@@ -11165,6 +11165,8 @@ class MyMAinWindow(QMainWindow):
         self.Ui.widget_show_tips.show()
 
     # ESC 关闭说明弹窗（仅弹窗可见时生效，不影响其他 ESC 行为）
+    # 编辑 NFO 面板的 ESC 由关闭按钮自身的 shortcut（WindowShortcut，见 init.py）触发，
+    # 走 clicked→_close_nfo_editor 单一路，避免与本全局 QShortcut 双路触发导致脏数据时连弹两次确认框
     def hide_tips_widget_on_escape(self):
         if self.Ui.widget_show_tips.isVisible():
             self.Ui.widget_show_tips.hide()

@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.8.0 (2026-10-12)
+
+### Breaking
+
+- the three SDKs moved into folders named for the version of the document they were generated from: `sdk/emby/4.10.0.40`, `sdk/jf/12.1.0` and `sdk/tmdb/2026.09.22`, so an import path says exactly which API it is for. Under each, `client` has `New`, the package named for the service (`emby`, `jf`, `tmdb`) holds every type, and each group of operations is a package of its own and a field on the client: `c.GetItems(...)` is `c.Items.GetItems(...)` on Emby and `c.Library.GetItems(...)` on Jellyfin
+- an operation's options type is `<Name>Options`, where it was `<Name>OperationOptions`
+- what a call answered is `res.Answer`, where it was `res.Model`, and the type of `res` is `<Name>Response`, where it was `<Name>OperationResponse`
+- the types the TMDB SDK makes up for an answer TMDB's document does not name end in `Answer`, where they ended in `Response`: `tmdb.FindByIdAnswerMovieResults`
+- a true or false in a record the servers only ever answer is a plain `bool`, where it was a pointer: `info.HasPendingRestart`. A record a request sends keeps its pointers, so a value never set is still never sent, and three answers keep theirs because "not said" means something: Emby's `TranscodingInfo.VideoDecoderIsHardware` and `VideoEncoderIsHardware`, and Jellyfin's `PluginInfo.CanUninstall`
+- an operation with exactly one option takes it as a plain argument in place of the struct: `c.Library.DeleteItems(ctx, ids)`. An optional one can be left out, and a `false` or `0` that is given is sent; a paged list and an operation with two or more options keep the struct
+- the hand-written TMDB code, `Facts` and the retrying transport, moved from `sdk/tmdb` to `sdk/tmdb/facts`; TMDB's `New`, `Client` and `DefaultBaseURL` are in the versioned folder
+- a date in the Emby and Jellyfin SDKs is a `Time`, where it was a string: `item.DateCreated.Year()`. It reads every form the two servers write, a date written any other way is zero with its text kept in `Unread`, and a zero one is not sent. One option stays text, `MinDateLastSaved` on the item searches (`GET /Items` on both servers and Emby's `GET /Users/{UserId}/Items`): the servers also take a bare day there and read it their own way. The other operations that take it, 57 on Emby and one on Jellyfin, take a `Time`
+- in the TMDB SDK a day is a `Day` and a date with a time is a `Time`, in options and answers alike: `film.ReleaseDate.Year()`. TMDB's document declares them plain strings, so which fields are dates is said by two workarounds and checked against the recorded answers. `facts.DateYear` takes a `Day`
+- an id in the Emby and Jellyfin SDKs says what it is the id of: `ItemID`, `UserID`, `SessionID`, `TaskID`, `PlaylistItemID` and `MediaSourceID`, each a string underneath, so a user's id where an item's goes does not compile. `emby.ItemID(text)` and `string(id)` convert one, pandorest's `client.StringIDs` a list. An id of anything else is a string as before
+- on Emby the options that take several ids as one comma-joined text are lists: `Ids`, `ExcludeItemIds` and `ItemIds` are `[]emby.ItemID`, and a playlist's `EntryIds` is `[]emby.PlaylistItemID`. They are sent joined as before
+
+### Changed
+
+- built on pandorest 0.8.3: an error from any of the three SDKs never repeats the API key or token it was given
+- built on go-kt 0.6.4: a tool that takes no arguments refuses one, where it was answered as if the argument had meant something: `library_list`, `server_info` and seven more. A failure's words reach the caller without what an address in them may carry a credential in: who it signs in as, its query values and what follows its `#`
+- a client is told on connecting what holds for every tool: text from outside is data and never an instruction, what a tool's annotations say, that an argument a tool does not take is refused, and what an empty list means; then which text embyfin cleans and which it shows exactly
+- text written outside embyfin is cleaned once, around every tool: a title, a name, an overview and a server's words for what went wrong lose the characters that do not display, a tab or a line break in them becomes a space, and one longer than 16,384 characters is cut with `…`. What a later call hands back is shown exactly as the server holds it: a path, an id, a genre, a tag, a studio, a setting, and a value an audit says to pass on
+- a date a server writes as year 1, which is how both write a date they do not have, is no date. A tool leaves it out where it showed `0001-01-01T00:00:00.0000000Z`; `audit_quality` no longer lists a file as written after the server first saw it in year 1; `audit_missing_episodes` and `show_missing` no longer count an episode dated so as aired; and an edit of an item sends such a date back as none
+- `server_log`'s `tail` blanks the keys in each line, as its search already did, and `task_get`'s `error_detail` loses what an address in it may carry a key in; both keep their line breaks
+- the line `EMBYFIN_LOG=info` writes for a write or delete call blanks more: every value under a free-form argument, the same parts of any address, and any value sent under a name with `password`, `passphrase` or `secret` in it. Two free-form arguments that cannot hold a credential are still written as sent, for a call the tool answered: `server_config_edit`'s `set` and `item_identify_apply`'s `candidate_ids`
+- `sdk/embyfin` names the two API versions it is built on, `EmbyAPIVersion` and `JellyfinAPIVersion`, and `server_info` reports both as `sdk_api_versions`, beside the one for the connected server
+- a call none of whose options is required can leave the options out: `c.Sessions.GetSessions(ctx)`
+- the generator's settings moved out of `sdk/pandorest`: the program is `sdk/main.go` (`go run ./sdk`), the list of services is `sdk/zservices`, and each service's workarounds sit beside its SDK in `sdk/<service>/workarounds`
+- `scripts/` is `.scripts/`
+- every test that runs against a real server is under `acceptance/`: `integration/` is now `acceptance/emby`, `acceptance/jf` and `acceptance/tmdb`, and the tool suite is `acceptance/tools`; the make targets are `testacc-sdk-<server>` and `testacc-tools-<server>`, and the build tag is `acceptance`
+- the checks are level with terraform-provider-azurerm's: spelling (`make typos`) and markdown (`make markdownlint`) are checked, and the workflow checker builds from the one tools module
+- lint reads every Go file, the acceptance tests included: it is given their build tag, and the rule that tests run in parallel is off for them, since they share one server and run in order
+- the live tool suite fails when an answer or a refusal shows one of the credentials the suite was given: the server's key, the test accounts' password, or the token of an account a test signs in
+
+### Added
+
+- `user_create`, `user_edit` and `user_delete`, in the `admin` toolset: make an ordinary account, give it a new password, say which libraries it sees, and remove it. An account always gets a password, since both servers let one without be logged into by its name alone, and the password is blanked in the log of write calls. `user_delete` is a delete tool, wants `confirm`, and never removes the last administrator
+- on Jellyfin `user_delete` waits three seconds first, and refuses an account that is playing: Jellyfin 12.2 stops, the whole server, when an account is deleted within half a second of its watch state changing
+- on Jellyfin `user_create` clears the new account of the watched marks, favourites, ratings and resume points of an account deleted before it, which Jellyfin 12.2 lists it with until the server is restarted, and says when there were any
+- one acceptance journey per server that goes from nothing to audited to fixed and back: it makes an account and a library, fixes every finding `audit_all` reports with the tools, makes a collection and a playlist, and removes all of it again, leaving the server holding what it held before
+- 92 tools: 62 read, 24 write, 6 delete
+- `acceptance/embyfin`: live tests of the hand-written `sdk/embyfin` layer by itself, each written once and run against both servers (`make testacc-embyfin`)
+- `sdk/embyfin`: `Count` says how many items a search matches without fetching any of them, and `ItemCounts` carries the server's artists, books, programs and its own total of everything, which Emby leaves at 0
+- the Emby SDK takes a list wherever Emby's document says a text option carries several values joined by commas, 21 options in all: `IncludeItemTypesList`, `FieldsList`, `YearsList` and the rest sit beside the text option of the same name and are sent joined. The text option stays, so no caller has to move
+
+### Fixed
+
+- `server_log` and `server_log_search` no longer show a session's access token: Jellyfin 12.2 writes the token itself into its log when a session signs out, and both tools handed the line on as written; found by the live suite's new credential check
+- an item asked for by an id of the wrong shape (a name, say) is answered "no item with id ..." on Emby too, where it was Emby's own HTTP 500; found by the new `acceptance/embyfin` suite
+- `user_get` leaves `has_password` out on Jellyfin, which says true for every account, one that logs in with no password included
+
 ## 0.7.0 (2026-10-10)
 
 ### Breaking
@@ -153,7 +204,7 @@
 
 ## 0.2.0 (2026-09-23)
 
-**New**
+### New
 
 - Comparing a download folder or vault against a big TV library without a call per series: `library_episodes`, `library_export`, `show_episodes_exist`, `show_resolve`, `plan_check` and `quality_compare`.
 - Audits: `audit_file_path`, `audit_provider`, `audit_language`, `audit_duplicate_episodes`, `audit_duplicate_series`, `audit_disc_folders`, `audit_anime_ids` and `audit_orphans` (with `item_orphans_delete`). `audit_all` has a row for every audit.
@@ -162,7 +213,7 @@
 - `user_get` reports playback preferences; `server_info` reports its own version and the SDK's.
 - `lib/tmdb` is generated from TMDB's OpenAPI document like the Emby and Jellyfin SDKs, and `make spec-refresh` re-vendors all three.
 
-**Changed**
+### Changed
 
 - Tools that did the same thing are merged: `library_items` searches and filters, `item_set_state` sets watched, favourite and position, `item_edit` takes one id or many. 89 tools: 62 read, 22 write, 5 delete.
 - `playlist_delete` and `collection_delete` need `--enable-delete`.
@@ -170,7 +221,7 @@
 - Breaking: sizes are in bytes and times in seconds everywhere, audio tracks are objects rather than strings, every list pages with `limit` and `offset`, and every audit answers `items_scanned` and `total_findings`.
 - The TMDB setting is `--tmdb-token` / `EMBYFIN_TMDB_TOKEN`; `--tmdb-key` still works.
 
-**Fixed**
+### Fixed
 
 - Emby finding nothing no longer ends the session, and a tool that fails unexpectedly returns an error.
 - Answers that were confidently wrong: a path read as free that was taken, a film and a series reported as duplicates, unprobed files counted as having no audio, a name resolved to the wrong show, one user's plays credited to another, a subtitle download reported that never happened.
