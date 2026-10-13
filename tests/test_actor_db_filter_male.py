@@ -292,7 +292,7 @@ def _mock_verify_network(monkeypatch, status_map: dict[int, int]):
             return _FakeResp(status_map.get(pid, 200))
 
     class _FakeClient:
-        def __init__(self):
+        def __init__(self, **kwargs):
             self.get = _FakeGet()
 
         async def __aenter__(self):
@@ -354,7 +354,7 @@ def test_verify_tmdbid_network_error_keeps_id(_tmp_actor_db: Path, monkeypatch):
             raise aiohttp.ClientError("network down")
 
     class _FakeClient:
-        def __init__(self):
+        def __init__(self, **kwargs):
             self.get = _BoomGet()
 
         async def __aenter__(self):
@@ -386,7 +386,7 @@ def test_verify_tmdbid_recovers_new_id(_tmp_actor_db: Path, monkeypatch):
             return _FakeResp(404)
 
     class _FakeClient:
-        def __init__(self):
+        def __init__(self, **kwargs):
             self.get = _FakeGet()
 
         async def __aenter__(self):
@@ -559,7 +559,7 @@ def test_verify_tmdbid_checkpoint_skips_verified(_tmp_actor_db: Path, monkeypatc
             return _FakeResp(200 if m else 500)
 
     class _FakeClient:
-        def __init__(self):
+        def __init__(self, **kwargs):
             self.get = _FakeGet()
 
         async def __aenter__(self):
@@ -614,7 +614,7 @@ def test_clean_male_checkpoint_skips_verified(_tmp_actor_db: Path, monkeypatch):
             return _FakeResp(200 if m else 500)
 
     class _FakeClient:
-        def __init__(self):
+        def __init__(self, **kwargs):
             self.get = _FakeGet()
 
         async def __aenter__(self):

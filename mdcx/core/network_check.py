@@ -122,6 +122,10 @@ DEFAULT_SITE_URLS: dict[Website, str] = {
     Website.AVSOX: "https://avsox.click",
     Website.AVMOO: "https://avmoo.shop",
     Website.AVHEAT: "https://avheat.shop",
+    # javlibrary / madouqu 最新获取网址写入代码（议题 #132）：检测前先用代码里
+    # 的网址，无法联通时再通过 get_javlibrary_domain / get_madouqu_domains 获取新网址重试。
+    Website.JAVLIBRARY: "https://www.javlibrary.com",
+    Website.MADOUQU: "https://madouqu.shop",
     Website.OFFICIAL: "",
 }
 
@@ -846,22 +850,11 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
             continue
         plans.append((site, crawler_cls, base_url, customized))
 
-    resolved_check_urls: list[list[str]] = []
-    if plans:
-        resolved_check_urls = list(
-            await asyncio.gather(*(_resolve_check_urls(crawler_cls) for _, crawler_cls, _, _ in plans))
-        )
-
-    for (site, crawler_cls, base_url, customized), check_urls in zip(plans, resolved_check_urls, strict=True):
-        # check_urls 即动态域名/镜像站点的额外检测地址（其余站点默认单地址）。
-        # 用户未自定义 URL 时，动态域名站优先用动态解析出的地址作为主检测地址。
-        # 过滤空串：base_url_() 返回空的站点（如 dmm）check_urls 会返回 [""]，
-        # 此时应回退到 DEFAULT_SITE_URLS 的默认地址，而不是覆盖成空导致误报"无固定入口"。
-        if not customized and check_urls:
-            non_empty_urls = [u.rstrip("/") for u in check_urls if u and u.strip()]
-            if non_empty_urls:
-                base_url = non_empty_urls[0]
-
+    for site, crawler_cls, base_url, customized in plans:
+        # 检测前先使用代码里的网址（默认域名 / 用户自定义），不覆盖为动态解析结果；
+        # 动态域名解析（javlibrary / avmoo / avsox / avheat / madouqu）仅在检测项
+        # 运行失败时作为兜底重试（见 run_network_check_item），且只在「网络连通」
+        # 之后才触发，避免十几分钟的前置等待（议题 #132）。
         path = SPECIAL_CHECK_PATHS.get(site, "")
         url = _join_url(base_url, path)
         headers: dict[str, str] = {}
@@ -974,33 +967,8 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
             )
         )
 
-        # 动态域名/镜像站点的额外检测地址：每个站点只保留 1 个镜像作抽样，
-        # 避免 javbus 等 5-6 个镜像逐个检测刷屏拖慢；主站失败时仍能看到镜像是否可用。
-        if len(check_urls) > 1:
-            main_host = url.split("://")[-1].split("/")[0]
-            extra_sampled = False
-            for extra_url in check_urls:
-                extra_url = extra_url.rstrip("/")
-                if not extra_url:
-                    continue
-                extra_host = extra_url.split("://")[-1].split("/")[0]
-                if extra_host == main_host:
-                    continue
-                if extra_sampled:
-                    continue
-                extra_sampled = True
-                specs.append(
-                    NetworkCheckSpec(
-                        name=f"{site.value}·镜像",
-                        group="站点检测",
-                        url=extra_url,
-                        site=site,
-                        use_proxy=use_proxy,
-                        headers=dict(headers),
-                        cookies=dict(cookies),
-                        enable_cf_bypass=True,
-                    )
-                )
+        # 镜像检测由检测失败时的兜底重试（run_network_check_item）处理，不在构建
+        # 规格时提前解析，避免十几分钟的前置等待。
     return specs
 
 
@@ -1156,17 +1124,100 @@ async def run_network_check_item(
                 else:
                     error = f"{error}，CloudFlare Bypass兜底失败：HTTP 500、HTTP 502"
         if response is None:
-            clean_error = _clean_error(error)
-            message = _message_for_error(clean_error)
-            return NetworkCheckResult(
-                spec=spec,
-                status=NetworkCheckStatus.FAILED,
-                message=message,
-                elapsed_ms=elapsed_ms,
-                error=clean_error,
-                used_proxy=used_proxy,
-            )
-
+            # 动态域名站（javlibrary / avmoo / avsox / avheat / madouqu）：代码里的
+            # 默认网址无法联通时，通过函数获取最新直连地址重试，且只在「网络连通」
+            # 之后执行（见 _build_site_specs 注释与议题 #132）。
+            if spec.site in (
+                Website.JAVLIBRARY,
+                Website.AVMOO,
+                Website.AVSOX,
+                Website.AVHEAT,
+                Website.MADOUQU,
+            ):
+                try:
+                    from mdcx.base.web import (
+                        get_javlibrary_domain,
+                        get_aio_domain,
+                        get_madouqu_domains,
+                    )
+                    new_url: str | None = None
+                    if spec.site == Website.JAVLIBRARY:
+                        new_url = await asyncio.wait_for(
+                            get_javlibrary_domain(), timeout=DYNAMIC_DOMAIN_TIMEOUT
+                        )
+                    elif spec.site in (Website.AVMOO, Website.AVSOX, Website.AVHEAT):
+                        new_url = await asyncio.wait_for(
+                            get_aio_domain(spec.site.value.lower()),
+                            timeout=DYNAMIC_DOMAIN_TIMEOUT,
+                        )
+                    elif spec.site == Website.MADOUQU:
+                        domains = await asyncio.wait_for(
+                            get_madouqu_domains(), timeout=DYNAMIC_DOMAIN_TIMEOUT
+                        )
+                        if domains:
+                            new_url = domains[0]
+                    if new_url and new_url != spec.url:
+                        retry_response, retry_error = await request_client.request(
+                            spec.method,
+                            new_url,
+                            headers=spec.headers or None,
+                            cookies=spec.cookies or None,
+                            json_data=spec.json_data,
+                            use_proxy=spec.use_proxy,
+                            timeout=_diagnostic_timeout(),
+                            enable_cf_bypass=spec.enable_cf_bypass
+                            and _bypass_available(_manager().config),
+                        )
+                        if retry_response is not None:
+                            response = retry_response
+                            error = retry_error
+                            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+                            # 跳过 FAILED 路径，继续后续解析与分类流程
+                        else:
+                            clean_error = _clean_error(retry_error or error)
+                            message = _message_for_error(clean_error)
+                            return NetworkCheckResult(
+                                spec=spec,
+                                status=NetworkCheckStatus.FAILED,
+                                message=f"代码网址与动态域名均无法联通：{message}",
+                                elapsed_ms=elapsed_ms,
+                                error=clean_error,
+                                used_proxy=used_proxy,
+                            )
+                    else:
+                        clean_error = _clean_error(error)
+                        message = _message_for_error(clean_error)
+                        return NetworkCheckResult(
+                            spec=spec,
+                            status=NetworkCheckStatus.FAILED,
+                            message=message,
+                            elapsed_ms=elapsed_ms,
+                            error=clean_error,
+                            used_proxy=used_proxy,
+                        )
+                except Exception:
+                    clean_error = _clean_error(error)
+                    message = _message_for_error(clean_error)
+                    return NetworkCheckResult(
+                        spec=spec,
+                        status=NetworkCheckStatus.FAILED,
+                        message=message,
+                        elapsed_ms=elapsed_ms,
+                        error=clean_error,
+                        used_proxy=used_proxy,
+                    )
+            else:
+                clean_error = _clean_error(error)
+                message = _message_for_error(clean_error)
+                return NetworkCheckResult(
+                    spec=spec,
+                    status=NetworkCheckStatus.FAILED,
+                    message=message,
+                    elapsed_ms=elapsed_ms,
+                    error=clean_error,
+                    used_proxy=used_proxy,
+                )
+        # 当 retry 成功时，response 已被替换，直接进入后续解析流程
         text = ""
         try:
             response.encoding = spec.encoding
@@ -1441,10 +1492,10 @@ async def run_network_check(
 
     start_time = time.perf_counter()
     proxy_down = False
-    # 站点 specs 的后台构建放在 try 之前紧挨着起：任务一旦创建就由下面的 finally
-    # 兜底取消，早于此处（取租约等）抛错也不会留下无人回收的 pending 任务。
-    if specs is None:
-        site_specs_task = asyncio.create_task(_build_site_specs())
+    # 站点 specs 的后台构建延迟到「网络连通」之后：用户要求先检测通用 HTTPS、
+    # GitHub Raw，再检测各站；动态域名解析（get_javlibrary_domain 等）只在检测
+    # 失败时作为兜底重试执行（见 run_network_check_item），避免十几分钟的前置等待。
+    site_specs_task: asyncio.Task[list[NetworkCheckSpec]] | None = None
     try:
         for group in GROUP_ORDER:
             if group == "基础环境":
@@ -1453,6 +1504,10 @@ async def run_network_check(
             # 的站点 specs —— 第一组结果因此能立刻出来。到后面的分组（站点检测在
             # 账号/API 与辅助服务之前）才 join；join 会带进来新的本站点检测项，
             # 所以必须在 join 之后才取本组清单。
+            # 站点 specs 在「网络连通」之后才开始构建（避免十几分钟前置等待）。
+            # 当首次需要非静态组时（如「站点检测」）才创建任务，随后立即 join。
+            if specs is None and site_specs_task is None and group not in STATIC_ONLY_GROUPS:
+                site_specs_task = asyncio.create_task(_build_site_specs())
             if site_specs_task is not None and group not in STATIC_ONLY_GROUPS:
                 await join_site_specs()
             group_specs = grouped_specs.get(group, [])

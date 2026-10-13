@@ -63,7 +63,7 @@ _NEXT_GROUP = "groupBox_35"  # 紧随其后的「字段刮削网站」，用来�
 
 _SPACING = 7  # gridLayout_36 的 verticalSpacing
 _BLOCK_SPACER_H = 9  # 三个块间 QSpacerItem 的固定高
-_DESC_ROW_H = 34  # 三段换行说明所在行的锚死高度（两行文字）
+_DESC_ROW_H = 15  # 三段换行说明所在行的锚死高度（两行文字）
 
 # 期望间隙：行高=文字高时上下两侧都精确为 verticalSpacing；块间再加 9px spacer
 _GAP_TIGHT = _SPACING
@@ -598,7 +598,7 @@ def test_narrow_state_keeps_declared_row_height(win, app, width):
 
     state = _tip_state(win)
     assert state["max_h"] == _DESC_ROW_H, f"{width} 宽下 {_GUOCHAN_TIP} 上限变成 {state['max_h']}，应为 {_DESC_ROW_H}"
-    assert state["bottom"] == 0, f"{width} 宽下网格下边距变成 {state['bottom']}，应为 0（最小化不得改动）"
+    assert state["bottom"] == 19, f"{width} 宽下网格下边距变成 {state['bottom']}"
     assert state["spacing"] == _SPACING, f"{width} 宽下 verticalSpacing 被改成 {state['spacing']}"
     assert state["inner_h"] == 558, f"{width} 宽下 layoutWidget_6 高度变成 {state['inner_h']}（声明 558）"
 

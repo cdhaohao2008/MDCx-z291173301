@@ -1511,49 +1511,39 @@ async def test_network_group_runs_before_site_specs_ready(monkeypatch: pytest.Mo
 
 
 @pytest.mark.anyio
-async def test_build_site_specs_resolves_dynamic_domains_concurrently(monkeypatch: pytest.MonkeyPatch):
-    """各站 check_urls（动态域名解析）必须并发，不能逐站串行累加耗时。"""
+async def test_build_site_specs_uses_hardcoded_url_not_dynamic(monkeypatch: pytest.MonkeyPatch):
+    """检测前先使用代码里的网址（默认域名），不覆盖为动态解析结果（议题 #132）；
+    动态域名解析仅在检测失败时作为兜底重试执行（见 run_network_check_item）。"""
     import asyncio
 
-    barrier = asyncio.Barrier(2)  # 两个站必须同时在跑才放行；串行执行会卡死在这里
-
-    class SlowCrawler:
+    class FakeCrawler:
         @classmethod
         def base_url_(cls):
-            return "https://slow.example"
+            return "https://hardcoded.example"
 
         @classmethod
         async def check_urls(cls):
-            await barrier.wait()
-            return ["https://slow.example"]
+            await asyncio.sleep(3600)  # 故意挂起：若构建时仍调用则超时失败
+            return ["https://dynamic.example"]
 
-    class SecondCrawler(SlowCrawler):
-        @classmethod
-        def base_url_(cls):
-            return "https://second.example"
-
-        @classmethod
-        async def check_urls(cls):
-            await barrier.wait()
-            return ["https://second.example"]
-
-    crawlers = {Website.MMTV: SlowCrawler, Website.MADOUQU: SecondCrawler}
-    fake_crawlers = SimpleNamespace(
-        get_registered_crawler_sites=lambda include_hidden=False: list(crawlers),
-        get_crawler=lambda site: crawlers.get(site),
+    monkeypatch.setitem(
+        sys.modules,
+        "mdcx.crawlers",
+        SimpleNamespace(
+            get_registered_crawler_sites=lambda include_hidden=False: [Website.MMTV],
+            get_crawler=lambda site: FakeCrawler,
+        ),
     )
-    monkeypatch.setitem(sys.modules, "mdcx.crawlers", fake_crawlers)
 
-    specs = await asyncio.wait_for(nc.build_network_check_specs(), timeout=10)
-
-    urls = {spec.site: spec.url for spec in specs if spec.site in crawlers}
-    assert urls[Website.MMTV] == "https://slow.example"
-    assert urls[Website.MADOUQU] == "https://second.example"
+    specs = await asyncio.wait_for(nc.build_network_check_specs(), timeout=5)
+    # 构建阶段不调用 check_urls，直接用代码里的网址
+    assert [spec.url for spec in specs if spec.site == Website.MMTV] == ["https://hardcoded.example"]
 
 
 @pytest.mark.anyio
-async def test_build_site_specs_bounds_hanging_dynamic_domain_lookup(monkeypatch: pytest.MonkeyPatch):
-    """卡死的动态域名解析要被单项限时掐断并回退默认域名，不能拖住整轮构建。"""
+async def test_build_site_specs_uses_default_url_even_if_dynamic_hangs(monkeypatch: pytest.MonkeyPatch):
+    """构建阶段不调用 check_urls，即使动态解析会卡死也不影响构建速度（议题 #132）；
+    检测时若代码里的网址无法联通，再通过函数获取新网址重试。"""
     import asyncio
 
     class HangingCrawler:
@@ -1571,11 +1561,9 @@ async def test_build_site_specs_bounds_hanging_dynamic_domain_lookup(monkeypatch
         get_crawler=lambda site: HangingCrawler,
     )
     monkeypatch.setitem(sys.modules, "mdcx.crawlers", fake_crawlers)
-    monkeypatch.setattr("mdcx.core.network_check.DYNAMIC_DOMAIN_TIMEOUT", 0.05)
 
-    specs = await asyncio.wait_for(nc.build_network_check_specs(), timeout=10)
-
-    # 超时 → 回退该站默认域名（不误报"无固定入口"、也不产出半截地址）
+    specs = await asyncio.wait_for(nc.build_network_check_specs(), timeout=5)
+    # 构建阶段不触发动态解析，直接用代码里的默认域名
     assert [spec.url for spec in specs if spec.site == Website.MMTV] == ["https://hanging.example"]
 
 

@@ -29,7 +29,7 @@ def test_eta_uniform_rate():
     rate = est.rate_per_sec()
     assert math.isclose(rate, 0.5, rel_tol=0.05)
     eta = est.eta_text()
-    assert eta in ("80 秒", "1 分钟")
+    assert eta in ("80秒", "1分钟")
 
 
 def test_window_drops_old_events():
@@ -59,10 +59,10 @@ def test_ema_smooths_jitter():
 
 def test_done_and_format_duration():
     """时长格式化各档位"""
-    assert _format_duration(45) == "45 秒"
-    assert _format_duration(90) == "1 分钟"
-    assert _format_duration(3700) == "1 小时 1 分"
-    assert _format_duration(90000) == "1 天 1 小时"
+    assert _format_duration(45) == "45秒"
+    assert _format_duration(90) == "1分钟"
+    assert _format_duration(3700) == "1小时1分"
+    assert _format_duration(90000) == "1天1小时"
 
 
 def test_append_eta_appends_when_available():

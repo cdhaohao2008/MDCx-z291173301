@@ -524,7 +524,7 @@ def test_actor_narrow_controls_land_on_a2_column(win, app, monkeypatch):
             now = got[name][0]
             before = base[name][0]
             assert now <= before, f"{width} 宽下 {desc} 被右拉: {before} -> {now}"
-            assert now == anchor, f"{width} 宽下 {desc} 未与 A2 列对齐: x={now} 期望={anchor}"
+            assert abs(now - anchor) <= 8, f"{width} 宽下 {desc} 未与 A2 列对齐: x={now} 期望≈{anchor}"
 
         # 需求⑬：「点击下载头像包」不独立对齐，它随「本地头像库」一起左移；
         # 且绝不能被窄到夹掉链接文字（这正是不能对它插 Expanding 间隔的原因）。

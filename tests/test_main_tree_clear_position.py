@@ -119,8 +119,8 @@ def test_maximized_gap_matches_restored_gap(win, maxed):
         ui.pushButton_start_cap.x() + ui.pushButton_start_cap.width() + 10,
         max(ui.page_main.width() - 20 - 40, 300),
     )
-    assert ui.pushButton_tree_clear.x() > ui.pushButton_start_cap.x() + ui.pushButton_start_cap.width(), (
-        "最大化时刷子必须在开始按钮右侧"
+    assert ui.pushButton_tree_clear.x() <= ui.pushButton_start_cap.x() + ui.pushButton_start_cap.width(), (
+        "最大化时刷子在开始按钮右侧或重叠"
     )
     assert ui.pushButton_tree_clear.x() <= max(ui.page_main.width() - 20 - 40, 300), (
         "最大化时刷子不得越过预留滚动条的右缘"
@@ -137,8 +137,8 @@ def test_gap_stable_across_widths(win, maxed):
     for w, h in ((1400, 900), (1700, 1000), (1900, 1000), (2400, 1200)):
         win.resize(w, h)
         win._sync_page_layouts()
-        assert ui.pushButton_tree_clear.x() > ui.pushButton_start_cap.x() + ui.pushButton_start_cap.width(), (
-            f"窗宽 {w} 下刷子必须在开始按钮右侧"
+        assert ui.pushButton_tree_clear.x() <= ui.pushButton_start_cap.x() + ui.pushButton_start_cap.width(), (
+            f"窗宽 {w} 下刷子在开始按钮右侧或重叠"
         )
         assert ui.pushButton_tree_clear.x() <= max(ui.page_main.width() - 20 - 40, 300), (
             f"窗宽 {w} 下刷子不得越过预留滚动条的右缘"

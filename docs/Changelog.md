@@ -1,6 +1,6 @@
 
 # Changelog
-## v2.4.2 (2026-10-13)
+## v2.4.2 (2026-10-20)
 ### 调整
 - **版本号**：`2.4.1` → `2.4.2`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`）。
 - **使用说明「Official 有码片商官网30家」只列片商名、不再塞官网域名（`mdcx/views/MDCx.ui` 的 `textBrowser_about` 帮助正文 + 重编译产物 `mdcx/views/MDCx.py`）**：该段原写作 `Official（综合：有码+无码，按番号前缀自动路由到各官网，全部走代理）：有码片商官网30家：S1（s1s1s1）、Moodyz（moodyz）、…、Prestige（prestige-av）`，`Official` 后的括号注释加 30 个域名括号把一行撑到近 500 字，读着像配置表而不是说明，域名与片商名一一对应也看不出差别。现只列片商短标签：`Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：S1S1S1、Moodyz、Madonna-av、Wanz-Factory、…、Nanpa-Japan、…、HHH-av、Prestige`；真正的域名与番号前缀表仍以 `mdcx/manual.py` 的 `ManualConfig.OFFICIAL` 为准（段末那句指向不变），`docs/Features.md` 对「30 家有码片商官网」的描述本就只讲数量，无需同步。`.ui` 改完按 `scripts/pyuic.sh` 重编译对齐 `.py`：该段在 `.py` 里原被手工拆成两个字符串字面量，与 `.ui` 的 pyuic6 编译产物漂移（`tests/test_ui_structure.py::test_mdcx_py_in_sync_with_ui` 本就会判红），现合回单一字面量（pyuic6 只在真实换行处切分，该段在 `.ui` 中是单独一行）。回归：`tests/test_ui_structure.py` 新增 `test_about_official_site_list_green_site_names_only`、`…_yellow_py_literal_single_line`、`…_red_stale_shape_gone` 三例，分别锁 `.ui` 文案（30 家齐全）、`.py` 单字面量且与 `.ui` 一字不差、旧「（域名）」写法与拆行形态不再复现。

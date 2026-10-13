@@ -342,8 +342,12 @@ def test_unwritable_cache_does_not_break_check(monkeypatch: pytest.MonkeyPatch):
 
 class _UnwritablePath:
     """任何读写都抛 OSError，模拟只读目录 / 权限不足。"""
+    name = "version_check_cache.json"
 
     def with_suffix(self, suffix):
+        return self
+
+    def with_name(self, name):
         return self
 
     def write_text(self, *args, **kwargs):
