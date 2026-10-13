@@ -11447,8 +11447,8 @@ class MyMAinWindow(QMainWindow):
 
     # 设置-网络-网址设置-下拉框切换
     def switch_custom_website_change(self, site):
-        # 显示文本可能带区域标签后缀（如 "javdb（勿用日本节点）"），剥掉后再转枚举
-        site = site.split("（")[0].strip()
+        # 显示文本格式为“站点名（区域标签） 定位说明”，先按空格取首段、再剥区域标签后缀后再转枚举
+        site = site.split(" ")[0].split("（")[0].strip()
         if site not in Website:
             # official 子行（official·heyzo 等）：自定义网址框仅作该子站地址展示，
             # 保存时按非枚举值跳过，不会写入 official 配置
@@ -11467,8 +11467,8 @@ class MyMAinWindow(QMainWindow):
     # 设置 - 网络 - 使用代理 - 添加网站
     def _add_no_proxy_site(self, site_value: str):
         """当用户从下拉框选择网站时，添加到输入框"""
-        # 显示文本可能带区域标签后缀（如 "javdb（勿用日本节点）"），取值时剥掉
-        site_value = site_value.split("（")[0].strip()
+        # 显示文本格式为“站点名（区域标签） 定位说明”，先按空格取首段、再剥区域标签后缀，取值时剥掉
+        site_value = site_value.split(" ")[0].split("（")[0].strip()
         if not site_value or site_value == "选择网站...":
             return
         # 重置下拉框到默认值

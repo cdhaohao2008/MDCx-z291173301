@@ -67,7 +67,7 @@ class MadouClubContext(Context):
 
 
 class MadouClubCrawler(BaseCrawler[MadouClubContext]):
-    description = "麻豆社 国产（国产）"
+    description = "麻豆：国产番号"
     # madou.club 收录麻豆系 MDX 等番号，搜索需无横杠关键词（MDX-0236 无结果，MDX0236 命中，2026-08 实测）
     probe_number = "MDX0236"
 

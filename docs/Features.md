@@ -21,37 +21,37 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 
 | 爬虫名 | 数据源 | 说明 |
 |--------|-------|------|
-| dmm | dmm.co.jp | 日本最大成人平台 FANZA（仅能有码） |
-| dmm_api | DMM 官方 Affiliate API | 直连 api.dmm.com/affiliate/v3（仅能有码） |
+| dmm | dmm.co.jp | 有码：仅能有码 |
+| dmm_api | DMM 官方 Affiliate API | 有码：仅能有码 |
 | thejavdb_api | api.thejavdb.net | TheJavDB API 数据源（免 CF，仅能有码） |
 | javdb | javdb.com | JavDB 综合信息站（综合：有码+无码） |
-| javdb_api | JavDB 镜像站 | 镜像站 HTML 直连，带简繁转换和异体字修正（综合：有码+无码） |
+| javdb_api | JavDB 镜像站 | 综合：有码+无码 |
 | javdb_app | JavDB 移动端 API | APK 逆向签名直连（综合：有码+无码；封面/海报/剧照走 App CDN 无水印原图，签名失效自动诊断，详见 docs/Javdb_App_Signature.md） |
-| javbus | javbus.com | 有码/无码分类搜索（综合：有码+无码） |
+| javbus | javbus.com | 综合：有码+无码 |
 | javlibrary | javlibrary.com | 老牌信息站（仅能有码） |
-| missav | missav.ws | 综合搜索（综合：有码+无码） |
-| missav_api | Recombee API | 免 CF 直连，演员字段留空（综合：有码+无码） |
-| mgstage | mgstage.com | 有码/素人官网（仅能有码+素人） |
-| prestige | prestige-av.com | Prestige 官网 JSON API（仅能有码+素人） |
-| r18dev | r18.dev | JSON API，番号自动补零（仅能有码） |
+| missav | missav.ws | 综合：有码+无码 |
+| missav_api | Recombee API | 综合：有码+无码 |
+| mgstage | mgstage.com | 有码：有码+素人 |
+| prestige | prestige-av.com | 有码：有码+素人 |
+| r18dev | r18.dev | 有码：仅能有码 |
 | official | 各官网 | 按番号前缀自动路由到 30 家有码片商官网 + 5 家无码官网（Caribbeancom/Heyzo/1Pondo/Pacopacomama/10Musume JSON 直连）+ Dahlia/Faleno 子爬虫（综合：有码+无码；全部走代理；前缀表维护在 `manual.py` 的 `OFFICIAL` 字典） |
-| avbase | av-base.net | 有码信息站（仅能有码+素人） |
+| avbase | av-base.net | 有码：有码+素人 |
 | freejavbt | freejavbt.com | 磁力信息站（仅能有码） |
-| mywife | mywife.cc | No. 素人番号（素人） |
+| mywife | mywife.cc | MyWife：MyWife No.1234 |
 | getchu | getchu.com | 游戏/视频综合（仅能有码，兼里番/动漫路由） |
 | libredmm | libredmm.com | 开源信息站（仅能有码） |
 | xcity | xcity.jp | 综合（仅能有码） |
-| avsox | avsox.click | 无码（无码专属） |
-| avmoo | avmoo.shop | 有码信息站（仅能有码） |
-| aventertainments | aventertainments.com | 无码（DVD+PPV） |
+| avsox | avsox.click | 无码：仅能无码 |
+| avmoo | avmoo.shop | 有码：仅能有码 |
+| aventertainments | aventertainments.com | 无码：DVD |
 | avheat | avheat.shop | 欧美（欧美） |
-| airav_cc | airav.cc | 综合：有码+无码 |
+| airav_cc | airav.cc | 有码：仅能有码 |
 | avsex | avsex.cc | 综合：有码+无码 |
 | fc2 | fc2.com | FC2 官网（FC2） |
 | fc2ppvdb | fc2cmadb.com | FC2 PPV 数据库（FC2） |
-| madouqu | madouqu.com | 国产（国产） |
-| madou_club | madou.club | 麻豆社 国产（国产） |
-| lulubar | lulubar.net | 仅能有码 |
+| madouqu | madouqu.com | 国产：仅能国产 |
+| madou_club | madou.club | 麻豆：国产番号 |
+| lulubar | lulubar.net | 综合：仅能有码 |
 | iqqtv | iqqtv.com | 综合：有码+无码+素人+国产 |
 | javday | javday.tv | 综合：有码+无码+国产 |
 | javfree | javfree.me | 综合：有码+FC2（素人） |

@@ -130,7 +130,7 @@ class JavfreeContext(Context):
 
 
 class JavfreeCrawler(BaseCrawler[JavfreeContext]):
-    description = "JAVFREE 综合（有码+FC2）"
+    description = "综合：有码+FC2"
     probe_number = "SSNI-647"
 
     @classmethod

@@ -475,14 +475,8 @@ class ManualConfig:
     # 站点地域访问约束（站点侧客观属性，与用户网络无关）的唯一数据源。
     # 仅标注代码/站点行为已佐证的稳定属性；"被墙/需代理"等随用户网络环境变化的属性不在此标注。
     # UI（站点选择列表 / 检测网络 tooltip）统一从这里读取，禁止在其它位置散落重复清单。
-    # 佐证：javdb 禁日本 IP（crawlers/javdb.py / javdb_api.py 报错与 network_check 版权区域判定），
-    #      dmm / mgstage 日本地域锁（network_check._classify_http_result 的 DMM/MGSTAGE 分支）。
-    SITE_REGION_TAGS: dict[str, str] = {
-        "dmm": "日本IP限定",
-        "mgstage": "日本IP限定",
-        "javdb": "勿用日本节点",
-        "javdb_api": "勿用日本节点",
-    }
+    # 佐证：javdb 禁日本 IP（crawlers/javdb.py / javdb_api.py 报错与 network_check 版权区域判定）。
+    SITE_REGION_TAGS: dict[str, str] = {}
 
     WEB_DIC = {
         "avbase": Website.AVBASE,

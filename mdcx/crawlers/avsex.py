@@ -151,7 +151,7 @@ class AvsexContext(Context):
 
 
 class AvsexCrawler(BaseCrawler[AvsexContext]):
-    description = "AVSex 无码（综合：有码+无码+国产）"
+    description = "综合：有码+无码+国产"
     # avsex.cc 缺 SSNI-647（用户实测），SSNI-452 已确认收录
     probe_number = "SSNI-452"
     UTF8_PARSER = etree.HTMLParser(encoding="utf-8")

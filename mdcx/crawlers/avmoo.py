@@ -6,7 +6,7 @@ from .aio_site import AioSiteCrawler
 
 
 class AvmooCrawler(AioSiteCrawler):
-    description = "AVMOO 有码信息站（仅能有码）"
+    description = "有码：仅能有码"
     namespace = "jav"
     domain_site = "avmoo"
     fallback_domain = "https://avmoo.shop"

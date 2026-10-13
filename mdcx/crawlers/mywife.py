@@ -62,7 +62,7 @@ def get_extrafanart(html):
 
 
 class MywifeCrawler(BaseCrawler):
-    description = "MyWife No. 素人番号（素人）"
+    description = "MyWife：MyWife No.1234"
     # 议题 #128: 原探测番号 1500 的 model 页已被站点下架(HTTP 500), 换用户实测有效的 2306
     probe_number = "mywife-2306"
 

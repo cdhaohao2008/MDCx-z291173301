@@ -155,7 +155,7 @@ class Parser(DetailPageParser):
 
 
 class JavdbCrawler(BaseCrawler):
-    description = "JavDB 综合信息站（综合：有码+无码）"
+    description = "综合：有码+无码"
     parser = Parser()
 
     def __init__(self, client, base_url: str = "", browser=None):

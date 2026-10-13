@@ -29,7 +29,7 @@ class AventertainmentsContext(Context):
 
 
 class AventertainmentsCrawler(BaseCrawler[AventertainmentsContext]):
-    description = "AVENTERTAINMENTS 无码（DVD+PPV）"
+    description = "无码：DVD"
     probe_number = "TRG-095"
 
     @classmethod

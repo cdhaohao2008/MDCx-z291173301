@@ -223,7 +223,7 @@ _IQQTV_DOMAINS = [
 
 
 class IqqtvCrawler(BaseCrawler):
-    description = "IQQTV 综合：有码+无码+素人+国产"
+    description = "综合：有码+无码+素人+国产"
     _domains: list[str] = _IQQTV_DOMAINS
 
     @classmethod

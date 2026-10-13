@@ -339,7 +339,7 @@ def get_mosaic(title, actor):
 
 
 class FreejavbtCrawler(BaseCrawler):
-    description = "FreeJAVBT 磁力信息站（仅能有码）"
+    description = "有码：仅能有码"
     _domains: list[str] = _FREEJAVBT_DOMAINS
 
     @classmethod

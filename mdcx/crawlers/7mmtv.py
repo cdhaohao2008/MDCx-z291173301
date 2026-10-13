@@ -176,7 +176,7 @@ def get_number(html, number):
 
 
 class MmtvCrawler(BaseCrawler):
-    description = "7mmtv 综合站（综合：有码+无码+素人+FC2）"
+    description = "综合：有码+无码+素人+FC2"
     _domains: list[str] = _7MMTV_DOMAINS
 
     @classmethod

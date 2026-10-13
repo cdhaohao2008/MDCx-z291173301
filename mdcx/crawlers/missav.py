@@ -271,7 +271,7 @@ _MISSAV_DOMAINS = [
 
 
 class MissavCrawler(BaseCrawler):
-    description = "MissAV 综合搜索（综合：有码+无码）"
+    description = "综合：有码+无码"
     _domains: list[str] = _MISSAV_DOMAINS
     parser = Parser()
 

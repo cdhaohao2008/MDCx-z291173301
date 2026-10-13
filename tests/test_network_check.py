@@ -1414,7 +1414,7 @@ def test_region_tags_reference_valid_websites():
 
     valid = {w.value for w in Website}
     assert set(ManualConfig.SITE_REGION_TAGS) <= valid
-    assert set(ManualConfig.SITE_REGION_TAGS) == {"dmm", "mgstage", "javdb", "javdb_api"}
+    assert set(ManualConfig.SITE_REGION_TAGS) == set()
 
 
 @pytest.mark.anyio

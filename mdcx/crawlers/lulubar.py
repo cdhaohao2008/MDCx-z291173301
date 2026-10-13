@@ -110,7 +110,7 @@ class LulubarContext(Context):
 
 
 class LulubarCrawler(BaseCrawler[LulubarContext]):
-    description = "Lulubar 综合（仅能有码）"
+    description = "综合：仅能有码"
     probe_number = "IPZZ-547"
 
     @classmethod

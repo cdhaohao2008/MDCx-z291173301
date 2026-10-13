@@ -449,7 +449,7 @@ async def get_real_url(client, ctx: Context, number, url_type, javbus_url, heade
 
 
 class JavbusCrawler(BaseCrawler):
-    description = "有码/无码分类搜索，12 镜像轮询（综合：有码+无码）"
+    description = "综合：有码+无码"
     _domains: list[str] = _JAVBUS_DOMAINS
 
     @classmethod

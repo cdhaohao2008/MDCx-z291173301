@@ -96,7 +96,7 @@ class _DmmApiItem(BaseModel):
 
 
 class DmmApiCrawler(DmmCrawler):
-    description = "DMM 官方 Affiliate API（仅能有码）"
+    description = "有码：仅能有码"
 
     @staticmethod
     def _log(message: str):

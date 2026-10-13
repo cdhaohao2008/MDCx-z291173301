@@ -1,5 +1,16 @@
 
 # Changelog
+## v2.4.1 (2026-10-13)
+### 调整
+- **版本号**：`2.4.0` → `2.4.1`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`）。
+### 修复
+- **网站设置站点下拉右键点网址后网址消失（`mdcx/controllers/main_window/init.py` 的 `_SiteUrlClickFilter`）**：原来网址区任意按键都 `webbrowser.open + hidePopup`，右键点网址直接关弹窗、看起来像网址没了；现仅左键跳转+关闭，右键/中键吞掉事件、弹窗保持打开，网址依然显示。
+- **网站设置站点下拉选中行网址白底白字看不见（`_SiteUrlItemDelegate.paint`）**：左半 `super().paint` 只铺了缩窄区选中背景，网址区仍是白色底却用白色字绘制，选中/悬停/右键选中后网址“消失”；选中态现先 `fillRect(网址区, palette.highlight())` 补背景再画白字（palette Highlight 与 QSS 选中蓝一致，深浅主题通用）。
+- **网站设置下拉提示去重（`_site_combo_tip`/`_site_combo_item_tooltip`）**：tooltip 先后删掉 `（点击右侧网址可在浏览器中打开）` 与 `官网：{url}` 两行（右侧网址列已展示）；上次检测格式由 `上次检测（{when}）：{label}·{route}` 改为 `上次检测：{when}{label}·{route}`，状态文案去空格（`✅可连通`/`⚠️有需关注项`/`❌连不通`/`⏭上次未测`）；`无码官网 · X` 去空格为 `无码官网·X`。hover 只留站点说明+区域标签+上次检测结果。
+- **网站设置站点下拉定位说明直接展示（`_populate_site_combo`/`_append_official_subsite_rows`）**：原来有码/无码/信息站等定位说明只藏在 tooltip；现显示文本改为 `站点名（区域标签） 定位说明`（如 `avbase AVBase 有码信息站（仅能有码+素人）`），`official·heyzo` 等 5 子站行同样拼接 `无码官网·X`；UserRole 仍存纯站点值，取值逻辑不变。
+- **网站设置站点下拉过宽收窄（`_SiteUrlItemDelegate._column_metrics`）**：弹窗原来按最长站名+最长网址全文撑开近全屏；现站名列限宽 340px、网址列限宽 240px，超出省略号，网址列各行仍左对齐。
+- **网站设置下拉隐藏 `official` 本行**：只留 `official·heyzo` 等 5 个子站行；同步修复显示文本反查解析（`switch_custom_website_change`、`_add_no_proxy_site` 先按空格取首段再剥区域标签，否则无标签站点与子站行认不出、代理名单会误填说明文字）。
+
 ## v2.4.0 (2026-10-13)
 ### 调整
 - **版本号**：`2.3.9` → `2.4.0`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`）。

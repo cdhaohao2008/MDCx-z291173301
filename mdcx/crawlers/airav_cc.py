@@ -138,7 +138,7 @@ def normalize_language(language: str) -> str:
 
 
 class AiravCcCrawler(BaseCrawler):
-    description = "airav.cc 有码（仅能有码）"
+    description = "有码：仅能有码"
 
     @classmethod
     @override

@@ -473,7 +473,7 @@ async def fetch_article_info_with_warmup(
 
 
 class Fc2ppvdbCrawler(BaseCrawler):
-    description = "FC2PPVDB 数据库（FC2）"
+    description = "FC2：FC2网站"
     probe_number = "FC2-4988506"
 
     @classmethod

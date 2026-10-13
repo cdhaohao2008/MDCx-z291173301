@@ -171,7 +171,7 @@ def normalize_fc2_number(number: str) -> str:
 
 
 class Fc2Crawler(BaseCrawler):
-    description = "FC2 官网（FC2）"
+    description = "FC2：FC2官网"
     probe_number = "FC2-4680562"
 
     @classmethod

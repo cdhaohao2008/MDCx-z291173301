@@ -59,7 +59,7 @@ def get_media_path(page_data, key):
 
 
 class PrestigeCrawler(BaseCrawler):
-    description = "Prestige 官网 JSON API（仅能有码+素人）"
+    description = "有码：有码+素人"
     probe_number = "ABW-130"
 
     @classmethod

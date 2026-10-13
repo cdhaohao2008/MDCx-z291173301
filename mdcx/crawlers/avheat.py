@@ -6,7 +6,7 @@ from .aio_site import AioSiteCrawler
 
 
 class AvheatCrawler(AioSiteCrawler):
-    description = "AVHEAT 欧美（欧美）"
+    description = "欧美：欧美番号"
     namespace = "wav"
     domain_site = "avheat"
     fallback_domain = "https://avheat.shop"
