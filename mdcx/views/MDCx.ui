@@ -2465,7 +2465,7 @@
                     <string>删除所有男性演员</string>
                   </property>
                 </widget>
-                <widget class="QPushButton" name="pushButton_actor_db_fill_minnano">
+                <widget class="QPushButton" name="pushButton_actor_db_fill_Minnano">
                   <property name="geometry">
                     <rect>
                       <x>260</x>
@@ -8534,7 +8534,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               </size>
                             </property>
                             <property name="text">
-                              <string>&lt;span&gt;「网站偏好」-「指定网站」指定madouqu、madou_club或者文件路径里含有「国产」、「麻豆」时，将自动使用以上网站刮削国产番号&lt;/span&gt;</string>
+                              <string>&lt;span&gt;「网站偏好」-「指定网站」指定Madouqu、madou_club或者文件路径里含有「国产」、「麻豆」时，将自动使用以上网站刮削国产番号&lt;/span&gt;</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
@@ -25424,7 +25424,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;无码&lt;/b&gt;：AVSOX、AVEntertainments及综合站（JavBus、JavDB系、MissAV系、AVSex、Official、JavDay、IQQTV、7mmtv）&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;素人&lt;/b&gt;：MGStage（259LUXU等）、Prestige、JavBus、JavDB系、DMM、DMM-API、AVBase、MissAV系、MyWife、IQQTV、7mmtv&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;FC2&lt;/b&gt;：FC2、FC2PPVDB、JavDB系、JavFree、7mmtv&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;国产&lt;/b&gt;：MADOUQU、MADOU_CLUB、AVSex、IQQTV、JavDay&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;国产&lt;/b&gt;：Madouqu、Madou_Club、AVSex、IQQTV、JavDay&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;欧美&lt;/b&gt;：THEPORNDB、AVHEAT&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;&lt;b&gt;Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：S1S1S1、Moodyz、Madonna-av、Wanz-Factory、IdeaPocket、Kirakira-av、E-Body、Bi-av、Premium-Beauty、Miman、Tameikegoro、Fitch-av、Kawaii、BeeFree、Muku.tv、Attackers、MKO-Labo、Dasdas、MVG、AV-Opera、Oppai-av、V-av、To-Satsu、Bibian-av、Honnaka、Rookie-av、Nanpa-Japan、HajimeKikaku、HHH-av、Prestige&lt;br/&gt;

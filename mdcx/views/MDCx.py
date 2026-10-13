@@ -925,9 +925,9 @@ class Ui_MDCx(object):
         self.pushButton_actor_db_clean_male = QtWidgets.QPushButton(parent=self.groupBox_actor_db_maintenance)
         self.pushButton_actor_db_clean_male.setGeometry(QtCore.QRect(40, 118, 200, 30))
         self.pushButton_actor_db_clean_male.setObjectName("pushButton_actor_db_clean_male")
-        self.pushButton_actor_db_fill_minnano = QtWidgets.QPushButton(parent=self.groupBox_actor_db_maintenance)
-        self.pushButton_actor_db_fill_minnano.setGeometry(QtCore.QRect(260, 118, 200, 30))
-        self.pushButton_actor_db_fill_minnano.setObjectName("pushButton_actor_db_fill_minnano")
+        self.pushButton_actor_db_fill_Minnano = QtWidgets.QPushButton(parent=self.groupBox_actor_db_maintenance)
+        self.pushButton_actor_db_fill_Minnano.setGeometry(QtCore.QRect(260, 118, 200, 30))
+        self.pushButton_actor_db_fill_Minnano.setObjectName("pushButton_actor_db_fill_Minnano")
         self.pushButton_actor_db_verify_tmdbid = QtWidgets.QPushButton(parent=self.groupBox_actor_db_maintenance)
         self.pushButton_actor_db_verify_tmdbid.setGeometry(QtCore.QRect(40, 148, 200, 30))
         self.pushButton_actor_db_verify_tmdbid.setObjectName("pushButton_actor_db_verify_tmdbid")
@@ -13127,13 +13127,13 @@ class Ui_MDCx(object):
             _translate("MDCx", "提示：补全结果将输出到日志页所有按钮均防重入，运行中按钮将禁用")
         )
         self.pushButton_actor_db_clean_male.setText(_translate("MDCx", "删除所有男性演员"))
-        self.pushButton_actor_db_fill_minnano.setToolTip(
+        self.pushButton_actor_db_fill_Minnano.setToolTip(
             _translate(
                 "MDCx",
                 "从Minnano-av补全缺生日/简介的条目，已有生日且简介非空的行跳过，只补空缺不覆盖已有值，作用于当前用户演员库，补全时会将出身/爱好/事务所/标签等日文字段翻译成中文，事务所/标签优先用内置信息库映射，其余用已配置的翻译引擎，需联网",
             )
         )
-        self.pushButton_actor_db_fill_minnano.setText(_translate("MDCx", "Minnano-AV补全"))
+        self.pushButton_actor_db_fill_Minnano.setText(_translate("MDCx", "Minnano-AV补全"))
         self.pushButton_actor_db_verify_tmdbid.setToolTip(
             _translate(
                 "MDCx",
@@ -14609,7 +14609,7 @@ class Ui_MDCx(object):
                 "<li><b>无码</b>：AVSOX、AVEntertainments及综合站（JavBus、JavDB系、MissAV系、AVSex、Official、JavDay、IQQTV、7mmtv）</li>\n"
                 "<li><b>素人</b>：MGStage（259LUXU等）、Prestige、JavBus、JavDB系、DMM、DMM-API、AVBase、MissAV系、MyWife、IQQTV、7mmtv</li>\n"
                 "<li><b>FC2</b>：FC2、FC2PPVDB、JavDB系、JavFree、7mmtv</li>\n"
-                "<li><b>国产</b>：MADOUQU、MADOU_CLUB、AVSex、IQQTV、JavDay</li>\n"
+                "<li><b>国产</b>：MADOUQU、Madou_Club、AVSex、IQQTV、JavDay</li>\n"
                 "<li><b>欧美</b>：THEPORNDB、AVHEAT</li>\n"
                 "</ul>\n"
                 "<p><b>Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：S1S1S1、Moodyz、Madonna-av、Wanz-Factory、IdeaPocket、Kirakira-av、E-Body、Bi-av、Premium-Beauty、Miman、Tameikegoro、Fitch-av、Kawaii、BeeFree、Muku.tv、Attackers、MKO-Labo、Dasdas、MVG、AV-Opera、Oppai-av、V-av、To-Satsu、Bibian-av、Honnaka、Rookie-av、Nanpa-Japan、HajimeKikaku、HHH-av、Prestige<br/>\n"
