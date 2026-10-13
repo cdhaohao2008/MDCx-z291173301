@@ -5056,8 +5056,8 @@ class MyMAinWindow(QMainWindow):
         # 顶部位置不动；min() 钳窗口上限、下限 280 保极小窗口不塌。
         gap_mid = self._nfo_fixed_gap_offset()
         if gap_mid is not None:
-            # 用户目测：中点基础上再上收 8px
-            nfo_h = min(29 + gap_mid + self._NFO_OVERLAY_BAR_H - 8, max_h)
+            # 用户目测：中点基础上再上收 9px
+            nfo_h = min(29 + gap_mid + self._NFO_OVERLAY_BAR_H - 9, max_h)
         else:
             nfo_h = min(29 + content_h + self._NFO_OVERLAY_BAR_H - self._NFO_OVERLAY_H_TRIM, max_h)
         nfo_h = max(nfo_h, 280)

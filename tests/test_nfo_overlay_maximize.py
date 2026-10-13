@@ -175,7 +175,7 @@ def test_overlay_bar_top_lands_on_plot_tag_gap(win):
     gap_mid = win._nfo_fixed_gap_offset()
     assert gap_mid is not None, "行高累加失败"
     bar_top = nfo.height() - bar  # 条上沿在面板坐标系的位置
-    assert bar_top - ui.scrollArea_nfo.y() == gap_mid - 8, (  # 中点基础上再上收 8px
+    assert bar_top - ui.scrollArea_nfo.y() == gap_mid - 9, (  # 中点基础上再上收 9px
         f"条上沿未落在两行中间: bar_top_offset={bar_top - ui.scrollArea_nfo.y()} gap_mid={gap_mid}"
     )
     save = ui.pushButton_nfo_save
