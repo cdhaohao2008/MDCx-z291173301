@@ -14612,7 +14612,7 @@ class Ui_MDCx(object):
                 "<li><b>国产</b>：Madouqu、Madou_Club、AVSex、IQQTV、JavDay</li>\n"
                 "<li><b>欧美</b>：ThepornDB、AVheat</li>\n"
                 "</ul>\n"
-                "<p><b>Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：S1S1S1、Moodyz、Madonna-av、Wanz-Factory、IdeaPocket、Kirakira-av、E-Body、Bi-av、Premium-Beauty、Miman、Tameikegoro、Fitch-av、Kawaii、BeeFree、Muku.tv、Attackers、MKO-Labo、Dasdas、MVG、AV-Opera、Oppai-av、V-av、To-Satsu、Bibian-av、Honnaka、Rookie-av、Nanpa-Japan、HajimeKikaku、HHH-av、Prestige<br/>\n"
+                "<p><b>Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：S1、Moodyz、Madonna-av、Wanz-Factory、IdeaPocket、Kirakira-av、E-Body、Bi-av、Premium-Beauty、Miman、Tameikegoro、Fitch-av、Kawaii、BeeFree、Muku.tv、Attackers、MKO-Labo、Dasdas、MVG、AV-Opera、Oppai-av、V-av、To-Satsu、Bibian-av、Honnaka、Rookie-av、Nanpa-Japan、HajimeKikaku、HHH-av、Prestige<br/>\n"
                 "无码官网5站，JSON API直连：Caribbeancom、Heyzo、1Pondo、Pacopacomama、10Musume<br/>\n"
                 "番号前缀DLDSS/FNS/JIMMY还分别路由到Dahlia/Faleno官网，官网前缀表维护在代码manual.py的OFFICIAL字典中，增减不影响使用说明。</p>\n"
                 "<h4>五、Cloudflare绕过（CFBypass）</h4>\n"
