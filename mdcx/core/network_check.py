@@ -66,6 +66,12 @@ SCRAPE_PROBE_ATTEMPT_TIMEOUTS = (30.0, 45.0)
 # 首轮首探超时（阶梯第一档），保留常量名供展示与默认值引用
 SCRAPE_PROBE_TIMEOUT = SCRAPE_PROBE_ATTEMPT_TIMEOUTS[0]
 
+# 构建站点检测项时、单个爬虫 check_urls（动态域名解析：抓发布页/GitHub 取最新
+# 直连地址）的耗时上限。原先这些抓取串行且吃客户端默认 超时(30s)×重试(3)，
+# 被墙环境下单站可耗数分钟、全部串起来十几分钟，且发生在任何检测项开跑之前；
+# 现并发执行并单项封顶，超时即回退该站默认域名（不牺牲检测项本身的结果）。
+DYNAMIC_DOMAIN_TIMEOUT = 20.0
+
 # 报告内分隔线的兜底字符数（量不到面板可视宽时用）。实际宽度由调用方按检测面板
 # 文本框的真实可视宽算好后传进来（见 MyMAinWindow._net_separator_chars → handlers
 # .net_separator_width），报告里的「-」「=」才会和面板最上/最下两条横幅永远同长、
@@ -120,6 +126,10 @@ DEFAULT_SITE_URLS: dict[Website, str] = {
 }
 
 GROUP_ORDER = ("基础环境", "网络连通", "站点检测", "账号/API", "辅助服务")
+# 这两组的检测项只由静态构建器产出（基础环境是横幅、网络连通是 GitHub Raw +
+# 通用 HTTPS），不需要等后台构建的站点 specs——首组结果因此不必被动态域名解析
+# 拖住（见 run_network_check）。
+STATIC_ONLY_GROUPS = ("基础环境", "网络连通")
 STATUS_ORDER = {
     NetworkCheckStatus.FAILED: 0,
     NetworkCheckStatus.WARNING: 1,
@@ -762,11 +772,34 @@ def format_summary(
     return lines
 
 
+async def _resolve_check_urls(crawler_cls: Any) -> list[str]:
+    """并发解析某站的检测地址；超时/异常/爬虫未实现该方法一律回退为空列表。
+
+    由调用方用默认域名兜底（与原先 try/except 的兜底语义一致）。CancelledError
+    是 BaseException、不在 except Exception 内，整轮取消仍能正常向上传播。
+    """
+    try:
+        return await asyncio.wait_for(crawler_cls.check_urls(), timeout=DYNAMIC_DOMAIN_TIMEOUT)
+    except Exception:
+        return []
+
+
 async def _build_site_specs() -> list[NetworkCheckSpec]:
     from mdcx.crawlers import get_crawler, get_registered_crawler_sites
 
     manager = _manager()
     specs: list[NetworkCheckSpec] = []
+    # 分两步：先纯本地规划（不触网），再统一并发解析动态域名，最后按原顺序拼装。
+    #
+    # 为什么要拆：动态域名站的 check_urls 会去抓发布页/GitHub 首页取最新直连地址
+    # （javlibrary → github.com/javlibcom + 2 个镜像探活；avmoo/avsox/avheat →
+    # tellme.pw 导航页最多试 3 个地址；madouqu → 发布页）。这些抓取吃的是客户端
+    # 默认 超时(30s) × 重试(3)，原先逐站串行 await，被墙/慢网环境下单站就能吃掉
+    # 数分钟，全部站点串起来可达十几分钟——而这段发生在任何检测项开跑之前，
+    # 用户点了「开始检测」只能盯着"⛑ 开始检测网络..."干等，连第一组的
+    # GitHub Raw / 通用HTTPS 都迟迟不显示。改为并发解析 + 单项限时后，
+    # 整段从"各站耗时之和"降为"最慢的那一站（且封顶）"，检测项顺序与内容不变。
+    plans: list[tuple[Website, Any, str, bool]] = []
     for site in get_registered_crawler_sites(include_hidden=False):
         if site == Website.THEPORNDB:
             continue
@@ -811,12 +844,16 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
                 )
             )
             continue
+        plans.append((site, crawler_cls, base_url, customized))
 
-        # 动态域名/镜像站点可返回多个检测地址；其余站点默认单地址。
-        try:
-            check_urls = await crawler_cls.check_urls()
-        except Exception:
-            check_urls = []
+    resolved_check_urls: list[list[str]] = []
+    if plans:
+        resolved_check_urls = list(
+            await asyncio.gather(*(_resolve_check_urls(crawler_cls) for _, crawler_cls, _, _ in plans))
+        )
+
+    for (site, crawler_cls, base_url, customized), check_urls in zip(plans, resolved_check_urls, strict=True):
+        # check_urls 即动态域名/镜像站点的额外检测地址（其余站点默认单地址）。
         # 用户未自定义 URL 时，动态域名站优先用动态解析出的地址作为主检测地址。
         # 过滤空串：base_url_() 返回空的站点（如 dmm）check_urls 会返回 [""]，
         # 此时应回退到 DEFAULT_SITE_URLS 的默认地址，而不是覆盖成空导致误报"无固定入口"。
@@ -1317,6 +1354,8 @@ async def run_network_check(
 
     specs: 指定检测子集（用于"重试失败项"只重测失败/警告项）；None 表示全量构建检测项。
     on_item_done: 每完成一项回调 (done, total) 结构化进度（"基础环境"组不参与计数）；供 UI 显示百分比。
+    全量构建时静态项与站点项分两段取（见下），站点项并入前 total 未知（=0），
+    此期间不触发 on_item_done——避免回调出"1/0"这类自相矛盾的进度。
     单站刮削探测的超时递进（30s/45s 最多两次）在探测环节内部完成（议题 #118）。
     separator_width: 报告内分隔线字符数，由 UI 按检测面板可视宽算好传入；None 用兜底值。
     """
@@ -1325,10 +1364,45 @@ async def run_network_check(
         for line in _format_header(separator_width):
             progress(line)
 
-    check_specs = specs if specs is not None else await build_network_check_specs()
+    # 静态检测项（网络连通/辅助服务/账号API）是纯本地拼装，毫秒级就绪；站点检测项
+    # 要先并发解析各站动态域名（见 _build_site_specs 注释），整段最坏按超时上限
+    # 也要几十秒。原先全量 specs（含动态域名解析）串在所有检测项之前构建完才开始
+    # 跑，用户点「开始检测」只能干等十几分钟，连第一组的 GitHub Raw / 通用HTTPS
+    # 都不显示。改为：静态项立刻开跑，站点 specs 丢后台并发构建，等真要跑到后面
+    # 的分组时再 join——第一组结果几秒内就出来。
+    site_specs_task: asyncio.Task[list[NetworkCheckSpec]] | None = None
+    if specs is not None:
+        check_specs: list[NetworkCheckSpec] = list(specs)
+    else:
+        check_specs = _build_static_specs()
+
     results: list[NetworkCheckResult] = []
-    total = sum(1 for s in check_specs if s.group != "基础环境")
+    # 全量构建时站点 specs 还在后台构建中，总项数未知，喂 0 让 UI 保持"停止检测"
+    # 按钮态（_on_net_check_progress 按 total>0 才刷新），既不显示"1/1"这种立刻
+    # 跑满的误导进度，也不触发 on_item_done；站点 specs 并入后按真实总数回调。
+    total = 0 if specs is None else sum(1 for s in check_specs if s.group != "基础环境")
     grouped_specs = {group: [spec for spec in check_specs if spec.group == group] for group in GROUP_ORDER}
+
+    def reindex_specs() -> None:
+        nonlocal total, grouped_specs
+        grouped_specs = {group: [spec for spec in check_specs if spec.group == group] for group in GROUP_ORDER}
+        total = sum(1 for s in check_specs if s.group != "基础环境")
+
+    async def join_site_specs() -> None:
+        """等后台构建好的站点检测项并入（取消/异常时保留已有静态项继续跑）。"""
+        nonlocal check_specs, site_specs_task
+        task, site_specs_task = site_specs_task, None
+        if task is None:
+            return
+        try:
+            site_specs = await task
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return
+        check_specs = [*check_specs, *site_specs]
+        reindex_specs()
+
     semaphore = asyncio.Semaphore(max(int(concurrency), 1))
     # Bypass 串行锁（单 run 一把）：检测组内并发跑项，直连失败站会同时触发
     # bypass 兜底占浏览器，TRAWL/FlareSolverr 浏览器池满后集体 502
@@ -1367,10 +1441,22 @@ async def run_network_check(
 
     start_time = time.perf_counter()
     proxy_down = False
+    # 站点 specs 的后台构建放在 try 之前紧挨着起：任务一旦创建就由下面的 finally
+    # 兜底取消，早于此处（取租约等）抛错也不会留下无人回收的 pending 任务。
+    if specs is None:
+        site_specs_task = asyncio.create_task(_build_site_specs())
     try:
         for group in GROUP_ORDER:
+            if group == "基础环境":
+                continue
+            # 「基础环境」「网络连通」两组的检测项只由静态项构建器产出，不必等后台
+            # 的站点 specs —— 第一组结果因此能立刻出来。到后面的分组（站点检测在
+            # 账号/API 与辅助服务之前）才 join；join 会带进来新的本站点检测项，
+            # 所以必须在 join 之后才取本组清单。
+            if site_specs_task is not None and group not in STATIC_ONLY_GROUPS:
+                await join_site_specs()
             group_specs = grouped_specs.get(group, [])
-            if not group_specs or group == "基础环境":
+            if not group_specs:
                 continue
             progress(group)
             # task → spec 映射：单项逃逸异常时定位所属站点（议题 #73）
@@ -1413,7 +1499,10 @@ async def run_network_check(
                             error=f"{type(exc).__name__}: {exc}",
                         )
                     results.append(result)
-                    if on_item_done is not None:
+                    # 站点 specs 尚未并入时 total 仍为 0（总数未知），此时不回调：
+                    # 报一个"1/0"或"1/2"的自相矛盾进度比不报更糟，UI 本就按
+                    # total>0 才刷新按钮文本，行为等价但回调契约保持干净。
+                    if on_item_done is not None and total:
                         on_item_done(len(results), total)
                     if result.spec.group == "网络连通":
                         if result.status == NetworkCheckStatus.FAILED and _is_proxy_error(result.error):
@@ -1441,6 +1530,15 @@ async def run_network_check(
             ),
         )
     finally:
+        # 后台构建站点 specs 的任务：正常路径已在 join_site_specs 里 await 过；
+        # 取消/异常提前退出时它还挂着，显式取消并收结果，避免遗留 pending 任务
+        # 警告，也让动态域名抓取立刻停手。await 已取消的任务必抛 CancelledError
+        # （BaseException，不在 suppress(Exception) 内），会顶掉取消路径上本该
+        # 返回的 results——清理代码不能盖结果，故一并抑制。
+        if site_specs_task is not None and not site_specs_task.done():
+            site_specs_task.cancel()
+            with suppress(Exception, asyncio.CancelledError):
+                await site_specs_task
         # run 结束摘掉串行锁：stale 锁本身无害（无竞争时跨 loop acquire 安全，
         # 下轮 run 也会覆盖），但正常刮削不应背着检测期的锁 attribute。
         # 只摘本轮挂上去的那把锁，不碰他人。取消路径的早期 return 同样经过这里。

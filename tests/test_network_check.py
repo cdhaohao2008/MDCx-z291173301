@@ -24,6 +24,24 @@ from mdcx.core.network_check import (
 )
 
 
+def _patch_check_specs(monkeypatch: pytest.MonkeyPatch, specs: list[NetworkCheckSpec]) -> None:
+    """把检测项构建的两处入口都替换成固定列表（按组拆开）。
+
+    run_network_check 现在分两段拿检测项：静态项同步拿、先跑第一组「网络连通」，
+    站点项丢后台并发构建、到后续分组再 join（原为 build_network_check_specs
+    一次 await 全部拿齐）。要注入假检测项必须两处都打桩，否则真实检测项会混进来，
+    结果数/总项数全对不上。「站点检测」组归站点项，其余组归静态项。
+    """
+    static_specs = [spec for spec in specs if spec.group != "站点检测"]
+    site_specs = [spec for spec in specs if spec.group == "站点检测"]
+
+    async def fake_site_specs() -> list[NetworkCheckSpec]:
+        return list(site_specs)
+
+    monkeypatch.setattr("mdcx.core.network_check._build_static_specs", lambda: list(static_specs))
+    monkeypatch.setattr("mdcx.core.network_check._build_site_specs", fake_site_specs)
+
+
 class FakeResponse:
     def __init__(self, status_code: int = 200, text: str = "ok", url: str = "https://example.test"):
         self.status_code = status_code
@@ -424,14 +442,14 @@ async def test_run_network_check_survives_task_level_exception(monkeypatch: pyte
     """
     import mdcx.core.network_check as nc_module
 
-    async def fake_specs():
-        return [
+    _patch_check_specs(
+        monkeypatch,
+        [
             NetworkCheckSpec(name="good", group="网络连通", url="https://good.example"),
             NetworkCheckSpec(name="boom", group="网络连通", url="https://boom.example"),
             NetworkCheckSpec(name="also_good", group="网络连通", url="https://also.example"),
-        ]
-
-    monkeypatch.setattr("mdcx.core.network_check.build_network_check_specs", fake_specs)
+        ],
+    )
 
     real_item = nc_module.run_network_check_item
 
@@ -464,13 +482,13 @@ async def test_run_network_check_cancelled_task_does_not_stop(monkeypatch: pytes
     """
     import asyncio
 
-    async def fake_specs():
-        return [
+    _patch_check_specs(
+        monkeypatch,
+        [
             NetworkCheckSpec(name="cancelled", group="网络连通", url="https://c.example"),
             NetworkCheckSpec(name="good", group="网络连通", url="https://g.example"),
-        ]
-
-    monkeypatch.setattr("mdcx.core.network_check.build_network_check_specs", fake_specs)
+        ],
+    )
 
     real_item = nc.run_network_check_item
 
@@ -493,13 +511,13 @@ async def test_run_network_check_cancelled_task_does_not_stop(monkeypatch: pytes
 
 @pytest.mark.anyio
 async def test_run_network_check_does_not_stop_on_single_item_exception(monkeypatch: pytest.MonkeyPatch):
-    async def fake_specs():
-        return [
+    _patch_check_specs(
+        monkeypatch,
+        [
             NetworkCheckSpec(name="good", group="网络连通", url="https://good.example"),
             NetworkCheckSpec(name="bad", group="网络连通", url="https://bad.example"),
-        ]
-
-    monkeypatch.setattr("mdcx.core.network_check.build_network_check_specs", fake_specs)
+        ],
+    )
     lines: list[str] = []
 
     results = await run_network_check(
@@ -516,13 +534,13 @@ async def test_run_network_check_does_not_stop_on_single_item_exception(monkeypa
 
 @pytest.mark.anyio
 async def test_run_network_check_can_cancel_between_groups(monkeypatch: pytest.MonkeyPatch):
-    async def fake_specs():
-        return [
+    _patch_check_specs(
+        monkeypatch,
+        [
             NetworkCheckSpec(name="first", group="网络连通", url="https://first.example"),
             NetworkCheckSpec(name="second", group="站点检测", url="https://second.example"),
-        ]
-
-    monkeypatch.setattr("mdcx.core.network_check.build_network_check_specs", fake_specs)
+        ],
+    )
     cancel_event = threading.Event()
     lines: list[str] = []
 
@@ -1419,15 +1437,15 @@ def test_region_tags_reference_valid_websites():
 
 @pytest.mark.anyio
 async def test_run_network_check_reports_structured_progress(monkeypatch: pytest.MonkeyPatch):
-    async def fake_specs():
-        return [
+    _patch_check_specs(
+        monkeypatch,
+        [
             NetworkCheckSpec(name="env", group="基础环境", url="https://env.example"),
             NetworkCheckSpec(name="a", group="网络连通", url="https://a.example"),
             NetworkCheckSpec(name="b", group="站点检测", url="https://b.example"),
             NetworkCheckSpec(name="c", group="站点检测", url="https://c.example"),
-        ]
-
-    monkeypatch.setattr("mdcx.core.network_check.build_network_check_specs", fake_specs)
+        ],
+    )
     seen: list[tuple[int, int]] = []
 
     results = await run_network_check(
@@ -1437,9 +1455,128 @@ async def test_run_network_check_reports_structured_progress(monkeypatch: pytest
         emit_header=False,
     )
 
-    # "基础环境"组不参与计数：total=3，done 单调递增到 3
-    assert seen == [(1, 3), (2, 3), (3, 3)]
+    # "基础环境"组不参与计数：total=3，done 单调递增到 3。
+    # done 含首组那项 "a"：它在后台站点 specs 并入前就跑完了，那时总项数还未知
+    # （total=0），按契约不回调（UI 也按 total>0 才刷新按钮），故首个回调是 2/3。
+    assert seen == [(2, 3), (3, 3)]
     assert len(results) == 3  # "基础环境"组是输出横幅非实际检测项，不执行也不计进度
+
+
+# ==================== 检测起步延迟：动态域名解析不得挡住「网络连通」首组 ====================
+
+
+@pytest.mark.anyio
+async def test_network_group_runs_before_site_specs_ready(monkeypatch: pytest.MonkeyPatch):
+    """「网络连通」必须在站点检测项构建完成之前就出结果（实测挡住十几分钟）。
+
+    根因：run_network_check 原先先 await build_network_check_specs() 才开始跑，
+    而站点 specs 要逐站串行解析动态域名（javlibrary 抓 GitHub、avmoo/avsox/
+    avheat 抓 tellme.pw、madouqu 抓发布页），被墙环境下各站耗时相加可达十几分钟，
+    用户点「开始检测」后连 GitHub Raw / 通用HTTPS 都看不到。现静态项先跑、站点
+    specs 后台构建。这里用「站点 specs 等静态项跑完才放行」的门闩锁死该顺序：
+    若实现退回首段阻塞构建，站点 specs 永远等不到门闩，整轮超时失败。
+    """
+    import asyncio
+
+    monkeypatch.setattr(
+        "mdcx.core.network_check._build_static_specs",
+        lambda: [NetworkCheckSpec(name="net", group="网络连通", url="https://net.example")],
+    )
+    gate = asyncio.Event()
+
+    async def gated_site_specs() -> list[NetworkCheckSpec]:
+        # 只有「网络连通」那项真的跑起来（下面 flaky_item 会开门闩）才放行
+        await gate.wait()
+        return [NetworkCheckSpec(name="site", group="站点检测", url="https://site.example")]
+
+    real_item = nc.run_network_check_item
+
+    async def flaky_item(spec, *, cancel_event=None, client=None):
+        gate.set()
+        return await real_item(spec, cancel_event=cancel_event, client=client)
+
+    monkeypatch.setattr("mdcx.core.network_check._build_site_specs", gated_site_specs)
+    monkeypatch.setattr("mdcx.core.network_check.run_network_check_item", flaky_item)
+    lines: list[str] = []
+
+    # 超时兜底：真退化成首段阻塞构建时这里是死锁，靠 wait_for 变成失败而非挂死
+    results = await asyncio.wait_for(
+        run_network_check(progress=lines.append, client=FakeClient(), emit_header=False),
+        timeout=10,
+    )
+
+    assert [result.spec.name for result in results] == ["net", "site"]
+    # 首组结果行在站点 specs 放行前就已打印（progress 先于 join）
+    assert any("net" in line for line in lines)
+
+
+@pytest.mark.anyio
+async def test_build_site_specs_resolves_dynamic_domains_concurrently(monkeypatch: pytest.MonkeyPatch):
+    """各站 check_urls（动态域名解析）必须并发，不能逐站串行累加耗时。"""
+    import asyncio
+
+    barrier = asyncio.Barrier(2)  # 两个站必须同时在跑才放行；串行执行会卡死在这里
+
+    class SlowCrawler:
+        @classmethod
+        def base_url_(cls):
+            return "https://slow.example"
+
+        @classmethod
+        async def check_urls(cls):
+            await barrier.wait()
+            return ["https://slow.example"]
+
+    class SecondCrawler(SlowCrawler):
+        @classmethod
+        def base_url_(cls):
+            return "https://second.example"
+
+        @classmethod
+        async def check_urls(cls):
+            await barrier.wait()
+            return ["https://second.example"]
+
+    crawlers = {Website.MMTV: SlowCrawler, Website.MADOUQU: SecondCrawler}
+    fake_crawlers = SimpleNamespace(
+        get_registered_crawler_sites=lambda include_hidden=False: list(crawlers),
+        get_crawler=lambda site: crawlers.get(site),
+    )
+    monkeypatch.setitem(sys.modules, "mdcx.crawlers", fake_crawlers)
+
+    specs = await asyncio.wait_for(nc.build_network_check_specs(), timeout=10)
+
+    urls = {spec.site: spec.url for spec in specs if spec.site in crawlers}
+    assert urls[Website.MMTV] == "https://slow.example"
+    assert urls[Website.MADOUQU] == "https://second.example"
+
+
+@pytest.mark.anyio
+async def test_build_site_specs_bounds_hanging_dynamic_domain_lookup(monkeypatch: pytest.MonkeyPatch):
+    """卡死的动态域名解析要被单项限时掐断并回退默认域名，不能拖住整轮构建。"""
+    import asyncio
+
+    class HangingCrawler:
+        @classmethod
+        def base_url_(cls):
+            return "https://hanging.example"
+
+        @classmethod
+        async def check_urls(cls):
+            await asyncio.sleep(3600)
+            return ["https://never.example"]
+
+    fake_crawlers = SimpleNamespace(
+        get_registered_crawler_sites=lambda include_hidden=False: [Website.MMTV],
+        get_crawler=lambda site: HangingCrawler,
+    )
+    monkeypatch.setitem(sys.modules, "mdcx.crawlers", fake_crawlers)
+    monkeypatch.setattr("mdcx.core.network_check.DYNAMIC_DOMAIN_TIMEOUT", 0.05)
+
+    specs = await asyncio.wait_for(nc.build_network_check_specs(), timeout=10)
+
+    # 超时 → 回退该站默认域名（不误报"无固定入口"、也不产出半截地址）
+    assert [spec.url for spec in specs if spec.site == Website.MMTV] == ["https://hanging.example"]
 
 
 # ==================== 议题 #129: API 组入缓存 + official 五站子检测/最差聚合 ====================
