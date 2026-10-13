@@ -894,3 +894,67 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
             if widths != {80}:
                 problems.append(f"两行 col=0 空位宽度应同为 80: {sorted(widths, key=str)!r}")
     assert not problems, "STRM 行位置/顺序问题:\n" + "\n".join(problems)
+
+
+# ---------- 使用说明「Official 有码片商官网30家」清单 —— 文案/同步回归锁 ----------
+
+# 使用说明只列片商名，不再把官网域名塞进括号里：Official 后的「（综合：…）」括号已去掉，
+# 30 家官网一律写成「片商名-域名风格」的短标签（如 S1S1S1、Madonna-av、Nanpa-Japan）。
+# 真正的域名与番号前缀表在 mdcx/manual.py 的 ManualConfig.OFFICIAL，本段只是可读说明，
+# 因此这里锁的是文案本身 + .ui/.py 两份必须一字不差。
+_OFFICIAL_ABOUT_PREFIX = "<p><b>Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家："
+_OFFICIAL_ABOUT_SITES = (
+    "S1S1S1、Moodyz、Madonna-av、Wanz-Factory、IdeaPocket、Kirakira-av、E-Body、Bi-av、"
+    "Premium-Beauty、Miman、Tameikegoro、Fitch-av、Kawaii、BeeFree、Muku.tv、Attackers、"
+    "MKO-Labo、Dasdas、MVG、AV-Opera、Oppai-av、V-av、To-Satsu、Bibian-av、Honnaka、"
+    "Rookie-av、Nanpa-Japan、HajimeKikaku、HHH-av、Prestige"
+)
+_OFFICIAL_ABOUT_PARA = _OFFICIAL_ABOUT_PREFIX + _OFFICIAL_ABOUT_SITES + "<br/>"
+# 修复前形态：片商名后跟「（域名）」、且 Official 后带括号注释——任一复现即为文案回退。
+_OFFICIAL_ABOUT_STALE = (
+    "<b>Official（综合：",
+    "S1（s1s1s1）",
+    "Moodyz（moodyz）",
+    "Kirakira（kirakira-av）",
+    "Prestige（prestige-av）",
+)
+
+
+def test_about_official_site_list_green_site_names_only():
+    """绿（成功）：使用说明 Official 段为纯片商名清单，30 家齐全、无域名括号。"""
+    assert len(_OFFICIAL_ABOUT_SITES.split("、")) == 30, "官网清单应为 30 家"
+
+    root = _parse_ui()
+    widget = _find_widget_by_name(root, "textBrowser_about")
+    assert widget is not None, "textBrowser_about 不存在"
+    about_html = _widget_string_prop(widget, "html") or ""
+    assert _OFFICIAL_ABOUT_PARA in about_html, "MDCx.ui 的 Official 段文案与预期不符"
+    assert about_html.count(_OFFICIAL_ABOUT_PARA) == 1, "Official 段应只出现一次"
+
+
+def test_about_official_site_list_yellow_py_literal_single_line():
+    """黄（边界）：MDCx.py 与 .ui 一致——同一段落必须是单一字符串字面量。
+
+    pyuic6 只在真实换行处切分字面量，而本段在 .ui 中是单独一行，故编译产物里
+    只能有一个字面量。手工把它拆成两行会让 .py 与 .ui 编译产物漂移
+    （test_mdcx_py_in_sync_with_ui 判红），运行时还会在浏览器里多出一个换行。
+    """
+    py_text = PY_PATH.read_text(encoding="utf-8")
+    assert py_text.count(_OFFICIAL_ABOUT_PARA) == 1, (
+        f"MDCx.py 中 Official 段应恰好出现一次（单一字面量），实际 {py_text.count(_OFFICIAL_ABOUT_PARA)} 次"
+    )
+    assert _OFFICIAL_ABOUT_PARA + "\\n\"" in py_text, "MDCx.py 的 Official 段字面量应以换行收尾"
+
+
+def test_about_official_site_list_red_stale_shape_gone():
+    """红（失败回归）：修复前的「（域名）」写法与拆行字面量均不得复现。"""
+    root = _parse_ui()
+    about_html = _widget_string_prop(_find_widget_by_name(root, "textBrowser_about"), "html") or ""
+    py_text = PY_PATH.read_text(encoding="utf-8")
+    for source, text in (("MDCx.ui", about_html), ("MDCx.py", py_text)):
+        stale = [s for s in _OFFICIAL_ABOUT_STALE if s in text]
+        assert not stale, f"{source} 残留修复前的「（域名）」写法: {stale}"
+    # 拆行形态：上一行字面量只写到「全部走代理）：」，下一行才补「有码片商官网30家：…」
+    assert '按番号前缀自动路由到各官网，全部走代理）："\n' not in py_text, (
+        "MDCx.py 不应再把 Official 段拆成两个字符串字面量"
+    )
