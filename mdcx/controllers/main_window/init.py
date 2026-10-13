@@ -3,7 +3,7 @@ import traceback
 import webbrowser
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QObject, QEvent, QRect, QSize, Qt
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QScreen
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -11,6 +11,9 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QListView,
     QMenu,
+    QStyledItemDelegate,
+    QStyle,
+    QStyleOptionViewItem,
     QSystemTrayIcon,
     QTreeWidgetItem,
 )
@@ -101,7 +104,9 @@ def _populate_site_combo(combo: QComboBox, site_values: list[str]) -> None:
                 description = crawler_cls.site_description() or ""
         except Exception:
             pass
-        combo.setItemData(combo.count() - 1, _site_combo_item_tooltip(value, description), Qt.ItemDataRole.ToolTipRole)
+        url = _resolve_site_url(value)
+        combo.setItemData(combo.count() - 1, url, _SITE_URL_ROLE)  # 当前网址：右侧网址列显示+点击跳转
+        combo.setItemData(combo.count() - 1, _site_combo_tip(value, description, url), Qt.ItemDataRole.ToolTipRole)
         combo.setItemData(combo.count() - 1, description, Qt.ItemDataRole.UserRole + 1)  # 纯说明供刷新时重建 tooltip
     view = combo.view()
     if view is not None:
@@ -119,7 +124,210 @@ def refresh_network_check_badges(self: "MyMAinWindow") -> None:
             entry = _load_check_cache().get(value)
             combo.setItemIcon(i, _site_status_icon(entry["status"]) if entry else QIcon())
             base = combo.itemData(i, Qt.ItemDataRole.UserRole + 1) or ""
-            combo.setItemData(i, _site_combo_item_tooltip(value, base), Qt.ItemDataRole.ToolTipRole)
+            # 显式网址行（official 子站）：保留手工地址，只刷新图标与 tooltip
+            url = combo.itemData(i, _SITE_URL_EXPLICIT_ROLE) or _resolve_site_url(value)  # 自定义网址保存后此处同步最新值
+            combo.setItemData(i, url, _SITE_URL_ROLE)
+            combo.setItemData(i, _site_combo_tip(value, base, url), Qt.ItemDataRole.ToolTipRole)
+        _fit_site_url_popup(combo)
+
+
+_SITE_URL_ROLE = Qt.ItemDataRole.UserRole + 2  # 各站点当前网址：下拉右侧网址列显示，点击跳转浏览器
+_SITE_URL_EXPLICIT_ROLE = Qt.ItemDataRole.UserRole + 3  # 手工指定的行网址：刷新徽章时不被重算覆盖
+_SITE_URL_GAP = 14
+_SITE_URL_LINK_COLOR = "#1a73e8"
+_SITE_URL_ICON_WIDTH = 24  # 状态圆点图标 + 间距预留
+
+
+# base_url_() 按设计返回空的站点，在下拉里展示这个兜底地址（official 是多站
+# 路由、没有单一官网，保持空白）。
+_SITE_URL_FALLBACK = {
+    "dmm": "https://www.dmm.co.jp/",  # 主搜索站（另有 dmm.com 写真站）
+}
+
+
+def _resolve_site_url(value: str) -> str:
+    """取站点当前网址：经 crawler.base_url_()（已含用户自定义 URL），只读配置不发请求。"""
+    try:
+        from mdcx.config.models import Website
+        from mdcx.crawlers import get_crawler
+
+        crawler_cls = get_crawler(Website(value))
+        if crawler_cls is None:
+            return ""
+        url = str(crawler_cls.base_url_() or "").strip()
+    except Exception:
+        return ""
+    if not url:
+        url = _SITE_URL_FALLBACK.get(value, "")
+    if url.startswith(("http://", "https://")):
+        return url.rstrip("/") + "/"
+    return url
+
+
+def _site_combo_tip(value: str, description: str, url: str) -> str:
+    """下拉项 tooltip：原有说明 + 官网地址（提示可点右侧网址跳转）。"""
+    tip = _site_combo_item_tooltip(value, description)
+    if url:
+        tip += f"\n官网：{url}\n（点击右侧网址可在浏览器中打开）"
+    return tip
+
+
+def _append_official_subsite_rows(combo: QComboBox) -> None:
+    """网站设置下拉：把 official 旗下 5 个无码官网拆成独立行（official·站名 + 各自网址）。
+
+    行 UserRole 仍存 official（选中走 official 爬虫，各消费端的 Website 防护不受影响）；
+    真实网址存显式角色，刷新徽章时不被重算覆盖。
+    """
+    try:
+        from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
+    except Exception:
+        return
+    cache_entry = _load_check_cache().get("official")
+    icon = _site_status_icon(cache_entry.get("status", "")) if cache_entry else QIcon()
+    anchor = -1
+    for i in range(combo.count()):
+        if (combo.itemData(i, Qt.ItemDataRole.UserRole) or "") == "official":
+            anchor = i
+    insert_at = anchor + 1 if anchor >= 0 else combo.count()
+    for offset, (name, spec) in enumerate(UNCENSORED_OFFICIAL_SITES.items()):
+        url = spec.base_url.rstrip("/") + "/"
+        description = f"无码官网 · {spec.studio}"
+        row = insert_at + offset
+        combo.insertItem(row, icon, f"official·{name}", "official")
+        combo.setItemData(row, url, _SITE_URL_ROLE)
+        combo.setItemData(row, url, _SITE_URL_EXPLICIT_ROLE)
+        combo.setItemData(row, _site_combo_tip("official", description, url), Qt.ItemDataRole.ToolTipRole)
+        combo.setItemData(row, description, Qt.ItemDataRole.UserRole + 1)  # 纯说明供刷新时重建 tooltip
+
+
+class _SiteUrlItemDelegate(QStyledItemDelegate):
+    """站点下拉双列绘制：左侧站点名，右侧当前网址；网址列各行同一起点（左对齐）。"""
+
+    def __init__(self, combo: QComboBox) -> None:
+        super().__init__(combo)
+        self._combo = combo
+
+    def _column_metrics(self) -> tuple[int, int]:
+        """返回 (网址列起点 x，相对行左 / 网址列最大文本宽）。"""
+        view = self._combo.view()
+        fm = view.fontMetrics() if view is not None else self._combo.fontMetrics()
+        model = self._combo.model()
+        name_w = 0
+        url_w = 0
+        for row in range(model.rowCount()):
+            index = model.index(row, 0)
+            name_w = max(name_w, fm.horizontalAdvance(str(index.data(Qt.ItemDataRole.DisplayRole) or "")))
+            url = str(index.data(_SITE_URL_ROLE) or "")
+            if url:
+                url_w = max(url_w, fm.horizontalAdvance(url))
+        return 4 + _SITE_URL_ICON_WIDTH + name_w + _SITE_URL_GAP, url_w
+
+    def total_width(self) -> int:
+        url_x, url_w = self._column_metrics()
+        return url_x + url_w + 8
+
+    def url_rect(self, index) -> QRect | None:
+        """某行的网址点击区（viewport 坐标）；无网址返回 None。"""
+        view = self._combo.view()
+        if view is None or not str(index.data(_SITE_URL_ROLE) or ""):
+            return None
+        row_rect = view.visualRect(index)
+        url_x, _ = self._column_metrics()
+        x = row_rect.left() + url_x
+        return QRect(x, row_rect.top(), max(0, row_rect.right() - x), row_rect.height())
+
+    def paint(self, painter, option, index) -> None:
+        view = self._combo.view()
+        url = str(index.data(_SITE_URL_ROLE) or "")
+        if view is None or not url:
+            super().paint(painter, option, index)
+            return
+        url_x, _ = self._column_metrics()
+        narrowed = QStyleOptionViewItem(option)
+        narrowed.rect.setWidth(max(0, url_x - option.rect.left()))
+        super().paint(painter, narrowed, index)
+        rect = self.url_rect(index)
+        if rect is None or rect.width() <= 0:
+            return
+        painter.save()
+        try:
+            if option.state & QStyle.StateFlag.State_Selected:
+                painter.setPen(option.palette.highlightedText().color())
+            else:
+                painter.setPen(QColor(_SITE_URL_LINK_COLOR))
+            text = view.fontMetrics().elidedText(url, Qt.TextElideMode.ElideRight, rect.width())
+            painter.drawText(
+                rect, int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter), text
+            )
+        finally:
+            painter.restore()
+
+    def sizeHint(self, option, index):
+        base = super().sizeHint(option, index)
+        if not str(index.data(_SITE_URL_ROLE) or ""):
+            return base
+        return QSize(self.total_width(), base.height())
+
+
+class _SiteUrlClickFilter(QObject):
+    """下拉 viewport 事件：点中网址区 → 浏览器打开且不改选中；悬停网址区 → 手形光标。"""
+
+    def __init__(self, combo: QComboBox) -> None:
+        super().__init__(combo)
+        self._combo = combo
+
+    def _url_index_at(self, pos):
+        view = self._combo.view()
+        if view is None:
+            return None
+        index = view.indexAt(pos)
+        if not index.isValid():
+            return None
+        delegate = self._combo.itemDelegate()
+        if not isinstance(delegate, _SiteUrlItemDelegate):
+            return None
+        rect = delegate.url_rect(index)
+        if rect is not None and rect.contains(pos):
+            return index
+        return None
+
+    def eventFilter(self, obj, event) -> bool:
+        try:
+            if event.type() == QEvent.Type.MouseButtonPress:
+                index = self._url_index_at(event.position().toPoint())
+                if index is not None:
+                    webbrowser.open(str(index.data(_SITE_URL_ROLE)))
+                    self._combo.hidePopup()
+                    return True
+            elif event.type() == QEvent.Type.MouseMove and not event.buttons():
+                view = self._combo.view()
+                if view is not None:
+                    over = self._url_index_at(event.position().toPoint()) is not None
+                    view.viewport().setCursor(
+                        Qt.CursorShape.PointingHandCursor if over else Qt.CursorShape.ArrowCursor
+                    )
+        except Exception:
+            pass
+        return super().eventFilter(obj, event)
+
+
+def _install_site_url_columns(combo: QComboBox) -> None:
+    """给站点下拉框装网址列（delegate + 点击/悬停处理 + 弹窗宽度适配）。"""
+    combo.setItemDelegate(_SiteUrlItemDelegate(combo))
+    view = combo.view()
+    if view is not None and getattr(combo, "_site_url_filter_installed", False) is not True:
+        view.viewport().setMouseTracking(True)
+        view.viewport().installEventFilter(_SiteUrlClickFilter(combo))
+        combo._site_url_filter_installed = True  # type: ignore[attr-defined]
+    _fit_site_url_popup(combo)
+
+
+def _fit_site_url_popup(combo: QComboBox) -> None:
+    """按网址列总宽撑开下拉弹窗（只动弹窗 view，不碰 combo 本体宽——闭合态几何测试不受影响）。"""
+    delegate = combo.itemDelegate()
+    view = combo.view()
+    if isinstance(delegate, _SiteUrlItemDelegate) and view is not None:
+        view.setMinimumWidth(delegate.total_width() + 30)  # 网址列 + 滚动条/边距
 
 
 # 首启默认窗口尺寸（大屏保持此值；窗口实际尺寸另按可用区 90%/85% 收窄，见
@@ -318,6 +526,7 @@ def Init_Ui(self: "MyMAinWindow"):
     self.Ui.comboBox_custom_website.clear()
     _populate_site_combo(self.Ui.comboBox_website_all, supported_websites)
     _populate_site_combo(self.Ui.comboBox_custom_website, supported_websites)
+    _append_official_subsite_rows(self.Ui.comboBox_custom_website)  # official 拆 5 个无码官网子行
     # 初始化使用代理网站下拉框
     self.Ui.comboBox_no_proxy_sites.clear()
     self.Ui.comboBox_no_proxy_sites.addItem("选择网站...", "")
@@ -325,6 +534,12 @@ def Init_Ui(self: "MyMAinWindow"):
     # 连接选择事件
     self.Ui.comboBox_no_proxy_sites.currentTextChanged.connect(self._add_no_proxy_site)
     _setup_combo_boxes(self)
+    for _site_combo in (
+        self.Ui.comboBox_website_all,
+        self.Ui.comboBox_custom_website,
+        self.Ui.comboBox_no_proxy_sites,
+    ):
+        _install_site_url_columns(_site_combo)
     # 高分屏缩放：放不下当前屏幕的档位直接从下拉隐藏（_setup_combo_boxes 换过 view，必须在其后）
     apply_ui_scale_option_limits(self.Ui.comboBox_ui_scale, QApplication.primaryScreen())
     self.Ui.textBrowser_log_main.document().setMaximumBlockCount(6000)

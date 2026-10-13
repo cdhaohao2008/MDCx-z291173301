@@ -11450,6 +11450,14 @@ class MyMAinWindow(QMainWindow):
         # 显示文本可能带区域标签后缀（如 "javdb（勿用日本节点）"），剥掉后再转枚举
         site = site.split("（")[0].strip()
         if site not in Website:
+            # official 子行（official·heyzo 等）：自定义网址框仅作该子站地址展示，
+            # 保存时按非枚举值跳过，不会写入 official 配置
+            if site.startswith("official·"):
+                from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
+
+                spec = UNCENSORED_OFFICIAL_SITES.get(site.split("·", 1)[1].strip())
+                if spec is not None:
+                    self.Ui.lineEdit_site_custom_url.setText(spec.base_url.rstrip("/") + "/")
             return
         site = Website(site)
         self.Ui.lineEdit_site_custom_url.setText(manager.config.get_site_url(site))
