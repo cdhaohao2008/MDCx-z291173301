@@ -95,6 +95,10 @@ async def test_fc2ppvdb_crawler_uses_article_then_xhr(monkeypatch):
     assert res.data.runtime == "65"
     assert res.data.mosaic == "无码"
     assert res.data.external_id == f"{FC2CMADB_BASE_URL}/articles/3259498"
+    assert res.data.thumb == "https://example.test/cover.jpg"
+    assert res.data.poster == "https://example.test/cover.jpg"
+    assert res.data.extrafanart == []
+    assert res.data.image_download is False
 
 
 def test_fc2ppvdb_cookie_parser_accepts_cookie_without_spaces():

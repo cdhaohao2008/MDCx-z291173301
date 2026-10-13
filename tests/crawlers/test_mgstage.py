@@ -190,3 +190,26 @@ async def test_parse_search_page_returns_none_for_unrelated_page():
     """既非已知拦截页也无番号时，仍按原语义返回 None 走下一个候选番号"""
     crawler, ctx = _crawler_and_ctx()
     assert await crawler._parse_search_page(ctx, Selector(text="<html><body><h1>noop</h1></body></html>"), "u") is None
+
+
+async def test_cover_poster_extrafanart_mapping():
+    """封面/竖版/剧照映射：EnlargeImage 横版原图，pf_ 为竖版，小图样张进 extrafanart。"""
+    from lxml import etree
+
+    from mdcx.crawlers.mgstage import getCover, getCoverSmall, getExtraFanart
+
+    html = etree.HTML(
+        """
+        <html><body>
+          <a id="EnlargeImage" href="https://example.test/pb_abf389.jpg"></a>
+          <dl id="sample-photo"><dd><ul>
+            <li><a class="sample_image" href="https://example.test/sample1.jpg"></a></li>
+            <li><a class="sample_image" href="https://example.test/sample2.jpg"></a></li>
+          </ul></dd></dl>
+        </body></html>
+        """
+    )
+    cover = getCover(html)
+    assert cover == "https://example.test/pb_abf389.jpg"
+    assert getCoverSmall(cover) == "https://example.test/pf_abf389.jpg"
+    assert getExtraFanart(html) == ["https://example.test/sample1.jpg", "https://example.test/sample2.jpg"]

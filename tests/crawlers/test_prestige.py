@@ -72,3 +72,7 @@ async def test_prestige_crawler_maps_api_response():
     assert res.data.runtime == "120"
     assert res.data.source == "prestige"
     assert res.data.external_id == "https://www.prestige-av.com/goods/uuid-001"
+    assert res.data.thumb == "https://www.prestige-av.com/api/media/goods/prestige/abw/130/pb_abw-130.jpg"
+    assert res.data.poster == "https://www.prestige-av.com/api/media/goods/prestige/abw/130/pf_abw-130.jpg"
+    assert res.data.extrafanart == ["https://www.prestige-av.com/api/media/sample/001.jpg"]
+    assert res.data.image_download is True

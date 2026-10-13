@@ -78,3 +78,31 @@ async def test_avsex_search_page_no_result_returns_none():
         )
     finally:
         await client.close()
+
+
+def test_avsex_cover_extrafanart_and_search_poster_mapping():
+    """封面/剧照/搜索竖版映射：详情 og 区横版原图，精彩劇照进 extrafanart，搜索卡片带竖版。"""
+    from lxml import etree
+
+    from mdcx.crawlers.avsex import get_cover, get_extrafanart, get_real_url
+
+    search_html = etree.HTML(
+        """
+        <html><body><ul class="grid"><li><a href="https://avsex.cc/video/1"><div>
+          <h4 class="truncate">SSNI-452 Title</h4>
+        </div><div class="relative overflow-hidden rounded-t-md"><img src="https://example.test/poster.jpg" /></div></a></li></ul></body></html>
+        """
+    )
+    assert get_real_url(search_html, "SSNI-452") == ("https://avsex.cc/video/1", "https://example.test/poster.jpg")
+
+    detail_html = etree.HTML(
+        """
+        <html><body>
+          <div class="relative overflow-hidden rounded-md"><img src="https://example.test/cover.jpg" /></div>
+          <h2>精彩剧照</h2>
+          <div><img class="object-cover" src="https://example.test/extra1.jpg" /></div>
+        </body></html>
+        """
+    )
+    assert get_cover(detail_html) == "https://example.test/cover.jpg"
+    assert get_extrafanart(detail_html) == ["https://example.test/extra1.jpg"]

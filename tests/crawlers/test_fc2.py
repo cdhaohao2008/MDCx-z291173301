@@ -81,4 +81,7 @@ async def test_fc2_crawler_maps_detail_and_sample_api(monkeypatch):
     assert res.data.runtime == "62"
     assert res.data.score == "4.5"
     assert res.data.trailer == "https://example.test/sample.mp4?mid=token"
+    assert res.data.thumb == "https://example.test/sample1.jpg"
+    assert res.data.poster == "https://example.test/thumb.jpg"
+    assert res.data.extrafanart == ["https://example.test/sample1.jpg"]
     assert res.data.source == "fc2"

@@ -93,3 +93,61 @@ def test_is_soft_404_page_ignores_normal_detail_page():
     )
 
     assert MissavCrawler._is_soft_404_page(html) is False
+
+
+class _FakeMissavClient:
+    async def get_text(self, url, **kwargs):
+        assert "missav" in url
+        assert "SSNI-647" in url
+        return (
+            """
+            <html>
+              <head>
+                <meta property="og:title" content="SSNI-647 Sample Title - MissAV" />
+                <meta property="og:image" content="https://fourhoi.com/ssni-647/cover-n.jpg" />
+                <meta property="og:url" content="https://missav.ws/cn/SSNI-647" />
+                <meta property="og:description" content="Sample outline" />
+              </head>
+              <body>
+                <div class="text-secondary"><span>番號</span><span class="font-medium">SSNI-647</span></div>
+                <div class="text-secondary"><span>標題</span><span class="font-medium">Sample Title</span></div>
+                <div class="text-secondary"><span>女優</span><span class="font-medium"><a>演员A</a></span></div>
+                <div class="text-secondary"><span>發行日期</span><span class="font-medium">2024-01-01</span></div>
+                <div class="text-secondary"><span>時長</span><span class="font-medium">120分鐘</span></div>
+                <div class="text-secondary"><span>類型</span><span class="font-medium"><a>剧情</a></span></div>
+                <div class="text-secondary"><span>系列</span><span class="font-medium"><a>系列A</a></span></div>
+                <div class="text-secondary"><span>發行商</span><span class="font-medium"><a>制作商</a></span></div>
+              </body>
+            </html>
+            """,
+            "",
+        )
+
+
+@pytest.mark.asyncio
+async def test_missav_run_maps_fields_and_thumb():
+    from mdcx.config.enums import Language
+    from mdcx.models.model_types import CrawlerInput
+
+    crawler = MissavCrawler(client=_FakeMissavClient(), base_url="https://missav.ws")
+    res = await crawler.run(
+        CrawlerInput(
+            appoint_number="",
+            appoint_url="",
+            file_path=None,
+            mosaic="",
+            number="SSNI-647",
+            short_number="SSNI-647",
+            language=Language.UNDEFINED,
+            org_language=Language.UNDEFINED,
+        )
+    )
+
+    assert res.debug_info.error is None
+    assert res.data is not None
+    assert res.data.source == "missav"
+    assert res.data.number == "SSNI-647"
+    assert res.data.title == "Sample Title"
+    assert res.data.actors == ["演员A"]
+    assert res.data.release == "2024-01-01"
+    assert res.data.thumb == "https://fourhoi.com/ssni-647/cover-n.jpg"

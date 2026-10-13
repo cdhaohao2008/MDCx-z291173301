@@ -62,6 +62,9 @@ async def test_javbus_crawler_maps_detail_page():
     assert res.data.directors == ["导演"]
     assert res.data.series == "系列"
     assert res.data.source == "javbus"
+    assert res.data.thumb == "https://www.javbus.com/pics/cover/ssis243_b.jpg"
+    assert res.data.poster == "https://www.javbus.com/pics/thumb/ssis243.jpg"
+    assert res.data.extrafanart == ["https://www.javbus.com/sample1.jpg"]
 
 
 class RotatingJavbusClient:
