@@ -14575,7 +14575,7 @@ class Ui_MDCx(object):
                 '<!DOCTYPEHTMLPUBLIC"-//W3C//DTDHTML4.0//EN""http://www.w3.org/TR/REC-html40/strict.dtd">\n'
                 '<html><head><metaname="qrichtext"content="1"/><styletype="text/css">\n'
                 "p,li{white-space:pre-wrap;}\n"
-                "</style></head><bodystyle=\"font-family:'MicrosoftYaHeiUI',PingFang SC,sans-serif; font-size:10pt;\">\n"
+                "</style></head><bodystyle=\"font-family:'MicrosoftYaHeiUI',PingFang SC,sans-serif; font-size:12pt;\">\n"
                 "<h3>MDCx使用说明</h3>\n"
                 "<p>MDCx是一款本地视频元数据刮削工具：从各大网站抓取影片的标题、演员、封面、简介等信息，生成标准.nfo文件与规范命名的文件夹，供Emby、Jellyfin、Kodi、Plex等媒体服务器直接使用。支持Windows/macOS/Linux。</p>\n"
                 "<h4>一、快速开始</h4>\n"
@@ -14609,7 +14609,7 @@ class Ui_MDCx(object):
                 "<li><b>无码</b>：AVSOX、AVEntertainments及综合站（JavBus、JavDB系、MissAV系、AVSex、Official、JavDay、IQQTV、7mmtv）</li>\n"
                 "<li><b>素人</b>：MGStage（259LUXU等）、Prestige、JavBus、JavDB系、DMM、DMM-API、AVBase、MissAV系、MyWife、IQQTV、7mmtv</li>\n"
                 "<li><b>FC2</b>：FC2、FC2PPVDB、JavDB系、JavFree、7mmtv</li>\n"
-                "<li><b>国产</b>：MADOUQU、MADOU_CLUB、AVSex、IQQTV、JavDay</li>\n"
+                "<li><b>国产</b>：Madouqu、Madou_Club、AVSex、IQQTV、JavDay</li>\n"
                 "<li><b>欧美</b>：THEPORNDB、AVHEAT</li>\n"
                 "</ul>\n"
                 "<p><b>Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：S1S1S1、Moodyz、Madonna-av、Wanz-Factory、IdeaPocket、Kirakira-av、E-Body、Bi-av、Premium-Beauty、Miman、Tameikegoro、Fitch-av、Kawaii、BeeFree、Muku.tv、Attackers、MKO-Labo、Dasdas、MVG、AV-Opera、Oppai-av、V-av、To-Satsu、Bibian-av、Honnaka、Rookie-av、Nanpa-Japan、HajimeKikaku、HHH-av、Prestige<br/>\n"
