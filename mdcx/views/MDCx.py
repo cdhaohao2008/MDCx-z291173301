@@ -14363,7 +14363,7 @@ class Ui_MDCx(object):
         self.checkBox_actor_pic_replace.setText(_translate("MDCx", "覆盖已存在的演员图片"))
         self.label_415.setText(_translate("MDCx", "图片已存在时："))
         self.pushButton_del_actor_folder.setText(_translate("MDCx", "清除所有.actors文件夹"))
-        self.checkBox_actor_photo_kodi.setText(_translate("MDCx", "刮削结束后自动创建"))
+        self.checkBox_actor_photo_kodi.setText(_translate("MDCx", "刮削结束后自动创建头像"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_5), _translate("MDCx", " 演员 "))
         self.groupBox_10.setTitle(_translate("MDCx", "Cookie设置"))
         self.label_45.setText(_translate("MDCx", "javdb：\n（登录状态）"))
@@ -14387,7 +14387,7 @@ class Ui_MDCx(object):
             _translate(
                 "MDCx",
                 "<p style='line-height:20px'>Cookie获取方法：<br>\n"
-                "                          1，使用浏览器打开目标网站然后登录，在网站页面空白位置点击鼠标右键，选择 「检查」 ；<br>\n"
+                "                          1，使用浏览器打开目标网站然后登录，在网站页面空白位置点击鼠标右键点击选择「检查」 ；<br>\n"
                 "                          2，右侧弹窗顶部选择：「网络」->「全部」，然后刷新当前页面，在标头里查找「Cookie」；<br>\n"
                 "                          3，点击「名称」栏新加载出来的第一个内容-> 「标头」->「请求表头」->填入「Cookie」；<br>\n"
                 "                          4，复制Cookie对应的全部值填入上面输入框，不要直接右键点击「复制值」填入「Cookie」；<br>\n"
@@ -14512,7 +14512,7 @@ class Ui_MDCx(object):
         self.checkBox_show_dialog_exit.setText(_translate("MDCx", "退出软件时"))
         self.checkBox_show_dialog_stop_scrape.setText(_translate("MDCx", "停止刮削时"))
         self.checkBox_timed_scrape.setText(_translate("MDCx", "每次间隔"))
-        self.label_84.setText(_translate("MDCx", "（时:分:秒），自动开始刮削视频，读取配置时开始计时"))
+        self.label_84.setText(_translate("MDCx", "（时:分:秒）自动开始刮削视频文件，读取配置时开始计时"))
         self.label_308.setText(_translate("MDCx", "自动任务："))
         self.label_309.setText(_translate("MDCx", "自动刮削："))
         self.label_277.setText(_translate("MDCx", "弹窗确认："))

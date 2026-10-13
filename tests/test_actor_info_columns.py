@@ -26,7 +26,7 @@
      「点击下载头像包」「刮削结束后自动补全演员头像」向左移动到与「使用 Graphis
      头像」严格上下对齐的位置，「使用 Graphis 头像」位置保持不变；最小化/还原时
      的页面布局、控件、组件等等均保持不变。
-  ⑫ 最大化时把「仅缺少头像的演员」「刮削结束后自动创建」向右移动到与「使用
+  ⑫ 最大化时把「仅缺少头像的演员」「刮削结束后自动创建头像」向右移动到与「使用
      Graphis 头像」严格上下对齐的位置，「使用 Graphis 头像」位置保持不变；最小化/
      还原时的页面布局、控件、组件等等均保持不变。
   ⑬ 窄态（最小化/还原）把「本地头像库」「点击下载头像包」向左移动到与「使用
@@ -398,7 +398,7 @@ def test_actor_info_state_restored_after_round_trip(win, app):
 _NARROW_A2_TARGETS = (
     ("checkBox_actor_info_photo", "补全完成后自动补全演员头像"),
     ("checkBox_actor_photo_auto", "刮削结束后自动补全演员头像"),
-    ("checkBox_actor_photo_kodi", "刮削结束后自动创建"),
+    ("checkBox_actor_photo_kodi", "刮削结束后自动创建头像"),
     ("radioButton_actor_info_miss", "仅缺少信息的演员"),
     ("radioButton_actor_photo_miss", "仅缺少头像的演员"),
     ("radioButton_server_jellyfin", "Jellyfin"),
@@ -681,7 +681,7 @@ _WIDE_LEFT_TARGETS = (
 # 需求⑫：向右移动到 A2 列的两个目标
 _WIDE_RIGHT_TARGETS = (
     ("radioButton_actor_photo_miss", "仅缺少头像的演员"),
-    ("checkBox_actor_photo_kodi", "刮削结束后自动创建"),
+    ("checkBox_actor_photo_kodi", "刮削结束后自动创建头像"),
 )
 
 # 只让宽度、不让位置的前导项（左缘必须纹丝不动）
@@ -973,7 +973,7 @@ def test_actor_narrow_net_photo_input_aligns_with_path_inputs(win, app, monkeypa
 
 
 def test_actor_narrow_kodi_aligns_to_a2(win, app):
-    """需求⑬：窄态「刮削结束后自动创建」向左移到与「使用Graphis头像」同列，锚点不动；宽态不变。"""
+    """需求⑬：窄态「刮削结束后自动创建头像」向左移到与「使用Graphis头像」同列，锚点不动；宽态不变。"""
     ui = win.Ui
     win.show()
     _goto_actor_page(win, app)
@@ -982,7 +982,7 @@ def test_actor_narrow_kodi_aligns_to_a2(win, app):
         assert win._actor_page_stretch_extra() <= 0, f"{width} 宽下不是窄态，测试前提失效"
         anchor = _abs(ui, ui.checkBox_actor_photo_ne_face)
         assert _abs(ui, ui.checkBox_actor_photo_kodi) == anchor, (
-            f"{width} 宽下「刮削结束后自动创建」未与「使用Graphis头像」对齐"
+            f"{width} 宽下「刮削结束后自动创建头像」未与「使用Graphis头像」对齐"
         )
     # 锚点自身在窄态不得被带动
     _resize(win, app, 1030, 753)

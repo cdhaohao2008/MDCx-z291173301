@@ -22067,7 +22067,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         </size>
                       </property>
                       <property name="text">
-                        <string>刮削结束后自动创建</string>
+                        <string>刮削结束后自动创建头像</string>
                       </property>
                     </widget>
                   </widget>
@@ -22456,7 +22456,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       </property>
                       <property name="text">
                         <string>&lt;p style='line-height:20px'&gt;Cookie获取方法：&lt;br&gt;
-                          1，使用浏览器打开目标网站然后登录，在网站页面空白位置点击鼠标右键，选择 「检查」 ；&lt;br&gt;
+                          1，使用浏览器打开目标网站然后登录，在网站页面空白位置点击鼠标右键点击选择「检查」 ；&lt;br&gt;
                           2，右侧弹窗顶部选择：「网络」-&gt;「全部」，然后刷新当前页面，在标头里查找「Cookie」；&lt;br&gt;
                           3，点击「名称」栏新加载出来的第一个内容-&gt; 「标头」-&gt;「请求表头」-&gt;填入「Cookie」；&lt;br&gt;
                           4，复制Cookie对应的全部值填入上面输入框，不要直接右键点击「复制值」填入「Cookie」；&lt;br&gt;
@@ -24255,7 +24255,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>（时:分:秒），自动开始刮削视频，读取配置时开始计时</string>
+                                  <string>（时:分:秒）自动开始刮削视频文件，读取配置时开始计时</string>
                                 </property>
                                 <property name="alignment">
                                   <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>

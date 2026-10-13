@@ -211,7 +211,7 @@ def _append_official_subsite_rows(combo: QComboBox) -> None:
             anchor = i
     insert_at = anchor + 1 if anchor >= 0 else combo.count()
     check_only = False  # official 子站行只出现在自定义网站框，tooltip 保留说明
-    for offset, (name, spec) in enumerate(UNCENSORED_OFFICIAL_SITES.items()):
+    for offset, (name, spec) in enumerate(sorted(UNCENSORED_OFFICIAL_SITES.items())):
         url = spec.base_url.rstrip("/") + "/"
         description = f"无码：{_OFFICIAL_STUDIO_DISPLAY.get(spec.studio, spec.studio)}"
         row = insert_at + offset
@@ -569,7 +569,7 @@ def Init_Ui(self: "MyMAinWindow"):
     self.Ui.textBrowser_log_main_3.hide()  # 失败列表隐藏
     self.Ui.pushButton_scraper_failed_list.hide()
     self.Ui.pushButton_save_failed_list.hide()
-    supported_websites = get_registered_crawler_site_values()
+    supported_websites = sorted(get_registered_crawler_site_values())
     self.Ui.comboBox_website_all.clear()
     self.Ui.comboBox_custom_website.clear()
     _populate_site_combo(self.Ui.comboBox_website_all, supported_websites)
