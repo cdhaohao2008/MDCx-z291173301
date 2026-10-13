@@ -39,16 +39,31 @@ DETAIL_RESPONSE = {
 }
 
 
+class _FakeCookies:
+    def get_dict(self):
+        return {"_csrf": "test-csrf"}
+
+
+class _FakeWarmupResp:
+    status_code = 200
+    cookies = _FakeCookies()
+
+
 class FakeClient:
     """模拟 async_client，记录请求参数并按顺序返回预设响应。"""
 
     def __init__(self, search=None, detail=None):
         self.calls: list[tuple[str, dict]] = []
+        self.warmup_calls: list[tuple[str, str]] = []
         self.search = search or SEARCH_RESPONSE
         self.detail = detail or DETAIL_RESPONSE
 
+    async def request(self, method, url, **kwargs):
+        self.warmup_calls.append((method, url))
+        return _FakeWarmupResp(), ""
+
     async def post_json(self, url, *, data=None, json_data=None, headers=None, **kwargs):
-        self.calls.append((url, {"data": data, "json_data": json_data, "headers": headers}))
+        self.calls.append((url, {"data": data, "json_data": json_data, "headers": headers, "cookies": kwargs.get("cookies")}))
         if url.endswith("/search"):
             return self.search, ""
         return self.detail, ""
@@ -103,10 +118,127 @@ async def test_search_request_uses_json_array_body():
     assert search_call[0] == "https://avmoo.shop/jav/data/api/search"
     assert search_call[1]["data"] == '[{"search": "SSNI-804", "lang": "cn"}, 60, 1]'
     assert search_call[1]["headers"]["Content-Type"] == "application/json"
+    # 预热 Cookie 透传到 API 请求
+    assert search_call[1]["cookies"] == {"_csrf": "test-csrf"}
 
     detail_call = crawler.async_client.calls[1]
     assert detail_call[0] == "https://avmoo.shop/jav/data/api/getMovie"
     assert detail_call[1]["data"] == {"movieId": "kgjavpj"}
+    assert detail_call[1]["cookies"] == {"_csrf": "test-csrf"}
+
+
+@pytest.mark.asyncio
+async def test_warmup_called_before_search():
+    client = FakeClient()
+    crawler = AvsoxCrawler(client=client, base_url="https://avsox.click")
+    input_data = CrawlerInput.empty()
+    input_data.number = "MKBD-S39"
+    await crawler.run(input_data)
+
+    assert client.warmup_calls and client.warmup_calls[0] == ("GET", "https://avsox.click")
+
+
+@pytest.mark.asyncio
+async def test_search_prefers_exact_fanhao():
+    """模糊搜索带回近似番号时优先精确匹配（MKBD-S39 不应拿成 MKBD-S72）。"""
+    search = {
+        "code": 200,
+        "data": [
+            {"movieId": "kplremk", "movieFanHao": "MKBD-S72", "title": "wrong"},
+            {"movieId": "dnaapdn", "movieFanHao": "MKBD-S39", "title": "right"},
+        ],
+    }
+    detail = {
+        "code": 200,
+        "data": {
+            "movieId": "dnaapdn",
+            "movieFanHao": "MKBD-S39",
+            "title": "KIRARI 39",
+            "releaseDate": "2012-12-06",
+            "length": 180,
+            "posterLarge": "https://img/pl.jpg",
+            "posterSmall": "https://img/ps.jpg",
+            "sampleLarge": [],
+            "studio": {"studioName": "S"},
+            "series": {"seriesName": "KIRARI (Blu-ray)"},
+            "label": {"labelName": "L"},
+            "director": {"directorName": "D"},
+            "star": [],
+            "genre": [],
+        },
+    }
+    crawler = AvsoxCrawler(client=FakeClient(search=search, detail=detail), base_url="https://avsox.click")
+    input_data = CrawlerInput.empty()
+    input_data.number = "MKBD-S39"
+    response = await crawler.run(input_data)
+    assert response.data is not None
+    assert response.data.number == "MKBD-S39"
+    assert response.data.title == "KIRARI 39"
+    detail_call = crawler.async_client.calls[1]
+    assert detail_call[1]["data"] == {"movieId": "dnaapdn"}
+
+
+@pytest.mark.asyncio
+async def test_mojibake_fields_fall_back_to_clean_language():
+    """MKBD-S39 实测：_ja 带 � 残码时回退干净值，标签优先 _cn 中文。"""
+    detail = {
+        "code": 200,
+        "data": {
+            "movieId": "dnaapdn",
+            "movieFanHao": "MKBD-S39",
+            "title": "KIRARI 39",
+            "releaseDate": "2012-12-06",
+            "length": 180,
+            "posterLarge": "https://img/pl.jpg",
+            "posterSmall": "https://img/ps.jpg",
+            "sampleLarge": [],
+            "studio": {"studioName_cn": "", "studioName_ja": "�ॲ�", "studioName_en": "MUGEN", "studioName": "�ॲ�"},
+            "series": {"seriesName": "KIRARI (Blu-ray)"},
+            "label": None,
+            "director": None,
+            "star": [{"starName_ja": "���g�ޤ���", "starName_en": "Maomi Nagasawa", "starName_cn": ""}],
+            "genre": [
+                {"genreName_cn": "美人", "genreName_ja": "美女", "genreName_en": "美女", "genreName": "美女"},
+                {"genreName_cn": "美肌", "genreName_ja": "iPhone/iPad対応", "genreName_en": "Beautiful Skin", "genreName": "iPhone/iPad対応"},
+                {"genreName_cn": "潮吹", "genreName_ja": "潮吹�?", "genreName_en": "Squirt", "genreName": "潮吹�?"},
+            ],
+        },
+    }
+    search = {"code": 200, "data": [{"movieId": "dnaapdn", "movieFanHao": "MKBD-S39"}]}
+    crawler = AvsoxCrawler(client=FakeClient(search=search, detail=detail), base_url="https://avsox.click")
+    input_data = CrawlerInput.empty()
+    input_data.number = "MKBD-S39"
+    response = await crawler.run(input_data)
+    assert response.data is not None
+    assert response.data.actors == ["Maomi Nagasawa"]
+    assert response.data.studio == "MUGEN"
+    assert response.data.tags == ["美人", "美肌", "潮吹"]
+
+
+@pytest.mark.asyncio
+async def test_dynamic_domain_miss_falls_back_to_default():
+    """动态域名搜不到时改用默认域名重试（浏览器直连正常时的兜底）。"""
+
+    class RoutingClient(FakeClient):
+        async def post_json(self, url, *, data=None, json_data=None, headers=None, **kwargs):
+            self.calls.append(
+                (url, {"data": data, "json_data": json_data, "headers": headers, "cookies": kwargs.get("cookies")})
+            )
+            if url.startswith("https://stale.example") and url.endswith("/search"):
+                return {"code": 200, "data": []}, ""
+            if url.endswith("/search"):
+                return self.search, ""
+            return self.detail, ""
+
+    crawler = AvsoxCrawler(client=RoutingClient(), base_url="https://stale.example")
+    input_data = CrawlerInput.empty()
+    input_data.number = "SSNI-804"
+    response = await crawler.run(input_data)
+    assert response.data is not None
+    assert response.data.number == "SSNI-804"
+    searched_hosts = [u for u, _ in crawler.async_client.calls if u.endswith("/search")]
+    assert searched_hosts[0].startswith("https://stale.example")
+    assert searched_hosts[-1] == "https://avsox.click/javu/data/api/search"
 
 
 @pytest.mark.asyncio

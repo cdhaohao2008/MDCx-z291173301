@@ -86,6 +86,19 @@ class AioSiteCrawler(BaseCrawler):
             ctx.debug(f"预热 Cookie 提取失败: {e}")
             return {}
 
+    @staticmethod
+    def _pick_clean(*values: object) -> str:
+        """多语言字段优选：跳过空值与含 U+FFFD（�）的故障值，取首个干净值。
+
+        avsox 搜索固定 `lang=cn`，老番（如 MKBD-S39）的 _ja 常带 � 残码，
+        而 _cn 是干净中文（浏览器标签页同源）。逐级回退保证干净优先。
+        """
+        for value in values:
+            text = str(value or "").strip()
+            if text and "�" not in text:
+                return text
+        return ""
+
     async def _api_search(
         self, ctx: Context, base: str, number: str, cookies: dict[str, str] | None = None
     ) -> dict | None:
@@ -104,7 +117,13 @@ class AioSiteCrawler(BaseCrawler):
         if not items:
             ctx.debug("搜索结果为空")
             return None
-        return items[0]
+        # 模糊搜索常带回近似番号（如搜 MKBD-S39 带回 MKBD-S72），优先精确番号。
+        want = "".join(number.upper().split())
+        for item in items:
+            if isinstance(item, dict) and "".join(str(item.get("movieFanHao") or "").upper().split()) == want:
+                return item
+        first = items[0]
+        return first if isinstance(first, dict) else None
 
     async def _api_get_movie(
         self, ctx: Context, base: str, movie_id: str, cookies: dict[str, str] | None = None
@@ -128,21 +147,70 @@ class AioSiteCrawler(BaseCrawler):
             title = str(movie.get("title_ja") or "").strip()
         fanhao = str(movie.get("movieFanHao") or input_number or "").strip()
 
-        actors = [
-            str((star.get("starName_ja") or star.get("starName_en") or "").strip())
-            for star in (movie.get("star") or [])
-            if (star.get("starName_ja") or star.get("starName_en"))
-        ]
-        actors = list(dict.fromkeys(actors))
+        actors = list(
+            dict.fromkeys(
+                picked
+                for star in (movie.get("star") or [])
+                if isinstance(star, dict)
+                for picked in [
+                    self._pick_clean(
+                        star.get("starName_ja"),
+                        star.get("starName_en"),
+                        star.get("starName_cn"),
+                        star.get("starName_tw"),
+                        star.get("starName"),
+                    )
+                ]
+                if picked
+            )
+        )
 
-        tags = [
-            str(genre.get("genreName") or "").strip() for genre in (movie.get("genre") or []) if genre.get("genreName")
-        ]
+        tags = list(
+            dict.fromkeys(
+                picked
+                for genre in (movie.get("genre") or [])
+                if isinstance(genre, dict)
+                for picked in [
+                    self._pick_clean(
+                        genre.get("genreName_cn"),
+                        genre.get("genreName_ja"),
+                        genre.get("genreName_en"),
+                        genre.get("genreName_tw"),
+                        genre.get("genreName"),
+                    )
+                ]
+                if picked
+            )
+        )
 
-        studio = str((movie.get("studio") or {}).get("studioName") or "").strip()
-        series = str((movie.get("series") or {}).get("seriesName") or "").strip()
-        label = str((movie.get("label") or {}).get("labelName") or "").strip()
-        director = str((movie.get("director") or {}).get("directorName") or "").strip()
+        studio_obj = movie.get("studio") or {}
+        series_obj = movie.get("series") or {}
+        label_obj = movie.get("label") or {}
+        director_obj = movie.get("director") or {}
+        studio = self._pick_clean(
+            studio_obj.get("studioName_cn"),
+            studio_obj.get("studioName_ja"),
+            studio_obj.get("studioName_en"),
+            studio_obj.get("studioName"),
+        )
+        series = self._pick_clean(
+            series_obj.get("seriesName_cn"),
+            series_obj.get("seriesName_ja"),
+            series_obj.get("seriesName_en"),
+            series_obj.get("seriesName"),
+        )
+        label = self._pick_clean(
+            label_obj.get("labelName_cn"),
+            label_obj.get("labelName_ja"),
+            label_obj.get("labelName_en"),
+            label_obj.get("labelName"),
+        )
+        director = self._pick_clean(
+            director_obj.get("directorName_cn"),
+            director_obj.get("directorName_ja"),
+            director_obj.get("directorName_en"),
+            director_obj.get("directorName"),
+        )
 
         release = str(movie.get("releaseDate") or "").strip()
         length = str(movie.get("length") or "").strip()
@@ -192,6 +260,15 @@ class AioSiteCrawler(BaseCrawler):
         cookies = await self._warmup_cookies(ctx, base)
 
         movie = await self._api_search(ctx, base, number, cookies)
+        if not movie:
+            # 动态域名可能过期/被墙（浏览器直连默认域名却正常），回退默认域名重试一次。
+            fallback = self._default_url()
+            if fallback != base:
+                ctx.debug(f"动态域名搜索无结果，改用默认域名重试: {fallback}")
+                cookies = await self._warmup_cookies(ctx, fallback)
+                movie = await self._api_search(ctx, fallback, number, cookies)
+                if movie:
+                    base = fallback
         if not movie:
             raise CrawlerException(f"未找到匹配: {number}")
 
