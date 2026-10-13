@@ -136,8 +136,8 @@ class MadouquContext(Context):
 
 class MadouquCrawler(BaseCrawler[MadouquContext]):
     description = "麻豆 国产（国产）"
-    # madouqu.shop 已实测收录 MDX-0236（2026-08）
-    probe_number = "MDX-0236"
+    # madouqu.shop 已实测收录 MDX0216（2026-10）：https://madouqu.shop/video/mdx0216/
+    probe_number = "MDX0216"
 
     @classmethod
     @override

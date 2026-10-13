@@ -17,7 +17,7 @@ DETAIL_HTML = """
   <head><meta property="og:image" content="https://cdn.example.test/cover.jpg" /></head>
   <body>
     <div id="videoInfo"><div>
-      <h1>MDX-0236 换母荡元宵</h1>
+      <h1>MXGS-319-L 初！強制イカセ洗礼 矢野沙紀（無碼流出版）</h1>
       <div>
         <p><span>类别</span><span><a>国产</a><a>剧情</a></span></p>
         <p><span>其他</span><span>xxx</span></p>
@@ -47,15 +47,15 @@ async def test_javday_run_maps_fields_and_thumb(monkeypatch):
     _mock_dmm_upgrade(monkeypatch)
     crawler = JavdayCrawler(client=FakeJavdayClient(), base_url="https://javday.app")
     data_input = CrawlerInput.empty()
-    data_input.number = "MDX-0236"
+    data_input.number = "MXGS-319"
 
     res = await crawler.run(data_input)
 
     assert res.debug_info.error is None
     assert res.data is not None
     assert res.data.source == "javday"
-    assert "MDX" in (res.data.number or "")
-    assert "换母" in (res.data.title or "")
+    assert "MXGS" in (res.data.number or "")
+    assert "矢野沙紀" in (res.data.title or "")
     assert res.data.thumb == "https://cdn.example.test/cover.jpg"
     assert res.data.mosaic == "国产"
     assert res.data.image_download is False
@@ -75,8 +75,8 @@ def test_javday_pure_helpers():
     from lxml import etree
 
     html = etree.fromstring(DETAIL_HTML, etree.HTMLParser())
-    assert "MDX-0236" in get_title(html)
-    series, tag, actor = get_some_info(html, "MDX-0236 换母荡元宵", "")
+    assert "MXGS-319" in get_title(html)
+    series, tag, actor = get_some_info(html, "MXGS-319-L 初！強制イカセ洗礼 矢野沙紀（無碼流出版）", "")
     assert series == "麻豆"
     assert "国产" in tag
     assert get_cover(html, "https://javday.app") == "https://cdn.example.test/cover.jpg"

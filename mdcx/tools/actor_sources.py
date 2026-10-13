@@ -30,7 +30,7 @@ from ..signals import signal
 from ..utils.domain_rotate import DomainRotator
 
 _LIBREDMM = "https://www.libredmm.com"
-_IQQTV_DOMAINS = ["https://iqq5.xyz", "https://iqqk4.quest"]
+_IQQTV_DOMAINS = ["https://iqqq3.quest", "https://iqq5.xyz", "https://iqqk4.quest"]
 _JAVBUS_DOMAINS = [
     "https://www.dmmsee.cyou",
     "https://www.busjav.bond",

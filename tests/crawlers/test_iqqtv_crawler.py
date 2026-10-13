@@ -8,7 +8,7 @@ from mdcx.models.model_types import CrawlerInput
 
 class FakeIqqtvClient:
     async def get_text(self, url, **kwargs):
-        if url == "https://iqq5.xyz/jp/search.php?kw=SSIS-001":
+        if url == "https://iqqq3.quest/jp/search.php?kw=SSIS-001":
             return (
                 """
                 <html><body>
@@ -18,9 +18,9 @@ class FakeIqqtvClient:
                 """,
                 "",
             )
-        if url == "https://iqq5.xyz/jp/player/SSIS-001":
+        if url == "https://iqqq3.quest/jp/player/SSIS-001":
             return _detail_html("JP Title SSIS-001", "JP Outline"), ""
-        if url == "https://iqq5.xyz/cn/player/SSIS-001":
+        if url == "https://iqqq3.quest/cn/player/SSIS-001":
             return _detail_html("中文标题 SSIS-001", "中文简介"), ""
         return None, f"unexpected url: {url}"
 
@@ -45,7 +45,7 @@ def _detail_html(title: str, outline: str) -> str:
 
 @pytest.mark.asyncio
 async def test_iqqtv_crawler_keeps_jp_original_fields_for_zh_cn():
-    crawler = IqqtvCrawler(client=FakeIqqtvClient(), base_url="https://iqq5.xyz")
+    crawler = IqqtvCrawler(client=FakeIqqtvClient(), base_url="https://iqqq3.quest")
     res = await crawler.run(
         CrawlerInput(
             appoint_number="",

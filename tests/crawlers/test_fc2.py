@@ -9,7 +9,7 @@ from mdcx.models.model_types import CrawlerInput
 
 class FakeFc2Client:
     async def get_text(self, url, **kwargs):
-        if url == "https://adult.contents.fc2.com/article/1723984/":
+        if url == "https://adult.contents.fc2.com/article/4680562/":
             return (
                 """
                 <html>
@@ -34,7 +34,7 @@ class FakeFc2Client:
                 """,
                 "",
             )
-        if url == "https://adult.contents.fc2.com/api/v2/videos/1723984/sample":
+        if url == "https://adult.contents.fc2.com/api/v2/videos/4680562/sample":
             return '{"path":"https://example.test/sample.mp4?mid=token"}', ""
         return None, f"unexpected url: {url}"
 
@@ -64,8 +64,8 @@ async def test_fc2_crawler_maps_detail_and_sample_api(monkeypatch):
             appoint_url="",
             file_path=None,
             mosaic="",
-            number="FC2-1723984",
-            short_number="FC2-1723984",
+            number="FC2-4680562",
+            short_number="FC2-4680562",
             language=Language.UNDEFINED,
             org_language=Language.UNDEFINED,
         )
@@ -73,7 +73,7 @@ async def test_fc2_crawler_maps_detail_and_sample_api(monkeypatch):
 
     assert res.debug_info.error is None
     assert res.data is not None
-    assert res.data.number == "FC2-1723984"
+    assert res.data.number == "FC2-4680562"
     assert res.data.title == "Sample Title"
     assert res.data.tags == ["素人"]
     assert res.data.release == "2026-04-03"
