@@ -1,5 +1,16 @@
 
 # Changelog
+## v2.4.2 (2026-10-13)
+### 调整
+- **版本号**：`2.4.1` → `2.4.2`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`）。
+### 修复
+- **爬虫定位说明统一为短标签（13 个爬虫 + `docs/Features.md` 说明列同步）**：下拉框显示文本是 `站点名 定位说明`，定位说明直接来自各爬虫 `site_description()`，原先同一句话在不同站里时而全称时而省略、长度不齐（如 avbase/mgstage/prestige 三家同为有码+素人却三种写法，mywife 的 `MyWife No.1234` 还带空格）。现统一为 `类型：能力` 句式：`有码：仅能有码`（airav_cc/dmm_api/r18dev/avmoo）、`有码：有码+素人`（avbase/mgstage/prestige）、`无码：仅能无码`（avsox）、`无码：DVD`（aventertainments）、`综合：有码+无码`（javbus/javdb_api/missav_api）、`MyWife：MyWife No.1234`（mywife，去空格）、`麻豆：国产番号`（madou_club）。`docs/Features.md` 的爬虫表「说明」列同步为同一文案（第 2 列数据源列原样保留）；能力分组标题、免 CF 提示行与 `models.py` 分组注释不动，抓取逻辑与落盘数据零改动。
+- **站点下拉不再拼地域标签（`mdcx/manual.py` 的 `ManualConfig.SITE_REGION_TAGS`）**：该字典只剩 javdb/javdb_api 两条「勿用日本节点」提示，却被当作文本拼进下拉显示与 tooltip，站点行因此多出一段与站点能力无关的括号说明。现整体清空为 `{}`，显示文本回到 `站点名 定位说明`；「勿用日本节点」的实际约束由检测逻辑负责，提示信息不再冒充站点属性。`tests/test_network_check.py` 的断言同步改为空集，`README.md` 功能描述删去相应标注半句。
+- **下拉弹窗收窄为框体宽（`mdcx/controllers/main_window/init.py` 的 `_fit_site_url_popup`/`_install_site_url_columns`/`_SiteUrlItemDelegate`）**：弹窗宽度改为与框体闭合宽一致（`view.setFixedWidth(combo.width())`，并在 `showPopup` 包装里每次打开前按当前框宽重钉，窗口缩放/布局变化后不取旧值）；delegate 的 `sizeHint` 不再按网址列总宽撑开，`paint` 在行宽容不下网址列起点时退化为单列省略号绘制、网址点击区随之宽度归零。直接后果：弹窗内右侧网址列不再可见，网址点击跳转在窄弹窗内失效；网址仍按行数据保留在 `_SITE_URL_ROLE`（供 tooltip 与后续消费），tooltip 不受影响。
+- **`official` 无码官网 5 个子站行展示名中文化（`init.py` 的 `_OFFICIAL_STUDIO_DISPLAY`）**：子站行的定位说明原先直接用站名原文，显示为 `无码：Caribbeancom`/`无码：1Pondo`/`无码：Pacopacomama`，与下拉其余行的中文口径不一致。现加展示映射（Caribbeancom→加勒比、1Pondo→一本道、Pacopacomama→Paco），显示为 `无码：加勒比` 等；映射只作用于下拉展示，抓取落盘的 `studio` 仍取 `spec.studio`（`mdcx/crawlers/official_uncensored.py`），NFO 数据不受影响。
+- **软件设置-刮削网站「指定网站」下拉框不再显示 `official` 的长说明（`mdcx/crawlers/official.py` 的 `OfficialCrawler.description`）**：下拉显示文本为 `站点名 定位说明`，`official` 的 `description` 原是一整段「按番号前缀自动路由官网，综合有码+无码，均走代理：有码30家厂牌官网S1/Moodyz/Prestige等…；无码5站官网…；注：「检测网络」仅逐站检测无码5站官网…」，在弹窗里把该行撑到与其他站点完全不同的超长文本、右侧网址列被挤出可视区。现改为与其他综合站一致短标签 `综合：有码+无码`（同 javbus/missav_api/javdb 等），下拉只剩 `official 综合：有码+无码`；路由细节仍在类实现与文档里，未删任何抓取逻辑。tooltip 随之变短（原长说明即 tooltip 主体）。回归：`tests/crawlers/test_official.py::test_official_description_three_tier_and_check_scope` 断言同步改为 `desc == "综合：有码+无码"` 且不含旧长文案。
+- **软件设置-刮削网站「指定网站」下拉框右侧不显示网址（`mdcx/controllers/main_window/init.py` 的 `Init_Ui`）**：右侧网址列由 `_install_site_url_columns()`（`_SiteUrlItemDelegate` 双列绘制 + `_SiteUrlClickFilter` 左键跳转 + 弹窗宽对齐框体）装到三个站点下拉框上，而该列只是「当前网址 + 点击跳转浏览器」的辅助信息，在「指定网站」这个只需选一个站点的框里反而把站点名压窄。现该函数只对 `comboBox_custom_website`（自定义网址）与 `comboBox_no_proxy_sites`（使用代理网站）调用，`comboBox_website_all` 不再装——弹窗回到 `_setup_combo_boxes` 装的默认 `QListView` 单列绘制，站点名占满整宽、Qt 按框宽省略号。另外两处网址列行为不变（含 `official·heyzo` 等 5 个子站行的手工网址、刷新徽章时的网址重算 `_SITE_URL_EXPLICIT_ROLE`）。因指定网站框不再装网址列，其下拉项的 `_SITE_URL_ROLE` 数据仍照写（供 tooltip 与后续消费），不显示而已。
+
 ## v2.4.1 (2026-10-13)
 ### 调整
 - **版本号**：`2.4.0` → `2.4.1`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`）。

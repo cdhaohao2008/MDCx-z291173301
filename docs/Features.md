@@ -19,48 +19,55 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 
 ### 全部 36 个爬虫
 
+> 「说明」列与软件内「设置→刮削网站」下拉框显示的爬虫定位标签一一对应（取自各爬虫类的 `description`）。
+
 | 爬虫名 | 数据源 | 说明 |
 |--------|-------|------|
 | dmm | dmm.co.jp | 有码：仅能有码 |
 | dmm_api | DMM 官方 Affiliate API | 有码：仅能有码 |
-| thejavdb_api | api.thejavdb.net | TheJavDB API 数据源（免 CF，仅能有码） |
-| javdb | javdb.com | JavDB 综合信息站（综合：有码+无码） |
+| thejavdb_api | api.thejavdb.net | 有码：仅能有码 |
+| javdb | javdb.com | 综合：有码+无码 |
 | javdb_api | JavDB 镜像站 | 综合：有码+无码 |
-| javdb_app | JavDB 移动端 API | APK 逆向签名直连（综合：有码+无码；封面/海报/剧照走 App CDN 无水印原图，签名失效自动诊断，详见 docs/Javdb_App_Signature.md） |
+| javdb_app | JavDB 移动端 API | 综合：有码+无码 |
 | javbus | javbus.com | 综合：有码+无码 |
-| javlibrary | javlibrary.com | 老牌信息站（仅能有码） |
+| javlibrary | javlibrary.com | 有码：仅能有码 |
 | missav | missav.ws | 综合：有码+无码 |
 | missav_api | Recombee API | 综合：有码+无码 |
 | mgstage | mgstage.com | 有码：有码+素人 |
 | prestige | prestige-av.com | 有码：有码+素人 |
 | r18dev | r18.dev | 有码：仅能有码 |
-| official | 各官网 | 按番号前缀自动路由到 30 家有码片商官网 + 5 家无码官网（Caribbeancom/Heyzo/1Pondo/Pacopacomama/10Musume JSON 直连）+ Dahlia/Faleno 子爬虫（综合：有码+无码；全部走代理；前缀表维护在 `manual.py` 的 `OFFICIAL` 字典） |
+| official | 各官网 | 综合：有码+无码 |
 | avbase | av-base.net | 有码：有码+素人 |
-| freejavbt | freejavbt.com | 磁力信息站（仅能有码） |
+| freejavbt | freejavbt.com | 有码：仅能有码 |
 | mywife | mywife.cc | MyWife：MyWife No.1234 |
-| getchu | getchu.com | 游戏/视频综合（仅能有码，兼里番/动漫路由） |
-| libredmm | libredmm.com | 开源信息站（仅能有码） |
-| xcity | xcity.jp | 综合（仅能有码） |
+| getchu | getchu.com | 综合：有码+游戏+视频 |
+| libredmm | libredmm.com | 有码：仅能有码 |
+| xcity | xcity.jp | 综合：仅能有码 |
 | avsox | avsox.click | 无码：仅能无码 |
 | avmoo | avmoo.shop | 有码：仅能有码 |
 | aventertainments | aventertainments.com | 无码：DVD |
-| avheat | avheat.shop | 欧美（欧美） |
+| avheat | avheat.shop | 欧美：欧美番号 |
 | airav_cc | airav.cc | 有码：仅能有码 |
-| avsex | avsex.cc | 综合：有码+无码 |
-| fc2 | fc2.com | FC2 官网（FC2） |
-| fc2ppvdb | fc2cmadb.com | FC2 PPV 数据库（FC2） |
+| avsex | avsex.cc | 综合：有码+无码+国产 |
+| fc2 | fc2.com | FC2：FC2官网 |
+| fc2ppvdb | fc2cmadb.com | FC2：FC2网站 |
 | madouqu | madouqu.com | 国产：仅能国产 |
 | madou_club | madou.club | 麻豆：国产番号 |
 | lulubar | lulubar.net | 综合：仅能有码 |
 | iqqtv | iqqtv.com | 综合：有码+无码+素人+国产 |
 | javday | javday.tv | 综合：有码+无码+国产 |
-| javfree | javfree.me | 综合：有码+FC2（素人） |
+| javfree | javfree.me | 综合：有码+FC2 |
 | 7mmtv | 7mmtv.sx | 综合：有码+无码+素人+FC2 |
-| theporndb | api.theporndb.net | 欧美（欧美） |
+| theporndb | api.theporndb.net | 欧美：欧美番号 |
+
+补充说明（不在下拉标签里体现的细节）：
+
+- **official**：按番号前缀自动路由到 30 家有码片商官网 + 5 家无码官网（Caribbeancom/Heyzo/1Pondo/Pacopacomama/10Musume JSON 直连）+ Dahlia/Faleno 子爬虫；全部走代理；前缀表维护在 `manual.py` 的 `OFFICIAL` 字典。「检测网络」只逐站检测无码 5 站官网。
+- **javdb_app**：APK 逆向签名直连，封面/海报/剧照走 App CDN 无水印原图，签名失效自动诊断，详见 [Javdb_App_Signature.md](Javdb_App_Signature.md)。
 
 > 注意：javdb_api、javdb_app、missav_api、r18dev、thejavdb_api 这五条是免 CF 通道，稳定性好，建议优先选用。
 
-**各爬虫适用类型**（能力分类；各类型默认网站源可在「设置→刮削网站」调整，不必与下表一一对应。无码默认源不含 javfree、airav_cc）：
+**各爬虫适用类型**（能力分类，统计的是该站实际能处理的番号类型，与上表「说明」列的定位标签不是同一维度，因此会出现 xcity、getchu、avbase 等同时出现在「仅能有码」与带「综合：」标签的站点里；各类型默认网站源可在「设置→刮削网站」调整，不必与上表一一对应。无码默认源不含 javfree、airav_cc）：
 - **仅能有码**：dmm、dmm_api、thejavdb_api、libredmm、r18dev、avbase、xcity、prestige、mgstage、getchu、javlibrary、freejavbt、lulubar、avmoo
 - **无码专属**：aventertainments、avsox
 - **综合（有码+无码）**：javbus、javdb、javdb_api、javdb_app、missav、missav_api、javday、javfree、airav_cc、avsex、official、iqqtv、7mmtv
