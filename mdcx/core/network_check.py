@@ -1501,6 +1501,7 @@ def merge_site_check_cache(results: "list[NetworkCheckResult]") -> None:
     写文件失败静默降级（缓存仅用于展示标注，不影响功能）。
     """
     import json
+    import os
     from datetime import datetime
 
     badge_worst = {"fail": 0, "warn": 1, "ok": 2, "skip": 3}
@@ -1524,9 +1525,12 @@ def merge_site_check_cache(results: "list[NetworkCheckResult]") -> None:
     try:
         path = _site_cache_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
+        # tmp + 原子替换：崩溃不再留半截 JSON（读端虽容错，仍避免缓存丢失）
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+        tmp.write_text(
             json.dumps({"version": NETWORK_CHECK_CACHE_VERSION, "sites": sites}, ensure_ascii=False, indent=1),
             encoding="utf-8",
         )
+        os.replace(tmp, path)
     except Exception:
         pass

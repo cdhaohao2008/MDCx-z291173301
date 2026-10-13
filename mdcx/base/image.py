@@ -101,12 +101,28 @@ def _get_mark_image(mark_pic_path: Path) -> Image.Image | None:
     img = _MARK_IMAGE_CACHE.get(mark_pic_path)
     if img is not None:
         return img
+    fh = None
     try:
-        img = Image.open(mark_pic_path).convert("RGBA")
+        fh = open(mark_pic_path, "rb")
+        with Image.open(fh) as opened:
+            img = opened.convert("RGBA")
+            # convert() 结果为独立内存副本，可安全缓存；关闭文件句柄即可
     except Exception:
         signal.show_log_text(f"{traceback.format_exc()}\n Open Pic: {mark_pic_path}")
         return None
+    finally:
+        if fh is not None:
+            try:
+                fh.close()
+            except Exception:
+                pass
     if len(_MARK_IMAGE_CACHE) >= _MARK_IMAGE_CACHE_MAX:
+        # 逐出旧缓存时关闭 PIL 缓冲，避免长期泄漏
+        for old in list(_MARK_IMAGE_CACHE.values()):
+            try:
+                old.close()
+            except Exception:
+                pass
         _MARK_IMAGE_CACHE.clear()
     _MARK_IMAGE_CACHE[mark_pic_path] = img
     return img
@@ -136,10 +152,24 @@ async def _add_to_pic(pic_path: Path, img_pic: Image.Image, mark_size: int, coun
         img_subt = _get_mark_image(Path(mark_pic_path))
         if img_subt is None:
             return
-        scroll_high = int(img_pic.height * mark_size / 40)
-        scroll_width = int(scroll_high * img_subt.width / img_subt.height)
-        img_subt = img_subt.resize((scroll_width, scroll_high), resample=Image.Resampling.LANCZOS)
-        r, g, b, a = img_subt.split()  # 获取颜色通道, 保持png的透明性
+        if img_subt.height <= 0 or img_subt.width <= 0 or img_pic.height <= 0 or img_pic.width <= 0:
+            return
+        try:
+            scroll_high = int(img_pic.height * mark_size / 40)
+            scroll_width = int(scroll_high * img_subt.width / img_subt.height)
+        except (ZeroDivisionError, ValueError, OverflowError):
+            return
+        if scroll_high <= 0 or scroll_width <= 0:
+            return
+        # 防止超大水印撑爆内存（限制为目标图尺寸内）
+        try:
+            scroll_width = min(scroll_width, img_pic.width)
+            scroll_high = min(scroll_high, img_pic.height)
+            img_subt = img_subt.resize((scroll_width, scroll_high), resample=Image.Resampling.LANCZOS)
+            r, g, b, a = img_subt.split()  # 获取颜色通道, 保持png的透明性
+        except Exception:
+            signal.show_log_text(traceback.format_exc())
+            return
 
         # 固定一个位置
         if mark_fixed == "corner":
@@ -165,7 +195,13 @@ async def _add_to_pic(pic_path: Path, img_pic: Image.Image, mark_size: int, coun
                 "top_right": corner_top_right,
                 "bottom_right": corner_bottom_right,
             }
-            mark_postion = corner_dic[mark_pos_corner][count]
+            # 配置被手工改坏或水印数量超限时回退到首个位置，避免 KeyError/IndexError 打穿刮削
+            corner_list = corner_dic.get(mark_pos_corner)
+            if not corner_list:
+                return
+            if count < 0 or count >= len(corner_list):
+                count = count % len(corner_list)
+            mark_postion = corner_list[count]
 
         # 封面四个角的位置
         else:
@@ -175,12 +211,19 @@ async def _add_to_pic(pic_path: Path, img_pic: Image.Image, mark_size: int, coun
                 {"x": img_pic.width - scroll_width, "y": img_pic.height - scroll_high},
                 {"x": 0, "y": img_pic.height - scroll_high},
             ]
+            if count < 0 or count >= len(pos):
+                count = count % len(pos)
             mark_postion = (pos[count]["x"], pos[count]["y"])
         try:  # 图片如果下载不完整时，这里会崩溃，跳过
             img_pic.paste(img_subt, mark_postion, mask=a)
         except Exception:
             signal.show_log_text(traceback.format_exc())
-        img_subt.close()
+        finally:
+            # img_subt 此时为 resize 后的副本，关闭释放内存；缓存的原图不受影响
+            try:
+                img_subt.close()
+            except Exception:
+                pass
 
 
 async def add_mark_thread(pic_path: Path, mark_list: list[str]):
@@ -193,6 +236,8 @@ async def add_mark_thread(pic_path: Path, mark_list: list[str]):
     mark_pos_corner = manager.config.mark_pos_corner
     try:
         img_pic = Image.open(pic_path)
+        # 延迟解码阶段的 OSError（截断图）在 convert/load 时抛出，此处预检避免后续泄漏
+        img_pic.load()
     except Exception:
         signal.show_log_text(f"{traceback.format_exc()}\n Open Pic: {pic_path}")
         return
@@ -229,14 +274,27 @@ async def add_mark_thread(pic_path: Path, mark_list: list[str]):
                 else:
                     await _add_to_pic(pic_path, img_pic, mark_size, mark_pos_count % 4, mark_name)
     # 所有水印 paste 完成后统一保存一次，避免每个水印都全图编码（N 个水印 N 次编码）
-    converted = img_pic.convert("RGB")
+    converted = None
     temp_pic_path = pic_path.with_suffix(".[MARK].jpg")
     try:
-        converted.load()
-        converted.save(temp_pic_path, quality=95, subsampling=0)
+        converted = img_pic.convert("RGB")
+        try:
+            converted.load()
+            converted.save(temp_pic_path, quality=95, subsampling=0)
+        except Exception:
+            signal.show_log_text(traceback.format_exc())
     except Exception:
         signal.show_log_text(traceback.format_exc())
-    img_pic.close()
+    finally:
+        try:
+            img_pic.close()
+        except Exception:
+            pass
+        if converted is not None:
+            try:
+                converted.close()
+            except Exception:
+                pass
     if await check_pic_async(temp_pic_path):
         # 临时水印图落位：目标本就是旧版本，直接覆盖（不产生 _conflict 残留）
         await move_file_async(temp_pic_path, pic_path, overwrite=True)

@@ -70,12 +70,15 @@ def get_studio(html):
 
 def get_runtime(html):
     runtime = ""
-    result = html.xpath(
-        'string(//dt[contains(text(), "片長") or contains(text(), "片长")]/following-sibling::dd)'
-    ).strip()
-    result = re.findall(r"\d+", result)
-    if len(result) == 3:
-        runtime = int(result[0]) * 60 + int(result[1])
+    try:
+        result = html.xpath(
+            'string(//dt[contains(text(), "片長") or contains(text(), "片长")]/following-sibling::dd)'
+        ).strip()
+        result = re.findall(r"\d+", result)
+        if len(result) == 3:
+            runtime = int(result[0]) * 60 + int(result[1])
+    except (ValueError, IndexError):
+        runtime = ""
     return runtime
 
 

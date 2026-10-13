@@ -761,7 +761,12 @@ async def check_file(file_path: Path, file_escape_size: float) -> bool:
         LogBuffer.error().write("文件不存在")
         return False
     if NoEscape.NO_SKIP_SMALL_FILE not in manager.config.no_escape:
-        file_size = await aiofiles.os.path.getsize(file_path) / float(1024 * 1024)
+        try:
+            file_size = await aiofiles.os.path.getsize(file_path) / float(1024 * 1024)
+        except OSError:
+            # exists 与 getsize 之间文件被删/移动（TOCTOU）：按不存在处理，避免打穿整批
+            LogBuffer.error().write("文件不存在")
+            return False
         if file_size < file_escape_size:
             LogBuffer.error().write(
                 f"文件小于 {file_escape_size} MB 被过滤!（实际大小 {round(file_size, 2)} MB）已跳过刮削！"

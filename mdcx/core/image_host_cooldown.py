@@ -88,7 +88,7 @@ def _persist_locked() -> None:
     data = {host: round(wall + (until - now)) for host, until in _cooldown_until.items() if until > now}
     path = _store_path()
     try:
-        tmp = path.with_suffix(".json.tmp")
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         tmp.write_text(json.dumps(data), encoding="utf-8")
         os.replace(tmp, path)
     except OSError as e:

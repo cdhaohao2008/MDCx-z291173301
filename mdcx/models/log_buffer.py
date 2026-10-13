@@ -158,7 +158,9 @@ class LogBuffer:
         return LogBuffer._get_buffer("req")
 
     def __init__(self):
-        self.buffer = []
+        self.buffer: list = []
+        # 单 buffer 上限：高频 add_log 在 UI 卡顿时堆积，此处截断头部保内存（行为不变，只丢最旧明细）
+        self._max_items = 2000
 
     def write(self, message, with_task_name=False):
         """
@@ -175,6 +177,9 @@ class LogBuffer:
             if self.buffer and self.buffer[-1] == message:
                 return
             self.buffer.append(message)
+            overflow = len(self.buffer) - self._max_items
+            if overflow > 0:
+                del self.buffer[:overflow]
 
     def get(self, only_self: bool = False):
         """取本任务组的聚合日志（自己 + 派生后代），不含陌生兄弟任务。

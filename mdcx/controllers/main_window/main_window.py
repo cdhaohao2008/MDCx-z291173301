@@ -8463,7 +8463,7 @@ class MyMAinWindow(QMainWindow):
     # region 显示版本号
     def show_version(self):
         try:
-            t = threading.Thread(target=self._show_version_thread)
+            t = threading.Thread(target=self._show_version_thread, daemon=True)
             t.start()  # 启动线程,即让线程开始执行
         except Exception:
             signal_qt.show_traceback_log(traceback.format_exc())
@@ -8509,7 +8509,7 @@ class MyMAinWindow(QMainWindow):
         if manager.config.use_database:
             ActressDB.init_db()
         try:
-            t = threading.Thread(target=check_theporndb_api_token)
+            t = threading.Thread(target=check_theporndb_api_token, daemon=True)
             t.start()  # 启动线程,即让线程开始执行
         except Exception:
             signal_qt.show_traceback_log(traceback.format_exc())
@@ -9708,7 +9708,7 @@ class MyMAinWindow(QMainWindow):
             #     self.setWindowFlags(self.windowFlags() | Qt.WindowDoesNotAcceptFocus)
             #     self.show()
             # 启动线程打开文件
-            t = threading.Thread(target=open_file_thread, args=(self.file_main_open_path, False))
+            t = threading.Thread(target=open_file_thread, args=(self.file_main_open_path, False), daemon=True)
             t.start()
 
     def main_open_folder_click(self):
@@ -9724,7 +9724,7 @@ class MyMAinWindow(QMainWindow):
             #     self.setWindowFlags(self.windowFlags() | Qt.WindowDoesNotAcceptFocus)
             #     self.show()
             # 启动线程打开文件
-            t = threading.Thread(target=open_file_thread, args=(self.file_main_open_path, True))
+            t = threading.Thread(target=open_file_thread, args=(self.file_main_open_path, True), daemon=True)
             t.start()
 
     def main_open_nfo_click(self):
@@ -10391,6 +10391,12 @@ class MyMAinWindow(QMainWindow):
         if not text:
             return
         self.main_log_queue.append(str(text))
+        # 无界 deque 在生产远超 100ms 消费时 OOM：丢最旧保内存（显示行为不变，只丢刷不出的旧行）
+        if len(self.main_log_queue) > 2000:
+            try:
+                self.main_log_queue.popleft()
+            except Exception:
+                pass
 
     # endregion
 
@@ -10538,6 +10544,8 @@ class MyMAinWindow(QMainWindow):
             self.pushButton_show_log_clicked()  # 点击开始移动按钮后跳转到日志页面
             try:
                 t = threading.Thread(target=self._move_file_thread)
+                # 已结束的线程对象及时摘除，长会话不再堆积（存活线程保留，停止逻辑不变）
+                self.threads_list = [x for x in self.threads_list if x.is_alive()]
                 self.threads_list.append(t)
                 t.start()  # 启动线程,即让线程开始执行
             except Exception:
@@ -11646,7 +11654,7 @@ class MyMAinWindow(QMainWindow):
             )
             try:
                 self._measure_net_report_sep_chars()
-                self.t_net = threading.Thread(target=self.network_check)
+                self.t_net = threading.Thread(target=self.network_check, daemon=True)
                 self.t_net.start()  # 启动线程,即让线程开始执行
             except Exception:
                 signal_qt.show_traceback_log(traceback.format_exc())
@@ -11692,7 +11700,7 @@ class MyMAinWindow(QMainWindow):
             return
         self.set_javdb_status.emit("⏳ 正在检测中...")
         try:
-            t = threading.Thread(target=self._check_javdb_cookie, args=(input_cookie,))
+            t = threading.Thread(target=self._check_javdb_cookie, args=(input_cookie,), daemon=True)
             t.start()  # 启动线程,即让线程开始执行
         except Exception:
             signal_qt.show_traceback_log(traceback.format_exc())
@@ -11950,7 +11958,7 @@ class MyMAinWindow(QMainWindow):
             return
         self.set_fc2ppvdb_status.emit("⏳ 正在检测中...")
         try:
-            t = threading.Thread(target=self._check_fc2ppvdb_cookie, args=(input_cookie,))
+            t = threading.Thread(target=self._check_fc2ppvdb_cookie, args=(input_cookie,), daemon=True)
             t.start()  # 启动线程,即让线程开始执行
         except Exception:
             signal_qt.show_traceback_log(traceback.format_exc())
@@ -11999,7 +12007,7 @@ class MyMAinWindow(QMainWindow):
         input_cookie = self.Ui.plainTextEdit_cookie_javbus.toPlainText()
         self.set_javbus_status.emit("⏳ 正在检测中...")
         try:
-            t = threading.Thread(target=self._check_javbus_cookie, args=(input_cookie,))
+            t = threading.Thread(target=self._check_javbus_cookie, args=(input_cookie,), daemon=True)
             t.start()  # 启动线程,即让线程开始执行
         except Exception:
             signal_qt.show_traceback_log(traceback.format_exc())

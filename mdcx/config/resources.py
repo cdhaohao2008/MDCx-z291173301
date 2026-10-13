@@ -126,7 +126,11 @@ class Resources:
                 signal.show_traceback_log(self._resources_base)
                 signal.show_traceback_log(traceback.format_exc())
         self._userdata_base = manager.data_folder / "userdata"
-        self._userdata_base.mkdir(parents=True, exist_ok=True)  # 确保用户数据目录存在
+        try:
+            self._userdata_base.mkdir(parents=True, exist_ok=True)  # 确保用户数据目录存在
+        except OSError as e:
+            # 只读盘/权限受限时不打穿 import，保证首屏仍可启动，业务访问时再报错
+            signal.show_traceback_log(f"用户数据目录创建失败（后续读写可能失败）: {self._userdata_base} {e}")
 
         # 获取资源路径
         self.actor_db_backup_path = self.r("userdata/actor_database.xlsx")  # 内置演员数据库 xlsx
@@ -186,7 +190,11 @@ class Resources:
         self._data_load_error: Exception | None = None
 
         self._get_mark_icon()
-        zhconv.loaddict(str(self.r("zhconv/zhcdict.json")))  # 加载繁简转换字典
+        try:
+            zhconv.loaddict(str(self.r("zhconv/zhcdict.json")))  # 加载繁简转换字典
+        except Exception as e:
+            # 打包漏字典/文件损坏时不打穿启动，繁简转换回退原文
+            signal.show_traceback_log(f"繁简字典加载失败（已回退原文）: {e}")
 
     def start_data_loading(self) -> None:
         """后台准备本地 XLSX 数据，避免构造 Resources 阻塞首屏。"""
@@ -209,7 +217,8 @@ class Resources:
         """等待本地 XLSX 数据就绪，供后台业务首次访问时调用。"""
         if not self._data_ready.is_set():
             self.start_data_loading()
-            self._data_ready.wait()
+            # UI 线程误调时不永久冻结：30s 超时后放行，后台继续加载，业务以降级数据运行
+            self._data_ready.wait(timeout=30.0)
         if self._data_load_error is not None:
             raise RuntimeError("本地数据库加载失败") from self._data_load_error
 
@@ -291,8 +300,16 @@ class Resources:
 
     def get_fonts(self):
         font_folder_path = self.qtr("fonts")
-        for f in os.listdir(font_folder_path):
-            QFontDatabase.addApplicationFont(os.path.join(font_folder_path, f))  # 字体路径
+        try:
+            names = os.listdir(font_folder_path)
+        except OSError as e:
+            signal.show_traceback_log(f"字体目录缺失/不可读，跳过加载: {font_folder_path} {e}")
+            return
+        for f in names:
+            try:
+                QFontDatabase.addApplicationFont(os.path.join(font_folder_path, f))  # 字体路径
+            except Exception:
+                continue
 
     def _get_or_generate_local_data(self):
         """如果用户数据目录下已有数据则直接读取, 否则根据内置数据生成"""
@@ -300,15 +317,21 @@ class Resources:
         db_local_path = self.u("actor_database.xlsx")
         if not os.path.exists(db_local_path):
             # 尝试从 XML 迁移
+            loop = None
             try:
                 from ..core.tmdb_actor import migrate_xml_to_xlsx
 
                 # 同步执行迁移（在事件循环外）
                 loop = asyncio.new_event_loop()
                 loop.run_until_complete(migrate_xml_to_xlsx())
-                loop.close()
             except Exception:
                 pass
+            finally:
+                if loop is not None:
+                    try:
+                        loop.close()
+                    except Exception:
+                        pass
 
             # 如果迁移未生成文件，尝试复制内置备份
             if not os.path.exists(db_local_path) and os.path.exists(self.actor_db_backup_path):
@@ -318,14 +341,20 @@ class Resources:
         info_db_local_path = self.u("info_database.xlsx")
         if not os.path.exists(info_db_local_path):
             # 尝试从 XML 迁移
+            loop2 = None
             try:
                 from ..core.tmdb_actor import migrate_info_xml_to_xlsx
 
-                loop = asyncio.new_event_loop()
-                loop.run_until_complete(migrate_info_xml_to_xlsx())
-                loop.close()
+                loop2 = asyncio.new_event_loop()
+                loop2.run_until_complete(migrate_info_xml_to_xlsx())
             except Exception:
                 pass
+            finally:
+                if loop2 is not None:
+                    try:
+                        loop2.close()
+                    except Exception:
+                        pass
 
             # 如果迁移未生成文件，尝试复制内置备份
             if not os.path.exists(info_db_local_path) and os.path.exists(self.info_db_backup_path):

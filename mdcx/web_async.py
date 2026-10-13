@@ -2339,22 +2339,51 @@ class AsyncWebClient:
             return False
         if not webp:
             return await self._write_file_content(url, file_path, content)
+        byte_stream = None
+        img = None
         try:
             byte_stream = BytesIO(content)
-            img: Image.Image = Image.open(byte_stream)
-            if img.mode == "RGBA":
-                img = img.convert("RGB")
-            img.save(file_path, quality=95, subsampling=0)
-            img.close()
+            with Image.open(byte_stream) as opened:
+                # convert() 返回独立副本，with 退出关闭原图，副本需手动关闭
+                img = opened.convert("RGB")
+            try:
+                img.save(file_path, quality=95, subsampling=0)
+            finally:
+                try:
+                    img.close()
+                except Exception:
+                    pass
             return True
         except Exception as e:
             self._log(f"🔴 WebP转换失败: {url} {file_path} {e!s}")
             return False
+        finally:
+            if byte_stream is not None:
+                try:
+                    byte_stream.close()
+                except Exception:
+                    pass
 
     async def _write_file_content(self, url: str, file_path: Path, content: bytes) -> bool:
         try:
-            async with aiofiles.open(file_path, "wb") as f:
-                await f.write(content)
+            # 先写同目录临时文件再原子替换，避免崩溃/断电留 0-byte 半截图
+            try:
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
+            tmp = file_path.with_name(file_path.name + ".tmp")
+            try:
+                async with aiofiles.open(tmp, "wb") as f:
+                    await f.write(content)
+                await asyncio.to_thread(os.replace, str(tmp), str(file_path))
+            except OSError:
+                try:
+                    await asyncio.to_thread(tmp.unlink, missing_ok=True)
+                except OSError:
+                    pass
+                # 云盘/占用场景退回直写，保证尽力落盘
+                async with aiofiles.open(file_path, "wb") as f:
+                    await f.write(content)
             return True
         except Exception as e:
             self._log(f"🔴 文件写入失败: {url} {file_path} {e!s}")

@@ -375,7 +375,18 @@ async def _google_translate(msg: str) -> tuple[str | None, str]:
         response, error = await computed.async_client.get_json(url)
     if response is None:
         return None, error
-    translated = "".join([sen[0] for sen in response[0]])
+    # Google 限流/改版时返回 dict/空 list/HTML 解析残留，直接索引会 IndexError/TypeError 打穿 gather
+    try:
+        first = response[0] if isinstance(response, (list, tuple)) else None
+        if not first:
+            return None, f"google 翻译返回异常: {str(response)[:200]}"
+        parts = []
+        for sen in first:
+            if isinstance(sen, (list, tuple)) and sen and isinstance(sen[0], str):
+                parts.append(sen[0])
+        translated = "".join(parts)
+    except Exception as e:
+        return None, f"google 翻译解析失败: {e}"
     translated = translated.replace("＃", "#")
     return translated, ""
 

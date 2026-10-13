@@ -48,16 +48,30 @@ def get_video_metadata_ffmpeg(p: Path) -> tuple[int, str]:
     if os.name == "nt":
         creationflags = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags)
-
-    data = json.loads(result.stdout)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return 0, ""
+    if result.returncode != 0 or not result.stdout:
+        return 0, ""
+    try:
+        data = json.loads(result.stdout)
+    except (json.JSONDecodeError, ValueError):
+        return 0, ""
+    streams = data.get("streams")
+    if not isinstance(streams, list):
+        return 0, ""
 
     # Find video stream
-    video_stream = next((stream for stream in data["streams"] if stream["codec_type"] == "video"), None)
+    video_stream = next((stream for stream in streams if isinstance(stream, dict) and stream.get("codec_type") == "video"), None)
 
     if video_stream:
-        height = int(video_stream["height"])
-        codec_fourcc = video_stream["codec_name"].upper()
+        try:
+            height = int(video_stream.get("height", 0) or 0)
+        except (ValueError, TypeError):
+            height = 0
+        codec_name = video_stream.get("codec_name") or ""
+        codec_fourcc = str(codec_name).upper()
     else:
         height = 0
         codec_fourcc = ""
@@ -68,7 +82,13 @@ def get_video_metadata(p: Path) -> tuple[int, str]:
     try:
         return get_video_metadata_pyav(p)
     except ImportError:
+        pass
+    except Exception:
+        return 0, ""
+    try:
         return get_video_metadata_ffmpeg(p)
+    except Exception:
+        return 0, ""
 
 
 def get_video_backend() -> str:

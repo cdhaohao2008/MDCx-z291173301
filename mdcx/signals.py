@@ -33,6 +33,8 @@ class Signals(QObject):
         super().__init__()
         self.log_lock = threading.Lock()
         self.detail_log_list = []
+        # 明细日志上限：UI 卡顿/高频 add_log 时丢最旧，防无界堆积 OOM（get_log 仍一次性 drain）
+        self._detail_log_max = 2000
         self.stop = False
 
     def add_log(self, *text):
@@ -42,6 +44,9 @@ class Signals(QObject):
         try:
             with self.log_lock:
                 self.detail_log_list.append(f" ⏰ {time.strftime('%H:%M:%S', time.localtime())} {' '.join(text)}")
+                overflow = len(self.detail_log_list) - self._detail_log_max
+                if overflow > 0:
+                    del self.detail_log_list[:overflow]
         except Exception:
             pass
 

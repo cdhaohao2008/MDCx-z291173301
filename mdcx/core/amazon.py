@@ -7,6 +7,7 @@ import asyncio
 import re
 import urllib.parse
 from asyncio import to_thread
+from contextlib import suppress
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
@@ -654,38 +655,51 @@ def _detect_amazon_barcode_candidates_from_image_bytes_with_reason(image_bytes: 
                 max(int(img.height * bottom_ratio), int(img.height * top_ratio) + 1),
             )
             crop = img.crop(crop_box).convert("RGB")
-            for scale in (1, 2):
-                processed = crop
-                if scale > 1:
-                    processed = crop.resize(
-                        (max(crop.width * scale, 1), max(crop.height * scale, 1)),
-                        resample=Image.Resampling.LANCZOS,
-                    )
-                try:
-                    image_array = cv2.cvtColor(np.array(processed), cv2.COLOR_RGB2BGR)
-                    retval, decoded_info, decoded_type, detected_points = detector.detectAndDecodeWithType(image_array)
-                except Exception:
-                    continue
-                if not retval:
-                    detected_points = None
+            try:
+                for scale in (1, 2):
+                    processed = crop
+                    image_array = None
                     try:
-                        detected, fallback_points = detector.detect(image_array)
-                    except Exception:
-                        detected = False
-                        fallback_points = None
-                    if detected:
-                        detected_points = fallback_points
-                else:
-                    for info, code_type in zip(decoded_info, decoded_type, strict=False):
-                        if str(code_type).upper() != "EAN_13":
+                        if scale > 1:
+                            processed = crop.resize(
+                                (max(crop.width * scale, 1), max(crop.height * scale, 1)),
+                                resample=Image.Resampling.LANCZOS,
+                            )
+                        try:
+                            image_array = cv2.cvtColor(np.array(processed), cv2.COLOR_RGB2BGR)
+                            retval, decoded_info, decoded_type, detected_points = detector.detectAndDecodeWithType(image_array)
+                        except Exception:
                             continue
-                        if barcode := _normalize_amazon_barcode(info):
-                            return [barcode], "direct"
-                if detected_points is None:
-                    continue
-                ocr_fallback_attempted = True
-                if barcodes := _try_extract_amazon_barcode_candidates_via_digit_ocr(image_array, detected_points):
-                    return barcodes, "ocr_digits"
+                        if not retval:
+                            detected_points = None
+                            try:
+                                detected, fallback_points = detector.detect(image_array)
+                            except Exception:
+                                detected = False
+                                fallback_points = None
+                            if detected:
+                                detected_points = fallback_points
+                        else:
+                            for info, code_type in zip(decoded_info, decoded_type, strict=False):
+                                if str(code_type).upper() != "EAN_13":
+                                    continue
+                                if barcode := _normalize_amazon_barcode(info):
+                                    return [barcode], "direct"
+                        if detected_points is None:
+                            continue
+                        ocr_fallback_attempted = True
+                        if barcodes := _try_extract_amazon_barcode_candidates_via_digit_ocr(image_array, detected_points):
+                            return barcodes, "ocr_digits"
+                    finally:
+                        # 大图/大数组及时释放：并发扫码时避免 10 套全分辨率常驻 OOM（返回/continue 均执行）
+                        if processed is not crop:
+                            with suppress(Exception):
+                                processed.close()
+                        with suppress(Exception):
+                            del image_array
+            finally:
+                with suppress(Exception):
+                    crop.close()
     finally:
         img.close()
 

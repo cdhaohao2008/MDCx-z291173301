@@ -329,6 +329,8 @@ def Init_Ui(self: "MyMAinWindow"):
     apply_ui_scale_option_limits(self.Ui.comboBox_ui_scale, QApplication.primaryScreen())
     self.Ui.textBrowser_log_main.document().setMaximumBlockCount(6000)
     self.Ui.textBrowser_log_main_2.document().setMaximumBlockCount(3000)
+    # 网络检测面板：10k 条清屏周期之外再加块数上限，多行日志堆积时兜底防 QTextDocument 无界增长
+    self.Ui.textBrowser_net_main.document().setMaximumBlockCount(30000)
     self.Ui.textBrowser_log_main.viewport().installEventFilter(self)  # 注册事件用于识别点击控件时隐藏失败列表面板
     self.Ui.textBrowser_log_main_2.viewport().installEventFilter(self)
     self.Ui.pushButton_save_failed_list.setIcon(QIcon(resources.save_failed_list_icon))

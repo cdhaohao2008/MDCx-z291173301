@@ -258,29 +258,36 @@ def check_pic_sync(p: str):
 
 
 def open_file_thread(p: Path, is_dir: bool) -> None:
-    if IS_WINDOWS:
-        if is_dir:
-            subprocess.Popen(["explorer", "/select,", str(p)])
+    # explorer/open/xdg-open 缺失或目标被删时不应打穿 UI 线程
+    try:
+        if IS_WINDOWS:
+            if is_dir:
+                subprocess.Popen(["explorer", "/select,", str(p)])
+            else:
+                subprocess.Popen(["explorer", str(p)])
+        elif IS_MAC:
+            if is_dir:
+                if p.is_symlink():
+                    p = p.parent
+                subprocess.Popen(["open", "-R", str(p)])
+            else:
+                subprocess.Popen(["open", str(p)])
         else:
-            subprocess.Popen(["explorer", str(p)])
-    elif IS_MAC:
-        if is_dir:
-            if p.is_symlink():
-                p = p.parent
-            subprocess.Popen(["open", "-R", str(p)])
-        else:
-            subprocess.Popen(["open", str(p)])
-    else:
-        if is_dir:
-            if p.is_symlink():
-                p = p.parent
-            try:
-                subprocess.Popen(["dolphin", "--select", p])
-            except Exception:
-                # xdg-open 不支持 -R（那是 macOS open 的参数），打开目录本身
-                subprocess.Popen(["xdg-open", str(p)])
-        else:
-            subprocess.Popen(["xdg-open", p])
+            if is_dir:
+                if p.is_symlink():
+                    p = p.parent
+                try:
+                    subprocess.Popen(["dolphin", "--select", p])
+                except Exception:
+                    # xdg-open 不支持 -R（那是 macOS open 的参数），打开目录本身
+                    subprocess.Popen(["xdg-open", str(p)])
+            else:
+                subprocess.Popen(["xdg-open", p])
+    except Exception as e:
+        try:
+            signal.add_log(f" 打开文件失败: {p} 错误: {e}")
+        except Exception:
+            pass
 
 
 async def write_file_atomic_async(p: str | Path, content: str, encoding: str = "UTF-8") -> None:
@@ -297,6 +304,10 @@ async def write_file_atomic_async(p: str | Path, content: str, encoding: str = "
       校验失败时退回直接写入再校验，仍失败则抛错——绝不允许假报成功
     """
     p = Path(p)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
     fd, tmp_name = tempfile.mkstemp(dir=p.parent, suffix=".tmp")
     tmp = Path(tmp_name)
     try:
@@ -322,6 +333,10 @@ async def write_file_atomic_async(p: str | Path, content: str, encoding: str = "
 def write_file_atomic(p: str | Path, content: str, encoding: str = "UTF-8") -> None:
     """同步版原子写入，供非 async 上下文使用（参数语义同 write_file_atomic_async）。"""
     p = Path(p)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
     fd, tmp_name = tempfile.mkstemp(dir=p.parent, suffix=".tmp")
     tmp = Path(tmp_name)
     try:

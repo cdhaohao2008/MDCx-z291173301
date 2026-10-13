@@ -400,7 +400,7 @@ async def run(
         except Exception as e:
             _log_line(f" ⚠️ [演员库维护] 行索引重建失败: {e}")
 
-    async with aiohttp.ClientSession() as client:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as client:
         semaphore = asyncio.Semaphore(3)
 
         async def _process_one(actor_name: str) -> None:
@@ -1515,7 +1515,7 @@ async def run_actor_db_xlsx(
     translated_count = 0
     linked_count = 0
 
-    async with aiohttp.ClientSession() as client:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as client:
         if mode == "link":
             base_concurrency = 2
         elif mode == "fill_zh_javdb":
@@ -1938,7 +1938,7 @@ async def sync_from_avdb(
     async def _tmdb_client() -> aiohttp.ClientSession:
         nonlocal tmdb_session
         if tmdb_session is None:
-            tmdb_session = aiohttp.ClientSession()
+            tmdb_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
         return tmdb_session
 
     # ---- 加载/创建 数据库 ----
@@ -2280,7 +2280,7 @@ async def clean_male_actors(*, limit: int = 5000, concurrency: int = 5) -> Clean
             # 阶段一：并发校验 gender，收集需删除的行
             male_row_indexes: set[int] = set()
             kept_indexes: set[int] = set()
-            async with aiohttp.ClientSession() as client:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as client:
                 task_iter = iter(enumerate(candidate_rows, 1))
                 running_tasks: set[asyncio.Task[None]] = set()
 
@@ -2454,7 +2454,7 @@ async def verify_tmdb_ids(*, limit: int = 5000, concurrency: int = 5) -> VerifyT
             invalid_rows: dict[int, int] = {}
             result.checked = len(candidate_rows)
 
-            async with aiohttp.ClientSession() as client:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as client:
                 task_iter = iter(candidate_rows)
                 running_tasks: set[asyncio.Task[None]] = set()
 
@@ -2555,7 +2555,7 @@ async def verify_tmdb_ids(*, limit: int = 5000, concurrency: int = 5) -> VerifyT
                     async with sem:
                         return await _recover(*args)
 
-                async with aiohttp.ClientSession() as client:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as client:
                     recover_items = [
                         (row_idx, jp, zh) for row_idx, (jp, zh) in invalid_meta.items() if not _is_stop_requested()
                     ]

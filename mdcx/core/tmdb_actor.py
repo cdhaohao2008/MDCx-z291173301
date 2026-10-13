@@ -302,7 +302,8 @@ def _tmdb_query_cache_persist_sync() -> None:
         payload[name] = {"ts": ts, "value": value}
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
+    # 固定名 .tmp 多线程/多进程并发会互覆盖：唯一名 tmp + 原子 replace（落盘结果不变）
+    tmp_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     tmp_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     os.replace(tmp_path, cache_path)
 
@@ -360,27 +361,33 @@ async def _tmdb_request(client: Any, method: str, url: str, **kwargs) -> _TmdbRe
     follow_redirects = kwargs.get("follow_redirects", True)
     status_code = 0
     try:
-        if hasattr(client, "request"):
-            result = await client.request(method, url, params=params)
-            # curl_cffi AsyncWebClient 返回 (resp, err)；aiohttp ClientSession 返回单 response
-            if isinstance(result, tuple):
-                result, _ = result
-                if result is None:
-                    return None
-            status_code = int(result.status_code if hasattr(result, "status_code") else result.status)
-            if hasattr(result, "text"):
-                if callable(result.text):  # aiohttp: text() 方法
-                    text = await result.text()
-                else:  # curl_cffi: text 属性
-                    text = result.text
-            else:
-                text = ""
-            return _TmdbResponse(status_code, text)
-        if hasattr(client, method.lower()):
-            send = getattr(client, method.lower())
-            resp = await send(url, params=params, allow_redirects=follow_redirects)
-            status_code = int(resp.status)
-            return _TmdbResponse(status_code, await resp.text())
+        try:
+            if hasattr(client, "request"):
+                # 无超时挂死会拖住上层 wait(FIRST_COMPLETED)：20s 封顶，超时按失败返回（行为不变）
+                result = await asyncio.wait_for(client.request(method, url, params=params), timeout=20)
+                # curl_cffi AsyncWebClient 返回 (resp, err)；aiohttp ClientSession 返回单 response
+                if isinstance(result, tuple):
+                    result, _ = result
+                    if result is None:
+                        return None
+                status_code = int(result.status_code if hasattr(result, "status_code") else result.status)
+                if hasattr(result, "text"):
+                    if callable(result.text):  # aiohttp: text() 方法
+                        text = await asyncio.wait_for(result.text(), timeout=20)
+                    else:  # curl_cffi: text 属性
+                        text = result.text
+                else:
+                    text = ""
+                return _TmdbResponse(status_code, text)
+            if hasattr(client, method.lower()):
+                send = getattr(client, method.lower())
+                resp = await asyncio.wait_for(
+                    send(url, params=params, allow_redirects=follow_redirects), timeout=20
+                )
+                status_code = int(resp.status)
+                return _TmdbResponse(status_code, await asyncio.wait_for(resp.text(), timeout=20))
+        except (asyncio.TimeoutError, TimeoutError):
+            return None
     finally:
         await _tmdb_rate_limiter.finish(status_code)
     return None

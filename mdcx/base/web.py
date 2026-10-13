@@ -586,12 +586,17 @@ async def check_url(url: str, length: bool = False, real_url: bool = False):
                     signal.add_log(f"🔴 检测链接失败: 未返回大小且预下载失败 {true_url}")
                     return None
                 # 如果返回内容的文件大小 < 8k，视为不可用
-                if int(content_length) < 8192:
+                try:
+                    content_length_int = int(str(content_length).strip())
+                except (ValueError, TypeError):
+                    signal.add_log(f"🔴 检测链接失败: 返回大小不可解析({content_length}) {true_url}")
+                    return None
+                if content_length_int < 8192:
                     signal.add_log(f"🔴 检测链接失败: 返回大小({content_length}) < 8k {true_url}")
                     return None
 
                 signal.add_log(f"✅ 检测链接通过: 返回大小({content_length}) {true_url}")
-                return int(content_length) if length else true_url
+                return content_length_int if length else true_url
 
             except Exception as e:
                 if retry_attempt < max_retries - 1:
@@ -1317,7 +1322,7 @@ def _write_version_cache(remote: RemoteVersion) -> None:
     path = _version_cache_path()
     payload = {"tag": remote.tag, "name": remote.name, "checked_at": time.time()}
     try:
-        tmp = path.with_suffix(".json.tmp")
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="UTF-8")
         os.replace(tmp, path)
     except (OSError, TypeError, ValueError):

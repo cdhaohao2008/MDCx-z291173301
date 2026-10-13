@@ -199,9 +199,17 @@ class ConfigManager:
           完成后 chmod 0o600（仅属主读写，降低敏感字段被同机其它用户读取的风险）。
         """
         if os.name == "nt":
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
             _write_windows(path, text)
             return
 
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
         tmp = path.with_name(f"{path.name}.tmp")
         tmp.write_text(text, encoding="UTF-8")
         try:
@@ -292,14 +300,28 @@ class ConfigManager:
 
     @staticmethod
     def write_mark_file(path: str | Path):
-        """写入 MARK_FILE"""
-        if not os.path.exists(MARK_FILE):  # 标记文件不存在
-            # 确保 MARK_FILE 所在目录存在
-            mark_dir = os.path.dirname(MARK_FILE)
-            if mark_dir:
-                os.makedirs(mark_dir, exist_ok=True)
-        with open(MARK_FILE, "w", encoding="UTF-8") as f:
-            f.write(str(path))
+        """写入 MARK_FILE（失败仅记日志，绝不打穿启动/切换配置流程）"""
+        try:
+            if not os.path.exists(MARK_FILE):  # 标记文件不存在
+                # 确保 MARK_FILE 所在目录存在
+                mark_dir = os.path.dirname(MARK_FILE)
+                if mark_dir:
+                    os.makedirs(mark_dir, exist_ok=True)
+            # 先写临时文件再原子替换，避免崩溃留空文件导致下次回退默认路径
+            tmp = MARK_FILE.with_name(MARK_FILE.name + ".tmp")
+            try:
+                tmp.write_text(str(path), encoding="UTF-8")
+                os.replace(str(tmp), str(MARK_FILE))
+            except OSError:
+                # 原子路径失败（如云盘/权限）：退回直写，保证尽力成功
+                try:
+                    tmp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                with open(MARK_FILE, "w", encoding="UTF-8") as f:
+                    f.write(str(path))
+        except OSError as e:
+            logger.error("标记文件写入失败（不阻断运行）: %s %s", MARK_FILE, e)
 
     @staticmethod
     def read_mark_file() -> str:

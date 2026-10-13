@@ -226,16 +226,26 @@ def _install_from_builtin(tool: str, dest_dir: Path) -> bool:
 
 async def _download_bytes(url: str) -> bytes:
     """下载单个源；HTTP 4xx/5xx 错误串带截断响应体，便于排障。"""
+    # 工具包约 30-60MB：流式拼接 + 200MB 封顶，恶意/异常 Content-Length 不再整包驻内存后 OOM
+    _MAX_BYTES = 200 * 1024 * 1024
     proxy = getattr(manager.config, "proxy", "") or ""
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(_SR_DOWNLOAD_TIMEOUT_SECONDS, connect=_SR_CONNECT_TIMEOUT_SECONDS),
         follow_redirects=True,
         proxy=proxy or None,
     ) as client:
-        resp = await client.get(url)
-        if resp.status_code >= 400:
-            raise RuntimeError(f"HTTP {resp.status_code}: {' '.join(resp.text.split())[:120]}")
-        return resp.content
+        async with client.stream("GET", url) as resp:
+            if resp.status_code >= 400:
+                await resp.aread()
+                raise RuntimeError(f"HTTP {resp.status_code}: {' '.join(resp.text.split())[:120]}")
+            chunks: list[bytes] = []
+            total = 0
+            async for chunk in resp.aiter_bytes(1024 * 256):
+                total += len(chunk)
+                if total > _MAX_BYTES:
+                    raise RuntimeError(f"工具包超过大小上限 ({_MAX_BYTES // (1024**2)} MB)，已拒绝: {url}")
+                chunks.append(chunk)
+            return b"".join(chunks)
 
 
 def _classify_upscale_failure(output: str) -> str:

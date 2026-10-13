@@ -29,10 +29,13 @@ IS_DOCKER = os.path.isfile("/.dockerenv")
 
 IS_NFC = True  # unicode NFC normalization
 if IS_MAC and mac_ver:
-    # 旧版本 mac 使用 NFD
-    ver_list = mac_ver.split(".")
-    if float(ver_list[0] + "." + ver_list[1]) < 10.12:
-        IS_NFC = False
+    # 旧版本 mac 使用 NFD；解析失败时保持默认 True，避免 import 期崩溃
+    try:
+        ver_list = mac_ver.split(".")
+        if len(ver_list) >= 2 and float(ver_list[0] + "." + ver_list[1]) < 10.12:
+            IS_NFC = False
+    except (ValueError, IndexError):
+        pass
 
 IS_PYINSTALLER = hasattr(sys, "frozen")
 
@@ -55,12 +58,24 @@ try:  # 从源代码运行时, 为 main.py 所在目录, 根据此文件路径�
     for _ in range(i):
         MAIN_PATH = MAIN_PATH.parent
 except Exception:
-    MAIN_PATH = Path(sys.path[0]).resolve()
+    # sys.path 可能为空（嵌入式/PyInstaller 极端场景），回退到 CWD，保证 import 不崩
+    _fallback = sys.path[0] if sys.path and sys.path[0] else os.getcwd()
+    try:
+        MAIN_PATH = Path(_fallback).resolve()
+    except OSError:
+        MAIN_PATH = Path(_fallback).absolute()
 
 if IS_PYINSTALLER:
     if IS_MAC:
-        MAIN_PATH = Path("~").expanduser() / ".mdcx"
+        try:
+            MAIN_PATH = Path("~").expanduser() / ".mdcx"
+            MAIN_PATH.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
     else:
-        MAIN_PATH = Path("").resolve()
+        try:
+            MAIN_PATH = Path("").resolve()
+        except OSError:
+            MAIN_PATH = Path("").absolute()
 
 MARK_FILE = MAIN_PATH / "MDCx.config"

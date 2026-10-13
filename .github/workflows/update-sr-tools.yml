@@ -19,6 +19,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # 锁定 3.14：setup-python 不写版本会取最新（现为 3.15），而 jiter/av/lxml 等
+  # 尚无 cp315 wheel，会退回源码编译；jiter 的 PyO3 0.27.1 最高只支持到 3.14，直接失败。
+  # 与 build-py314.yml 同口径（python-version + UV_PYTHON 双保险）。
+  UV_PYTHON: "3.14"
+
 jobs:
   refresh:
     strategy:
@@ -34,13 +40,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Python
+      - name: Set up Python 3.14
         uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.1.0
         with:
           activate-environment: true
+
+      # 防 uv 悄悄挑到别的解释器（与 build-py314.yml 同款断言）。
+      - name: Verify Python 3.14 in use
+        shell: bash
+        run: |
+          python -c 'import sys; print(sys.version); assert sys.version_info[:2] == (3, 14), f"expected 3.14, got {sys.version_info[:2]}"'
 
       # Linux 上 import 链（scripts.fetch_sr_tools → mdcx.core.super_resolution →
       # mdcx.signals/resources → PyQt6）需要 Qt 系统库；av 包（pyav/pyav）源码编译

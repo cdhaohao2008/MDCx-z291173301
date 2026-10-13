@@ -159,10 +159,11 @@ class LLMClient:
         ]
         wait = 1
         body = extra_body
+        chat = None
         await self._begin_request()
         try:
             async with self.limiter:
-                for _ in range(max_try):
+                for _ in range(max(0, max_try)):
                     try:
                         chat = await self.client.chat.completions.create(
                             model=model,
@@ -186,7 +187,15 @@ class LLMClient:
         finally:
             await self._end_request()
         # reasoning_content = getattr(chat.choices[0].message, "reasoning_content", None)
-        text = chat.choices[0].message.content
+        try:
+            choices = getattr(chat, "choices", None) or []
+            if not choices:
+                log_fn("❌ LLM 返回为空（choices 为空）\n")
+                return None
+            text = choices[0].message.content
+        except Exception as e:
+            log_fn(f"❌ LLM 返回解析失败: {e}\n")
+            return None
         # 移除 cot
         if text:
             text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)

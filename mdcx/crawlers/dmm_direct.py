@@ -414,6 +414,14 @@ def _prune_dmm_upgrade_cache(now: float) -> None:
     expired = [key for key, (ts, _, _) in _dmm_upgrade_cache.items() if now - ts >= _DMM_UPGRADE_CACHE_TTL]
     for key in expired:
         _dmm_upgrade_cache.pop(key, None)
+    # 不过期但超限时按时间最旧淘汰，避免大库不同番号无界增长（命中逻辑不变）
+    overflow = len(_dmm_upgrade_cache) - _DMM_UPGRADE_CACHE_MAX
+    if overflow > 0:
+        for key, _ in sorted(_dmm_upgrade_cache.items(), key=lambda kv: kv[1][0]):
+            _dmm_upgrade_cache.pop(key, None)
+            overflow -= 1
+            if overflow <= 0:
+                break
 
 
 def is_uncensored_number(number: str) -> bool:

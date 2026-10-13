@@ -979,7 +979,7 @@ class Scraper:
                             # 预加载 workbook，所有查询结果的写操作先攒在内存，最后一次性落盘
                             _wb, _db_path = _load_actor_db_wb()
                             try:
-                                async with aiohttp.ClientSession() as client:
+                                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as client:
                                     protocol = "https://"
                                     base = tmdb_api_base.strip()
                                     if base.startswith("http://"):

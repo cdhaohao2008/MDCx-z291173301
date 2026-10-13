@@ -502,47 +502,75 @@ class CutWindow(QDialog):
         self.main_window.img_path = img_path  # 裁剪后更新图片url，这样再次点击时才可以重新加载并裁剪
 
         # 裁剪poster
+        img = None
+        img_new_png = None
         try:
-            img = Image.open(img_path).convert("RGB")
+            with Image.open(img_path) as opened:
+                img = opened.convert("RGB")
         except Exception:
             self.main_window.show_log_text(f"{traceback.format_exc()}\n Open Pic: {img_path}")
             return False
-        img_new_png = img.crop((self.c_x, self.c_y, self.c_x2, self.c_y2))
+        try:
+            img_new_png = img.crop((self.c_x, self.c_y, self.c_x2, self.c_y2))
+        except Exception:
+            self.main_window.show_log_text(f"{traceback.format_exc()}\n 裁剪参数异常: {img_path}")
+            try:
+                img.close()
+            except Exception:
+                pass
+            return False
         try:
             if os.path.exists(self.cut_poster_path):
                 delete_file_sync(self.cut_poster_path)
         except Exception as e:
             self.main_window.show_log_text(" 🔴 Failed to remove old poster!\n    " + str(e))
+            try:
+                img.close()
+            except Exception:
+                pass
+            try:
+                img_new_png.close()
+            except Exception:
+                pass
             return False
-        img_new_png.save(self.cut_poster_path, quality=95, subsampling=0)
-        # poster加水印
-        if manager.config.poster_mark == 1:
-            await add_mark_thread(self.cut_poster_path, mark_list)
+        try:
+            img_new_png.save(self.cut_poster_path, quality=95, subsampling=0)
+            # poster加水印
+            if manager.config.poster_mark == 1:
+                await add_mark_thread(self.cut_poster_path, mark_list)
 
-        # 清理旧的thumb
-        if DownloadableFile.THUMB in manager.config.download_files:
-            if thumb_path != img_path:
-                if os.path.exists(thumb_path):
-                    delete_file_sync(thumb_path)
-                img.save(thumb_path, quality=95, subsampling=0)
-            # thumb加水印
-            if manager.config.thumb_mark == 1:
-                await add_mark_thread(thumb_path, mark_list)
-        else:
-            thumb_path = img_path
+            # 清理旧的thumb
+            if DownloadableFile.THUMB in manager.config.download_files:
+                if thumb_path != img_path:
+                    if os.path.exists(thumb_path):
+                        delete_file_sync(thumb_path)
+                    img.save(thumb_path, quality=95, subsampling=0)
+                # thumb加水印
+                if manager.config.thumb_mark == 1:
+                    await add_mark_thread(thumb_path, mark_list)
+            else:
+                thumb_path = img_path
 
-        # 清理旧的fanart
-        if DownloadableFile.FANART in manager.config.download_files:
-            if self.cut_fanart_path != img_path:
-                if os.path.exists(self.cut_fanart_path):
-                    delete_file_sync(self.cut_fanart_path)
-                img.save(self.cut_fanart_path, quality=95, subsampling=0)
-            # fanart加水印
-            if manager.config.fanart_mark == 1:
-                await add_mark_thread(self.cut_fanart_path, mark_list)
-
-        img.close()
-        img_new_png.close()
+            # 清理旧的fanart
+            if DownloadableFile.FANART in manager.config.download_files:
+                if self.cut_fanart_path != img_path:
+                    if os.path.exists(self.cut_fanart_path):
+                        delete_file_sync(self.cut_fanart_path)
+                    img.save(self.cut_fanart_path, quality=95, subsampling=0)
+                # fanart加水印
+                if manager.config.fanart_mark == 1:
+                    await add_mark_thread(self.cut_fanart_path, mark_list)
+        finally:
+            if img is not None:
+                try:
+                    img.close()
+                except Exception:
+                    pass
+            if img_new_png is not None:
+                try:
+                    img_new_png.close()
+                except Exception:
+                    pass
 
         # 在主界面显示预览（QWidget 只能主线程操作，经信号调度）。
         # 信息管理页发起的裁剪：留在信息管理页，只刷新两张预览图，不跳主页

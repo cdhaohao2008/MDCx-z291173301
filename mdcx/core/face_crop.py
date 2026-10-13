@@ -66,8 +66,13 @@ def _download_face_model(model_path: Path) -> bool:
     try:
         with urlopen(YUNET_MODEL_URL, timeout=30) as response:
             model_path.parent.mkdir(parents=True, exist_ok=True)
+            # 分块落盘，避免整模型一次性 read() 驻内存（弱网/大模型时 OOM）
             with tmp_path.open("wb") as fp:
-                fp.write(response.read())
+                while True:
+                    chunk = response.read(256 * 1024)
+                    if not chunk:
+                        break
+                    fp.write(chunk)
         tmp_path.replace(model_path)
         LogBuffer.web().write("\n 🖼 人脸识别模型已自动缓存")
         return True
@@ -211,13 +216,17 @@ def _detect_faces_with_rotation_fallback(image_bgr: np.ndarray) -> tuple[list[Fa
     source_h, source_w = image_bgr.shape[:2]
     for label, rotation_code in ROTATION_FALLBACKS:
         rotated = cv2.rotate(image_bgr, rotation_code)
-        faces = _detect_faces_by_yunet(rotated)
-        if faces:
-            return [
-                _map_rotated_face_to_source(face, rotation_code, source_w, source_h)
-                for face in faces
-                if face.width > 0 and face.height > 0
-            ], label
+        try:
+            faces = _detect_faces_by_yunet(rotated)
+            if faces:
+                return [
+                    _map_rotated_face_to_source(face, rotation_code, source_w, source_h)
+                    for face in faces
+                    if face.width > 0 and face.height > 0
+                ], label
+        finally:
+            # 全分辨率旋转副本及时释放：fallback 最多 3 份全拷贝常驻，4K 图下易爆
+            del rotated
     return [], ""
 
 
@@ -256,6 +265,8 @@ def get_face_crop_left(image: Image.Image, crop_width: int, log_fn=None) -> int 
     finally:
         rgb_image.close()
     faces, rotation_label = _detect_faces_with_rotation_fallback(image_bgr)
+    # BGR 全分辨率双份（np + cvtColor）在检测完成后即释放，后续只用 FaceBox 坐标
+    del image_bgr
     primary_face = _select_primary_face(faces, image.width)
     if primary_face is None:
         _log_face("\n 🖼 Poster裁剪: 未检测到有效人脸，使用居中裁剪", log_fn)

@@ -51,7 +51,9 @@ def get_studio(html):
 def get_release(html):
     result = html.xpath('//i[@class="fa fa-clock me-2"]/../text()')
     if result:
-        s = re.search(r"\d{4}-\d{2}-\d{2}", result[0]).group()
+        # 页面无日期时 search 返回 None，.group() 会 AttributeError 打穿该爬虫
+        m = re.search(r"\d{4}-\d{2}-\d{2}", result[0])
+        s = m.group() if m else ""
         return s if s else ""
     return ""
 

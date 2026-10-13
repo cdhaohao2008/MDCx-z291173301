@@ -96,16 +96,19 @@ def get_release(res):
 
 def get_runtime(s):
     runtime = ""
-    if ":" in s:
-        temp_list = s.split(":")
-        if len(temp_list) == 3:
-            runtime = int(temp_list[0]) * 60 + int(temp_list[1])
-        elif len(temp_list) <= 2:
-            runtime = int(temp_list[0])
-    elif "分" in s or "min" in s:
-        a = re.findall(r"(\d+)(分|min)", s)
-        if a:
-            runtime = a[0][0]
+    try:
+        if ":" in s:
+            temp_list = s.split(":")
+            if len(temp_list) == 3:
+                runtime = int(temp_list[0].strip() or 0) * 60 + int(temp_list[1].strip() or 0)
+            elif len(temp_list) <= 2:
+                runtime = int(temp_list[0].strip() or 0)
+        elif "分" in s or "min" in s:
+            a = re.findall(r"(\d+)(分|min)", s)
+            if a:
+                runtime = a[0][0]
+    except (ValueError, IndexError):
+        runtime = ""
     return str(runtime)
 
 
@@ -195,7 +198,9 @@ class MmtvCrawler(BaseCrawler):
     async def _generate_search_url(self, ctx: Context) -> list[str] | str | None:
         search_keyword = ctx.input.number
         if ctx.input.number.upper().startswith("FC2"):
-            search_keyword = re.findall(r"\d{3,}", ctx.input.number)[0]
+            found = re.findall(r"\d{3,}", ctx.input.number)
+            # FC2 番号无数字（如用户手输 "FC2-"）：回退原番号搜索，避免 IndexError 打穿整站任务
+            search_keyword = found[0] if found else ctx.input.number
         return f"{self.base_url}/zh/searchform_search/all/index.html?search_keyword={search_keyword}&search_type=searchall&op=search"
 
     @override
