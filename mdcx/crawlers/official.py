@@ -118,9 +118,9 @@ class OfficialCrawler(BaseCrawler):
     # 重写为三档结构, 并注明网络检测覆盖面(无码五站)与抓取面的差异。
     description = (
         "按番号前缀自动路由官网，综合有码+无码，均走代理："
-        "有码 30 家厂牌官网（S1/Moodyz/Prestige 等，DLDSS→Dahlia、FNS/JIMMY→Faleno 专用爬虫）；"
-        "无码 5 站官网（Caribbeancom/Heyzo/1pondo/pacopacomama/10musume，JSON API 直连）。"
-        "注：「检测网络」仅逐站检测无码 5 站官网，有码 30 家不参与检测"
+        "有码30家厂牌官网S1/Moodyz/Prestige等，DLDSS→Dahlia、FNS/JIMMY→Faleno专用爬虫；"
+        "无码5站官网Caribbeancom/Heyzo/1pondo/pacopacomama/10musume，JSONAPI直连，"
+        "注：「检测网络」仅逐站检测无码5站官网，有码30家不参与检测"
     )
 
     @classmethod
