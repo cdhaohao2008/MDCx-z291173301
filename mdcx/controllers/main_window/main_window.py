@@ -8553,7 +8553,7 @@ class MyMAinWindow(QMainWindow):
                     # 左下角提示格式「有新版本了！（日期tag）」：保留 🍉 图标与感叹号，只显示日期 tag 全角括号红字。
                     self.new_version = f'\n🍉 有新版本了！<font color="red">（{latest_version.tag}）</font>'
                     signal_qt.show_scrape_info()
-                    version_info = f'基于MDC-GUI修改·当前版本：{self.version_display} （<font color="red">最新版本是：{latest_version.display}，请及时更新！🚀</font>）'
+                    version_info = f'基于MDC-GUI修改·当前版本：{self.version_display}（<font color="red">最新版本是：{latest_version.display}，请及时更新！🚀</font>）'
                     download_link = f' ⬇️ <a href="{GITHUB_RELEASES_URL}">下载新版本</a>'
             else:
                 version_info = f'基于MDC-GUI修改·当前版本：{self.version_display}（<font color="green">你使用的是最新版本！🎉</font>）'
