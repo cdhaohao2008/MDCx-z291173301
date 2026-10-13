@@ -4880,13 +4880,64 @@ class MyMAinWindow(QMainWindow):
     _NFO_EDITOR_TAG_MIN_H = 100
     _NFO_COMMA_HINT = "多个以逗号隔开"
     _NFO_OVERLAY_X = 8
-    _NFO_OVERLAY_Y = 2
+    _NFO_OVERLAY_Y = 0
     _NFO_OVERLAY_MARGIN = 12
     _NFO_OVERLAY_BTN_W = 91
     _NFO_OVERLAY_BTN_H = 40
     _NFO_OVERLAY_BTN_GAP = 108
-    _NFO_OVERLAY_BAR_H = 52
+    _NFO_OVERLAY_BAR_H = 50
     _NFO_OVERLAY_TREE_GAP = 8
+    # 整体高度缩减量的固定回退值（行高累加失败时才用）：35px
+    _NFO_OVERLAY_H_TRIM = 35
+
+    def _nfo_fixed_gap_offset(self) -> int | None:
+        """底部条上沿在内容区的目标偏移 = 「原简介」行底到「标签」行顶的中点，按行固有高度算死。
+
+        文件行（一般两行）/番号三联行/演员/标题/原标题行/简介框/原简介框的高度都是
+        定死的（原生 QTextEdit 的 sizeHint 不随文本变，框高即 minimumHeight），与
+        内容区当前尺寸无关——之前探针法首开量的是设计尺寸下的旧几何，第二次才收敛，
+        故两次高度不一样。现改累加各行 `max(最小高, sizeHint, 最小sizeHint)` + 行距，
+        次次一致。文件标签是 wordWrap 两行，高度随宽度轻微浮动，属唯一近似项。
+        任一部件取不到就返回 None，调用方回退固定 trim。
+        """
+        ui = self.Ui
+        content = ui.scrollAreaWidgetContents_nfo_editor
+        if content.layout() is None:
+            return None
+
+        def _row_h(*widgets) -> int | None:
+            h = 0
+            for w in widgets:
+                if w is None:
+                    return None
+                h = max(h, w.minimumHeight(), w.sizeHint().height(), w.minimumSizeHint().height())
+            return h
+
+        rows = (
+            (ui.label_381, ui.label_nfo),
+            (
+                ui.label_360,
+                ui.lineEdit_nfo_number,
+                ui.label_369,
+                ui.comboBox_nfo,
+                ui.label_380,
+                ui.lineEdit_nfo_year,
+            ),
+            (ui.label_359, ui.lineEdit_nfo_actor),
+            (ui.label_361, ui.lineEdit_nfo_title),
+            (ui.label_372, ui.lineEdit_nfo_originaltitle),
+            (ui.label_19, ui.textEdit_nfo_outline),
+            (ui.label_371, ui.textEdit_nfo_originalplot),
+        )
+        total = 6  # outer 顶 margin
+        for i, r in enumerate(rows):
+            if i:
+                total += 6  # outer 行距
+            h = _row_h(*r)
+            if h is None:
+                return None
+            total += h
+        return total + 3  # 到标签行顶的半个行距
 
     def _ensure_nfo_editor_layout(self) -> None:
         """议题 #154/#166：覆盖层内容区改为行式布局，字段随宽度拉伸。
@@ -5000,7 +5051,16 @@ class MyMAinWindow(QMainWindow):
             content_h = max(lay.sizeHint().height(), 200)
         else:
             content_h = 200
-        nfo_h = min(29 + content_h + self._NFO_OVERLAY_BAR_H, max_h)
+        # 底部条上沿对齐到「原简介/标签」两行正中间：按行固有高度算死（见
+        # _nfo_fixed_gap_offset），与内容区当前尺寸无关，首开与之后完全一致。
+        # 顶部位置不动；min() 钳窗口上限、下限 280 保极小窗口不塌。
+        gap_mid = self._nfo_fixed_gap_offset()
+        if gap_mid is not None:
+            # 用户目测：中点基础上再上收 8px
+            nfo_h = min(29 + gap_mid + self._NFO_OVERLAY_BAR_H - 8, max_h)
+        else:
+            nfo_h = min(29 + content_h + self._NFO_OVERLAY_BAR_H - self._NFO_OVERLAY_H_TRIM, max_h)
+        nfo_h = max(nfo_h, 280)
         nfo.setGeometry(nfo_x, nfo_y, nfo_w, nfo_h)
         btn_w, btn_h, gap, bar_h = (
             self._NFO_OVERLAY_BTN_W,
@@ -5011,12 +5071,15 @@ class MyMAinWindow(QMainWindow):
         pair_w = btn_w + gap + btn_w
         save_x = max((nfo_w - pair_w) // 2, 0)
         close_x = save_x + btn_w + gap
-        btn_y = max(nfo_h - margin - btn_h, 0)
+        # 两按钮在底部操作条内上下居中（左右位置不变）：条高 50、按钮高 40，上下各留 5px
+        btn_y = max(nfo_h - bar_h + (bar_h - btn_h) // 2, 0)
         ui.pushButton_nfo_close.setGeometry(close_x, btn_y, btn_w, btn_h)
         ui.pushButton_nfo_save.setGeometry(save_x, btn_y, btn_w, btn_h)
         ui.pushButton_nfo_save.raise_()
         ui.pushButton_nfo_close.raise_()
-        ui.label_save_tips.setGeometry(margin, max(nfo_h - margin - 24, 0), max(save_x - margin, 60), 20)
+        ui.label_save_tips.setGeometry(
+            margin, max(nfo_h - bar_h + (bar_h - 20) // 2, 0), max(save_x - margin, 60), 20
+        )
         ui.label_4.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
         ui.label_4.setGeometry(0, 5, nfo_w, ui.label_4.height())
         scroll = ui.scrollArea_nfo

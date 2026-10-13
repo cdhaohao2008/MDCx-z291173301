@@ -121,13 +121,13 @@ def test_overlay_buttons_centered_and_pinned(win):
         win._sync_nfo_overlay_geometry()
         save, close = ui.pushButton_nfo_save, ui.pushButton_nfo_close
         expect_save, expect_close = _pair_geometry(nfo.width())
-        assert save.y() == nfo.height() - 12 - 40, f"{width}x{height}: 保存按钮未钉底 (y={save.y()})"
+        bar, bh = win._NFO_OVERLAY_BAR_H, win._NFO_OVERLAY_BTN_H
+        assert save.y() == nfo.height() - bar + (bar - bh) // 2, f"{width}x{height}: 保存按钮未在底部条内上下居中 (y={save.y()})"
         assert save.x() == expect_save, f"{width}x{height}: 保存按钮未成对居中 (x={save.x()})"
         assert close.x() == expect_close, f"{width}x{height}: 关闭按钮未成对居中 (x={close.x()})"
         assert close.x() - (save.x() + save.width()) == 108, "保存/关闭间距应为 108px"
-        # 底部操作条高度 _NFO_OVERLAY_BAR_H=50，比按钮+下边距（12+40=52）小 2px，
-        # 滚动区底边因此最多到 save.y()+2（当前设计的既有偏差，非本次回归）
-        assert scroll.y() + scroll.height() <= save.y() + 2, "滚动区明显覆盖了底部操作条"
+        # 按钮在底部操作条内上下居中；滚动区底边恰为操作条顶边
+        assert scroll.y() + scroll.height() <= save.y(), "滚动区覆盖了底部操作条"
         assert save.x() + save.width() <= close.x(), "保存/关闭按钮重叠"
 
 
@@ -161,6 +161,27 @@ def test_overlay_title_centered_and_comma_hints_moved(win):
     assert ui.textEdit_nfo_tag.placeholderText() == "多个以逗号隔开"
 
 
+def test_overlay_bar_top_lands_on_plot_tag_gap(win):
+    """底部条上沿应落在行固有高度算出的中点上，且连续两次同步高度一致（首开不再漂移）。"""
+    ui = win.Ui
+    _open_overlay(win)
+    win.resize(1920, 1080)
+    win._sync_nfo_overlay_geometry()
+    first_h = ui.widget_nfo.height()
+    win._sync_nfo_overlay_geometry()
+    assert ui.widget_nfo.height() == first_h, "两次同步高度不一致"
+    nfo = ui.widget_nfo
+    bar, bh = win._NFO_OVERLAY_BAR_H, win._NFO_OVERLAY_BTN_H
+    gap_mid = win._nfo_fixed_gap_offset()
+    assert gap_mid is not None, "行高累加失败"
+    bar_top = nfo.height() - bar  # 条上沿在面板坐标系的位置
+    assert bar_top - ui.scrollArea_nfo.y() == gap_mid - 8, (  # 中点基础上再上收 8px
+        f"条上沿未落在两行中间: bar_top_offset={bar_top - ui.scrollArea_nfo.y()} gap_mid={gap_mid}"
+    )
+    save = ui.pushButton_nfo_save
+    assert save.y() == bar_top + (bar - bh) // 2, "按钮未在底部条内上下居中"
+
+
 def test_overlay_syncs_on_first_open_without_resize(win, monkeypatch):
     ui = win.Ui
     monkeypatch.setattr(win, "_check_main_file_path", lambda: True)
@@ -169,7 +190,9 @@ def test_overlay_syncs_on_first_open_without_resize(win, monkeypatch):
     win.main_open_nfo_click()
     nfo = ui.widget_nfo
     assert not nfo.isHidden()
-    assert ui.pushButton_nfo_save.y() == nfo.height() - 12 - 40, "首次打开未同步钉底几何"
+    assert ui.pushButton_nfo_save.y() == nfo.height() - win._NFO_OVERLAY_BAR_H + (
+        win._NFO_OVERLAY_BAR_H - win._NFO_OVERLAY_BTN_H
+    ) // 2, "首次打开按钮未在底部条内上下居中"
     expect_save, _ = _pair_geometry(nfo.width())
     assert ui.pushButton_nfo_save.x() == expect_save, "首次打开按钮未成对居中"
     assert ui.scrollAreaWidgetContents_nfo_editor.layout() is not None, "首次打开未建立内容布局"
