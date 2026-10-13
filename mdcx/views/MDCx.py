@@ -14789,7 +14789,6 @@ class Ui_MDCx(object):
         self.label_381.setText(_translate("MDCx", "文件："))
         self.pushButton_nfo_save.setText(_translate("MDCx", "保存"))
         self.pushButton_nfo_close.setText(_translate("MDCx", "关闭"))
-        self.pushButton_nfo_close.setShortcut(_translate("MDCx", "Esc"))
         self.label_4.setText(_translate("MDCx", "编辑NFO"))
 
 

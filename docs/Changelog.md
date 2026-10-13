@@ -3,7 +3,8 @@
 ## v2.4.0 (2026-10-13)
 ### 调整
 - **版本号**：`2.3.9` → `2.4.0`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`）。
-- **「编辑 NFO」覆盖层三处微调**：①上边框上移 4px（`main_window.py` 的 `_NFO_OVERLAY_Y` 由 8 改为 4，贴到顶部图标面板）；②底部操作条高度由 50 改为 52（`_NFO_OVERLAY_BAR_H`），按钮钉底 y（`nfo_h-12-40`）与滚动区底边（`29+nfo_h-29-52`）恰好对齐，消除之前 2px 压盖偏差；③关闭按钮关联 ESC 键（`init.py` 显式 `setShortcut("Esc")`，按钮 shortcut 默认即窗口级上下文，与 `.ui` 的 shortcut=Esc 双保险，焦点在输入框/文本框时同样生效），走 `clicked→_close_nfo_editor` 单一路、脏数据照常弹保存确认；全局 ESC handler 保持只管说明弹窗，避免双路触发连弹两次确认框。
+- **「编辑 NFO」覆盖层三处微调**：①上边框上移 6px（`main_window.py` 的 `_NFO_OVERLAY_Y` 由 8 改为 2，贴到顶部图标面板）；②底部操作条高度由 50 改为 52（`_NFO_OVERLAY_BAR_H`），按钮钉底 y（`nfo_h-12-40`）与滚动区底边（`29+nfo_h-29-52`）恰好对齐，消除之前 2px 压盖偏差；③ESC 关闭编辑窗口：此前关闭按钮自带的 shortcut=Esc 与主窗口全局 `QShortcut(Esc)` 键序列相同，被 Qt 判为 ambiguous shortcut 后两条都不触发（ESC 毫无反应的根因；另 `QPushButton` 根本没有 `setShortcutContext` 方法）。现删掉按钮 shortcut（`.ui`、`MDCx.py`、`init.py` 三处），ESC 全应用只留全局 `QShortcut` 这一条路径（`hide_tips_widget_on_escape`）：NFO 面板可见时等同点「关闭」（走 `_close_nfo_editor`，脏数据照常弹保存确认），否则才关说明弹窗；窗口级上下文，焦点在输入框/文本框时同样生效。
+## v2.3.9 (2026-10-13)
 ### 修复
 - **版本号**：`2.3.8` → `2.3.9`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`；`LOCAL_VERSION` 保持 `20261020`）。
 - **超分黑图/近黑图漏检（`mdcx/core/super_resolution.py`）**：旧 `_is_all_black` 只拦灰度均值 `<5` 的纯黑，均值 8~15 的近黑图（肉眼全黑）会通过尺寸校验直接覆盖原图。现改用 64x64 灰度统计（`_image_gray_stats`），单文件阈值放宽到均值 `<16`，并新增原图对照判定 `_upscale_failure_reason`（绝对黑/近黑/亮度崩塌到原图 0.35 倍以下/纹理丢失/高光丢失，原图本身暗时不误判）；首超失败改换另一款工具重试一次（同工具黑图多为确定性驱动问题，重试无意义），仍失败则删产物保原图。

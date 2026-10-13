@@ -591,8 +591,9 @@ def Init_Singal(self: "MyMAinWindow"):
     self.Ui.pushButton_show_tips_close.clicked.connect(self.Ui.widget_show_tips.hide)
     self.Ui.pushButton_nfo_close.clicked.connect(self._close_nfo_editor)
     self.Ui.pushButton_nfo_save.clicked.connect(self.save_nfo_info)
-    # 关闭按钮关联 ESC 键（与 .ui 的 shortcut=Esc 双保险；按钮 shortcut 默认即窗口级上下文，文本框焦点下同样生效）
-    self.Ui.pushButton_nfo_close.setShortcut("Esc")
+    # 关闭按钮刻意不设 shortcut：ESC 由主窗口唯一的全局 QShortcut
+    #（hide_tips_widget_on_escape）统一处理，NFO 可见时等同点关闭；按钮上再挂一条
+    # 相同键序列的 shortcut 会被 Qt 判为 ambiguous，两条都不触发。
     # endregion
 
     # region 鼠标点击

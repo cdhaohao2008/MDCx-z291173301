@@ -27447,9 +27447,6 @@ p, li { white-space: pre-wrap; }
           <property name="text">
             <string>关闭</string>
           </property>
-          <property name="shortcut">
-            <string>Esc</string>
-          </property>
         </widget>
         <widget class="QLabel" name="label_4">
           <property name="geometry">

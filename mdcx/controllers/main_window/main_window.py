@@ -4880,7 +4880,7 @@ class MyMAinWindow(QMainWindow):
     _NFO_EDITOR_TAG_MIN_H = 100
     _NFO_COMMA_HINT = "多个以逗号隔开"
     _NFO_OVERLAY_X = 8
-    _NFO_OVERLAY_Y = 4
+    _NFO_OVERLAY_Y = 2
     _NFO_OVERLAY_MARGIN = 12
     _NFO_OVERLAY_BTN_W = 91
     _NFO_OVERLAY_BTN_H = 40
@@ -11164,10 +11164,14 @@ class MyMAinWindow(QMainWindow):
         self.Ui.textBrowser_show_tips.setText(msg)
         self.Ui.widget_show_tips.show()
 
-    # ESC 关闭说明弹窗（仅弹窗可见时生效，不影响其他 ESC 行为）
-    # 编辑 NFO 面板的 ESC 由关闭按钮自身的 shortcut（WindowShortcut，见 init.py）触发，
-    # 走 clicked→_close_nfo_editor 单一路，避免与本全局 QShortcut 双路触发导致脏数据时连弹两次确认框
+    # ESC 统一入口：编辑 NFO 面板可见时等同点「关闭」按钮（走 _close_nfo_editor，
+    # 脏数据照常弹保存确认）；否则才关说明弹窗。注意 ESC 全应用只许存在这一条路径——
+    # 关闭按钮自身不得再设 shortcut，否则与本全局 QShortcut 键序列相同会被 Qt 判为
+    # ambiguous shortcut，两条都不触发（此前 ESC 毫无反应的根因）。
     def hide_tips_widget_on_escape(self):
+        if not self.Ui.widget_nfo.isHidden():
+            self._close_nfo_editor()
+            return
         if self.Ui.widget_show_tips.isVisible():
             self.Ui.widget_show_tips.hide()
 
