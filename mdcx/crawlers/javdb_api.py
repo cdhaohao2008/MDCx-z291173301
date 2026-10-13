@@ -7,6 +7,7 @@ from urllib.parse import urlencode, urljoin
 
 from parsel import Selector
 
+from ..base.web import is_bare_host_url
 from ..config.manager import manager
 from ..config.models import Website
 from ..models.model_types import CrawlerResult
@@ -201,7 +202,21 @@ class Parser(DetailPageParser):
         return extract_text(html, _SELECTOR_COVER)
 
     async def extrafanart(self, ctx, html: Selector) -> list[str]:
-        return extract_all_texts(html, _SELECTOR_EXTRAFANART)
+        # 与 JavdbCrawler 同源 markup：href 是原图优先，裸 CDN 根占位逐个丢弃、
+        # 回退内层 img src（MKBD-S39 /v/eprkM 实测 51 个裸 href 全靠 img 兜底）。
+        urls: list[str] = []
+        anchors = html.xpath("//div[@class='tile-images preview-images']/a[@class='tile-item']")
+        if not anchors:
+            return []
+        for anchor in anchors:
+            href = (anchor.xpath("./@href").get() or "").strip()
+            if href and not is_bare_host_url(href):
+                urls.append(href)
+                continue
+            src = (anchor.xpath("./img/@src").get() or "").strip()
+            if src and not is_bare_host_url(src):
+                urls.append(src)
+        return list(dict.fromkeys(urls))
 
     async def trailer(self, ctx, html: Selector) -> str:
         return extract_text(html, _SELECTOR_TRAILER)

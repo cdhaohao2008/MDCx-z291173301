@@ -141,6 +141,24 @@ def is_jdbstatic_image_url(url: str) -> bool:
     return path.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".avif"))
 
 
+def is_bare_host_url(url: str) -> bool:
+    """裸域名 URL（无 path 或 path 仅为 '/'）：永远不可能返回图片/视频资源。
+
+    javdb 样图画廊的 a.tile-item 占位 href 即此类（`https://c0.jdbstatic.com/`），
+    真图在内层 img src。调用方应直接丢弃，不发起请求。
+    """
+    normalized = normalize_media_url(url)
+    if normalized.startswith("//"):
+        normalized = "https:" + normalized
+    try:
+        split_result = urlsplit(normalized)
+    except Exception:
+        return False
+    if not split_result.netloc or not split_result.scheme.startswith("http"):
+        return False
+    return not split_result.path or split_result.path == "/"
+
+
 # JavDB App 专用图片 CDN：返回单字节 XOR 加密流，解密后为无水印原图
 # 判定按域名而非完整路径——路径中段（如 rhe951l4q）可能随服务端调整变更
 _SPFCAS_IMAGE_HOST = "tp.spfcas.com"

@@ -21,6 +21,7 @@ from ..base.web import (
     _should_retry_link_error,
     build_jdbstatic_headers,
     decode_spfcas_image_content,
+    is_bare_host_url,
     is_dmm_image_url,
     is_jdbstatic_image_url,
     log_jdbstatic_request_headers,
@@ -103,7 +104,12 @@ class MediaResourceContext:
 
     @staticmethod
     def normalize_url(url: str) -> str:
-        return normalize_media_url(url)
+        normalized = normalize_media_url(url)
+        # 纵深防御：裸域名（无 path）永远不可能返回图片，直接视为空，
+        # 任何爬虫再吐出 host 根 URL 都不会进入请求层（javdb 画廊占位 href 教训）。
+        if normalized and is_bare_host_url(normalized):
+            return ""
+        return normalized
 
     async def fetch_image(self, url: str) -> FetchedImage | None:
         normalized_url = self.normalize_url(url)

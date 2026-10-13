@@ -7,6 +7,7 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 from parsel import Selector
 
+from ..base.web import is_bare_host_url
 from ..config.manager import manager
 from ..config.models import Website
 from ..models.model_types import CrawlerResult
@@ -113,7 +114,23 @@ class Parser(DetailPageParser):
         return extract_text(html, "//img[@class='video-cover']/@src")
 
     async def extrafanart(self, ctx, html: Selector) -> list[str]:
-        return extract_all_texts(html, "//div[@class='tile-images preview-images']/a[@class='tile-item']/@href")
+        # 样图是 fancybox 画廊：a.tile-item 的 href 是原图（点击放大目标），
+        # 内层 img 只是小缩略图；但部分页面（如 MKBD-S39 /v/eprkM）的 href
+        # 是裸 CDN 根占位（`https://c0.jdbstatic.com/`，51 个重复），此时才
+        # 回退到 img src。裸域名逐个丢弃，否则图片管线并发空转撞 CF。
+        urls: list[str] = []
+        anchors = html.xpath("//div[@class='tile-images preview-images']/a[@class='tile-item']")
+        if not anchors:
+            return []
+        for anchor in anchors:
+            href = (anchor.xpath("./@href").get() or "").strip()
+            if href and not is_bare_host_url(href):
+                urls.append(href)
+                continue
+            src = (anchor.xpath("./img/@src").get() or "").strip()
+            if src and not is_bare_host_url(src):
+                urls.append(src)
+        return list(dict.fromkeys(urls))
 
     async def trailer(self, ctx, html: Selector) -> str:
         return extract_text(html, "//video[@id='preview-video']/source/@src")
