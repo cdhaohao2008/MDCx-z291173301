@@ -2465,7 +2465,7 @@
                     <string>删除所有男性演员</string>
                   </property>
                 </widget>
-                <widget class="QPushButton" name="pushButton_actor_db_fill_Minnano">
+                <widget class="QPushButton" name="pushButton_actor_db_fill_minnano">
                   <property name="geometry">
                     <rect>
                       <x>260</x>
@@ -25390,7 +25390,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
               <string>&lt;!DOCTYPEHTMLPUBLIC"-//W3C//DTDHTML4.0//EN""http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
 &lt;html&gt;&lt;head&gt;&lt;metaname="qrichtext"content="1"/&gt;&lt;styletype="text/css"&gt;
 p,li{white-space:pre-wrap;}
-&lt;/style&gt;&lt;/head&gt;&lt;bodystyle="font-family:'MicrosoftYaHeiUI',PingFangSC,sans-serif;font-size:12pt;"&gt;
+&lt;/style&gt;&lt;/head&gt;&lt;bodystyle="font-family:'MicrosoftYaHeiUI',PingFangSC,sans-serif;font-size:11pt;"&gt;
 &lt;h3&gt;MDCx使用说明&lt;/h3&gt;
 &lt;p&gt;MDCx是一款本地视频元数据刮削工具：从各大网站抓取影片的标题、演员、封面、简介等信息，生成标准.nfo文件与规范命名的文件夹，供Emby、Jellyfin、Kodi、Plex等媒体服务器直接使用。支持Windows/macOS/Linux。&lt;/p&gt;
 &lt;h4&gt;一、快速开始&lt;/h4&gt;
@@ -25420,14 +25420,14 @@ p,li{white-space:pre-wrap;}
 &lt;h4&gt;四、网站选择&lt;/h4&gt;
 &lt;p&gt;网站下拉框由已注册的爬虫自动生成（当前36个），可按需选用全部网站或指定网站。主要来源包括：&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;b&gt;有码&lt;/b&gt;：仅能有码：DMM、DMM_API、TheJavDB_API、LibreDMM、R18.dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO；综合（有码+无码）：JavBus、JavDB系、MissAV系、Official、airav.cc、AVSex、JavDay、JavFree、IQQTV、7mmtv&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;有码&lt;/b&gt;：仅能有码：DMM、DMM-API、TheJavDB-API、LibreDMM、R18.dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO；综合（有码+无码）：JavBus、JavDB系、MissAV系、Official、airav.cc、AVSex、JavDay、JavFree、IQQTV、7mmtv&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;无码&lt;/b&gt;：AVSOX、AVEntertainments及综合站（JavBus、JavDB系、MissAV系、AVSex、Official、JavDay、IQQTV、7mmtv）&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;素人&lt;/b&gt;：MGStage（259LUXU等）、Prestige、JavBus、JavDB系、DMM、DMM_API、AVBase、MissAV系、MyWife、IQQTV、7mmtv&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;素人&lt;/b&gt;：MGStage（259LUXU等）、Prestige、JavBus、JavDB系、DMM、DMM-API、AVBase、MissAV系、MyWife、IQQTV、7mmtv&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;FC2&lt;/b&gt;：FC2、FC2PPVDB、JavDB系、JavFree、7mmtv&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;国产&lt;/b&gt;：Madouqu、Madou_Club、AVSex、IQQTV、JavDay&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;欧美&lt;/b&gt;：ThepornDB、AVheat&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;国产&lt;/b&gt;：MADOUQU、MADOU_CLUB、AVSex、IQQTV、JavDay&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;欧美&lt;/b&gt;：THEPORNDB、AVHEAT&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;&lt;b&gt;Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：S1、Moodyz、Madonna-av、Wanz-Factory、IdeaPocket、Kirakira-av、E-Body、Bi-av、Premium-Beauty、Miman、Tameikegoro、Fitch-av、Kawaii、BeeFree、Muku.tv、Attackers、MKO-Labo、Dasdas、MVG、AV-Opera、Oppai-av、V-av、To-Satsu、Bibian-av、Honnaka、Rookie-av、Nanpa-Japan、HajimeKikaku、HHH-av、Prestige&lt;br/&gt;
+&lt;p&gt;&lt;b&gt;Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：S1S1S1、Moodyz、Madonna-av、Wanz-Factory、IdeaPocket、Kirakira-av、E-Body、Bi-av、Premium-Beauty、Miman、Tameikegoro、Fitch-av、Kawaii、BeeFree、Muku.tv、Attackers、MKO-Labo、Dasdas、MVG、AV-Opera、Oppai-av、V-av、To-Satsu、Bibian-av、Honnaka、Rookie-av、Nanpa-Japan、HajimeKikaku、HHH-av、Prestige&lt;br/&gt;
 无码官网5站，JSON API直连：Caribbeancom、Heyzo、1Pondo、Pacopacomama、10Musume&lt;br/&gt;
 番号前缀DLDSS/FNS/JIMMY还分别路由到Dahlia/Faleno官网，官网前缀表维护在代码manual.py的OFFICIAL字典中，增减不影响使用说明。&lt;/p&gt;
 &lt;h4&gt;五、Cloudflare绕过（CFBypass）&lt;/h4&gt;
@@ -25442,7 +25442,7 @@ p,li{white-space:pre-wrap;}
 &lt;p&gt;在"设置→网络"中配置：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;b&gt;使用代理&lt;/b&gt;：开启后填写HTTP/HTTPS或SOCKS5代理地址（如http://127.0.0.1:7890）。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;走代理网站&lt;/b&gt;：仅指定域名走代理，其余直连。默认包含amazon.co.jp、m.media-amazon.com、xcity.jp、Minnano-av.com、avbase.net、javbus.com、javdb.com、javlibrary.com、r18.dev、mgstage.com、prestige-av.com、seesaawiki.jp、avsox.click、avsox.com、avmoo.shop、avmoo.com、avheat.shop、avheat.com、caribbeancom.com、heyzo.com、1pondo.tv、pacopacomama.com、10musume.com、mywife.cc、github.com、raw.githubusercontent.com、google.com、missav.ws、missav.ai、missav.live、aventertainments.com、javfree.me、7mmtv.sx、7tv022.com。可按需增删（也可直接填数据源名，如missav、javdb，站点及其镜像域名将整体走代理）。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;走代理网站&lt;/b&gt;：仅指定域名走代理，其余直连。默认包含amazon.co.jp、m.media-amazon.com、xcity.jp、minnano-av.com、avbase.net、javbus.com、javdb.com、javlibrary.com、r18.dev、mgstage.com、prestige-av.com、seesaawiki.jp、avsox.click、avsox.com、avmoo.shop、avmoo.com、avheat.shop、avheat.com、caribbeancom.com、heyzo.com、1pondo.tv、pacopacomama.com、10musume.com、mywife.cc、github.com、raw.githubusercontent.com、google.com、missav.ws、missav.ai、missav.live、aventertainments.com、javfree.me、7mmtv.sx、7tv022.com。可按需增删（也可直接填数据源名，如missav、javdb，站点及其镜像域名将整体走代理）。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;Bypass代理&lt;/b&gt;：为绕过Cloudflare的请求单独设置代理。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;如持续提示网络/代理错误，请检查地址与端口、确认代理软件处于全局模式，或尝试重启代理与网卡。&lt;/p&gt;
@@ -25468,7 +25468,7 @@ p,li{white-space:pre-wrap;}
 &lt;h4&gt;十、软件工具页面&lt;/h4&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;b&gt;NFO库管理&lt;/b&gt;：左侧导航独立页面，浏览和编辑整个NFO库。选择目录后递归扫描所有.nfo文件生成列表，支持番号/演员/标题筛选；点列表项读取NFO填充15字段编辑表单（番号/标题/演员/发行日/年份/时长/导演/片商/发行商/系列/评分/简介/标签/封面URL/海报URL），右侧同步预览本地海报和缩略图，可调起裁剪工具；保存前自动对比改动弹窗确认（字段级diff），无改动不写盘；批量操作面板支持多选后一键替换演员名、加标签、删标签、统一系列名；列表右键菜单提供重新刮削番号（找同目录同名视频入队）、打开所在目录、删除NFO文件。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;演员库维护&lt;/b&gt;：直接操作actor_database.xlsx。补全中文名（按TMDB ID补翻译）、补全LibreDMM链接、补全别名（可选来源：TMDB、Minnano或JavDB；默认仅补缺别名的条目，勾选「全量更新」则并入全部行，不覆盖本地已有别名，支持「起始行/限量」分片续跑）、JavDB中文名（从JavDB影片详情页抓取演员中文名，并发拉取影片详情，支持分片续跑与「停止当前维护任务」）、Minnano-av补全（从Minnano-av补缺生日/简介，日文字段自动翻译）、检查用户库（扫描格式/结构/数据异常并弹窗报告，安全项可一键自动修复，TMDB给出人工修复步骤）、打开数据库（用默认程序打开xlsx查看与编辑）、剔除男演员（按TMDB性别删除男优）、校验tmdbid有效性（清除TMDB失效id并按名字重搜补回）、更新nfo文件TMDB ID字段（用本地库新id覆盖nfo旧id）。联网工具支持限量分片与「停止当前维护任务」按钮，网络请求自动并发，进度实时显示。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;演员库维护&lt;/b&gt;：直接操作actor_database.xlsx。补全中文名（按TMDB ID补翻译）、补全LibreDMM链接、补全别名（可选来源：TMDB、minnano或JavDB；默认仅补缺别名的条目，勾选「全量更新」则并入全部行，不覆盖本地已有别名，支持「起始行/限量」分片续跑）、JavDB中文名（从JavDB影片详情页抓取演员中文名，并发拉取影片详情，支持分片续跑与「停止当前维护任务」）、Minnano-av补全（从Minnano-av补缺生日/简介，日文字段自动翻译）、检查用户库（扫描格式/结构/数据异常并弹窗报告，安全项可一键自动修复，TMDB给出人工修复步骤）、打开数据库（用默认程序打开xlsx查看与编辑）、剔除男演员（按TMDB性别删除男优）、校验tmdbid有效性（清除TMDB失效id并按名字重搜补回）、更新nfo文件TMDB ID字段（用本地库新id覆盖nfo旧id）。联网工具支持限量分片与「停止当前维护任务」按钮，网络请求自动并发，进度实时显示。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;刮削缓存管理&lt;/b&gt;：在「软件工具」页刮削缓存面板可查看断点续刮缓存状态（已完成/失败/总数），支持刷新缓存统计、导出缓存数据、重置缓存（清除全部已完成标记，下次全量重刮）、清空缓存（删除scrape_state.db文件）。适合在断点续刮数据异常或需要重新全量刮削时使用。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;Emby/Jellyfin演员管理器&lt;/b&gt;：填写Emby/Jellyfin地址和API密钥后连接服务器，获取演员列表并按媒体库筛选（可配置只获取演员类型/重复去重）；从Gfriends/Graphis.ne.jp/Minnano-av/本地文件夹按可配置优先级匹配头像和背景图（本地文件夹采用预扫描索引，N次全树遍历降为1次），从本地演员库/维基百科/Minnano-av/数据库按可配置优先级匹配简介和出生日期；Gfriends/Graphis/信息链路已合并为统一函数，按数据源优先级依次尝试；「数据源测试」可逐源验证结果，「设置」可配置数据源优先级与获取过滤；预览后批量同步到服务器（支持仅补缺失或强制重新获取，同步完成后自动刷新列表），双击演员行打开详情编辑对话框，可编辑简介/信息并单独同步头像/简介；头像缓存持久化到userdata/emby_actor_cache/目录（不再随临时目录清理丢失），「清空缓存文件夹」可一键清理。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;单文件刮削&lt;/b&gt;：指定某个文件的番号网址进行刮削，当存在相同番号时可手工指定。&lt;/li&gt;
@@ -25481,12 +25481,12 @@ p,li{white-space:pre-wrap;}
 &lt;h4&gt;十一、常见番号命名参考&lt;/h4&gt;
 &lt;p&gt;刮削前尽量命名规范、不区分大小写：&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;b&gt;标准有码&lt;/b&gt;：JavDB/JavBus:SSNI-111；DMM:SSNI00111&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;标准有码&lt;/b&gt;：JavDB/JavBus:SSNI-111；DMM:ssni00111&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;标准无码&lt;/b&gt;：JavDB/JavBus/Avsox:111111-1111、111111_111、HEYZO-1111、n1111&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;素人番号&lt;/b&gt;：MGStage:259LUXU-1111；JavDB:LUXU-1111；FC2:FC2-111111、FC2-PPV-111111&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;欧美番号&lt;/b&gt;：JavDB/JavBus:sexart.11.11.11（系列.年.月.日）&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;字幕影片&lt;/b&gt;：SSNI-xxx-c.mp4/-C.mp4（字幕标记靠近扩展名）&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;分集影片&lt;/b&gt;：SSNI-xxx-cd1.mp4、SSNI-xxx-cd2.mp4（默认支持-cdN/-partN/-hdN/单数字结尾-1等形式；如需-A字母分集或-01两位数字分集，可在设置→命名中勾选『允许识别分集』对应选项）&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;字幕影片&lt;/b&gt;：ssni-xxx-c.mp4/-C.mp4（字幕标记靠近扩展名）&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;分集影片&lt;/b&gt;：ssni-xxx-cd1.mp4、ssni-xxx-cd2.mp4（默认支持-cdN/-partN/-hdN/单数字结尾-1等形式；如需-A字母分集或-01两位数字分集，可在设置→命名中勾选『允许识别分集』对应选项）&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;外挂字幕&lt;/b&gt;：字幕文件名需与影片一致，支持srt/ass/sub，方可随影片一起移动&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;十二、获取帮助&lt;/h4&gt;
