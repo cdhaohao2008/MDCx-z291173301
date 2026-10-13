@@ -1407,7 +1407,7 @@ class MyMAinWindow(QMainWindow):
     # （既非 _STRETCH 也非右缘 ≥90%），压根没进 registry，于是通用宽幅同步
     # 既不会推它、也不会在还原时把它推回来。最大化被本方法挪走后只能靠自己复位，
     # 故单独记下它的设计几何（相对 groupBox_68，与 MDCx.ui 一致）。
-    _ACTOR_PAGE_MISS_DESIGN = (300, 130, 141, 40)
+    _ACTOR_PAGE_MISS_DESIGN = (300, 130, 180, 40)
 
     # ── 演员信息组（groupBox_64）列对齐：行标签冒号 + 各行左缘对到 Graphis 列 ──
     # 锚点是 groupBox_41（头像组）horizontalLayout_93 里三个 Graphis 复选框的左缘：
@@ -8536,7 +8536,7 @@ class MyMAinWindow(QMainWindow):
             signal_qt.show_log_text(traceback.format_exc())
 
     def _show_version_thread(self):
-        version_info = f"基于 MDC-GUI 修改 当前版本: {self.version_display}"
+        version_info = f"基于MDC-GUI修改·当前版本： {self.version_display}"
         download_link = ""
         has_new_version = False
         latest_version = check_version()
@@ -8553,10 +8553,10 @@ class MyMAinWindow(QMainWindow):
                     # 左下角提示格式「有新版本了！（日期tag）」：保留 🍉 图标与感叹号，只显示日期 tag 全角括号红字。
                     self.new_version = f'\n🍉 有新版本了！<font color="red">（{latest_version.tag}）</font>'
                     signal_qt.show_scrape_info()
-                    version_info = f'基于 MDC-GUI 修改 · 当前版本: {self.version_display} （ <font color="red" >最新版本是: {latest_version.display}，请及时更新！🚀 </font>）'
+                    version_info = f'基于MDC-GUI修改·当前版本： {self.version_display} （<font color="red" >最新版本是：{latest_version.display}，请及时更新！🚀</font>）'
                     download_link = f' ⬇️ <a href="{GITHUB_RELEASES_URL}">下载新版本</a>'
             else:
-                version_info = f'基于 MDC-GUI 修改 · 当前版本: {self.version_display} （ <font color="green">你使用的是最新版本！🎉 </font>）'
+                version_info = f'基于MDC-GUI修改·当前版本：{self.version_display} （<font color="green">你使用的是最新版本！🎉</font>）'
 
         feedback = f' 💌 问题反馈: <a href="{GITHUB_ISSUES_URL}">GitHub Issues</a>'
 
