@@ -257,20 +257,35 @@ class JavlibraryCrawler(BaseCrawler):
         lang_path = language_path(language)
         domain_2 = f"{self.base_url}/{lang_path}"
         real_url = appoint_url
+        # 浏览器 bypass 解出的 cookie：搜索页带上后，详情页直连大概率直接 200，省一次解挑战
+        search_cookies: dict[str, str] = {}
         if not real_url:
             search_url = f"{domain_2}/vl_searchbyid.php?keyword={number}"
             ctx.debug(f"搜索地址[{language.value}]: {search_url}")
             ctx.debug_info.search_urls = [*(ctx.debug_info.search_urls or []), search_url]
             html_search, error = await self.async_client.get_text(search_url, use_proxy=self.use_proxy)
             if html_search is None or is_selenium_cf_html(html_search):
-                ctx.debug(f"搜索页遇 CF challenge，尝试 Selenium bypass: {search_url}")
-                selenium_html = await self._selenium_bypass(ctx, search_url)
-                if selenium_html:
-                    html_search = selenium_html
+                ctx.debug(f"搜索页遇 CF challenge，尝试浏览器 bypass: {search_url}")
+                bypass_html, bypass_cookies = await self._browser_bypass(ctx, search_url)
+                if bypass_html:
+                    html_search = bypass_html
+                    search_cookies = bypass_cookies
+                    if search_cookies:
+                        ctx.debug(f"浏览器 cookie 已透传到详情请求（{len(search_cookies)} 个）")
+                    else:
+                        ctx.debug("浏览器未带回可用 cookie，详情页仍裸请求")
+                    # 钉住当前池指纹：详情直连（带透传 cookie）沿用同一指纹，避免轮换导致再挑战
+                    pin = getattr(self.async_client, "pin_current_fingerprint", None)
+                    if callable(pin):
+                        try:
+                            if pin(search_url, use_proxy=self.use_proxy):
+                                ctx.debug("当前池指纹已钉住，详情请求沿用同一指纹")
+                        except Exception as e:
+                            ctx.debug(f"指纹钉住失败（不影响继续）: {e}")
                 elif html_search is None:
                     raise CrawlerException(f"请求错误:{error}")
                 else:
-                    raise CrawlerException("搜索结果: 被 Cloudflare 拦截，Selenium bypass 失败！")
+                    raise CrawlerException("搜索结果: 被 Cloudflare 拦截，浏览器 bypass 失败！")
             html = etree.fromstring(html_search, etree.HTMLParser())
             real_url = get_real_url(html, number, domain_2)
             if not real_url:
@@ -278,16 +293,20 @@ class JavlibraryCrawler(BaseCrawler):
 
         ctx.debug(f"番号地址[{language.value}]: {real_url}")
         ctx.debug_info.detail_urls = [*(ctx.debug_info.detail_urls or []), real_url]
-        html_info, error = await self.async_client.get_text(real_url, use_proxy=self.use_proxy)
+        if search_cookies:
+            ctx.debug(f"详情页直连携带浏览器 cookie（{len(search_cookies)} 个）")
+        html_info, error = await self.async_client.get_text(
+            real_url, use_proxy=self.use_proxy, cookies=search_cookies or None
+        )
         if html_info is None or is_selenium_cf_html(html_info):
-            ctx.debug(f"详情页遇 CF challenge，尝试 Selenium bypass: {real_url}")
-            selenium_html = await self._selenium_bypass(ctx, real_url)
-            if selenium_html:
-                html_info = selenium_html
+            ctx.debug(f"详情页遇 CF challenge，尝试浏览器 bypass: {real_url}")
+            bypass_html, _ = await self._browser_bypass(ctx, real_url)
+            if bypass_html:
+                html_info = bypass_html
             elif html_info is None:
                 raise CrawlerException(f"请求错误:{error}")
             else:
-                raise CrawlerException("详情页: 被 Cloudflare 拦截，Selenium bypass 失败！")
+                raise CrawlerException("详情页: 被 Cloudflare 拦截，浏览器 bypass 失败！")
 
         html_detail = etree.fromstring(html_info, etree.HTMLParser())
         title = get_title(html_detail)
@@ -322,48 +341,49 @@ class JavlibraryCrawler(BaseCrawler):
             wanted=get_wanted(html_detail),
         )
 
-    async def _selenium_bypass(self, ctx: Context, url: str) -> str | None:
+    async def _browser_bypass(self, ctx: Context, url: str) -> tuple[str | None, dict[str, str]]:
         """浏览器 CF bypass fallback：Selenium+Edge 第一顺位，Playwright+Edge 第二顺位。
 
-        配置开关关闭或双后端都不可用时返回 None。
+        单次浏览器会话同时返回 HTML 与 cookie，调用方可把 cookie 透传给后续
+        直连请求（省一次解挑战）。配置开关关闭或双后端都不可用时返回 (None, {})。
         """
         if not manager.config.cf_selenium_bypass:
-            ctx.debug("Selenium bypass 已在配置中关闭")
-            return None
+            ctx.debug("浏览器 bypass 已在配置中关闭")
+            return None, {}
 
-        from ..cf_bypass.selenium_adapter import get_html as selenium_get_html
+        from ..cf_bypass.selenium_adapter import get_html_and_cookies as selenium_get
         from ..cf_bypass.selenium_adapter import is_available as selenium_available
         from ..cf_bypass.selenium_adapter import is_cf_html
 
         if selenium_available():
             try:
-                html = await selenium_get_html(url)
+                html, cookies = await selenium_get(url)
                 if html and not is_cf_html(html):
-                    ctx.debug("Selenium bypass 成功")
-                    return html
+                    ctx.debug(f"Selenium bypass 成功（带回 {len(cookies)} 个 cookie）")
+                    return html, cookies
                 ctx.debug("Selenium bypass 后仍含 CF 标记，换 Playwright 再试")
             except Exception as e:
                 ctx.debug(f"Selenium bypass 异常: {e}，换 Playwright 再试")
         else:
             ctx.debug("Selenium bypass 不可用（无 Edge 或 selenium 未安装），换 Playwright 再试")
 
-        from ..cf_bypass.playwright_adapter import get_html as playwright_get_html
+        from ..cf_bypass.playwright_adapter import get_html_and_cookies as playwright_get
         from ..cf_bypass.playwright_adapter import is_available as playwright_available
 
         if not playwright_available():
             ctx.debug("Playwright bypass 不可用（无 Edge 或 playwright 未安装）")
-            return None
+            return None, {}
 
         try:
-            html = await playwright_get_html(url)
+            html, cookies = await playwright_get(url)
             if html and not is_cf_html(html):
-                ctx.debug("Playwright bypass 成功")
-                return html
+                ctx.debug(f"Playwright bypass 成功（带回 {len(cookies)} 个 cookie）")
+                return html, cookies
             ctx.debug("Playwright bypass 后仍含 CF 标记")
-            return None
+            return None, {}
         except Exception as e:
             ctx.debug(f"Playwright bypass 异常: {e}")
-            return None
+            return None, {}
 
     @override
     async def post_process(self, ctx: Context, res: CrawlerResult) -> CrawlerResult:

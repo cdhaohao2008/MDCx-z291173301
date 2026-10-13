@@ -130,6 +130,37 @@ def _wait_cf_pass(driver, max_wait: int = 60) -> str:
     return driver.page_source
 
 
+def _fetch_html_and_cookies_sync(url: str, timeout: int = 90) -> tuple[str | None, dict[str, str]]:
+    """单次浏览器会话获取页面 HTML 与 cookie（无失败计数，调用方做冷却/记账）。"""
+    driver = None
+    try:
+        driver = _create_driver()
+        driver.set_page_load_timeout(timeout)
+        driver.get(url)
+        html = _wait_cf_pass(driver)
+        if is_cf_html(html):
+            logger.warning("Selenium bypass: CF 挑战未通过")
+            return None, {}
+        cookies: dict[str, str] = {}
+        try:
+            for item in driver.get_cookies() or []:
+                name = str(item.get("name") or "")
+                if name:
+                    cookies[name] = str(item.get("value") or "")
+        except Exception as e:
+            logger.debug("Selenium 取 cookie 失败: %s", e)
+        return html, cookies
+    except Exception as e:
+        logger.warning("Selenium bypass 异常: %s", e)
+        return None, {}
+    finally:
+        if driver is not None:
+            try:
+                driver.quit()
+            except Exception:
+                pass
+
+
 def _get_html_sync(url: str, timeout: int = 90) -> str | None:
     """同步获取页面 HTML，自动过 CF。"""
     if not is_available():
@@ -142,28 +173,12 @@ def _get_html_sync(url: str, timeout: int = 90) -> str | None:
         logger.debug("Selenium bypass 冷却中，跳过")
         return None
 
-    driver = None
-    try:
-        driver = _create_driver()
-        driver.set_page_load_timeout(timeout)
-        driver.get(url)
-        html = _wait_cf_pass(driver)
-        if is_cf_html(html):
-            logger.warning("Selenium bypass: CF 挑战未通过")
-            _incr_failures()
-            return None
-        _reset_failures()
-        return html
-    except Exception as e:
-        logger.warning("Selenium bypass 异常: %s", e)
+    html, _ = _fetch_html_and_cookies_sync(url, timeout)
+    if not html:
         _incr_failures()
         return None
-    finally:
-        if driver is not None:
-            try:
-                driver.quit()
-            except Exception:
-                pass
+    _reset_failures()
+    return html
 
 
 def _incr_failures() -> None:
@@ -199,4 +214,27 @@ async def get_html(url: str, timeout: int = 90) -> str | None:
     Returns:
         过 CF 后的页面 HTML，失败返回 None
     """
-    return await asyncio.to_thread(_get_html_sync, url, timeout)
+    html, _ = await get_html_and_cookies(url, timeout)
+    return html
+
+
+async def get_html_and_cookies(url: str, timeout: int = 90) -> tuple[str | None, dict[str, str]]:
+    """单次浏览器会话获取页面 HTML 与 cookie（供后续直连请求透传，省一次解挑战）。
+
+    Returns:
+        (过 CF 后的页面 HTML, 浏览器 cookie 字典)，失败返回 (None, {})
+    """
+    if not is_available():
+        return None, {}
+
+    now = time.monotonic()
+    if now < _cooldown_until:
+        logger.debug("Selenium bypass 冷却中，跳过")
+        return None, {}
+
+    html, cookies = await asyncio.to_thread(_fetch_html_and_cookies_sync, url, timeout)
+    if not html:
+        _incr_failures()
+        return None, {}
+    _reset_failures()
+    return html, cookies

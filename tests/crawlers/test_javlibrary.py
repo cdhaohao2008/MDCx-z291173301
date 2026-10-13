@@ -260,18 +260,19 @@ def test_selenium_cf_detection():
 
 @pytest.mark.asyncio
 async def test_selenium_bypass_disabled_when_config_off(monkeypatch):
-    """配置关闭时 Selenium bypass 不触发，遇 CF 直接报错。"""
+    """配置关闭时浏览器 bypass 不触发，遇 CF 直接报错。"""
     monkeypatch.setattr(manager.config, "cf_selenium_bypass", False)
 
-    selenium_called = False
+    called = []
 
-    async def fake_get_html(url, timeout=90):
-        nonlocal selenium_called
-        selenium_called = True
-        return None
+    async def fake_get(url, timeout=90):
+        called.append(url)
+        return None, {}
 
-    monkeypatch.setattr("mdcx.cf_bypass.selenium_adapter.get_html", fake_get_html)
+    monkeypatch.setattr("mdcx.cf_bypass.selenium_adapter.get_html_and_cookies", fake_get)
     monkeypatch.setattr("mdcx.cf_bypass.selenium_adapter.is_available", lambda: True)
+    monkeypatch.setattr("mdcx.cf_bypass.playwright_adapter.get_html_and_cookies", fake_get)
+    monkeypatch.setattr("mdcx.cf_bypass.playwright_adapter.is_available", lambda: True)
 
     class FakeClientWithCF:
         async def get_text(self, url, **kwargs):
@@ -283,7 +284,39 @@ async def test_selenium_bypass_disabled_when_config_off(monkeypatch):
     assert res.data is None
     assert res.debug_info.error is not None
     assert "Cloudflare" in str(res.debug_info.error)
-    assert not selenium_called
+    assert not called
+
+
+@pytest.mark.asyncio
+async def test_browser_bypass_cookies_threaded_to_detail(monkeypatch):
+    """浏览器 bypass 解出的 cookie 必须透传给详情页直连（省一次解挑战）。"""
+    monkeypatch.setattr(manager.config, "cf_selenium_bypass", True)
+    monkeypatch.setattr("mdcx.cf_bypass.selenium_adapter.is_available", lambda: False)
+    monkeypatch.setattr("mdcx.cf_bypass.playwright_adapter.is_available", lambda: True)
+
+    async def fake_playwright(url, timeout=90):
+        return _search_html("/ja/?v=javtest200", "FSDSS-200 Japanese Title"), {"cf_clearance": "xyz"}
+
+    monkeypatch.setattr("mdcx.cf_bypass.playwright_adapter.get_html_and_cookies", fake_playwright)
+
+    class CookieCaptureClient:
+        def __init__(self):
+            self.detail_cookies = []
+
+        async def get_text(self, url, **kwargs):
+            if "vl_searchbyid" in url:
+                return "<html><title>Just a moment...</title></html>", ""
+            self.detail_cookies.append(kwargs.get("cookies"))
+            return _detail_html("FSDSS-200 Japanese Title", "女優A"), ""
+
+    client = CookieCaptureClient()
+    crawler = JavlibraryCrawler(client=client, base_url="https://www.javlibrary.com")
+    res = await crawler.run(_make_input(language=Language.JP))
+
+    assert res.data is not None
+    assert res.data.number == "FSDSS-200"
+    assert client.detail_cookies, "详情页直连应被调用"
+    assert client.detail_cookies[0] == {"cf_clearance": "xyz"}
 
 
 @pytest.mark.asyncio

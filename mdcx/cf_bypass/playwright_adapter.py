@@ -100,8 +100,8 @@ async def _goto(page, url: str, timeout_ms: int) -> None:
     await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
 
 
-async def _get_html_async(url: str, timeout: int) -> str | None:
-    """用 Playwright+Edge 获取页面 HTML，轮询等待 CF 挑战消失。"""
+async def _get_html_async(url: str, timeout: int) -> tuple[str | None, dict[str, str]]:
+    """用 Playwright+Edge 获取页面 HTML 与 cookie，轮询等待 CF 挑战消失。"""
     from playwright.async_api import async_playwright
 
     async with async_playwright() as driver:
@@ -121,7 +121,7 @@ async def _get_html_async(url: str, timeout: int) -> str | None:
                 await _goto(page, url, timeout * 1000)
             except Exception as e:
                 logger.debug("Playwright goto 失败: %s", e)
-                return None
+                return None, {}
             deadline = time.monotonic() + timeout
             html = await page.content()
             while is_cf_html(html) and time.monotonic() < deadline:
@@ -130,7 +130,15 @@ async def _get_html_async(url: str, timeout: int) -> str | None:
                     html = await page.content()
                 except Exception:
                     break
-            return html
+            cookies: dict[str, str] = {}
+            try:
+                for item in await context.cookies() or []:
+                    name = str(item.get("name") or "")
+                    if name:
+                        cookies[name] = str(item.get("value") or "")
+            except Exception as e:
+                logger.debug("Playwright 取 cookie 失败: %s", e)
+            return html, cookies
         finally:
             try:
                 await browser.close()
@@ -169,23 +177,33 @@ async def get_html(url: str, timeout: int = 90) -> str | None:
     Returns:
         过 CF 后的页面 HTML，失败返回 None
     """
+    html, _ = await get_html_and_cookies(url, timeout)
+    return html
+
+
+async def get_html_and_cookies(url: str, timeout: int = 90) -> tuple[str | None, dict[str, str]]:
+    """单次浏览器会话获取页面 HTML 与 cookie（供后续直连请求透传，省一次解挑战）。
+
+    Returns:
+        (过 CF 后的页面 HTML, 浏览器 cookie 字典)，失败返回 (None, {})
+    """
     if not is_available():
-        return None
+        return None, {}
 
     now = time.monotonic()
     if now < _cooldown_until:
         logger.debug("Playwright bypass 冷却中，跳过")
-        return None
+        return None, {}
 
     try:
-        html = await _get_html_async(url, timeout)
+        html, cookies = await _get_html_async(url, timeout)
     except Exception as e:
         logger.warning("Playwright bypass 异常: %s", e)
         _incr_failures()
-        return None
+        return None, {}
     if not html or is_cf_html(html):
         logger.warning("Playwright bypass: CF 挑战未通过")
         _incr_failures()
-        return None
+        return None, {}
     _reset_failures()
-    return html
+    return html, cookies
