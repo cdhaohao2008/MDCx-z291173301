@@ -66,13 +66,36 @@ class AioSiteCrawler(BaseCrawler):
             ctx.debug(f"动态域名获取失败, 使用默认域名: {e}")
             return self._default_url()
 
-    async def _api_search(self, ctx: Context, base: str, number: str) -> dict | None:
+    async def _warmup_cookies(self, ctx: Context, base: str) -> dict[str, str]:
+        """预热本站会话：GET 一次站点首页，把 Set-Cookie（如 _csrf）取回，
+        后续 API POST 显式携带才能通过 WAF 校验（无 Cookie 直接 POST 会被 403）。
+        预热失败返回空 dict，主流程按原逻辑继续，不构成回归。"""
+        try:
+            resp, _ = await self.async_client.request("GET", base, retry_count=1, enable_cf_bypass=False)
+        except Exception as e:
+            ctx.debug(f"会话预热失败: {e}")
+            return {}
+        if resp is None:
+            return {}
+        try:
+            jar = resp.cookies
+            if hasattr(jar, "get_dict"):
+                return dict(jar.get_dict())
+            return {c.name: c.value for c in jar}
+        except Exception as e:
+            ctx.debug(f"预热 Cookie 提取失败: {e}")
+            return {}
+
+    async def _api_search(
+        self, ctx: Context, base: str, number: str, cookies: dict[str, str] | None = None
+    ) -> dict | None:
         url = f"{base}/{self.namespace}/data/api/search"
         body = json.dumps([{"search": number, "lang": "cn"}, 60, 1])
         json_data, error = await self.async_client.post_json(
             url,
             data=body,
             headers={"Accept": "application/json", "Content-Type": "application/json"},
+            cookies=cookies,
         )
         if error or json_data is None:
             ctx.debug(f"搜索请求失败: {error}")
@@ -83,12 +106,15 @@ class AioSiteCrawler(BaseCrawler):
             return None
         return items[0]
 
-    async def _api_get_movie(self, ctx: Context, base: str, movie_id: str) -> dict | None:
+    async def _api_get_movie(
+        self, ctx: Context, base: str, movie_id: str, cookies: dict[str, str] | None = None
+    ) -> dict | None:
         url = f"{base}/{self.namespace}/data/api/getMovie"
         json_data, error = await self.async_client.post_json(
             url,
             data={"movieId": movie_id},
             headers={"Accept": "application/json"},
+            cookies=cookies,
         )
         if error or json_data is None:
             ctx.debug(f"详情请求失败: {error}")
@@ -163,13 +189,15 @@ class AioSiteCrawler(BaseCrawler):
         base = await self._resolve_domain(ctx)
         ctx.debug(f"API 基础地址: {base}")
 
-        movie = await self._api_search(ctx, base, number)
+        cookies = await self._warmup_cookies(ctx, base)
+
+        movie = await self._api_search(ctx, base, number, cookies)
         if not movie:
             raise CrawlerException(f"未找到匹配: {number}")
 
         movie_id = str(movie.get("movieId") or "").strip()
         ctx.debug(f"搜索命中 movieId: {movie_id}")
-        detail = await self._api_get_movie(ctx, base, movie_id)
+        detail = await self._api_get_movie(ctx, base, movie_id, cookies)
         if not detail:
             raise CrawlerException("获取详情失败")
 

@@ -255,7 +255,10 @@ class Scraper:
         elif file_mode == FileMode.Again:
             signal.show_log_text(f"🍯 🍯 🍯 NOTE: 开始重新刮削！！！ 刮削文件数量（{len(movie_list)})")
             n = 0
-            for each_f, each_i in Flags.new_again_dic.items():
+            # UI 线程可并发写 new_again_dic：锁内快照后出锁再用
+            with Flags.guarded():
+                again_items = list(Flags.new_again_dic.items())
+            for each_f, each_i in again_items:
                 n += 1
                 if each_i[0]:
                     signal.show_log_text(f"{n} 🖥 File path: {each_f}\n 🚘 File number: {each_i[0]}")
@@ -350,7 +353,8 @@ class Scraper:
             except Exception as e:
                 signal.show_log_text(f" ⚠ 刮削状态缓存读取失败，按全量处理: {e}")
 
-        Flags.remain_list = movie_list.copy()
+        with Flags.guarded():
+            Flags.remain_list = movie_list.copy()
         Flags.can_save_remain = True
 
         task_count = len(movie_list)
@@ -459,10 +463,15 @@ class Scraper:
             await creat_kodi_actors(True, manage_button_state=False)
 
         signal.reset_buttons_status.emit()
-        if len(Flags.again_dic):
-            Flags.new_again_dic = Flags.again_dic.copy()
-            new_movie_list = list(Flags.new_again_dic.keys())
-            Flags.again_dic.clear()
+        # UI 线程可并发写 again_dic：检查-拷贝-清空须原子，否则两次写之间
+        # 落下的条目会被 clear 吞掉
+        with Flags.guarded():
+            has_again = bool(Flags.again_dic)
+            if has_again:
+                Flags.new_again_dic = Flags.again_dic.copy()
+                new_movie_list = list(Flags.new_again_dic.keys())
+                Flags.again_dic.clear()
+        if has_again:
             signal.change_buttons_status.emit()
             await self._run(FileMode.Again, new_movie_list)
             return
@@ -676,7 +685,8 @@ class Scraper:
                     )
                 failed_folder = get_movie_path_setting(file_path).failed_folder
                 fail_file_path = await move_file_to_failed_folder(failed_folder, file_path, folder_old_path)
-                Flags.failed_list.append((fail_file_path, error_msg))
+                with Flags.guarded():
+                    Flags.failed_list.append((fail_file_path, error_msg))
                 await self._failed_file_info_show(str(Flags.fail_count), fail_file_path, error_msg)
                 signal.view_failed_list_settext.emit(f"失败 {Flags.fail_count}")
                 if self._state_cache and self._state_cache.is_usable() and manager.config.main_mode != 5:
@@ -730,7 +740,8 @@ class Scraper:
         # 更新剩余任务
         try:
             try:
-                Flags.remain_list.remove(file_path)
+                with Flags.guarded():
+                    Flags.remain_list.remove(file_path)
                 Flags.can_save_remain = True
             except Exception as e1:
                 signal.show_log_text(f"remove:  {file_path}\n {e1!s}\n {traceback.format_exc()}")
@@ -1476,12 +1487,14 @@ class Scraper:
 
     def _check_stop(self, show_name: str) -> None:
         if signal.stop or Flags.stop_requested:
-            Flags.now_kill += 1
-            signal.show_log_text(
-                f" 🕷 {get_current_time()} 已停止刮削：{Flags.now_kill}/{Flags.total_kills} {show_name}"
-            )
+            # _kill_threads（工作线程）会并发写 now_kill/total_kills，走同步锁，
+            # 读侧锁内快照后出锁再拼字符串。
+            now_kill = Flags.increment_sync("now_kill")
+            with Flags.guarded():
+                total_kills = Flags.total_kills
+            signal.show_log_text(f" 🕷 {get_current_time()} 已停止刮削：{now_kill}/{total_kills} {show_name}")
             signal.set_label_file_path.emit(
-                f"⛔️ 正在停止刮削...\n   正在停止已在运行的任务线程（{Flags.now_kill}/{Flags.total_kills}）..."
+                f"⛔️ 正在停止刮削...\n   正在停止已在运行的任务线程（{now_kill}/{total_kills}）..."
             )
             raise StopScrape("手动停止刮削")
 
@@ -1577,8 +1590,10 @@ def get_remain_list() -> bool:
         return False
     with open(remain_list_path, encoding="utf-8", errors="ignore") as f:
         remains = [p for path in f if (line := path.strip()) and (p := Path(line)).suffix]
-    Flags.remain_list = remains
-    if not len(Flags.remain_list) or Switch.REMAIN_TASK not in manager.config.switch_on:
+    with Flags.guarded():
+        Flags.remain_list = remains
+        has_remain = bool(Flags.remain_list)
+    if not has_remain or Switch.REMAIN_TASK not in manager.config.switch_on:
         return False
     box = QMessageBox(QMessageBox.Icon.Information, "继续刮削", "上次刮削未完成，是否继续刮削剩余任务？")
     box.setStandardButtons(
@@ -1606,7 +1621,9 @@ def get_remain_list() -> bool:
 
     movie_paths = parse_media_paths()
 
-    p = Flags.remain_list[0]
+    with Flags.guarded():
+        remain_snapshot = list(Flags.remain_list)
+    p = remain_snapshot[0]
     if not is_any_descendant(p, *movie_paths):
         box = QMessageBox(
             QMessageBox.Icon.Warning,
@@ -1626,17 +1643,18 @@ def get_remain_list() -> bool:
         reply = box.exec()
         if reply == QMessageBox.StandardButton.No:
             return True
-    signal.show_log_text(f"🍯 🍯 🍯 NOTE: 继续刮削未完成任务！！！ 剩余未刮削文件数量（{len(Flags.remain_list)})")
+    signal.show_log_text(f"🍯 🍯 🍯 NOTE: 继续刮削未完成任务！！！ 剩余未刮削文件数量（{len(remain_snapshot)})")
     # 传快照而非共享可变列表：新 Scraper 的 Flags.reset() 与后续任务删除
     # 操作不再与启动参数共享同一 list 对象（议题 #98 2.5）
-    start_new_scrape(FileMode.Default, list(Flags.remain_list))
+    start_new_scrape(FileMode.Default, list(remain_snapshot))
     return True
 
 
 def again_search() -> None:
-    Flags.new_again_dic = Flags.again_dic.copy()
-    new_movie_list = list(Flags.new_again_dic.keys())
-    Flags.again_dic.clear()
+    with Flags.guarded():
+        Flags.new_again_dic = Flags.again_dic.copy()
+        new_movie_list = list(Flags.new_again_dic.keys())
+        Flags.again_dic.clear()
     start_new_scrape(FileMode.Again, new_movie_list)
 
 

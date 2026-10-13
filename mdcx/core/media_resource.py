@@ -61,6 +61,12 @@ def _get_header(headers: Any, name: str) -> str:
 class MediaResourceContext:
     """单次刮削媒体资源上下文，按 URL 复用已获取的内容与探测元数据。"""
 
+    # _images 持整图 bytes：extrafanart 多图 × 并发曾无上限常驻。
+    # 双预算 FIFO 淘汰：条数 64 / 去重后总字节 256MB，超限时淘汰最先插入者。
+    # _image_sizes/_content_lengths 只存小元组，可忽略不计，不设限。
+    _IMAGES_MAX_ENTRIES = 64
+    _IMAGES_MAX_BYTES = 256 * 1024 * 1024
+
     def __init__(self):
         self._images: dict[str, FetchedImage] = {}
         self._image_fetch_tasks: dict[str, asyncio.Task[FetchedImage | None]] = {}
@@ -118,6 +124,27 @@ class MediaResourceContext:
         if self._image_fetch_tasks.get(url) is task:
             self._image_fetch_tasks.pop(url, None)
 
+    def _evict_images(self) -> None:
+        """FIFO 淘汰 _images 直到条数/字节双预算达标（插入序即 dict 序）。"""
+        while True:
+            if len(self._images) <= self._IMAGES_MAX_ENTRIES and self._images_bytes() <= self._IMAGES_MAX_BYTES:
+                return
+            oldest = next(iter(self._images))
+            self._images.pop(oldest, None)
+            self._image_sizes.pop((oldest, False), None)
+
+    def _images_bytes(self) -> int:
+        """去重统计（normalized/true 双键常指向同一对象，只计一次）。"""
+        seen: set[int] = set()
+        total = 0
+        for image in self._images.values():
+            if id(image) in seen:
+                continue
+            seen.add(id(image))
+            content = getattr(image, "content", b"")
+            total += len(content) if isinstance(content, (bytes, bytearray)) else 0
+        return total
+
     async def _fetch_image(self, normalized_url: str) -> FetchedImage | None:
         # 完整下载不能使用 DMM 探测参数，否则会把 120x90 探测图写入封面缓存。
         request_url, added_probe = normalized_url, False
@@ -168,6 +195,7 @@ class MediaResourceContext:
         if true_url != normalized_url:
             self._images[true_url] = image
             self._image_sizes[(true_url, False)] = image.size
+        self._evict_images()
         image_host_cooldown.record_success(request_url)
         return image
 

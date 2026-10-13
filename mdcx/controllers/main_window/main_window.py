@@ -12,7 +12,7 @@ from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
-from PyQt6.QtCore import QEvent, QItemSelectionModel, QPoint, QPointF, QRect, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QEventLoop, QItemSelectionModel, QPoint, QPointF, QRect, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QAction,
     QColor,
@@ -101,7 +101,6 @@ from mdcx.utils import (
     executor,
     get_current_time,
     get_used_time,
-    kill_a_thread,
     split_path,
 )
 from mdcx.utils.file import (
@@ -362,6 +361,9 @@ class MyMAinWindow(QMainWindow):
 
         # region 其它属性声明
         self.threads_list: list[threading.Thread] = []  # 启动的线程列表
+        # 移动文件线程的协作式停止事件：移动开始时 clear，停止按钮处理器中 set，
+        # _move_files_core 在每个目录/文件检查点轮询（替代已删除的 ctypes 强杀）。
+        self._move_cancel_event = threading.Event()
         self.start_click_time = 0
         self.start_click_pos: QPoint
         self.window_marjin = None
@@ -6175,7 +6177,8 @@ class MyMAinWindow(QMainWindow):
         for _ in range(3):
             before = (btn.x(), gb.width(), sc.viewport().width())
             self._sync_page_layouts()
-            QApplication.processEvents()
+            # 只拦用户输入重入：布局/绘制/定时器照常 pump，deferred 输入事后补派，不丢事件
+            QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
             after = (btn.x(), gb.width(), sc.viewport().width())
             if after == before:
                 break
@@ -7339,8 +7342,8 @@ class MyMAinWindow(QMainWindow):
                     return
                 if _matches(first_pins, second_pins, c1_min):
                     # 与当前约束逐值一致：泵事件冲掉之前应用的后果，再验证一次，
-                    # 仍一致才算真收敛（否则继续循环应用）。
-                    QApplication.processEvents()
+                    # 仍一致才算真收敛（否则继续循环应用）。拦用户输入防重入槽。
+                    QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                     _activate_all()
                     ok2, first_pins2, second_pins2, c1_min2 = _compute()
                     if ok2 and _matches(first_pins2, second_pins2, c1_min2):
@@ -7370,7 +7373,7 @@ class MyMAinWindow(QMainWindow):
                 grid.setColumnMinimumWidth(1, c1_min)
                 grid.invalidate()
                 grid.activate()
-                QApplication.processEvents()
+                QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                 _activate_all()
             # 慢路径动过手：排一拍 NFO 链跑在后续生长（lw10/内容宽）后面。
             # 注意必须直接排链（_sync_nfo_page_align，有休眠守卫），不能排全量同步——
@@ -8747,6 +8750,8 @@ class MyMAinWindow(QMainWindow):
         if self.Ui.pushButton_start_cap.text() == "■ 停止":
             Flags.stop_requested = True
             signal_qt.stop = True
+            # 唤醒移动文件线程的检查点（协作式停止，替代已删除的 ctypes 强杀）
+            self._move_cancel_event.set()
             executor.run(save_success_list())
             # 停止时立即持久化最新剩余任务，不能只依赖 1.5s 定时器
             # （停止后定时器保存到的可能是竞态旧快照，续刮会丢任务，议题 #98）
@@ -8761,7 +8766,7 @@ class MyMAinWindow(QMainWindow):
                 self.stop_used_time = 0.0
                 self.show_stop_info_thread()
                 return
-            t = threading.Thread(target=self._kill_threads)  # 关闭线程池
+            t = threading.Thread(target=self._kill_threads, daemon=True)  # 关闭线程池
             t.start()
 
     # 显示停止信息
@@ -8800,7 +8805,8 @@ class MyMAinWindow(QMainWindow):
             signal_qt.show_log_text(f"{' ⏱ Used time'.ljust(13)}: {used_time}S")
             signal_qt.show_log_text(f"{' 🍕 Per time'.ljust(13)}: {average_time}S")
             signal_qt.show_log_text("================================================================================")
-            Flags.again_dic.clear()
+            with Flags.guarded():
+                Flags.again_dic.clear()
         except Exception:
             signal_qt.show_traceback_log(traceback.format_exc())
             signal_qt.show_log_text(traceback.format_exc())
@@ -8810,39 +8816,44 @@ class MyMAinWindow(QMainWindow):
     def show_stop_info_thread(
         self,
     ):
-        t = threading.Thread(target=self._show_stop_info)
+        t = threading.Thread(target=self._show_stop_info, daemon=True)
         t.start()
 
-    # 关闭线程池和扫描线程
+    # 关闭线程池和扫描线程（协作式停止：只 join 等待，不强杀线程。
+    # threads_list 里的移动线程靠 _move_cancel_event 在检查点自行退出；
+    # 刮削协程靠 signal.stop/Flags.stop_requested + cancel_async 退出。）
     def _kill_threads(self):
-        Flags.total_kills = len(self.threads_list)
-        Flags.now_kill = 0
+        with Flags.guarded():
+            Flags.total_kills = len(self.threads_list)
+            Flags.now_kill = 0
+            total_kills = Flags.total_kills
         start_time = time.time()
-        self.set_label_file_path.emit(f"⛔️ 正在停止刮削...\n   正在停止已在运行的任务线程（1/{Flags.total_kills}）...")
+        self.set_label_file_path.emit(f"⛔️ 正在停止刮削...\n   正在停止已在运行的任务线程（1/{total_kills}）...")
         signal_qt.show_log_text(
-            f"\n ⛔️ {get_current_time()} 已停止添加新的刮削任务，正在停止已在运行的任务线程（{Flags.total_kills}）..."
+            f"\n ⛔️ {get_current_time()} 已停止添加新的刮削任务，正在停止已在运行的任务线程（{total_kills}）..."
         )
-        signal_qt.show_traceback_log(f"⛔️ 正在停止正在运行的任务线程 ({Flags.total_kills}) ...")
+        signal_qt.show_traceback_log(f"⛔️ 正在停止正在运行的任务线程 ({total_kills}) ...")
         i = 0
         for each in self.threads_list:
             i += 1
-            signal_qt.show_traceback_log(f"正在停止线程: {i}/{Flags.total_kills} {each.name} ...")
+            signal_qt.show_traceback_log(f"正在停止线程: {i}/{total_kills} {each.name} ...")
         signal_qt.show_traceback_log(
             "线程正在停止中，请稍后...\n 🍯 停止时间与线程数量及线程正在执行的任务有关，比如正在执行网络请求、文件下载等IO操作时，需要等待其释放资源。。。\n"
         )
         signal_qt.stop = True
-        for each in self.threads_list:  # 线程池的线程
-            kill_a_thread(each, timeout=0.0)
 
         # 对全部线程使用一个总等待窗口，避免线程数量放大停止耗时。
         wait_deadline = time.monotonic() + 12.0
-        while any(each.is_alive() for each in self.threads_list) and time.monotonic() < wait_deadline:
-            time.sleep(0.05)
+        for each in self.threads_list:
+            remaining = wait_deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            each.join(timeout=remaining)
 
         self.stop_used_time = get_used_time(start_time)
         stopped_count = sum(not each.is_alive() for each in self.threads_list)
-        signal_qt.show_log_text(f" 🕷 已停止线程：{stopped_count}/{Flags.total_kills}")
-        if stopped_count == Flags.total_kills:
+        signal_qt.show_log_text(f" 🕷 已停止线程：{stopped_count}/{total_kills}")
+        if stopped_count == total_kills:
             signal_qt.show_traceback_log(f"所有线程已停止！！！({self.stop_used_time}s)\n ⛔️ 刮削已手动停止！\n")
             signal_qt.show_log_text(f" ⛔️ {get_current_time()} 所有线程已停止！({self.stop_used_time}s)")
         else:
@@ -9498,7 +9509,9 @@ class MyMAinWindow(QMainWindow):
                 )
 
         if should_record_success and success_paths_to_record:
-            Flags.success_list.update(success_paths_to_record)
+            # success_list 正被刮削协程并发 add，整段包锁
+            with Flags.guarded():
+                Flags.success_list.update(success_paths_to_record)
             executor.run(save_success_list())
             signal_qt.show_log_text(f" 💾 已写入成功列表 {len(success_paths_to_record)} 项")
 
@@ -9810,7 +9823,8 @@ class MyMAinWindow(QMainWindow):
                 self, "输入番号重新刮削", f"文件名: {main_file_name}\n请输入番号:", text=default_text
             )
             if ok and text:
-                Flags.again_dic[file_path] = (text, "", "")
+                with Flags.guarded():
+                    Flags.again_dic[file_path] = (text, "", "")
                 signal_qt.show_scrape_info(f"💡 已添加刮削！{get_current_time()}")
                 if self.Ui.pushButton_start_cap.text() == "开始":
                     again_search()
@@ -9834,7 +9848,8 @@ class MyMAinWindow(QMainWindow):
             if ok and text:
                 website, url = deal_url(text)
                 if website:
-                    Flags.again_dic[file_path] = ("", url, website)
+                    with Flags.guarded():
+                        Flags.again_dic[file_path] = ("", url, website)
                     signal_qt.show_scrape_info(f"💡 已添加刮削！{get_current_time()}")
                     if self.Ui.pushButton_start_cap.text() == "开始":
                         again_search()
@@ -10154,9 +10169,11 @@ class MyMAinWindow(QMainWindow):
         reply = box.exec()
         if reply == QMessageBox.StandardButton.Yes:
             success_text = self.Ui.textBrowser_show_success_list.toPlainText().replace("暂无成功刮削的文件", "").strip()
-            Flags.success_list = {
+            new_success = {
                 p for path in success_text.splitlines() if (line := path.strip()) and (p := Path(line)).suffix
             }
+            with Flags.guarded():
+                Flags.success_list = new_success
             executor.run(save_success_list())
             get_success_list()
             self.Ui.widget_show_success.hide()
@@ -10169,15 +10186,19 @@ class MyMAinWindow(QMainWindow):
         box.setDefaultButton(QMessageBox.StandardButton.No)
         reply = box.exec()
         if reply == QMessageBox.StandardButton.Yes:
-            Flags.success_list.clear()
+            with Flags.guarded():
+                Flags.success_list.clear()
             executor.run(save_success_list())
             self.Ui.widget_show_success.hide()
 
     def pushButton_view_success_file_clicked(self):
         self.Ui.widget_show_success.show()
         info = "暂无成功刮削的文件"
-        if len(Flags.success_list):
-            info = "\n".join(sorted(str(p) for p in Flags.success_list))
+        # 锁内快照后出锁再排序拼串：UI 读时协程可能正 add
+        with Flags.guarded():
+            success_snapshot = list(Flags.success_list)
+        if success_snapshot:
+            info = "\n".join(sorted(str(p) for p in success_snapshot))
         self.Ui.textBrowser_show_success_list.setText(info)
 
     # endregion
@@ -10315,13 +10336,17 @@ class MyMAinWindow(QMainWindow):
 
     # 日志页点一键刮削失败列表
     def pushButton_scraper_failed_list_clicked(self):
-        if len(Flags.failed_list) and self.Ui.pushButton_start_cap.text() == "开始":
-            start_new_scrape(FileMode.Default, movie_list=[s[0] for s in Flags.failed_list])
+        with Flags.guarded():
+            failed_snapshot = list(Flags.failed_list)
+        if failed_snapshot and self.Ui.pushButton_start_cap.text() == "开始":
+            start_new_scrape(FileMode.Default, movie_list=[s[0] for s in failed_snapshot])
             self.show_hide_failed_list(False)
 
     # 日志页点另存失败列表
     def pushButton_save_failed_list_clicked(self):
-        if len(Flags.failed_list):
+        with Flags.guarded():
+            has_failed = bool(Flags.failed_list)
+        if has_failed:
             log_name = "failed_" + time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime()) + ".txt"
             log_name = get_movie_path_setting().movie_path / log_name
             filename, filetype = QFileDialog.getSaveFileName(
@@ -10554,6 +10579,8 @@ class MyMAinWindow(QMainWindow):
 
     def _move_file_thread(self):
         signal_qt.change_buttons_status.emit()
+        # 协作式停止事件：每次移动开始时清零，停止按钮处理器中置位
+        self._move_cancel_event.clear()
         try:
             self._move_files_core()
         except Exception:
@@ -10565,6 +10592,10 @@ class MyMAinWindow(QMainWindow):
     def _move_files_core(self):
         movie_items = []
         for movie_path in get_movie_path_setting().movie_paths:
+            # 协作式停止检查点（替代已删除的 ctypes 强杀）：目录扫描之间可退出
+            if self._move_cancel_event.is_set():
+                signal_qt.show_log_text(" ⛔️ 已取消移动文件！")
+                return
             if not Path(movie_path).exists():
                 signal_qt.show_log_text(f" 🔴 Movie folder does not exist: {movie_path}")
                 continue
@@ -10582,6 +10613,10 @@ class MyMAinWindow(QMainWindow):
         signal_qt.show_log_text("Start move movies...")
         skip_list = []
         for movie_path, file_path in movie_items:
+            # 协作式停止检查点：每个文件移动前可退出（已移动的不回滚）
+            if self._move_cancel_event.is_set():
+                signal_qt.show_log_text(" ⛔️ 已取消移动文件！")
+                break
             des_path = movie_path / "Movie_moved"
             if not des_path.exists():
                 signal_qt.show_log_text(f"Created folder: {des_path}")
@@ -12174,8 +12209,10 @@ class MyMAinWindow(QMainWindow):
         )
         Flags.file_mode = FileMode.Default
         self.threads_list = []
-        if len(Flags.failed_list):
-            self.Ui.pushButton_scraper_failed_list.setText(f"一键重新刮削当前 {len(Flags.failed_list)} 个失败文件")
+        with Flags.guarded():
+            failed_count = len(Flags.failed_list)
+        if failed_count:
+            self.Ui.pushButton_scraper_failed_list.setText(f"一键重新刮削当前 {failed_count} 个失败文件")
         else:
             self.Ui.pushButton_scraper_failed_list.setText("当有失败任务时，点击可以一键刮削当前失败列表")
 

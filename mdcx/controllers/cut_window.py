@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
-from PyQt6.QtCore import QPoint, QRect, Qt
+from PyQt6.QtCore import QPoint, QRect, Qt, pyqtSignal
 from PyQt6.QtGui import QCursor, QPixmap
 from PyQt6.QtWidgets import QDialog, QFileDialog, QPushButton
 
@@ -75,6 +75,9 @@ class DraggableButton(QPushButton):
 
 
 class CutWindow(QDialog):
+    # 裁剪任务完成（后台线程发出，主线程收）：载荷 True/False/None 仅用于重启用按钮，结果本身无人消费
+    cut_task_done = pyqtSignal(object)
+
     def __init__(self, parent: "MyMAinWindow"):
         super().__init__(parent)
         self.Ui = Ui_Dialog_cut_poster()  # 实例化 Ui
@@ -104,6 +107,7 @@ class CutWindow(QDialog):
         self.Ui.pushButton_cut_close.clicked.connect(self.do_cut_and_close)
         self.Ui.pushButton_cut.clicked.connect(self.do_cut)
         self.Ui.pushButton_close.clicked.connect(self.close)
+        self.cut_task_done.connect(self._on_cut_task_done)
         self.showimage()
 
     def set_style(self):
@@ -483,8 +487,32 @@ class CutWindow(QDialog):
         self.close()
 
     def do_cut(self):
+        # 重任务异步化：旧同步 executor.run 会冻住 UI 直到裁剪+水印全做完；
+        # 改 submit + 禁用按钮，完成后经信号回主线程重启用（do_cut 返回值无人消费，行为不变）。
         mark_list = self._collect_mark_list()
-        executor.run(self.to_cut(mark_list))
+        self.Ui.pushButton_cut.setEnabled(False)
+        future = executor.submit(self.to_cut(mark_list))
+
+        def _notify(done_future):
+            try:
+                result = done_future.result()
+            except Exception:
+                # to_cut 已知失败路径内部都记了日志；这里只兜未知异常，保持旧同步版“打 traceback”的可排查性
+                self.main_window.show_log_text(traceback.format_exc())
+                result = False
+            try:
+                self.cut_task_done.emit(result)
+            except RuntimeError:
+                pass  # 关窗后 emit 撞已销毁对象则丢弃（文件已落盘，结果无人消费）
+
+        future.add_done_callback(_notify)
+
+    def _on_cut_task_done(self, _result):
+        """主线程：裁剪完成，重启用按钮。"""
+        try:
+            self.Ui.pushButton_cut.setEnabled(True)
+        except RuntimeError:
+            pass
 
     async def to_cut(self, mark_list: list[str]):
         img_path = self.show_image_path  # 被裁剪的图片

@@ -3,19 +3,15 @@ import atexit
 import concurrent
 import concurrent.futures
 import contextlib
-import ctypes
 import html
-import inspect
 import random
 import re
 import threading
 import time
-import traceback
 import unicodedata
 from collections.abc import Coroutine
 from concurrent.futures import Future
 from pathlib import Path
-from threading import Thread
 from typing import Any, TypeVar
 
 from ..consts import IS_NFC
@@ -74,9 +70,15 @@ class AsyncBackgroundExecutor:
             self._critical_futures.add(future)
         return future
 
-    def run(self, coro: Coroutine[Any, Any, T]) -> T:
-        """submit 的阻塞版本, 等待协程执行完毕并返回结果. 此方法线程安全."""
-        return self.submit(coro).result()
+    def run(self, coro: Coroutine[Any, Any, T], timeout: float | None = None) -> T:
+        """submit 的阻塞版本, 等待协程执行完毕并返回结果. 此方法线程安全.
+
+        timeout 为 None 时无限等待（保持旧语义）；传入秒数则到期抛
+        concurrent.futures.TimeoutError，后台协程继续跑，不会被取消。
+        UI 线程只可对本地 IO 型协程用 run（重任务改 submit + 回调），
+        免得超时前界面冻结。
+        """
+        return self.submit(coro).result(timeout=timeout)
 
     def wait_all(self, timeout=None):
         """等待所有未完成任务执行完毕, 任务异常将作为结果返回. 此方法线程安全."""
@@ -308,44 +310,6 @@ def clean_list(a: str) -> str:
     移除逗号分隔的字符串中的重复项, 同时移除每项首尾的空格, 并保持顺序.
     """
     return ",".join(dict.fromkeys(w.strip() for w in a.split(",") if w.strip()).keys())
-
-
-# todo 此方法调用 c api 强制终止线程, 在异步版本中应该不需要
-def _async_raise(tid, exctype):
-    """raises the exception, performs cleanup if needed"""
-    tid = ctypes.c_long(tid)
-    if not inspect.isclass(exctype):
-        exctype = type(exctype)
-    # 注入一次即可；原实现 `while res == 1` 会无限重复注入，线程阻塞在
-    # 原生调用（TLS/DNS/文件 IO）时返回 1 造成永久自旋
-    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exctype))
-    if res == 0:
-        # 线程不存在或已退出
-        return
-    if res > 1:
-        # 同时命中多个线程，需要 revert
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
-        raise SystemError("PyThreadState_SetAsyncExc failed")
-
-
-# todo 同上, 应该优雅的退出线程
-def kill_a_thread(t: Thread, timeout: float = 10.0):
-    """强制终止线程。
-
-    线程阻塞在无法处理异步异常的原生调用（TLS 握手/DNS/文件 IO）时，
-    SystemExit 注入不生效，原实现会无限忙等。这里注入有限次数后超时放弃，
-    避免 CPU 满载与按钮永久卡在「■ 停止中」。
-    """
-    if not t.is_alive():
-        return
-    try:
-        _async_raise(t.ident, SystemExit)
-    except Exception:
-        print(traceback.format_exc())
-        return
-    deadline = time.monotonic() + timeout
-    while t.is_alive() and time.monotonic() < deadline:
-        time.sleep(0.05)
 
 
 def get_random_headers() -> dict:

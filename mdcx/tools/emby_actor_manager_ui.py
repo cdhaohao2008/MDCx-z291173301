@@ -390,15 +390,23 @@ def _detach_running_thread(thread: QThread) -> None:
 class _CancellableWorkerThread(QThread):
     """议题 #175: 关窗时必须能打断 executor 阻塞，否则 QThread 随父窗口销毁会 abort 主进程。"""
 
+    # _run_coro 轮询 future 的步长：abort 后最长再堵这么久 run() 必返回，
+    # 线程正常 finish 走 wait 放行，不再依赖关窗超时的 detach 保命。
+    _ABORT_POLL_INTERVAL = 0.2
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._future = None
         self._lock = threading.Lock()
+        self._abort_requested = threading.Event()
 
     def cancel(self):
         self.abort()
 
     def abort(self):
+        # 先立 flag 再 cancel：即使协程卡在不可取消的原生阻塞里，
+        # _run_coro 的轮询也能看到 flag 自行退出，run() 不再无限堵在 result()。
+        self._abort_requested.set()
         with self._lock:
             future = self._future
         if future is not None and not future.done():
@@ -409,7 +417,15 @@ class _CancellableWorkerThread(QThread):
         with self._lock:
             self._future = future
         try:
-            return future.result()
+            while True:
+                try:
+                    return future.result(timeout=self._ABORT_POLL_INTERVAL)
+                except concurrent.futures.TimeoutError:
+                    # 未完成且关窗/abort 已请求：不等协程了，直接按取消返回，
+                    # run() 退出 → finished 正常发射 → wait() 放行。
+                    if self._abort_requested.is_set():
+                        raise _WorkerCancelled("关窗/停止时放弃等待后台协程")
+                    continue
         except (concurrent.futures.CancelledError, asyncio.CancelledError) as e:
             raise _WorkerCancelled from e
         finally:

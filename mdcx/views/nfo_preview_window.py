@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QEventLoop, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QDialog,
@@ -241,9 +241,9 @@ class NfoPreviewWindow(QDialog):
                 self._restore_rect_too_small() or self._restore_rect_mismatch(desired)
             ):
                 self.showNormal()
-                QApplication.processEvents()
+                QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                 self.setGeometry(desired)
-                QApplication.processEvents()
+                QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
             self.showMinimized()
             return
         if parent.isMaximized():
@@ -258,18 +258,18 @@ class NfoPreviewWindow(QDialog):
                 self.showMaximized()
             elif not self.isMaximized():
                 self.showNormal()
-                QApplication.processEvents()
+                QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                 self.setGeometry(desired)
-                QApplication.processEvents()
+                QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                 self.showMaximized()
             elif self._restore_rect_too_small() or self._restore_rect_mismatch(desired):
                 # 已最大化但还原矩形是历史残留（过小，或主窗口还原尺寸已变
                 # 而预览还留着旧值）：还原→钉好→再最大化修一次。不一致才修，
                 # 避免每次点图都闪一下。
                 self.showNormal()
-                QApplication.processEvents()
+                QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                 self.setGeometry(desired)
-                QApplication.processEvents()
+                QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                 self.showMaximized()
         else:
             # 先显示再摆位置：显示前就撑满屏幕会被系统判成最大化
@@ -726,17 +726,17 @@ class NfoPreviewWindow(QDialog):
                         from PyQt6.QtWidgets import QApplication
 
                         self.showNormal()
-                        QApplication.processEvents()
+                        QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                         self.setGeometry(desired)
-                        QApplication.processEvents()
+                        QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                         self.showMaximized()
                 else:
                     from PyQt6.QtWidgets import QApplication
 
                     self.showNormal()
-                    QApplication.processEvents()
+                    QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                     self.setGeometry(desired)
-                    QApplication.processEvents()
+                    QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
                     self.showMaximized()
             elif not self.isMaximized():
                 self.showNormal()

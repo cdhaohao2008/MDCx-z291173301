@@ -1,6 +1,9 @@
 import asyncio
+import threading
 from asyncio import Event
 from collections import OrderedDict
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TypedDict
@@ -33,6 +36,30 @@ class _Flags:
 
     async def increment(self, name: str, value: int = 1) -> int:
         async with self._counter_lock:
+            current = getattr(self, name, 0) + value
+            setattr(self, name, current)
+            return current
+
+    # 跨线程共享容器（remain_list / success_list / failed_list / again 系 dict）
+    # 的互斥锁：读它们的是 UI 线程、写它们的是刮削协程（后台 loop 线程）、
+    # 读写的还有工作线程（to_thread 内 task、移动线程、停止线程）。
+    # 用法：一律 with Flags.guarded(): 包住“读-改-写/快照”整段，读侧在锁内
+    # 取快照（list()/set()/dict()/len()），出锁后再遍历使用。
+    # 注意：asyncio.Lock 不能跨线程拿，故这里单独用 threading.RLock；
+    # 同 loop 线程内的协程并发仍由各 _*_lock（asyncio.Lock）负责。
+    # 纯 bool 开关（stop_requested / stop_other / can_save_remain）是单字赋值，
+    # 最坏只是瞬时过期读，无撕裂风险，保持无锁直读直写。
+    _sync_lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
+
+    @contextmanager
+    def guarded(self) -> Iterator[None]:
+        """跨线程容器临界区（同步线程 + 后台 loop 线程通用）。"""
+        with self._sync_lock:
+            yield
+
+    def increment_sync(self, name: str, value: int = 1) -> int:
+        """同步线程用的计数器自增（对应协程侧的 increment）。"""
+        with self._sync_lock:
             current = getattr(self, name, 0) + value
             setattr(self, name, current)
             return current
@@ -106,6 +133,13 @@ class _Flags:
     local_number_cnword_set: set[str] = field(default_factory=set)
 
     def reset(self) -> None:
+        # reset 多在 UI 线程跑，但容器正被后台 loop 线程读写，整体包锁
+        # 快照式替换，避免“刚 clear 又被 append”的交叉丢失。
+        with self._sync_lock:
+            self._reset_locked()
+
+    def _reset_locked(self) -> None:
+        """reset 的锁内实现（调用方须已持有 _sync_lock）。"""
         self.appoint_url = ""
         self.website_name = ""
         self.failed_list = []

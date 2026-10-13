@@ -1090,7 +1090,9 @@ def _nfo_lib_rescrape(self: MyMAinWindow, nfo_paths: list[Path]) -> None:
             if not ok or not text:
                 return
             number = text
-        Flags.again_dic[video_path] = (number, "", "")
+        # UI 线程写 again_dic，刮削线程可并发读/清：单条包锁
+        with Flags.guarded():
+            Flags.again_dic[video_path] = (number, "", "")
         added += 1
 
     if added:

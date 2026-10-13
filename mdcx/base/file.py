@@ -242,13 +242,18 @@ async def pic_some_deal(number: str, thumb_final_path: Path, fanart_final_path: 
 async def save_success_list(old_path: Path | None = None, new_path: Path | None = None) -> None:
     if old_path and NoEscape.RECORD_SUCCESS_FILE in manager.config.no_escape:
         # 软硬链接时，保存原路径；否则保存新路径
+        # （UI 线程可并发改 success_list，add 包锁；await 不可放锁内，
+        # 先判链再进锁，避免跨挂起点持锁冻住 UI）
         if manager.config.soft_link != 0:
-            Flags.success_list.add(old_path)
-        elif new_path:
-            Flags.success_list.add(new_path)
-            if await aiofiles.os.path.islink(new_path):
+            with Flags.guarded():
                 Flags.success_list.add(old_path)
-                Flags.success_list.add(new_path.resolve())
+        elif new_path:
+            is_link = await aiofiles.os.path.islink(new_path)
+            with Flags.guarded():
+                Flags.success_list.add(new_path)
+                if is_link:
+                    Flags.success_list.add(old_path)
+                    Flags.success_list.add(new_path.resolve())
     if get_used_time(Flags.success_save_time) > 5 or not old_path:
         Flags.success_save_time = time.time()
         success_tmp_path = Path()
@@ -256,7 +261,8 @@ async def save_success_list(old_path: Path | None = None, new_path: Path | None 
             async with _success_list_save_lock:
                 success_path = resources.u("success.txt")
                 success_tmp_path = _build_success_tmp_path(success_path)
-                success_list_snapshot = list(Flags.success_list)
+                with Flags.guarded():
+                    success_list_snapshot = list(Flags.success_list)
                 async with aiofiles.open(success_tmp_path, "w", encoding="utf-8", errors="ignore") as f:
                     await f.writelines(_path_lines_for_write(success_list_snapshot, "成功列表"))
                 await _replace_success_file_with_retry(success_tmp_path, success_path)
@@ -265,7 +271,9 @@ async def save_success_list(old_path: Path | None = None, new_path: Path | None 
         finally:
             if success_tmp_path:
                 await _cleanup_success_tmp_file(success_tmp_path)
-        signal.view_success_file_settext.emit(f"查看 ({len(Flags.success_list)})")
+        with Flags.guarded():
+            success_count = len(Flags.success_list)
+        signal.view_success_file_settext.emit(f"查看 ({success_count})")
 
 
 def save_remain_list() -> None:
@@ -279,7 +287,8 @@ def save_remain_list() -> None:
         return
     if not _remain_save_lock.acquire(blocking=False):
         return
-    remain_snapshot = list(Flags.remain_list)
+    with Flags.guarded():
+        remain_snapshot = list(Flags.remain_list)
     threading.Thread(target=_save_remain_list_sync, args=(remain_snapshot,), daemon=True).start()
 
 
@@ -294,7 +303,8 @@ def save_remain_list_now() -> None:
         return
     if not _remain_save_lock.acquire(blocking=False):
         return
-    remain_snapshot = list(Flags.remain_list)
+    with Flags.guarded():
+        remain_snapshot = list(Flags.remain_list)
     threading.Thread(target=_save_remain_list_sync, args=(remain_snapshot,), daemon=True).start()
 
 
@@ -317,8 +327,10 @@ def _save_remain_list_sync(paths: list[Path]) -> None:
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp_path, remain_path)
-        if list(Flags.remain_list) == paths:
-            Flags.can_save_remain = False
+        # 检查-清标志须原子：比对期间 remain_list 又被改则不清，交下一轮收尾
+        with Flags.guarded():
+            if list(Flags.remain_list) == paths:
+                Flags.can_save_remain = False
     except Exception as e:
         signal.show_log_text(f"save remain list error: {e!s}\n {traceback.format_exc()}")
         with contextlib.suppress(OSError):
@@ -435,9 +447,13 @@ def get_success_list() -> None:
     success_path = resources.u("success.txt")
     if os.path.isfile(success_path):
         with open(success_path, encoding="utf-8", errors="ignore") as f:
-            Flags.success_list = {p for path in f if (line := path.strip()) and (p := Path(line)).suffix}
+            loaded_success = {p for path in f if (line := path.strip()) and (p := Path(line)).suffix}
+        with Flags.guarded():
+            Flags.success_list = loaded_success
         executor.run(save_success_list())
-    signal.view_success_file_settext.emit(f"查看 ({len(Flags.success_list)})")
+    with Flags.guarded():
+        success_total = len(Flags.success_list)
+    signal.view_success_file_settext.emit(f"查看 ({success_total})")
 
 
 async def movie_lists(ignore_dirs: list[Path], media_type: list[str], movie_path: Path) -> list[Path]:
@@ -502,10 +518,16 @@ async def movie_lists(ignore_dirs: list[Path], media_type: list[str], movie_path
                                 skip_repeat_softlink += 1
                                 continue
                             seen_link_targets.add(real_path)
-                        if not_skip_success or path not in Flags.success_list:
+                        if not_skip_success:
                             total.append(path)
                         else:
-                            skip += 1
+                            # task() 跑在 to_thread 工作线程，success_list 正被协程/UI 并发改：包锁判
+                            with Flags.guarded():
+                                already_done = path in Flags.success_list
+                            if already_done:
+                                skip += 1
+                            else:
+                                total.append(path)
 
         found_count = len(total)
         if found_count >= i:
