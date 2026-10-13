@@ -11,6 +11,7 @@
 """
 
 import asyncio
+import contextlib
 import hashlib
 import os
 import shutil
@@ -118,6 +119,10 @@ _SR_MAX_INPUT_BYTES = 8 * 1024 * 1024
 # 同一时间只对一张图片进行超分，完成后再进行下一张
 _SR_LOCK = asyncio.Lock()
 
+# 工具安装（释放内置/下载解压）串行化：防批刮并发同时下载解压到同一目录
+# （此前无锁，5 并发实测触发 10 次下载 + rmtree/copytree 竞态）。
+_SR_INSTALL_LOCK = asyncio.Lock()
+
 
 def _tools_dir() -> Path:
     return resources.u("sr/tools")
@@ -161,21 +166,27 @@ def _make_executable(path: Path) -> None:
 
 
 def _extract_zip(data: bytes, dest_dir: Path) -> None:
-    """ncnn-vulkan 包带一层顶层目录：解到父目录后整体改名到 dest_dir。"""
+    """ncnn-vulkan 包带一层顶层目录：校验成员路径防 zip-slip 后解压再整体改名到 dest_dir。
+
+    非法路径（绝对路径/`..`）直接抛错拒绝解压；空包抛错。
+    （此前 `top = names[0]..` 对 `..` 开头包会把父目录整树复制进目标目录。）
+    """
     dest_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(BytesIO(data)) as zf:
-        names = zf.namelist()
-        top = names[0].split("/")[0] if names and "/" in names[0] else ""
-        if top:
-            with tempfile.TemporaryDirectory(dir=dest_dir.parent) as tmp:
-                zf.extractall(tmp)
-                extracted = Path(tmp) / top
-                if extracted.is_dir():
-                    if dest_dir.exists():
-                        shutil.rmtree(dest_dir, ignore_errors=True)
-                    shutil.copytree(extracted, dest_dir, dirs_exist_ok=True)
-        else:
-            zf.extractall(dest_dir)
+        members = [m for m in zf.infolist() if not m.is_dir()]
+        if not members:
+            raise ValueError("超分工具包为空")
+        for m in members:
+            if Path(m.filename).is_absolute() or ".." in Path(m.filename).parts:
+                raise ValueError(f"工具包内含非法路径，已拒绝解压: {m.filename}")
+        firsts = [Path(m.filename).parts[0] for m in members]
+        top = firsts[0] if all(p == firsts[0] for p in firsts) else ""
+        with tempfile.TemporaryDirectory(dir=dest_dir.parent) as tmp:
+            zf.extractall(tmp)
+            extracted = Path(tmp) / top if top and (Path(tmp) / top).is_dir() else Path(tmp)
+            if dest_dir.exists():
+                shutil.rmtree(dest_dir, ignore_errors=True)
+            shutil.copytree(extracted, dest_dir, dirs_exist_ok=True)
     _make_executable(binary_path_from_dir(dest_dir.name, dest_dir))
 
 
@@ -253,36 +264,40 @@ async def ensure_binary(tool: str) -> Path | None:
     path = binary_path(tool)
     if is_binary_ready(tool):
         return path
-    platform = _PLATFORM.get(sys.platform) or ""
-    url = _TOOL_DOWNLOAD_URLS.get(tool, {}).get(platform)
-    if not url:
-        _sr_report_skip(tool, [f"当前系统不支持自动下载（{sys.platform}）"])
-        return None
-    if _install_from_builtin(tool, path.parent):
-        signal.show_log_text(f"✅ 超分工具就绪（内置）: {path}")
-        return path
-    signal.show_log_text(f"📥 首次使用，下载超分工具 {tool}（约 30-60MB，仅一次）...")
-    failures: list[str] = []
-    for attempt in range(1, _SR_DOWNLOAD_ATTEMPTS + 1):
-        try:
-            data = await _download_bytes(url)
-        except Exception as e:
-            failures.append(f"第 {attempt} 次下载失败: {e}")
-            continue
-        if not _checksum_matches(data, tool, platform):
-            failures.append(f"第 {attempt} 次校验不匹配（内容非官方原包）")
-            break
-        try:
-            _extract_zip(data, path.parent)
-        except Exception as e:
-            failures.append(f"第 {attempt} 次解压失败: {e}")
-            break
+    async with _SR_INSTALL_LOCK:
+        # 双重检查：等待锁期间可能已有协程完成安装
         if is_binary_ready(tool):
-            signal.show_log_text(f"✅ 超分工具就绪: {path}")
             return path
-        failures.append(f"第 {attempt} 次解压产物不可执行")
-    _sr_report_skip(tool, failures or [f"工具获取失败: {tool}/{platform}"])
-    return None
+        platform = _PLATFORM.get(sys.platform) or ""
+        url = _TOOL_DOWNLOAD_URLS.get(tool, {}).get(platform)
+        if not url:
+            _sr_report_skip(tool, [f"当前系统不支持自动下载（{sys.platform}）"])
+            return None
+        if _install_from_builtin(tool, path.parent):
+            signal.show_log_text(f"✅ 超分工具就绪（内置）: {path}")
+            return path
+        signal.show_log_text(f"📥 首次使用，下载超分工具 {tool}（约 30-60MB，仅一次）...")
+        failures: list[str] = []
+        for attempt in range(1, _SR_DOWNLOAD_ATTEMPTS + 1):
+            try:
+                data = await _download_bytes(url)
+            except Exception as e:
+                failures.append(f"第 {attempt} 次下载失败: {e}")
+                continue
+            if not _checksum_matches(data, tool, platform):
+                failures.append(f"第 {attempt} 次校验不匹配（内容非官方原包）")
+                break
+            try:
+                _extract_zip(data, path.parent)
+            except Exception as e:
+                failures.append(f"第 {attempt} 次解压失败: {e}")
+                break
+            if is_binary_ready(tool):
+                signal.show_log_text(f"✅ 超分工具就绪: {path}")
+                return path
+            failures.append(f"第 {attempt} 次解压产物不可执行")
+        _sr_report_skip(tool, failures or [f"工具获取失败: {tool}/{platform}"])
+        return None
 
 
 def build_args(src: Path, dst: Path, preset: SrPreset) -> list[str]:
@@ -293,11 +308,20 @@ def build_args(src: Path, dst: Path, preset: SrPreset) -> list[str]:
     return cli
 
 
+# _run_elevated 超时专用的退出码：与二进制真实失败(-1/非零)区分，
+# 调用方据此走"超时"日志分支（与 POSIX 分支文案对齐），而非误报"工具执行失败"。
+_TIMEOUT_EXIT_CODE = -2
+
+
 def _run_elevated(cmd: list[str], cwd: str, timeout: float) -> tuple[int, bytes, bytes]:
     """Windows 专用：隐藏窗口（CREATE_NO_WINDOW / SW_HIDE）执行命令，
-    通过临时文件重定向捕获 stdout/stderr。返回 (exit_code, stdout_bytes, stderr_bytes)。"""
-    stdout_path = tempfile.mktemp(suffix="_sr_stdout.log")
-    stderr_path = tempfile.mktemp(suffix="_sr_stderr.log")
+    通过临时文件重定向捕获 stdout/stderr。返回 (exit_code, stdout_bytes, stderr_bytes)。
+    超时返回 _TIMEOUT_EXIT_CODE，并在 Windows 上尽力 taskkill 残留子进程
+    （shell=True 时 subprocess 只能杀掉 cmd 外壳，ncnn 子进程会变孤儿继续占 GPU/写文件）。"""
+    stdout_fd, stdout_path = tempfile.mkstemp(suffix="_sr_stdout.log")
+    os.close(stdout_fd)
+    stderr_fd, stderr_path = tempfile.mkstemp(suffix="_sr_stderr.log")
+    os.close(stderr_fd)
     redirect_cmd = f'{subprocess.list2cmdline(cmd)} > "{stdout_path}" 2> "{stderr_path}"'
 
     # 使用 subprocess 的 CREATE_NO_WINDOW 隐藏窗口，避免弹出 CMD
@@ -321,8 +345,15 @@ def _run_elevated(cmd: list[str], cwd: str, timeout: float) -> tuple[int, bytes,
         # 实际 stdout/stderr 通过重定向文件捕获
         exit_code = proc.returncode
     except subprocess.TimeoutExpired:
-        exit_code = -1
-    except Exception as e:
+        exit_code = _TIMEOUT_EXIT_CODE
+        if sys.platform == "win32" and cmd:
+            with contextlib.suppress(Exception):
+                subprocess.run(
+                    ["taskkill", "/F", "/IM", Path(cmd[0]).name],
+                    capture_output=True,
+                    timeout=30,
+                )
+    except Exception:
         exit_code = -1
 
     stdout_bytes = b""
@@ -391,6 +422,11 @@ async def upscale_image(src: Path, dst: Path, preset: SrPreset) -> bool:
                 exit_code = proc.returncode
                 stderr_text = stderr_bytes.decode(errors="replace") if stderr_bytes else ""
                 stdout_text = stdout_bytes.decode(errors="replace") if stdout_bytes else ""
+            if exit_code == _TIMEOUT_EXIT_CODE:
+                # Windows 分支超时：与 POSIX 分支同文案上报，避免误报"工具执行失败"
+                signal.show_traceback_log(f"🔶 超分超时（保持原图）: {src.name}")
+                _sr_report_skip(tool, [f"超分执行超过 {int(_SR_TIMEOUT_SECONDS)} 秒"])
+                return False
             if exit_code != 0 or not dst.is_file() or dst.stat().st_size == 0:
                 output = stderr_text or stdout_text
                 signal.show_traceback_log(f"🔶 超分失败（保持原图）: {src.name} {output[:120]}")
@@ -422,6 +458,65 @@ def _image_gray_stats(path: Path) -> tuple[float, float, int] | None:
         return None
 
 
+# 超分产物与原图相似度下限：首超低于此值视为失败，删除并换工具重试一次。
+# 以全局 SSIM（0~1）衡量，正常超分缩回原尺寸后一般 0.85+，出口仅拦截 <0.5 的严重偏离。
+_SR_SIMILARITY_THRESHOLD = 0.5
+
+# 近纯色判定：灰度标准差小于此值视为纯色/接近纯色（黑/白/纯红等失败产物 std≈0）。
+_SR_SOLID_STD = 8.0
+
+
+def _bilinear() -> int:
+    try:
+        return Image.Resampling.BILINEAR  # type: ignore[attr-defined]
+    except AttributeError:  # Pillow < 9.1 兼容
+        return Image.BILINEAR
+
+
+def _similarity(src: Path, dst: Path) -> float | None:
+    """原图与超分产物的内容相似度（全局 SSIM，0~1），失败返回 None。
+
+    把大尺寸产物缩回原图尺寸再比，避免分辨率不同无法直接比较；
+    统一缩到 128x128 灰度图上算全局 SSIM，无 numpy/scipy 依赖。
+    黑图 vs 正常海报≈0，正常超分一般 0.85+。
+    """
+    try:
+        with Image.open(src) as a, Image.open(dst) as b:
+            w, h = a.size
+            if w <= 0 or h <= 0:
+                return None
+            resample = _bilinear()
+            ga = a.convert("L").resize((128, 128), resample)
+            gb = b.convert("L").resize((w, h), resample).resize((128, 128), resample)
+            pa = list(ga.getdata())
+            pb = list(gb.getdata())
+            if not pa or len(pa) != len(pb):
+                return None
+            n = len(pa)
+            mu_a = sum(pa) / n
+            mu_b = sum(pb) / n
+            var_a = sum((p - mu_a) ** 2 for p in pa) / n
+            var_b = sum((p - mu_b) ** 2 for p in pb) / n
+            cov = sum((pa[i] - mu_a) * (pb[i] - mu_b) for i in range(n)) / n
+            c1 = (0.01 * 255) ** 2
+            c2 = (0.03 * 255) ** 2
+            denom = (mu_a**2 + mu_b**2 + c1) * (var_a + var_b + c2)
+            if denom == 0:
+                return 1.0 if cov == 0 else 0.0
+            ssim = (2 * mu_a * mu_b + c1) * (2 * cov + c2) / denom
+            return max(0.0, min(1.0, ssim))
+    except Exception:
+        return None
+
+
+def _is_near_solid(path: Path) -> bool:
+    """单文件是否纯色/接近纯色（灰度标准差极小）。"""
+    stats = _image_gray_stats(path)
+    if stats is None:
+        return False
+    return stats[1] < _SR_SOLID_STD
+
+
 def _is_all_black(path: Path) -> bool:
     """检查图片是否全黑/近黑（单文件绝对亮度判定，无原图对照时用）。
 
@@ -441,14 +536,17 @@ def _upscale_failure_reason(src: Path, dst: Path) -> str | None:
 
     ncnn-vulkan 工具偶发 exit 0 但输出纯黑/近黑（驱动/Vulkan 异常所致，
     重试同工具大概率复现），单靠绝对阈值会漏检“均值略高于旧阈值但相对原图
-    亮度崩塌”的情况，故同时做相对亮度/纹理/高光对照；原图本身就很暗时
+    亮度崩塌”的情况，故同时做相对亮度/纹理/高光/相似度对照；原图本身就很暗时
     不误判（相对规则要求原图先达到亮度下限）。
+    相似度为全局 SSIM（产物缩回原尺寸后比较），正常超分一般 0.85+，
+    仅当 <0.5（内容严重偏离）才判失败。
     """
-    try:
-        if _image_max_dim(dst) <= _image_max_dim(src):
-            return "产物尺寸未增大"
-    except Exception:
+    dst_dim = _image_max_dim(dst)
+    src_dim = _image_max_dim(src)
+    if dst_dim == 0 or src_dim == 0:
         return "产物无法读取"
+    if dst_dim <= src_dim:
+        return "产物尺寸未增大"
     src_stats = _image_gray_stats(src)
     dst_stats = _image_gray_stats(dst)
     if dst_stats is None:
@@ -468,6 +566,38 @@ def _upscale_failure_reason(src: Path, dst: Path) -> str | None:
         return "产物纹理丢失"
     if max_dst < 24 and max_src > 80:
         return "产物高光丢失"
+    sim = _similarity(src, dst)
+    if sim is not None and sim < _SR_SIMILARITY_THRESHOLD:
+        return f"产物相似度过低({sim:.2f})"
+    return None
+
+
+def _hard_failure_reason(src: Path, dst: Path) -> str | None:
+    """第二次超分的硬失败判定：仅拦截不可用的产物（尺寸/无法读取/纯黑/近黑/纯色）。
+
+    按策略：二次相似度仍 <50% 也不再丢弃，只要不是纯黑/近黑/纯色就保留。
+    原图本身就是纯色时，纯色产物视为正常（不误判）。
+    """
+    dst_dim = _image_max_dim(dst)
+    src_dim = _image_max_dim(src)
+    if dst_dim == 0 or src_dim == 0:
+        return "产物无法读取"
+    if dst_dim <= src_dim:
+        return "产物尺寸未增大"
+    src_stats = _image_gray_stats(src)
+    dst_stats = _image_gray_stats(dst)
+    if dst_stats is None:
+        return "产物无法读取"
+    if src_stats is None:
+        return "产物绝对黑" if dst_stats[0] < 16 else None
+    mean_src, std_src, _ = src_stats
+    mean_dst, std_dst, _ = dst_stats
+    if mean_dst < 8:
+        return "产物绝对黑"
+    if mean_dst < 18 and mean_src > 35:
+        return "产物近黑"
+    if std_dst < _SR_SOLID_STD and std_src > 15:
+        return "产物纯色"
     return None
 
 
@@ -509,8 +639,10 @@ def _sr_trigger_ok(path: Path) -> bool:
 async def maybe_upscale_poster(poster_path: Path) -> bool:
     """刮削收尾钩子：符合条件时对海报超分并原子替换；否则原样返回 False。
 
-    失败产物（纯黑/近黑/亮度崩塌）直接弃用保原图；首选预设产物无效时换
-    另一款工具重试一次（同工具重试大概率复现黑图），仍无效则保持原图。
+    首超产物无效（含相似度<50%）时删除并换另一款工具重试一次
+    （同工具黑图多为确定性驱动问题，重试无意义）；
+    二次相似度仍<50% 也不再丢弃，只要不是纯黑/近黑/纯色就保留，
+    否则弃用并保持原图。
     """
     if not _sr_trigger_ok(poster_path):
         return False
@@ -528,20 +660,38 @@ async def maybe_upscale_poster(poster_path: Path) -> bool:
             return False
         reason = _upscale_failure_reason(poster_path, tmp)
         if reason is None:
-            os.replace(tmp, poster_path)
+            try:
+                os.replace(tmp, poster_path)
+            except OSError as e:
+                signal.show_traceback_log(f"🔶 超分落盘失败（保持原图）: {poster_path.name}: {e}")
+                return False
             signal.show_log_text(f"✨ 海报超分完成: {poster_path.name}")
             return True
-        signal.show_traceback_log(f"🔶 超分产物异常（{reason}），换工具重试一次: {poster_path.name}")
+        signal.show_traceback_log(f"🔶 超分产物异常（{reason}），删除并换工具重试一次: {poster_path.name}")
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
         # 换另一款工具重试（同工具黑图多为确定性驱动问题，重试无意义）
         if not await upscale_image(poster_path, retry_tmp, fallback):
             signal.show_traceback_log(f"🔶 超分重试失败（保持原图）: {poster_path.name}")
             return False
-        retry_reason = _upscale_failure_reason(poster_path, retry_tmp)
-        if retry_reason is not None:
-            signal.show_traceback_log(f"🔶 超分重试仍异常（{retry_reason}），弃用并保持原图: {poster_path.name}")
+        hard_reason = _hard_failure_reason(poster_path, retry_tmp)
+        if hard_reason is not None:
+            signal.show_traceback_log(f"🔶 超分重试仍异常（{hard_reason}），弃用并保持原图: {poster_path.name}")
             return False
-        os.replace(retry_tmp, poster_path)
-        signal.show_log_text(f"✨ 海报超分重试完成: {poster_path.name}")
+        sim = _similarity(poster_path, retry_tmp)
+        if sim is not None and sim < _SR_SIMILARITY_THRESHOLD:
+            signal.show_log_text(
+                f"✨ 海报超分重试完成（相似度{sim:.2f}仍偏低，但非黑/纯色，按策略保留）: {poster_path.name}"
+            )
+        else:
+            signal.show_log_text(f"✨ 海报超分重试完成: {poster_path.name}")
+        try:
+            os.replace(retry_tmp, poster_path)
+        except OSError as e:
+            signal.show_traceback_log(f"🔶 超分落盘失败（保持原图）: {poster_path.name}: {e}")
+            return False
         return True
     finally:
         try:

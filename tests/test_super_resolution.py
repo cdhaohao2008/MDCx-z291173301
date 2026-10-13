@@ -138,6 +138,95 @@ async def test_maybe_upscale_failure_keeps_original(tmp_path, monkeypatch):
     assert poster.read_bytes() == before
 
 
+def _make_textured_jpg(path, w: int, h: int) -> None:
+    from PIL import ImageDraw
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img = Image.new("RGB", (w, h), (120, 60, 200))
+    d = ImageDraw.Draw(img)
+    d.rectangle([20, 20, w - 20, h - 20], fill=(200, 180, 60))
+    d.ellipse([w // 4, h // 4, 3 * w // 4, 3 * h // 4], fill=(30, 120, 90))
+    img.save(path, "JPEG")
+
+
+def test_similarity_high_for_good_upscale(tmp_path):
+    src = tmp_path / "src.jpg"
+    _make_textured_jpg(src, 300, 450)
+    dst = tmp_path / "dst.jpg"
+    with Image.open(src) as im:
+        im.resize((1200, 1800), Image.BICUBIC).save(dst, "JPEG")
+    sim = sr._similarity(src, dst)
+    assert sim is not None and sim >= 0.9, f"正常超分相似度应很高，实际 {sim}"
+    assert sr._upscale_failure_reason(src, dst) is None
+
+
+def test_similarity_low_for_black_output(tmp_path):
+    src = tmp_path / "src.jpg"
+    _make_textured_jpg(src, 300, 450)
+    dst = tmp_path / "black.jpg"
+    Image.new("RGB", (1200, 1800), (0, 0, 0)).save(dst, "JPEG")
+    sim = sr._similarity(src, dst)
+    assert sim is not None and sim < 0.5, f"黑图相似度应低于阈值，实际 {sim}"
+    assert sr._upscale_failure_reason(src, dst) is not None
+
+
+@pytest.mark.asyncio
+async def test_maybe_upscale_deletes_low_similarity_first_and_retries(tmp_path, monkeypatch):
+    """首超相似度<50%（黑图）须删除并换工具重试，重试可用则保留。"""
+    poster = tmp_path / "poster.jpg"
+    _make_textured_jpg(poster, 300, 450)
+    calls: list[str] = []
+
+    async def fake_upscale(src, dst, preset):
+        calls.append(str(preset))
+        if len(calls) == 1:
+            Image.new("RGB", (1200, 1800), (0, 0, 0)).save(dst, "JPEG")
+        else:
+            with Image.open(src) as im:
+                im.resize((1200, 1800), Image.BICUBIC).save(dst, "JPEG")
+        return True
+
+    monkeypatch.setattr(sr, "upscale_image", fake_upscale)
+    assert await sr.maybe_upscale_poster(poster) is True
+    assert calls == ["realesr-photo-4x", "waifu-photo-2x"], "重试须换另一款工具"
+    assert [p for p in tmp_path.rglob("*") if "[SR]" in p.name] == [], "临时产物须清理"
+
+
+@pytest.mark.asyncio
+async def test_maybe_upscale_keeps_usable_retry_despite_low_similarity(tmp_path, monkeypatch):
+    """二次相似度仍<50% 但非黑/非纯色时按策略保留（噪声图模拟内容偏离但可用）。"""
+    import random
+
+    poster = tmp_path / "poster.jpg"
+    _make_textured_jpg(poster, 300, 450)
+
+    async def fake_upscale(src, dst, preset):
+        rnd = random.Random(7)
+        px = bytes(rnd.randint(0, 255) for _ in range(300 * 450))
+        Image.frombytes("L", (300, 450), px).convert("RGB").resize((1200, 1800)).save(dst, "JPEG")
+        return True
+
+    monkeypatch.setattr(sr, "upscale_image", fake_upscale)
+    # 首超即噪声：相似度低触发重试；二次同样噪声但硬判定通过，按策略保留
+    assert await sr.maybe_upscale_poster(poster) is True
+
+
+@pytest.mark.asyncio
+async def test_maybe_upscale_discards_solid_retry(tmp_path, monkeypatch):
+    """二次仍是纯色（白图）则弃用并保持原图。"""
+    poster = tmp_path / "poster.jpg"
+    _make_textured_jpg(poster, 300, 450)
+    before = poster.read_bytes()
+
+    async def fake_upscale(src, dst, preset):
+        Image.new("RGB", (1200, 1800), (255, 255, 255)).save(dst, "JPEG")
+        return True
+
+    monkeypatch.setattr(sr, "upscale_image", fake_upscale)
+    assert await sr.maybe_upscale_poster(poster) is False
+    assert poster.read_bytes() == before
+
+
 @pytest.mark.asyncio
 async def test_upscale_image_timeout_degrades(monkeypatch, tmp_path):
     src = tmp_path / "a.jpg"
@@ -284,3 +373,87 @@ async def test_upscale_failure_reports_vulkan_unavailable(tmp_path, monkeypatch)
     hits = [text for text in logs if "海报超分未生效" in text]
     assert len(hits) == 1, f"结论行应只报一次，实际: {hits}"
     assert "Vulkan" in hits[0]
+
+
+@pytest.mark.asyncio
+async def test_maybe_upscale_mixed_black_white_keeps_original(tmp_path, monkeypatch):
+    """两次超分分别是黑图/纯白图：必须删产物、保原图、无残留。"""
+    poster = tmp_path / "poster.jpg"
+    _make_textured_jpg(poster, 300, 450)
+    before = poster.read_bytes()
+    calls: list[int] = []
+
+    async def fake_upscale(src, dst, preset):
+        calls.append(1)
+        color = (0, 0, 0) if len(calls) == 1 else (255, 255, 255)
+        Image.new("RGB", (1200, 1800), color).save(dst, "JPEG")
+        return True
+
+    monkeypatch.setattr(sr, "upscale_image", fake_upscale)
+    assert await sr.maybe_upscale_poster(poster) is False
+    assert poster.read_bytes() == before, "两次全坏必须保持原始下载图"
+    assert [p for p in tmp_path.rglob("*") if "[SR]" in p.name] == [], "超分产物须删除"
+
+
+@pytest.mark.asyncio
+async def test_maybe_upscale_replace_failure_keeps_original(tmp_path, monkeypatch):
+    """落盘替换被锁抛错时返回 False 而不是抛异常，原图不动。"""
+    import os
+
+    poster = tmp_path / "poster.jpg"
+    _make_textured_jpg(poster, 300, 450)
+    before = poster.read_bytes()
+
+    async def fake_upscale(src, dst, preset):
+        with Image.open(src) as im:
+            im.resize((1200, 1800), Image.BICUBIC).save(dst, "JPEG")
+        return True
+
+    monkeypatch.setattr(sr, "upscale_image", fake_upscale)
+    monkeypatch.setattr(os, "replace", lambda a, b: (_ for _ in ()).throw(PermissionError("locked")))
+    assert await sr.maybe_upscale_poster(poster) is False
+    assert poster.read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_ensure_binary_concurrent_install_single_download(tmp_path, monkeypatch):
+    """批刮并发只下载安装一次（_SR_INSTALL_LOCK 防 rmtree/copytree 竞态）。"""
+    monkeypatch.setattr(sr, "_TOOL_CHECKSUMS", {})
+    calls: list[int] = []
+
+    async def fake_download(url):
+        calls.append(1)
+        await asyncio.sleep(0.1)
+        return _make_tool_zip("realesrgan")
+
+    monkeypatch.setattr(sr, "_download_bytes", fake_download)
+    results = await asyncio.gather(*[sr.ensure_binary("realesrgan") for _ in range(5)])
+    assert all(r is not None for r in results)
+    assert len(calls) == 1, f"5 并发应只下载 1 次，实际 {len(calls)} 次"
+
+
+def test_run_elevated_timeout_returns_distinct_code(tmp_path, monkeypatch):
+    """_run_elevated 超时返回 _TIMEOUT_EXIT_CODE（与二进制失败区分，便于正确上报）。"""
+    import subprocess
+
+    def boom(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd="x", timeout=1)
+
+    monkeypatch.setattr(sr.subprocess, "run", boom)
+    code, _, _ = sr._run_elevated(["realesrgan-ncnn-vulkan.exe"], str(tmp_path), 1)
+    assert code == sr._TIMEOUT_EXIT_CODE
+
+
+def test_extract_zip_rejects_path_traversal(tmp_path):
+    """含 ../绝对路径的包必须拒解、不写出目标外。"""
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zf:
+        zf.writestr("../../evil.txt", b"x")
+    dest = tmp_path / "tools" / "realesrgan"
+    try:
+        sr._extract_zip(buffer.getvalue(), dest)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("非法路径包应抛 ValueError")
+    assert not (tmp_path / "evil.txt").exists()
