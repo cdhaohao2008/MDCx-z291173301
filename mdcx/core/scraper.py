@@ -704,7 +704,7 @@ class Scraper:
             progress_percentage = f"{progress_value:.2f}%"
             used_time = get_used_time(start_time)
             scrape_info_begin = f"{count:d}/{count_all:d} ({progress_percentage}) round({Flags.count_claw}) {split_path(file_path)[1]}    新的刮削线程"
-            scrape_info_begin = "\n\n\n" + scrape_info_begin + "\n" + "=" * 108
+            scrape_info_begin = "\n\n\n" + scrape_info_begin
             scrape_info_after = f"\n 🕷 {get_current_time()} {count}/{count_all} {split_path(file_path)[1]} 刮削完成！用时 {used_time} 秒！"
             # 三个调试开关（show_web_log / show_from_log / show_data_log）
             # 互相独立，拼装逻辑见 compose_scrape_log_output（议题 #98）
