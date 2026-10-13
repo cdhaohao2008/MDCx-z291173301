@@ -152,12 +152,10 @@ async def test_official_crawler_jimmy_prefix_routes_to_faleno():
 
 
 def test_official_description_three_tier_and_check_scope():
-    """议题 #165: 站点描述须讲清「有码30家 + 无码5站 + 检测仅覆盖无码五站」,
-    防止再被读成 official 只有无码路由。"""
+    """指定网站下拉框保持紧凑：official 与其他综合站一致只展示短定位，
+    不再拼接“按番号前缀自动路由官网…”长描述（下拉过宽）。"""
     from mdcx.crawlers.official import OfficialCrawler
 
     desc = OfficialCrawler.site_description()
-    assert "有码30" in desc, "有码官网档位必须出现在描述中"
-    assert "无码5站" in desc
-    assert "检测网络" in desc or "「检测网络」" in desc, "须注明检测覆盖面与抓取面的差异"
-    assert desc.index("有码30") < desc.index("无码5站"), "有码在前, 与路由主体构成一致"
+    assert desc == "综合：有码+无码"
+    assert "按番号前缀自动路由官网" not in desc

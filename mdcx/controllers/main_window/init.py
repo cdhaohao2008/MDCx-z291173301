@@ -48,10 +48,6 @@ def _site_status_icon(level: str) -> QIcon:
     return QIcon(pixmap)
 
 
-# tooltip 仅显示上次检测、不带定位说明的站点下拉框（按 objectName）
-_SITE_TIP_CHECK_ONLY_COMBOS = frozenset({"comboBox_no_proxy_sites"})
-
-
 def _site_combo_item_tooltip(value: str, description: str, *, check_only: bool = False) -> str:
     """拼装站点项 tooltip：站点定位说明 + 区域标签 + 上次检测结果（check_only 时只留后者）。"""
     from mdcx.manual import ManualConfig
@@ -91,13 +87,15 @@ def invalidate_check_cache() -> None:
     _CHECK_CACHE = None
 
 
-def _populate_site_combo(combo: QComboBox, site_values: list[str]) -> None:
-    """填充站点下拉框：区域标签与定位说明直接拼入显示文本，检测状态入图标，说明与上次检测结果入 tooltip。"""
+def _populate_site_combo(combo: QComboBox, site_values: list[str], *, check_only: bool = False) -> None:
+    """填充站点下拉框：区域标签与定位说明直接拼入显示文本，检测状态入图标，上次检测结果入 tooltip。
+
+    check_only=True 的下拉框（网络页使用代理网站）：tooltip 只留上次检测一行，不带定位说明。
+    """
     from mdcx.config.models import Website
     from mdcx.crawlers import get_crawler
     from mdcx.manual import ManualConfig
 
-    check_only = combo.objectName() in _SITE_TIP_CHECK_ONLY_COMBOS
     for value in site_values:
         tag = ManualConfig.SITE_REGION_TAGS.get(value, "")
         cache_entry = _load_check_cache().get(value)
@@ -127,8 +125,11 @@ def _populate_site_combo(combo: QComboBox, site_values: list[str]) -> None:
 def refresh_network_check_badges(self: "MyMAinWindow") -> None:
     """检测完成后刷新三个站点下拉框的状态图标与 tooltip（不重排文本，保留当前选中项）。"""
     invalidate_check_cache()
-    for combo in (self.Ui.comboBox_website_all, self.Ui.comboBox_custom_website, self.Ui.comboBox_no_proxy_sites):
-        check_only = combo.objectName() in _SITE_TIP_CHECK_ONLY_COMBOS
+    for combo, check_only in (
+        (self.Ui.comboBox_website_all, False),
+        (self.Ui.comboBox_custom_website, False),
+        (self.Ui.comboBox_no_proxy_sites, True),  # 网络页：tooltip 只要上次检测，不要定位说明
+    ):
         for i in range(combo.count()):
             value = combo.itemData(i, Qt.ItemDataRole.UserRole) or combo.itemText(i).split(" ")[0].split("（")[0].strip()
             if not value:
@@ -209,7 +210,7 @@ def _append_official_subsite_rows(combo: QComboBox) -> None:
         if (combo.itemData(i, Qt.ItemDataRole.UserRole) or "") == "official":
             anchor = i
     insert_at = anchor + 1 if anchor >= 0 else combo.count()
-    check_only = combo.objectName() in _SITE_TIP_CHECK_ONLY_COMBOS
+    check_only = False  # official 子站行只出现在自定义网站框，tooltip 保留说明
     for offset, (name, spec) in enumerate(UNCENSORED_OFFICIAL_SITES.items()):
         url = spec.base_url.rstrip("/") + "/"
         description = f"无码：{_OFFICIAL_STUDIO_DISPLAY.get(spec.studio, spec.studio)}"
@@ -577,12 +578,12 @@ def Init_Ui(self: "MyMAinWindow"):
     # 初始化使用代理网站下拉框
     self.Ui.comboBox_no_proxy_sites.clear()
     self.Ui.comboBox_no_proxy_sites.addItem("选择网站...", "")
-    _populate_site_combo(self.Ui.comboBox_no_proxy_sites, sorted(supported_websites))
+    _populate_site_combo(self.Ui.comboBox_no_proxy_sites, sorted(supported_websites), check_only=True)
     # 连接选择事件
     self.Ui.comboBox_no_proxy_sites.currentTextChanged.connect(self._add_no_proxy_site)
     _setup_combo_boxes(self)
+    # 指定网站（comboBox_website_all）下拉右侧不显示网址：只装另外两框的网址列
     for _site_combo in (
-        self.Ui.comboBox_website_all,
         self.Ui.comboBox_custom_website,
         self.Ui.comboBox_no_proxy_sites,
     ):
