@@ -3,19 +3,19 @@ import traceback
 import webbrowser
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QObject, QEvent, QPoint, QRect, QSize, QTimer, Qt
+from PyQt6.QtCore import QObject, QEvent, QPoint, QRect, QSize, Qt
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QScreen
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QComboBox,
+    QLabel,
     QListView,
     QMenu,
     QStyledItemDelegate,
     QStyle,
     QStyleOptionViewItem,
     QSystemTrayIcon,
-    QToolTip,
     QTreeWidgetItem,
     QWidget,
 )
@@ -373,35 +373,136 @@ def _event_pos(event) -> QPoint:
     return to_point() if callable(to_point) else point
 
 
-def _tip_label() -> QWidget | None:
-    """QToolTip 内部复用的那个提示窗（QTipLabel，全进程只有这一个）。
+_SITE_TIP_QSS = (
+    "QWidget#siteTip{border:1px solid #D8DEE9;border-radius:8px;background:#FFFFFF;color:#111827;padding:4px 10px;}"
+)
+_UNLIMITED_SIZE = 1 << 30  # 放开 setFixedXxx 用；PyQt6 没有导出 QWIDGETSIZE_MAX
 
-    它每次显示都按当前排版结果自行 `resize()`；Windows 侧首显那次与随后几次排出的高度
-    可能不同（同一段「上次检测：…」提示框忽高忽低），所以站点下拉的提示高度由我们自己钉。
+
+class _SiteTipLabel(QLabel):
+    """站点下拉专用的悬停提示窗（三个下拉共用同一个，同一时刻只显示一份）。
+
+    不再借道 `QToolTip`：那个提示窗（QTipLabel）是全进程共用的，它每次显示都自行重排
+    版、位置也由 Qt 决定、还要靠平台侧约 1s 后合成的 ToolTip 事件驱动；而别处一次
+    `QToolTip.hideText()`（或 Qt 自己收起它）就会让我们「以为提示还亮着」的记录与实际
+    脱钩——记录里的行号没变、提示其实已经没了，同一行内再移动就不重弹，这就是用户
+    反馈的「有时鼠标移动了也不显示」。自己建窗自己管：亮没亮、高度、位置、对齐都由此
+    决定，不与全局提示窗互相干扰，也不会掀掉应用中其它控件的提示。
+
+    高度按行高取整：字体刚加载完/没加载完会排出不同的行高，同一段「上次检测：…」的提
+    示框就忽高忽低（用户反馈 1/2/3 次显示高度不一致）。故先量一次单行自然高度作为行高
+    `line_h`（含 QSS 内边距与边框），再把所有提示的高度取整成 `line_h` 的整数倍——**单行恒
+    定、折行按行高递增**，既不会忽高忽低，也不会出现两行半那种零头高度；同一段文本仍取历
+    次最大值，宁可统一偏高也不把文字裁掉。文字对齐钉成水平+垂直居中，提示窗高度固定后不会
+    随排版漂到上边沿。长文本（框体自带的说明文字）在 `MAX_WIDTH` 处折行，不会超出屏幕被裁掉。
     """
-    for widget in QApplication.allWidgets():
-        if widget.metaObject().className() == "QTipLabel":
-            return widget
-    return None
+
+    # 折行宽度上限（逻辑像素）。取 560 是量出来的：字号大到行高 ~36px（用户机器上的样子）时，
+    # 「上次检测：2026-10-09 20:51✅可连通·走代理」这句本身要 422~460px，420 会把它折成两行，
+    # 于是最常见的单行提示反而变成两行高；560 能让这类提示在 14~16pt 下都保持单行。
+    MAX_WIDTH = 560
+
+    def __init__(self) -> None:
+        super().__init__(None)
+        self._line_h: int = 0  # 单行自然高度（含 QSS 内边距/边框）；所有提示高度都是它的整数倍
+        self._pinned: dict[str, int] = {}  # 文本 → 钉住的高度（保证同一段文字每次一样高）
+        self.show_count = 0  # 回归测试用：实际弹过几次
+        self.setObjectName("siteTip")
+        self.setStyleSheet(_SITE_TIP_QSS)  # 与全局 QSS 里的 QToolTip 同一套配色/圆角
+        self.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+        self.setWordWrap(True)
+        self.setMargin(0)
+
+    def is_showing(self, text: str) -> bool:
+        """提示窗此刻是否真的亮着，且亮的是这段文本。"""
+        return self.isVisible() and self.text() == text
+
+    def show_at(self, text: str, anchor: QPoint) -> None:
+        """在 anchor（全局坐标，通常取该行下沿）弹出 text。"""
+        self.setText(text)
+        # 先量单行自然尺寸（含 QSS 内边距与边框）：行高由此确定，宽度超上限则折行，否则一行
+        # 拉到屏幕外被裁掉
+        self.setWordWrap(False)
+        self._release_size()
+        self.adjustSize()
+        self._line_h = max(self._line_h, self.height(), 1)  # 行高只涨不跌（字体加载完可能更高）
+        width = min(self.width(), self.MAX_WIDTH)
+        self.setWordWrap(True)
+        self.setFixedWidth(width)
+        natural = max(self.heightForWidth(width), self.sizeHint().height())
+        # 向上取整到行高的整数倍：单行恒定，折行按行高递增，不留「两行半」的零头高度
+        lines = max(1, -(-natural // self._line_h))
+        pinned = max(self._pinned.get(text, 0), lines * self._line_h)  # 同文本取历次最大，宁高不裁
+        self._pinned[text] = pinned
+        self.setFixedHeight(pinned)  # 钉高后 resize 被上下限夹住，视觉高度恒定
+        self.move(_clamp_tip_pos(anchor, width, pinned))
+        self.show()
+        self.raise_()
+        self.show_count += 1
+
+    def _release_size(self) -> None:
+        """放开 `setFixedXxx` 留下的上下限（PyQt6 未导出 QWIDGETSIZE_MAX，用足够大的值代替）。"""
+        self.setMinimumSize(0, 0)
+        self.setMaximumSize(_UNLIMITED_SIZE, _UNLIMITED_SIZE)
+
+    def hide_tip(self) -> None:
+        if self.isVisible():
+            self.hide()
+
+
+def _clamp_tip_pos(anchor: QPoint, width: int, height: int) -> QPoint:
+    """提示窗贴 anchor 下沿弹出，并夹在所在屏幕可用区内（夹到屏外就等于没显示）。"""
+    x = anchor.x()
+    y = anchor.y() + 16
+    screen = QApplication.screenAt(anchor) or QApplication.primaryScreen()
+    geo = screen.availableGeometry() if screen is not None else QRect()
+    if geo.isValid():
+        if x + width > geo.right():
+            x = geo.right() - width + 1
+        if y + height > geo.bottom():
+            y = anchor.y() - height - 8  # 下方放不下就翻到上方
+        x = max(geo.left(), x)
+        y = max(geo.top(), y)
+    return QPoint(x, y)
+
+
+_SITE_TIP_LABEL: "_SiteTipLabel | None" = None
+
+
+def _site_tip_label() -> _SiteTipLabel:
+    """站点提示窗单例（懒建；三个站点下拉共用，避免同时弹出两份）。"""
+    global _SITE_TIP_LABEL
+    if _SITE_TIP_LABEL is None:
+        _SITE_TIP_LABEL = _SiteTipLabel()
+    return _SITE_TIP_LABEL
 
 
 class _SiteComboTipFilter(QObject):
-    """站点下拉弹窗悬停提示：光标落到哪一行就立刻显示哪一行的 ToolTipRole 文本。
+    """站点下拉悬停提示：弹窗里按光标所在行显示，闭合时显示当前选中项的结果。
 
-    此前完全交给 Qt 默认链路（平台侧合成 QEvent::ToolTip → `QStyledItemDelegate.helpEvent`
-    → `QToolTip`），在「软件设置→网络→网站设置→当前网站」等站点下拉里实测 hover 不出
-    提示：弹窗是 Qt::Popup 顶层窗，Windows 侧要停住约 1s 才合成该事件，事件还未必送达
-    弹窗 viewport；即便偶发显示，也常是上一行/空白处遗留的旧文本（提示与光标所指行对不
-    上）。这里改为自管：viewport 的 MouseMove 直接按 `view.indexAt()` 取光标所在行自己
-    弹（行内移动不重弹、换行即换内容，无提示文本则收起），平台侧的 ToolTip 事件也一并
-    接管掉，保证同一时刻只有一份提示、且与光标所在行一致；移出列表/弹窗关闭即隐藏。
+    提示窗是本模块自建的 `_SiteTipLabel`（见其注释：不再借道全局 QToolTip 的理由）。
+    MouseMove 直接按 `view.indexAt()` 取光标所在行自己弹、自己收：
+
+    - 同一行内移动且提示确实还亮着 → 不重弹（重弹会让提示闪一下并重置位置）；
+    - 提示已经被收起（哪怕行号没变）→ 照弹，这正是「有时鼠标移动了也不显示」的修法；
+    - 无提示文本、移出列表、弹窗关闭、按下鼠标、滚轮滚动（行号会挪但不一定有 MouseMove
+      跟来）→ 收起；
+    - 平台侧 ToolTip 事件一并接管，避免同一处出现第二份/过期提示。
+
+    同一个过滤器也装在框体上（闭合态）：闭合时没有弹窗可接管，Qt 要等约 1s 才合成
+    ToolTip 事件才弹原生提示框，那两个压根没设提示文字的下拉就是「鼠标移上去什么都不出
+    现」（用户反馈的「显示不灵敏」）。这里 MouseMove 即弹当前项的上次检测结果；框体自带
+    提示文字（不分流那个下拉的说明）就拼在前面一并显示。
     """
 
     def __init__(self, combo: QComboBox) -> None:
         super().__init__(combo)
         self._combo = combo
-        self._shown_row: int = -1  # 已显示提示所在行（-1 = 无提示）；行内移动据此跳过重弹
-        self._tip_height: int = 0  # 提示窗钉高：历次自然高度的最大值，0 = 尚未记录
+        self._shown_row: int = -1  # 已显示提示所在行（-1 = 无提示）
 
     def _index_at(self, pos):
         """光标所在行的 index；空白处/无 view 返回 None。"""
@@ -411,76 +512,79 @@ class _SiteComboTipFilter(QObject):
         index = view.indexAt(pos)
         return index if index.isValid() else None
 
-    def _show_tip_for(self, index) -> None:
-        """按 index 显示 tooltip；index 为 None 或文本为空则收起提示。"""
-        view = self._combo.view()
-        if view is None:
+    def _hide_tip(self) -> None:
+        self._shown_row = -1
+        self._combo._site_tip_in_popup = False  # type: ignore[attr-defined]
+        _site_tip_label().hide_tip()
+
+    def _closed_tip_text(self) -> str:
+        """闭合态提示文本：框体自带说明（若有）+ 当前选中项的上次检测结果。"""
+        parts = []
+        own = str(self._combo.toolTip() or "").strip()
+        if own:
+            parts.append(own)
+        picked = str(self._combo.itemData(self._combo.currentIndex(), Qt.ItemDataRole.ToolTipRole) or "").strip()
+        if picked:
+            parts.append(picked)
+        return "\n".join(parts)
+
+    def _show_closed_tip(self) -> None:
+        """闭合态悬停：显示当前选中项的结果（弹窗开着时归弹窗内的过滤器管）。"""
+        if getattr(self._combo, "_site_tip_in_popup", False) is True:
             return
-        row = index.row() if index is not None else -1
-        if row == self._shown_row and row != -1:
-            return  # 同一行内移动：不重复弹（重弹会让提示闪一下并重置位置）
-        self._shown_row = row
-        text = str(index.data(Qt.ItemDataRole.ToolTipRole) or "").strip() if index is not None else ""
+        text = self._closed_tip_text()
+        label = _site_tip_label()
         if not text:
-            QToolTip.hideText()
+            label.hide_tip()
             return
+        if label.is_showing(text):
+            return
+        label.show_at(text, self._combo.mapToGlobal(QPoint(0, self._combo.height())))
+
+    def _show_tip_for(self, index) -> None:
+        """按 index 显示提示；index 为 None 或文本为空则收起提示。"""
+        view = self._combo.view()
+        row = index.row() if index is not None else -1
+        text = str(index.data(Qt.ItemDataRole.ToolTipRole) or "").strip() if index is not None else ""
+        label = _site_tip_label()
+        if view is None or row < 0 or not text:
+            self._hide_tip()
+            return
+        if row == self._shown_row and label.is_showing(text):
+            return  # 同一行内移动且提示还亮着：不重复弹
         viewport = view.viewport()
         rect = view.visualRect(index)
         # 贴着该行下沿弹出：只有「上次检测：…」一行（定位说明已在显示文本里），鼠标停在本行即持续可见
-        QToolTip.showText(viewport.mapToGlobal(rect.bottomLeft()), text, viewport, rect)
-        self._sync_tip_label()
-
-    def _sync_tip_label(self, *, allow_defer: bool = True) -> None:
-        """把 QToolTip 那个提示窗收拾成稳定的样子：文字恒居中 + 高度按首显钉死。
-
-        QTipLabel 每次显示都按当下排版结果自己 `resize()`，字体刚加载/没加载完会排出不同
-        高度，同一段「上次检测：…」的提示框就忽高忽低（用户反馈第 1/2/3 次显示高度不一致）。
-        钉上固定高度后 `resize()` 被上下限夹住、视觉高度恒定；取历次最大值是兜住万一某次
-        排版更高，不把文字裁掉。文字对齐则钉成水平+垂直居中：QTipLabel 默认只 AlignLeft，
-        钉高后多出来的那点空白会把字顶到上边沿（看着就是「飘」），居中后每次显示都稳在同一
-        位置；水平居中在提示窗宽度正好等于文字宽度时是无害的。
-        """
-        label = _tip_label()
-        if label is None:
-            if allow_defer:
-                # 首显这一次提示窗还没挂上控件树，下一轮事件循环再来（趁用户还没移到下一行）
-                QTimer.singleShot(0, lambda: self._sync_tip_label(allow_defer=False))
-            return
-        label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
-        pinned = label.minimumHeight()
-        if pinned > 0:
-            # 临时解除再量：钉死后 sizeHint 会被固定高度夹住，读出来没意义。
-            # 解除与复原都在同一轮事件内完成，Qt 本来每次显示也会 resize，看不到闪烁。
-            label.setFixedHeight(0)
-        natural = label.sizeHint().height()
-        if natural <= 0:
-            if pinned > 0:
-                label.setFixedHeight(pinned)  # 量不出来就把原钉高还回去，别把提示窗压扁
-            return
-        self._tip_height = max(self._tip_height, natural)  # 首显那次的自然高度为准
-        if label.minimumHeight() != self._tip_height or label.maximumHeight() != self._tip_height:
-            label.setFixedHeight(self._tip_height)
-
-    def _release_tip_height(self) -> None:
-        """解除钉高：QTipLabel 是全进程共用的，不能把固定高度留给应用里其它提示。"""
-        label = _tip_label()
-        if label is not None and label.minimumHeight() > 0:
-            label.setFixedHeight(0)
+        anchor = viewport.mapToGlobal(rect.bottomLeft() if rect.isValid() else viewport.rect().topLeft())
+        label.show_at(text, anchor)
+        self._shown_row = row  # 弹成功后再记账：中途异常也不会留下「以为亮着」的脏状态
+        self._combo._site_tip_in_popup = True  # type: ignore[attr-defined]
 
     def eventFilter(self, obj, event) -> bool:
         try:
             event_type = event.type()
+            view = self._combo.view()
+            in_popup = view is not None and obj is view.viewport()
             if event_type == QEvent.Type.MouseMove and not event.buttons():
                 # 无按键移动才做提示（拖拽选择过程中不打扰）
-                self._show_tip_for(self._index_at(_event_pos(event)))
+                if in_popup:
+                    self._show_tip_for(self._index_at(_event_pos(event)))
+                else:
+                    self._show_closed_tip()
                 return False  # 交给其余过滤器（如网址列的 _SiteUrlClickFilter）继续处理
             if event_type == QEvent.Type.ToolTip:
-                self._show_tip_for(self._index_at(_event_pos(event)))
+                if in_popup:
+                    self._show_tip_for(self._index_at(_event_pos(event)))
+                else:
+                    self._show_closed_tip()
                 return True  # 接管：不走 Qt 默认 delegate，避免同一处出现第二份/过期提示
-            if event_type in (QEvent.Type.Hide, QEvent.Type.Leave):
-                self._shown_row = -1
-                QToolTip.hideText()
-                self._release_tip_height()
+            if event_type in (
+                QEvent.Type.Hide,
+                QEvent.Type.Leave,
+                QEvent.Type.MouseButtonPress,
+                QEvent.Type.Wheel,
+            ):
+                self._hide_tip()
                 return False
         except Exception:
             pass
@@ -488,15 +592,22 @@ class _SiteComboTipFilter(QObject):
 
 
 def _install_site_combo_tips(combo: QComboBox) -> None:
-    """给站点下拉框装悬停提示（按光标所在行实时显示 ToolTipRole）。
+    """给站点下拉框装悬停提示（弹窗内按行、闭合时按当前项）。
 
-    必须在 `_setup_combo_boxes` 换过 view 之后调用（过滤器装在 view.viewport() 上）。
+    必须在 `_setup_combo_boxes` 换过 view 之后调用：弹窗那侧的过滤器装在
+    view.viewport() 上，闭合那侧装在框体（及其 lineEdit）上。
     """
     view = combo.view()
     if view is None or getattr(combo, "_site_tip_filter_installed", False) is True:
         return
-    view.viewport().setMouseTracking(True)  # 无按键也要有 MouseMove，才能定位光标所在行
-    view.viewport().installEventFilter(_SiteComboTipFilter(combo))
+    tip_filter = _SiteComboTipFilter(combo)
+    targets = [view.viewport(), combo]
+    if combo.lineEdit() is not None:
+        targets.append(combo.lineEdit())
+    for target in targets:
+        # 无按键也要有 MouseMove，否则移动到新位置时收不到事件
+        target.setMouseTracking(True)
+        target.installEventFilter(tip_filter)
     combo._site_tip_filter_installed = True  # type: ignore[attr-defined]
 
 

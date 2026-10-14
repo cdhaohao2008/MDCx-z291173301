@@ -1,17 +1,24 @@
 """站点下拉框悬停提示回归（软件设置→网络→网站设置→当前网站 等三个站点下拉）。
 
-用户反馈：下拉列表里把鼠标放在某个选项上，不显示提示（截图里偶发弹出的还是别的行的旧文本）。
+用户反馈：
+- 一开始：下拉列表里把鼠标放在某个选项上不显示提示（截图里偶发弹出的还是别的行的旧文本）。
+- 后来：QToolTip 感觉显示不灵敏，大部分时间能显示，但有时鼠标移动了也不显示。
+- 再后来：提示框高度忽高忽低、提示文字不居中。
+
 提示内容按用户要求只保留「上次检测：…」（定位说明已在选项显示文本里，不重复）；
 没检测过的站点不弹提示。
 
-原实现把提示完全交给 Qt 默认链路（平台侧合成 QEvent::ToolTip → delegate.helpEvent →
-QToolTip），弹窗是 Qt::Popup 顶层窗，这条链路在项目里不可靠。现改为
-`init._SiteComboTipFilter` 自管：viewport 的 MouseMove 直接按光标所在行取
-ToolTipRole 自己弹，平台侧的 ToolTip 事件一并接管，保证提示与光标所指行一致、
-且不残留上一行的内容。
+实现（`init._SiteComboTipFilter` + `init._SiteTipLabel`）：
+- 提示窗自建（`Qt::ToolTip` 无边框窗 + 全局 QSS 同款配色），不再借道 `QToolTip`。
+  全局提示窗是全进程共用的，它自己决定尺寸/位置/时序，别的控件一次 `hideText()` 就能让
+  「以为提示还亮着」的记录与实际脱钩——行号没变、提示已经没了，同一行内再移动就不重弹，
+  这正是「有时鼠标移动了也不显示」。现在亮没亮由提示窗自己说了算。
+- 高度按行高取整：单行提示恒定同一高度，折行按行高递增（同一文本取历次最大值，宁高不裁），
+  文字恒水平+垂直居中。
+- 收起时机：移出列表 / 弹窗关闭 / 按下鼠标 / 滚轮滚动 / 落到无提示文本的行。
 
-测试用假的 QToolTip（替换 init 模块里的引用）记录 showText/hideText 调用，
-断言不依赖具体平台是否真的画出提示窗。
+测试用真实的自建提示窗（`_site_tip_label()`）断言，不再替换成假 QToolTip —— 之前的假对象
+让高度、对齐这类真实渲染行为完全没被覆盖。
 """
 
 import inspect
@@ -23,7 +30,7 @@ import sys
 
 import pytest
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
-from PyQt6.QtGui import QHelpEvent, QMouseEvent
+from PyQt6.QtGui import QFont, QHelpEvent, QMouseEvent
 from PyQt6.QtWidgets import QApplication, QComboBox, QListView
 
 import mdcx.controllers.main_window.init as init_mod
@@ -45,20 +52,6 @@ _ROWS = (
 )
 
 
-class _FakeToolTip:
-    """记录 QToolTip 调用的替身（offscreen 平台无真实提示窗，不能靠 QToolTip.text() 断言）。"""
-
-    def __init__(self) -> None:
-        self.shown: list[str] = []
-        self.hide_count = 0
-
-    def showText(self, pos, text, widget=None, rect=None, msecShowTime=-1, msecHideTime=-1):  # noqa: N802
-        self.shown.append(text)
-
-    def hideText(self) -> None:  # noqa: N802
-        self.hide_count += 1
-
-
 def _ensure_app() -> QApplication:
     global _app
     if _app is None:
@@ -66,20 +59,37 @@ def _ensure_app() -> QApplication:
     return _app
 
 
-def _make_combo() -> QComboBox:
+@pytest.fixture
+def tip():
+    """每个用例一个全新的提示窗：钉高与弹过次数不串味。"""
+    _ensure_app()
+    old = init_mod._SITE_TIP_LABEL
+    if old is not None:
+        old.hide_tip()
+    init_mod._SITE_TIP_LABEL = None
+    label = init_mod._site_tip_label()
+    try:
+        yield label
+    finally:
+        label.hide_tip()
+        init_mod._SITE_TIP_LABEL = old
+
+
+def _make_combo(*, opened: bool = True) -> QComboBox:
     _ensure_app()
     combo = QComboBox()
     combo.setView(QListView(combo))
     combo.resize(400, 30)
-    for i, (text, tip) in enumerate(_ROWS):
+    for i, (text, tip_text) in enumerate(_ROWS):
         combo.addItem(text, f"v{i}")
-        if tip:
-            combo.setItemData(i, tip, Qt.ItemDataRole.ToolTipRole)
+        if tip_text:
+            combo.setItemData(i, tip_text, Qt.ItemDataRole.ToolTipRole)
     combo.show()
     _ensure_app().processEvents()
     _install_site_combo_tips(combo)
-    combo.showPopup()
-    _ensure_app().processEvents()
+    if opened:
+        combo.showPopup()
+        _ensure_app().processEvents()
     return combo
 
 
@@ -91,7 +101,7 @@ def _row_pos(combo: QComboBox, row: int, dx: int = 10) -> QPoint:
 
 
 def _hover(combo: QComboBox, row: int, dx: int = 10) -> None:
-    """模拟鼠标无按键移动到第 row 行。"""
+    """模拟鼠标无按键移动到第 row 行（弹窗内）。"""
     viewport = combo.view().viewport()
     pos = _row_pos(combo, row, dx)
     QApplication.sendEvent(
@@ -108,43 +118,72 @@ def _hover(combo: QComboBox, row: int, dx: int = 10) -> None:
     _ensure_app().processEvents()
 
 
-@pytest.fixture
-def fake_tip(monkeypatch) -> _FakeToolTip:
-    tip = _FakeToolTip()
-    monkeypatch.setattr(init_mod, "QToolTip", tip)
-    return tip
+def _hover_closed(combo: QComboBox, dx: int = 10) -> None:
+    """模拟鼠标无按键移动到闭合状态的框体上。"""
+    pos = QPoint(dx, combo.height() // 2)
+    QApplication.sendEvent(
+        combo,
+        QMouseEvent(
+            QEvent.Type.MouseMove,
+            QPointF(pos),
+            QPointF(combo.mapToGlobal(pos)),
+            Qt.MouseButton.NoButton,
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+        ),
+    )
+    _ensure_app().processEvents()
 
 
-def test_hover_shows_tooltip_of_row_under_cursor(fake_tip):
+def test_hover_shows_tip_of_row_under_cursor(tip):
     """悬停哪一行就弹哪一行的上次检测结果（用户要的就是这个）。"""
     combo = _make_combo()
     _hover(combo, 0)
-    assert fake_tip.shown[-1] == _ROWS[0][1]
+    assert tip.isVisible() is True
+    assert tip.text() == _ROWS[0][1]
     _hover(combo, 1)
-    assert fake_tip.shown[-1] == _ROWS[1][1]
+    assert tip.text() == _ROWS[1][1]
 
 
-def test_same_row_move_does_not_reshow(fake_tip):
-    """行内移动不重复弹：重弹会让提示闪一下并重置位置。"""
+def test_same_row_move_does_not_reshow(tip):
+    """行内移动且提示还亮着时不重复弹：重弹会让提示闪一下并重置位置。"""
     combo = _make_combo()
     _hover(combo, 1, dx=10)
-    count = len(fake_tip.shown)
+    count = tip.show_count
     _hover(combo, 1, dx=40)
-    assert len(fake_tip.shown) == count
+    assert tip.show_count == count
+    assert tip.isVisible() is True
 
 
-def test_row_without_tip_text_hides_instead_of_keeping_stale(fake_tip):
+def test_tip_reshown_after_hidden_while_row_unchanged(tip):
+    """提示被收起后，同一行内再移动必须重弹。
+
+    这是「有时鼠标移动了也不显示」的回归：旧实现只看「行号没变」就跳过重弹，一旦提示
+    其实已经被 Qt 或别处收起，同一行怎么移动都不会再出现。
+    """
+    combo = _make_combo()
+    _hover(combo, 1)
+    assert tip.isVisible() is True
+    tip.hide()  # 模拟提示被别处收起：行号记录没变，提示其实已经没了
+    _ensure_app().processEvents()
+    assert tip.isVisible() is False
+    count = tip.show_count
+    _hover(combo, 1, dx=40)  # 同一行内移动
+    assert tip.isVisible() is True, "提示已收起时行内移动也必须重弹"
+    assert tip.text() == _ROWS[1][1]
+    assert tip.show_count == count + 1
+
+
+def test_row_without_tip_text_hides_instead_of_keeping_stale(tip):
     """提示文本为空的行收起提示，不留着上一行的内容（截图里的旧文本就是这么来的）。"""
     combo = _make_combo()
     _hover(combo, 0)
-    fake_tip.shown.clear()
-    hide_before = fake_tip.hide_count
+    assert tip.isVisible() is True
     _hover(combo, 2)
-    assert fake_tip.shown == []
-    assert fake_tip.hide_count == hide_before + 1
+    assert tip.isVisible() is False
 
 
-def test_platform_tooltip_event_is_taken_over(fake_tip):
+def test_platform_tooltip_event_is_taken_over(tip):
     """平台侧 ToolTip 事件被接管（返回 True）：不与 Qt 默认 delegate 抢着弹两份。"""
     combo = _make_combo()
     viewport = combo.view().viewport()
@@ -152,10 +191,11 @@ def test_platform_tooltip_event_is_taken_over(fake_tip):
     tip_filter = _SiteComboTipFilter(combo)
     handled = tip_filter.eventFilter(viewport, QHelpEvent(QEvent.Type.ToolTip, pos, viewport.mapToGlobal(pos)))
     assert handled is True
-    assert fake_tip.shown[-1] == _ROWS[1][1]
+    assert tip.text() == _ROWS[1][1]
+    assert tip.isVisible() is True
 
 
-def test_help_event_position_falls_back_to_pos(fake_tip):
+def test_help_event_position_falls_back_to_pos(tip):
     """QHelpEvent 没有 position()（只有 pos()）：坐标取错会退化成「无提示」。"""
     from mdcx.controllers.main_window.init import _event_pos
 
@@ -164,15 +204,49 @@ def test_help_event_position_falls_back_to_pos(fake_tip):
     assert _event_pos(help_event) == pos
 
 
-def test_hide_event_hides_tip_and_allows_reshow(fake_tip):
+def test_hide_event_hides_tip_and_allows_reshow(tip):
     """弹窗关闭即收起；重新打开后再悬停同一行仍要能弹出来。"""
     combo = _make_combo()
     _hover(combo, 1)
     QApplication.sendEvent(combo.view().viewport(), QEvent(QEvent.Type.Hide))
-    assert fake_tip.hide_count >= 1
-    shown_before = len(fake_tip.shown)
+    assert tip.isVisible() is False
+    count = tip.show_count
     _hover(combo, 1)
-    assert len(fake_tip.shown) == shown_before + 1
+    assert tip.isVisible() is True
+    assert tip.show_count == count + 1
+
+
+def test_wheel_hides_tip_because_row_under_cursor_moves(tip):
+    """滚轮会挪动行号却不一定有 MouseMove 跟来，先收起，别让提示停在旧行上。"""
+    combo = _make_combo()
+    _hover(combo, 0)
+    assert tip.isVisible() is True
+    QApplication.sendEvent(combo.view().viewport(), QEvent(QEvent.Type.Wheel))
+    assert tip.isVisible() is False
+    _hover(combo, 1)
+    assert tip.isVisible() is True
+    assert tip.text() == _ROWS[1][1]
+
+
+def test_mouse_press_hides_tip(tip):
+    """按下鼠标即收起提示（要开始选择了就别再挡着）。"""
+    combo = _make_combo()
+    _hover(combo, 0)
+    viewport = combo.view().viewport()
+    pos = _row_pos(combo, 0)
+    QApplication.sendEvent(
+        viewport,
+        QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            QPointF(pos),
+            QPointF(viewport.mapToGlobal(pos)),
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        ),
+    )
+    _ensure_app().processEvents()
+    assert tip.isVisible() is False
 
 
 def test_install_is_idempotent_and_enables_mouse_tracking():
@@ -183,47 +257,142 @@ def test_install_is_idempotent_and_enables_mouse_tracking():
     assert combo.view().viewport().hasMouseTracking() is True
     assert getattr(combo, "_site_tip_filter_installed", False) is True
     # 二次安装直接返回（标记为真即代表已装过），过滤行为仍正常
-    _hover(combo, 0)
     assert callable(first)
 
 
-def test_tip_height_pinned_to_first_display():
+def test_tip_height_pinned_and_text_centered(tip):
     """提示窗高度按首显钉死、提示文字恒居中（用户反馈 1/2/3 次显示高度不一致）。
 
-    用真实 QToolTip（不替换成假对象）才能拿到 QTipLabel；钉高体现为上下限，离屏平台提示窗
-    从不真正显示，height() 不会随上下限更新，拿它断言会假失败。Qt 每次 showText 都会重新
-    排版提示窗，所以每次悬停后都要重新取，不能缓存引用。
+    断言用 minimumHeight/maximumHeight 而非 height()：离屏平台提示窗不排版，height()
+    不随上下限更新，拿它断言会假失败。
     """
     combo = _make_combo()
     _hover(combo, 0)
-    first = init_mod._tip_label()
-    assert first is not None, "首显后应能拿到 QTipLabel"
-    first_height = first.minimumHeight()
-    assert first_height > 0, "首显就要钉住高度，否则忽高忽低的那一次仍会露出来"
-    assert first.maximumHeight() == first_height
+    first = tip.minimumHeight()
+    assert first > 0, "首显就要钉住高度，否则忽高忽低的那一次仍会露出来"
+    assert tip.maximumHeight() == first
     centered = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
-    assert first.alignment() == centered, "提示文字要恒为居中，不能随排版漂到上边沿"
+    assert tip.alignment() == centered, "提示文字要恒为居中，不能随排版漂到上边沿"
 
     _hover(combo, 1)
-    label = init_mod._tip_label()
-    assert label is not None
-    assert label.minimumHeight() == first_height, "后续显示应被钉回首显高度"
-    assert label.alignment() == centered
+    assert tip.minimumHeight() == first, "后续显示应被钉回首显高度"
+    assert tip.alignment() == centered
 
     _hover(combo, 3)  # 文本更长的另一行，高度与对齐同样不能变
-    label = init_mod._tip_label()
-    assert label.minimumHeight() == first_height
-    assert label.alignment() == centered
+    assert tip.minimumHeight() == first
+    assert tip.alignment() == centered
 
-    # 万一某次排版更高（字体还没加载完走了 fallback），钉高只涨不跌：宁可统一偏高也不裁字
-    label.setFixedHeight(first_height + 12)
+    # 万一某次排版更高（字体没加载完走了 fallback，或字体被换大），钉高只涨不跌：
+    # 宁可统一偏高也不把文字裁掉
+    big = QFont(tip.font())
+    big.setPointSize(big.pointSize() + 8)
+    tip.setFont(big)
     _hover(combo, 0)
-    assert init_mod._tip_label().minimumHeight() == first_height + 12
+    assert tip.minimumHeight() > first, "排版更高时钉高要跟着涨"
+    assert tip.maximumHeight() == tip.minimumHeight()
+    assert tip.alignment() == centered
 
-    # 弹窗关闭要解除钉高：QTipLabel 全进程共用，不能把固定高度留给应用里其它提示
-    label = init_mod._tip_label()
-    QApplication.sendEvent(combo.view().viewport(), QEvent(QEvent.Type.Hide))
-    assert label.minimumHeight() == 0, "弹窗关闭要解除钉高，别影响应用里其它提示"
+
+def test_single_line_tips_share_one_height_and_wrap_grows_by_line_height(tip):
+    """单行提示恒定同一高度，折行按行高递增（用户要求：单行同一高度、折行按字体高度递增）。
+
+    高度必须取整到行高的整数倍，否则会出现「两行半」这种零头高度，看着仍是不一致。
+    """
+    combo = _make_combo()
+    heights = set()
+    for row in (0, 1, 3):  # 文本长度不同，但都是单行
+        _hover(combo, row)
+        assert tip.isVisible() is True
+        heights.add(tip.minimumHeight())
+    line_h = tip._line_h
+    assert heights == {line_h}, f"单行提示高度应恒为行高 {line_h}，实测 {heights}"
+
+    long_text = "开启后所有请求都发给代理地址；上次检测：2026-10-09 20:51✅可连通·走代理；" * 6
+    tip.show_at(long_text, QPoint(10, 10))
+    assert tip.minimumHeight() >= 2 * line_h, "长文本折行后应至少两行高"
+    assert tip.minimumHeight() % line_h == 0, "折行高度必须是行高的整数倍，不能留零头"
+
+    tip.show_at(_ROWS[0][1], QPoint(10, 10))
+    assert tip.minimumHeight() == line_h, "长文本不能把单行提示的高度带高"
+
+
+def test_closed_combo_hover_shows_selected_item_tip(tip):
+    """闭合态悬停框体即弹当前选中项的上次检测结果，不必等 Qt 那 1s 的原生提示。"""
+    combo = _make_combo(opened=False)
+    _hover_closed(combo)
+    assert tip.isVisible() is True
+    assert tip.text() == _ROWS[0][1]
+    count = tip.show_count
+    _hover_closed(combo, dx=60)  # 同一项内移动不重弹
+    assert tip.show_count == count
+
+
+def test_closed_combo_hover_prepends_own_tooltip_text(tip):
+    """框体自带说明文字（不分流那个下拉）时拼在前面一起显示，不再只靠原生提示框。"""
+    combo = _make_combo(opened=False)
+    combo.setToolTip("开启后所有请求都发给代理地址")
+    _hover_closed(combo)
+    assert tip.text() == f"开启后所有请求都发给代理地址\n{_ROWS[0][1]}"
+
+
+def test_closed_combo_ignores_while_popup_open(tip):
+    """弹窗开着时归弹窗内的过滤器管，闭合那侧不抢着弹。"""
+    combo = _make_combo(opened=True)
+    _hover(combo, 3)
+    assert tip.text() == _ROWS[3][1]
+    _hover_closed(combo)
+    assert tip.text() == _ROWS[3][1], "弹窗开着时闭合侧不该改提示内容"
+    assert tip.isVisible() is True
+
+
+def test_closed_combo_press_hides_tip(tip):
+    """按下鼠标即收起（准备打开弹窗了）。"""
+    combo = _make_combo(opened=False)
+    _hover_closed(combo)
+    assert tip.isVisible() is True
+    pos = QPoint(10, combo.height() // 2)
+    QApplication.sendEvent(
+        combo,
+        QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            QPointF(pos),
+            QPointF(combo.mapToGlobal(pos)),
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        ),
+    )
+    _ensure_app().processEvents()
+    assert tip.isVisible() is False
+
+
+def test_tip_window_does_not_disturb_combo_popup(tip):
+    """自建提示窗不能把下拉弹窗顶掉，也不能吃掉鼠标事件。"""
+    combo = _make_combo()
+    assert combo.view().isVisible() is True
+    _hover(combo, 0)
+    assert tip.isVisible() is True
+    assert combo.view().isVisible() is True, "提示窗不能抢走/关闭下拉弹窗"
+    assert tip.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents) is True
+    assert tip.testAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating) is True
+    assert tip.focusPolicy() == Qt.FocusPolicy.NoFocus
+
+
+def test_tip_pos_clamped_inside_screen(tip):
+    """提示窗位置必须夹在屏幕可用区内：弹到屏外等于「没显示」。"""
+    _ensure_app()
+    screen = QApplication.primaryScreen()
+    assert screen is not None
+    geo = screen.availableGeometry()
+
+    pos = init_mod._clamp_tip_pos(QPoint(geo.right() - 2, geo.bottom() - 2), 300, 40)
+    assert pos.x() >= geo.left(), "不能被顶出可用区左边"
+    assert pos.y() >= geo.top(), "不能被顶出可用区上边"
+    assert pos.x() + 300 <= geo.right() + 1, "右边越界"
+    assert pos.y() + 40 <= geo.bottom() + 1, "下方放不下要翻到上方"
+
+    pos = init_mod._clamp_tip_pos(QPoint(geo.left(), geo.top()), 300, 40)
+    assert pos.x() >= geo.left() and pos.y() >= geo.top()
 
 
 def test_populated_site_combo_tooltip_only_carries_check_result(monkeypatch):
@@ -242,10 +411,10 @@ def test_populated_site_combo_tooltip_only_carries_check_result(monkeypatch):
     # 没检测过的站点不弹提示（tooltip 为空）
     assert combo.itemData(1, Qt.ItemDataRole.ToolTipRole) == ""
     for i in range(combo.count()):
-        tip = str(combo.itemData(i, Qt.ItemDataRole.ToolTipRole) or "")
-        assert tip == "" or tip.startswith("上次检测："), f"第 {i} 行提示混入了别的内容：{tip!r}"
+        tip_text = str(combo.itemData(i, Qt.ItemDataRole.ToolTipRole) or "")
+        assert tip_text == "" or tip_text.startswith("上次检测："), f"第 {i} 行提示混入了别的内容：{tip_text!r}"
         for label in ("有码：", "无码：", "综合：", "麻豆：", "MyWife："):
-            assert label not in tip, f"第 {i} 行提示里不该再出现定位说明「{label}」：{tip!r}"
+            assert label not in tip_text, f"第 {i} 行提示里不该再出现定位说明「{label}」：{tip_text!r}"
     # 定位说明仍在显示文本里，删的只是提示里的重复
     assert "有码：有码+素人" in combo.itemText(0)
 
