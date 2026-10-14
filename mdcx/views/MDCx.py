@@ -13453,7 +13453,7 @@ class Ui_MDCx(object):
         self.label_link_off.setText(
             _translate(
                 "MDCx",
-                "<span>适合NAS硬盘用户，本地党可以随心所欲整理<br>注意：选择此项，下面的「成功后移动文件」以及「失败移动文件」才会生效</span>",
+                "<span>适合NAS硬盘用户，本地党可以随心所欲整理<br>注意：选择此项，下面的「成功后移动文件」以及「失败后移动文件」才会生效</span>",
             )
         )
         self.radioButton_hard_on.setText(_translate("MDCx", "创建硬链接"))
@@ -13664,7 +13664,7 @@ class Ui_MDCx(object):
         )
         self.pushButton_add_all_extrafanart_copy.setText(_translate("MDCx", "添加所有剧照副本"))
         self.pushButton_del_all_extrafanart_copy.setText(_translate("MDCx", "删除所有剧照副本"))
-        self.groupBox_52.setTitle(_translate("MDCx", "下载高清图"))
+        self.groupBox_52.setTitle(_translate("MDCx", "下载高清图片"))
         self.checkBox_amazon_big_pic.setText(_translate("MDCx", "启用 Amazon 查找高清封面图"))
         self.label_397.setText(_translate("MDCx", "仅影响Amazon高清封面图片搜索和下载，不影响普通图片的下载和保存"))
         self.checkBox_amazon_skip_poster_size_precheck.setText(_translate("MDCx", "跳过前置 Poster 大小校验"))

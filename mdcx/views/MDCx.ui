@@ -8055,7 +8055,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <string notr="true">color: rgb(8, 128, 128);</string>
                             </property>
                             <property name="text">
-                              <string>&lt;span&gt;适合NAS硬盘用户，本地党可以随心所欲整理&lt;br&gt;注意：选择此项，下面的「成功后移动文件」以及「失败移动文件」才会生效&lt;/span&gt;</string>
+                              <string>&lt;span&gt;适合NAS硬盘用户，本地党可以随心所欲整理&lt;br&gt;注意：选择此项，下面的「成功后移动文件」以及「失败后移动文件」才会生效&lt;/span&gt;</string>
                             </property>
                           </widget>
                         </item>
@@ -11665,7 +11665,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       </size>
                     </property>
                     <property name="title">
-                      <string>下载高清图</string>
+                      <string>下载高清图片</string>
                     </property>
                     <widget class="QWidget" name="horizontalLayoutWidget_24">
                       <property name="geometry">
