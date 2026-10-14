@@ -371,6 +371,33 @@ def test_format_summary_groups_failure_causes():
     assert "30s/45s" in text
 
 
+def test_format_summary_bypass_failure_suffix_counts_as_unsolved():
+    """直连传输失败兜底那一支的错误后缀（`CloudFlare Bypass失败：…`）也算「CF Bypass 已尝试但未解开」。
+
+    该后缀去掉了「兜底」二字；直连错误里又带着 `Cloudflare`（web_async 的
+    `遭遇Cloudflare挑战页且Bypass失败` 会和传输错误一起累积进同一条检测行），
+    分组若只认旧文案，这类行会掉回「Cloudflare拦截×N：请配置外部CF服务」——
+    服务明明已配好并实际跑过，正是加这个分组要避免的错误建议。
+    """
+    from mdcx.core.network_check import NetworkCheckResult, format_summary
+
+    results = [
+        NetworkCheckResult(
+            spec=NetworkCheckSpec(name="getchu", group="刮削站点", url="https://www.getchu.com"),
+            status=NetworkCheckStatus.FAILED,
+            message=(
+                "GET https://www.getchu.com 失败: 遭遇Cloudflare挑战页且Bypass失败: HTTP 403、"
+                "Failed to perform CloudFlare Bypass失败：HTTP 502"
+            ),
+        )
+    ]
+
+    text = "\n".join(format_summary(results, elapsed=1.0, cancelled=False))
+
+    assert "CF Bypass 已尝试但未解开 ×1" in text, text
+    assert "Cloudflare拦截×" not in text, text
+
+
 def test_format_summary_separator_width_follows_panel():
     """汇总区的「-」「=」两条分隔线必须同长，且跟随传入的面板可视宽。
 
