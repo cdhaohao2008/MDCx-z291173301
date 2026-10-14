@@ -90,7 +90,7 @@ _SITE_RENAMES = {
     "mgstage": "MGStage",
     "mywife": "MyWife",
     "prestige": "Prestige",
-    "r18dev": "R18dev",
+    "r18dev": "R18.dev",
     "theporndb": "ThepornDB",
     "xcity": "Xcity",
     "official": "Official",

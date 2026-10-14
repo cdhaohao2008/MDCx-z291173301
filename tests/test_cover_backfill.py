@@ -38,7 +38,7 @@ def _build_file_info(tmp_path: Path, number: str = "ABC-123") -> FileInfo:
 
 def test_cover_candidate_sites_forced_site_wins(tmp_path: Path):
     file_info = _build_file_info(tmp_path)
-    assert cb._cover_candidate_sites(file_info, forced_site="R18dev") == ["R18dev"]
+    assert cb._cover_candidate_sites(file_info, forced_site="R18.dev") == ["R18.dev"]
 
 
 def test_cover_candidate_sites_uses_single_website(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -64,7 +64,7 @@ def test_cover_candidate_sites_orders_priority_first(monkeypatch: pytest.MonkeyP
         "Official",
         "MGStage",
         "MissAV",
-        "R18dev",
+        "R18.dev",
     ]
 
 

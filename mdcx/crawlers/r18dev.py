@@ -431,7 +431,7 @@ class R18DevCrawler(BaseCrawler):
     @classmethod
     @override
     def display_name(cls) -> str:
-        return "R18dev"
+        return "R18.dev"
 
     @classmethod
     @override

@@ -469,7 +469,7 @@ class Website(Enum):
     MGSTAGE = "MGStage"
     MYWIFE = "MyWife"
     PRESTIGE = "Prestige"
-    R18DEV = "R18dev"
+    R18DEV = "R18.dev"
     THEPORNDB = "ThepornDB"
     XCITY = "Xcity"
 
@@ -514,7 +514,7 @@ class Website(Enum):
                 "mgstage": "MGStage",
                 "mywife": "MyWife",
                 "prestige": "Prestige",
-                "r18dev": "R18dev",
+                "r18dev": "R18.dev",
                 "theporndb": "ThepornDB",
                 "xcity": "Xcity",
                 "official": "Official",

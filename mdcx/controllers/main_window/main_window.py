@@ -11248,7 +11248,7 @@ class MyMAinWindow(QMainWindow):
 <body>
   <p><span style=" font-weight:700;">所有可用网站:</span></p>
 {sites_html}  <p><span style=" font-weight:700;">指定类型影片可指定刮削网站:<span></p>
-   <p>· 有码：DMM、DMM_API、TheJavDB_API、LibreDMM、R18dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO，以及 JavBus、JavDB、MissAV、Official（含 Dahlia/Faleno 厂牌与无码官网路由）、Airav.cc、AVSEX、JavDay、JavFree、IQQTV、7mmtv 等综合站；JavDB_API/JavDB_APP/MissAV_API/R18dev/TheJavDB_API 是免 CF 直连通道</p>
+   <p>· 有码：DMM、DMM_API、TheJavDB_API、LibreDMM、R18.dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO，以及 JavBus、JavDB、MissAV、Official（含 Dahlia/Faleno 厂牌与无码官网路由）、Airav.cc、AVSEX、JavDay、JavFree、IQQTV、7mmtv 等综合站；JavDB_API/JavDB_APP/MissAV_API/R18.dev/TheJavDB_API 是免 CF 直连通道</p>
    <p>· 无码：AVEntertainments、AVSOX，以及 JavBus、JavDB、MissAV、AVSEX、Official、JavDay、IQQTV、7mmtv 等综合站</p>
   <p>· 欧美：AVheat、ThepornDB</p>
   <p>· 国产：AVSEX、IQQTV、JavDay、Madou_Club、Madouqu</p>

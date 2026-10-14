@@ -1513,7 +1513,53 @@ async def run_network_check(
             group_specs = grouped_specs.get(group, [])
             if not group_specs:
                 continue
+            # 除「网络连通」两项外，其余组按名称 A-Z 排序后依次检测、依次打印。
+            # 「网络连通」(GitHub Raw/通用 HTTPS)保持原有并发先行，其余组串行跑：
+            # 检测顺序与打印顺序均为同一 A-Z 顺序，结果可读且可复现。
+            if group != "网络连通":
+                group_specs = sorted(group_specs, key=lambda s: s.name.lower())
             progress(group)
+            if group != "网络连通":
+                for spec in group_specs:
+                    if cancel_event and cancel_event.is_set():
+                        elapsed = time.perf_counter() - start_time
+                        for line in format_summary(
+                            results,
+                            elapsed,
+                            cancelled=True,
+                            proxy_unavailable=proxy_down,
+                            separator_width=separator_width,
+                        ):
+                            progress(line)
+                        return results
+                    try:
+                        result = await run_one(spec)
+                    except asyncio.CancelledError:
+                        # 与并发路径一致：单项取消只记 CANCELLED，不中断整轮
+                        result = NetworkCheckResult(
+                            spec=spec,
+                            status=NetworkCheckStatus.CANCELLED,
+                            message="已取消",
+                            error="CancelledError",
+                        )
+                    except Exception as exc:
+                        result = NetworkCheckResult(
+                            spec=spec,
+                            status=NetworkCheckStatus.FAILED,
+                            message="检测任务异常",
+                            error=f"{type(exc).__name__}: {exc}",
+                        )
+                    results.append(result)
+                    if on_item_done is not None and total:
+                        on_item_done(len(results), total)
+                    display_result = result
+                    if proxy_down and result.status == NetworkCheckStatus.FAILED and _is_proxy_error(result.error):
+                        # 与并发路径一致：results 保留原始错误，打印行简化提示
+                        display_result = replace(
+                            result, message="代理不可用（详见下方检测结果汇总区的提示）", error=""
+                        )
+                    progress(format_result_line(display_result))
+                continue
             # task → spec 映射：单项逃逸异常时定位所属站点（议题 #73）
             tasks = {asyncio.create_task(run_one(spec)): spec for spec in group_specs}
             pending = set(tasks)
@@ -1580,8 +1626,7 @@ async def run_network_check(
             results,
             key=lambda result: (
                 GROUP_ORDER.index(result.spec.group) if result.spec.group in GROUP_ORDER else len(GROUP_ORDER),
-                STATUS_ORDER[result.status],
-                result.spec.name,
+                result.spec.name.lower(),
             ),
         )
     finally:
