@@ -117,7 +117,7 @@ export QT_QPA_PLATFORM=xcb
 
 **有的网站一直失败**：可能是被墙了。试试：
 - 改用免 CF 通道（javdb_api、javdb_app、missav_api、r18dev、thejavdb_api，默认已加入网站源）
-- 或者配置外部CloudFlare服务（设置 → 网络 → 外部CloudFlare服务，填 TRAWL / FlareSolverr 地址；本地 FlareSolverr 填 `http://127.0.0.1:8191` 开头，不要写成 `https`）
+- 或者配置CloudFlare 绕过服务（设置 → 网络 → CloudFlare 绕过服务，填 TRAWL / FlareSolverr 地址；本地 FlareSolverr 填 `http://127.0.0.1:8191` 开头，不要写成 `https`）
 - JavLibrary 遇 Cloudflare JS challenge 时会自动 fallback 到 Selenium+Edge headless 获取页面（cf_selenium_bypass，默认开启，需要 Windows 10/11 + Edge 浏览器，无 Edge 环境优雅降级，连续失败 3 次进入 5 分钟冷却）
 
 **刮出来的标题是日文/英文**：设置 → 翻译，开启翻译并选 Google 或 Bing。
@@ -208,7 +208,7 @@ export QT_QPA_PLATFORM=xcb
 
 推荐基于全部历史刮削结果（含跨会话），刮削的影片越多推荐越准，全程本地计算无需联网。
 
-所有爬虫站点都拿不到图时，会自动走 **官方图源直链兜底**：① **DMM**：按番号直构 DMM 官方 CDN 高清封面，内置约 110 个主流系列前缀表并自动学习未收录厂牌的前缀（学习数据保存在 `userdata/dmm_prefix_learned.json`）；优先下载 DMM 高清竖版图作海报，竖版不存在时下横版高清图并自动裁剪成海报；无码番号（FC2/HEYZO 等）不会命中 DMM 兜底。② **MGStage**：DMM 不收录的素人番号（LUXU/OTIM 等）直构 MGStage 官方 CDN——横版大图作封面、竖版图作海报。默认开启，可在设置 → 下载「下载高清图片」组关闭。
+所有爬虫站点都拿不到图时，会自动走 **官方图源直链兜底**：① **DMM**：按番号直构 DMM 官方 CDN 高清封面，内置约 110 个主流系列前缀表并自动学习未收录厂牌的前缀（学习数据保存在 `userdata/dmm_prefix_learned.json`）；优先下载 DMM 高清竖版图作海报，竖版不存在时下横版高清图并自动裁剪成海报；无码番号（FC2/HEYZO 等）不会命中 DMM 兜底。② **MGStage**：DMM 不收录的素人番号（LUXU/OTIM 等）直构 MGStage 官方 CDN——横版大图作封面、竖版图作海报。默认开启，可在设置 → 下载「下载高清图」组关闭。
 
 ### 场景：管理 Emby 演员头像和简介
 
