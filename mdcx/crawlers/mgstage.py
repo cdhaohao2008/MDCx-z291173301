@@ -217,6 +217,11 @@ class MgstageCrawler(BaseCrawler):
     def base_url_(cls) -> str:
         return "https://www.mgstage.com"
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "MGStage"
+
     @override
     async def _generate_search_url(self, ctx: Context) -> list[str] | str | None:
         candidate_numbers = build_candidate_numbers(ctx.input.number.upper(), ctx.input.short_number.upper())

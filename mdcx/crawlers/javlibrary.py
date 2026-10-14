@@ -160,6 +160,11 @@ class JavlibraryCrawler(BaseCrawler):
 
     @classmethod
     @override
+    def display_name(cls) -> str:
+        return "JavLibrary"
+
+    @classmethod
+    @override
     def known_hosts(cls) -> frozenset[str]:
         """javlibrary 额外并入静态镜像表与运行时学习到的最新直连域名（议题 #83）。"""
         from urllib.parse import urlparse

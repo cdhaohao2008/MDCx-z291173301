@@ -72,6 +72,11 @@ class PrestigeCrawler(BaseCrawler):
     def base_url_(cls) -> str:
         return "https://www.prestige-av.com"
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "Prestige"
+
     @override
     async def _run(self, ctx: Context):
         real_url = ctx.input.appoint_url.replace("goods", "api/product")

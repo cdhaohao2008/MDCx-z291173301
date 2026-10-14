@@ -123,6 +123,11 @@ class LulubarCrawler(BaseCrawler[LulubarContext]):
     def base_url_(cls) -> str:
         return manager.config.get_site_url(Website.LULUBAR, "https://lulubar.co")
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "Lulubar"
+
     @override
     def new_context(self, input: CrawlerInput) -> LulubarContext:
         return LulubarContext(input=input)

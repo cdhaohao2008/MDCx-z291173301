@@ -37,7 +37,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 | prestige | prestige-av.com | 有码：有码+素人 |
 | r18dev | r18.dev | 有码：仅能有码 |
 | official | 各官网 | 综合：有码+无码 |
-| AVBase | av-base.net | 有码：有码+素人 |
+| avbase | av-base.net | 有码：有码+素人 |
 | freejavbt | freejavbt.com | 有码：仅能有码 |
 | mywife | mywife.cc | MyWife：MyWife No.1234 |
 | getchu | getchu.com | 综合：有码+游戏+视频 |
@@ -67,11 +67,11 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 
 > 注意：javdb_api、javdb_app、missav_api、r18dev、thejavdb_api 这五条是免 CF 通道，稳定性好，建议优先选用。
 
-**各爬虫适用类型**（能力分类，统计的是该站实际能处理的番号类型，与上表「说明」列的定位标签不是同一维度，因此会出现 xcity、getchu、AVBase 等同时出现在「仅能有码」与带「综合：」标签的站点里；各类型默认网站源可在「设置→刮削网站」调整，不必与上表一一对应。无码默认源不含 javfree、airav_cc）：
-- **仅能有码**：dmm、dmm_api、thejavdb_api、libredmm、r18dev、AVBase、xcity、prestige、mgstage、getchu、javlibrary、freejavbt、lulubar、avmoo
+**各爬虫适用类型**（能力分类，统计的是该站实际能处理的番号类型，与上表「说明」列的定位标签不是同一维度，因此会出现 xcity、getchu、avbase 等同时出现在「仅能有码」与带「综合：」标签的站点里；各类型默认网站源可在「设置→刮削网站」调整，不必与上表一一对应。无码默认源不含 javfree、airav_cc）：
+- **仅能有码**：dmm、dmm_api、thejavdb_api、libredmm、r18dev、avbase、xcity、prestige、mgstage、getchu、javlibrary、freejavbt、lulubar、avmoo
 - **无码专属**：aventertainments、avsox
 - **综合（有码+无码）**：javbus、javdb、javdb_api、javdb_app、missav、missav_api、javday、javfree、airav_cc、avsex、official、iqqtv、7mmtv
-- **素人**：7mmtv、AVBase、dmm、dmm_api、iqqtv、javbus、javdb、mgstage、missav、missav_api、mywife、prestige
+- **素人**：7mmtv、avbase、dmm、dmm_api、iqqtv、javbus、javdb、mgstage、missav、missav_api、mywife、prestige
 - **FC2 ：**7mmtv、fc2、fc2ppvdb、javdb、javfree
 - **欧美**：avheat、theporndb
 - **国产**：avsex、iqqtv、javday、madou_club、madouqu
@@ -79,7 +79,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 ### DMM 官方高清直链
 
 - 封面/海报统一走 DMM 官方 awsimgsrc CDN 高清直链（竖版 `ps` 通常 1032×1469，部分系列为 745×1081 等中尺寸档；横版 `pl` 通常 2184×1469），由 `mdcx/crawlers/dmm_direct.py` 的番号→DMM cid 前缀映射生成，内置静态前缀表覆盖约 110 个主流系列（含 `h_xxx`/数字特殊前缀与跨厂商附加前缀），并叠加学习表自动扩充未收录系列的前缀。升级时校验分辨率宽≥700 过滤 147×200 缩略图占位图，避免把海报覆盖成低清缩略图。
-- **LibreDMM / R18.dev / JavBus / JavDB / JavDB API / JavDB App / DMM / DMM API / JavLibrary / AVBase** 十个爬虫在刮削时直接把返回的低清封面/海报升级为 DMM 高清（R18.dev 的 `jacket_full_url` 是 pics.dmm.co.jp 低清且部分系列 cid 未补零，JavBus 是自家 CDN 低清镜像，DMM/AVBase 用域名替换 + dmm_direct 前缀表候选），无码番号自动跳过。
+- **LibreDMM / R18.dev / JavBus / JavDB / JavDB API / JavDB App / DMM / DMM API / JavLibrary / avbase** 十个爬虫在刮削时直接把返回的低清封面/海报升级为 DMM 高清（R18.dev 的 `jacket_full_url` 是 pics.dmm.co.jp 低清且部分系列 cid 未补零，JavBus 是自家 CDN 低清镜像，DMM/avbase 用域名替换 + dmm_direct 前缀表候选），无码番号自动跳过。
 - **JavDB 系图源无水印升级**：JavDB / JavDB API / JavDB App 三站产出/落回的 javdb 图床图片，下载时自动改走 JavDB App 专用 CDN `tp.spfcas.com` 无水印原图（加密流下载层透明解密），替代带 javdb 水印的网页版 CDN；App CDN 路径中段由 javdb_app 响应自动学习，失效时自动回退网页版。DMM 升级链覆盖不到的番号（无码/FC2/老片等）落回 javdb 图源时受益。
 - 开启「Poster 选优」（poster_auto_best）时，候选池自动注入 DMM 竖版高清候选，按尺寸自动胜过低清原图，其他爬虫也能受益。
 - DMM 图下载失败按「设置→网络→重试」次数（默认 3 次）自动重试，应对 awsimgsrc 偶发的连接抖动。
