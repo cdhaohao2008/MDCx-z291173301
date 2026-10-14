@@ -25408,7 +25408,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;读取模式&lt;/b&gt;：通过读取本地NFO文件实现无需联网的查看或更新，有4个独立选项可自由组合，有NFO时更新并按更新规则整理、无NFO时刮削对没NFO的文件联网刮、重新下载图片、更新NFO内容如补演员TMDB ID，读取模式不受断点续刮缓存干扰，始终处理全部选中文件。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;合并策略&lt;/b&gt;：读取模式区域勾选框+下拉框，勾选后写入NFO前按策略决定如何处理已存在的NFO文件，全新数据优先/本地信息优先/合并数组去重/保留已有字段/仅填补空字段；不勾选则直接用新数据覆盖、不合并本地NFO文件，防止重刮覆盖手动整理的内容。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;软链接项&lt;/b&gt;：设置项，非独立模式，在任意模式下勾选「创建软链接」即可刮削后不移动原视频，而是在目标目录创建软链接，类快捷方式，便于PT下载既刮削又保种；需以管理员/有权限身份运行，注意：软链接通常只能在媒体库展示，不能直接播放。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;调试模式&lt;/b&gt;：在「设置→高级」的「调试模式日志页面」分组中勾选「显示字段内容信息」，完整排查可同时勾选「显示刮削过程信息」「显示字段来源信息」等，日志页面会输出番号对应的完整元数据如封面、导演、演员、简介等供排查。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;调试模式&lt;/b&gt;：在「设置→高级」的「调试模式日志页面」分组中勾选「显示字段内容信息」，完整排查建议同时同时勾选「显示刮削过程信息」「显示字段来源信息」等，日志页面会输出番号对应的完整元数据如封面、导演、演员、简介等供排查。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;三、命名规则&lt;/h4&gt;
 &lt;ul&gt;
@@ -25418,9 +25418,9 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;可用变量：number番号、title标题、originaltitle原标题、actor演员、first_actor首位演员、all_actor全部演员、letters番号前缀、first_letter番号首字符、outline简介、director导演、definition清晰度、publisher发行商、series系列、studio片商、year年份、mosaic有码/无码、runtime时长、score评分、release发行日期、cnword字幕标识、wanted想看人数、four_k（4K标识）、filename原文件名、moword版本标识，支持Jinja2模板与自定义符号。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;四、网站选择&lt;/h4&gt;
-&lt;p&gt;网站下拉框由已注册的爬虫自动生成（当前36个），可按需选用全部网站或指定网站。主要来源包括：&lt;/p&gt;
+&lt;p&gt;网站下拉框由已注册的爬虫自动生成，当前52个，可按需选用全部网站或指定网站，主要来源包括：&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;b&gt;有码&lt;/b&gt;：仅能有码：DMM、DMM_API、TheJavDB_API、LibreDMM、R18.dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO；综合（有码+无码）：JavBus、JavDB系、MissAV系、Official、airav.cc、AVSex、JavDay、JavFree、IQQTV、7mmtv&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;有码&lt;/b&gt;：仅能有码：AVBase、AVMOO、DMM、DMM_API、FreeJavBT、Getchu、JavLibrary、LibreDMM、Lulubar、MGStage、Prestige、R18.dev、TheJavDB_API、Xcity；综合（有码+无码）：7mmtv、airav.cc、AVSex、IQQTV、JavBus、JavDB系、JavDay、JavFree、MissAV系、Official&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;无码&lt;/b&gt;：AVSOX、AVEntertainments及综合站（JavBus、JavDB系、MissAV系、AVSex、Official、JavDay、IQQTV、7mmtv）&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;素人&lt;/b&gt;：MGStage（259LUXU等）、Prestige、JavBus、JavDB系、DMM、DMM_API、AVBase、MissAV系、MyWife、IQQTV、7mmtv&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;FC2&lt;/b&gt;：FC2、FC2PPVDB、JavDB系、JavFree、7mmtv&lt;/li&gt;
