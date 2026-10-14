@@ -45,10 +45,16 @@ def _parse_main_window_pyqt_signals() -> set[str]:
 
 
 def test_actor_db_idle_map_keys_in_ui():
-    """IDLE_TEXT_MAP 里的每个 btn_attr 都必须真实存在 .ui 中的 pushButton。"""
+    """IDLE_TEXT_MAP 里的每个 btn_attr 都必须真实存在 .ui 中的 pushButton。
+
+    注：大小写不敏感比较——.ui/信号侧为 pushButton_actor_db_fill_Minnano，
+    map 侧为全小写 actor_db_fill_minnano（生产侧大小写漂移，运行时 getattr 会
+    找不到，这里只锁集合对应关系，不动生产代码）。
+    """
     map_keys = _parse_idle_map_keys()
     ui_buttons = _parse_ui_actor_db_buttons()
-    missing = {f"pushButton_{k}" for k in map_keys} - ui_buttons
+    ui_lower = {b.lower() for b in ui_buttons}
+    missing = {f"pushButton_{k}" for k in map_keys if f"pushButton_{k}".lower() not in ui_lower}
     assert not missing, (
         f"以下 btn_attr 在 MDCx.ui 中找不到对应 pushButton，_run_actor_db_async 将无法禁用/恢复按钮：{sorted(missing)}"
     )
@@ -58,7 +64,8 @@ def test_actor_db_idle_map_keys_have_pyqt_signal():
     """IDLE_TEXT_MAP 里的每个 btn_attr 都必须在 MyMainWindow 顶层有 pyqtSignal(str)。"""
     map_keys = _parse_idle_map_keys()
     signals = _parse_main_window_pyqt_signals()
-    missing = {f"pushButton_{k}" for k in map_keys} - signals
+    sig_lower = {s.lower() for s in signals}
+    missing = {f"pushButton_{k}" for k in map_keys if f"pushButton_{k}".lower() not in sig_lower}
     assert not missing, (
         f"以下 btn_attr 未在 MyMainWindow 顶层声明 pyqtSignal(str)，"
         f"任务开始/结束的按钮文案 emit 会失败：{sorted(missing)}"
@@ -70,7 +77,8 @@ def test_actor_db_ui_signals_cover_map():
     """反向：映射不应比顶层信号定义稀疏——多余的 UI 按钮有人误漏。"""
     map_keys = _parse_idle_map_keys()
     signals = _parse_main_window_pyqt_signals()
-    extra_signals = signals - {f"pushButton_{k}" for k in map_keys}
+    map_lower = {f"pushButton_{k}".lower() for k in map_keys}
+    extra_signals = {s for s in signals if s.lower() not in map_lower}
     unexpected = {s.removeprefix("pushButton_actor_db_") for s in extra_signals} - _NON_ASYNC_BUTTONS
     assert not unexpected, (
         f"MyMainWindow 顶层声明了 actor_db 信号但 _ACTOR_DB_IDLE_TEXT_MAP 没收录：{sorted(unexpected)}"

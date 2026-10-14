@@ -63,7 +63,7 @@ _NEXT_GROUP = "groupBox_35"  # 紧随其后的「字段刮削网站」，用来�
 
 _SPACING = 7  # gridLayout_36 的 verticalSpacing
 _BLOCK_SPACER_H = 9  # 三个块间 QSpacerItem 的固定高
-_DESC_ROW_H = 15  # 三段换行说明所在行的锚死高度（两行文字）
+_DESC_ROW_H = 34  # 三段换行说明所在行的锚死高度（两行文字）
 
 # 期望间隙：行高=文字高时上下两侧都精确为 verticalSpacing；块间再加 9px spacer
 _GAP_TIGHT = _SPACING
@@ -334,12 +334,12 @@ def test_declared_geometry_is_compacted_and_followers_shifted():
 # 三段会换行的绿色说明文案（`.ui` 里以 &lt;p&gt; 富文本存储）
 _WRAPPED_DESC_TEXTS = {
     "label_232": (
-        "<span>「网站偏好」-「指定网站」指定madouqu、madou_club或者文件路径里含有「国产」、「麻豆」时，"
+        "<span>「网站偏好」-「指定网站」指定Madouqu、Madou_Club或者文件路径里含有「国产」、「麻豆」时，"
         "将自动使用以上网站刮削国产番号</span>"
     ),
     "label_318": (
-        "<p>「网站偏好」-「指定网站」指定getchu、dmm等站点或者文件路径里包含有「里番」、「动漫」时，"
-        "程序将会自动使用getchu进行刮削</p>"
+        "<p>「网站偏好」-「指定网站」指定Getchu、DMM等站点或者文件路径里包含有「里番」、「动漫」时，"
+        "程序将会自动使用Getchu进行刮削</p>"
     ),
     "label_323": (
         "<p>「网站偏好」-「指定网站」指定MyWife或文件路径里含有MyWife时，程序将自动使用MyWife刮削，"
@@ -598,7 +598,7 @@ def test_narrow_state_keeps_declared_row_height(win, app, width):
 
     state = _tip_state(win)
     assert state["max_h"] == _DESC_ROW_H, f"{width} 宽下 {_GUOCHAN_TIP} 上限变成 {state['max_h']}，应为 {_DESC_ROW_H}"
-    assert state["bottom"] == 19, f"{width} 宽下网格下边距变成 {state['bottom']}"
+    assert state["bottom"] == 0, f"{width} 宽下网格下边距变成 {state['bottom']}，应为 0（最小化不得改动）"
     assert state["spacing"] == _SPACING, f"{width} 宽下 verticalSpacing 被改成 {state['spacing']}"
     assert state["inner_h"] == 558, f"{width} 宽下 layoutWidget_6 高度变成 {state['inner_h']}（声明 558）"
 

@@ -1122,7 +1122,14 @@ async def run_network_check_item(
                     except Exception:
                         fallback_bypass_mode = ""
                 else:
-                    error = f"{error}，CloudFlare Bypass兜底失败：HTTP 500、HTTP 502"
+                    base_error = str(error or "").split(" body=", 1)[0].rstrip()
+                    clean_bypass = (
+                        str(bypass_error or "").split(" body=", 1)[0].strip().replace("; GET ", "、").replace("; ", "、")
+                    )
+                    if clean_bypass:
+                        error = f"{base_error} CloudFlare Bypass兜底失败：{clean_bypass}"
+                    else:
+                        error = f"{base_error} CloudFlare Bypass兜底失败"
         if response is None:
             # 动态域名站（javlibrary / avmoo / avsox / avheat / madouqu）：代码里的
             # 默认网址无法联通时，通过函数获取最新直连地址重试，且只在「网络连通」
