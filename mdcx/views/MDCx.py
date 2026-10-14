@@ -14627,7 +14627,7 @@ class Ui_MDCx(object):
                 '<p>在"设置→网络"中配置：</p>\n'
                 "<ul>\n"
                 "<li><b>使用代理</b>：开启后填写HTTP/HTTPS或SOCKS5代理地址（如http://127.0.0.1:7890）。</li>\n"
-                "<li><b>走代理网站</b>：仅指定域名走代理，其余直连。默认包含amazon.co.jp、m.media-amazon.com、xcity.jp、minnano-av.com、avbase.net、javbus.com、javdb.com、javlibrary.com、r18.dev、mgstage.com、prestige-av.com、seesaawiki.jp、avsox.click、avsox.com、avmoo.shop、avmoo.com、avheat.shop、avheat.com、caribbeancom.com、heyzo.com、1pondo.tv、pacopacomama.com、10musume.com、mywife.cc、github.com、raw.githubusercontent.com、google.com、missav.ws、missav.ai、missav.live、aventertainments.com、javfree.me、7mmtv.sx、7tv022.com。可按需增删（也可直接填数据源名，如missav、javdb，站点及其镜像域名将整体走代理）。</li>\n"
+                "<li><b>走代理网站</b>：仅指定域名走代理，其余直连，默认包含amazon.co.jp、m.media-amazon.com、xcity.jp、minnano-av.com、avbase.net、javbus.com、javdb.com、javlibrary.com、r18.dev、mgstage.com、prestige-av.com、seesaawiki.jp、avsox.click、avsox.com、avmoo.shop、avmoo.com、avheat.shop、avheat.com、caribbeancom.com、heyzo.com、1pondo.tv、pacopacomama.com、10musume.com、mywife.cc、github.com、raw.githubusercontent.com、google.com、missav.ws、missav.ai、missav.live、aventertainments.com、javfree.me、7mmtv.sx、7tv022.com，可按需增删也可直接填数据源名，如missav、javdb，站点及其镜像域名将整体走代理。</li>\n"
                 "<li><b>Bypass代理</b>：为绕过Cloudflare的请求单独设置代理。</li>\n"
                 "</ul>\n"
                 "<p>如持续提示网络/代理错误，请检查地址与端口、确认代理软件处于全局模式，或尝试重启代理与网卡。</p>\n"
