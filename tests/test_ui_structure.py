@@ -904,9 +904,9 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
 # 因此这里锁的是文案本身 + .ui/.py 两份必须一字不差。
 _OFFICIAL_ABOUT_PREFIX = "<p><b>Official综合：有码+无码，按番号前缀自动路由到各番号官网，全部走代理：有码片商官网30家："
 _OFFICIAL_ABOUT_SITES = (
-    "Attackers、AV Opera、BeeFree、Bi、Bibian、Dasdas、E-Body、Fitch、HHH、"
+    "Attackers、AV Opera、BeeFree、Bi-AV、Bibian、Dasdas、E-Body、Fitch、HHH-AV、"
     "Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、"
-    "MKO-Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、"
+    "MKO Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai-AV、Premium Beauty、"
     "Prestige、Rookie、S1S1S1、Tameikegoro、To-Satsu、V-AV、Wanz Factory"
 )
 _OFFICIAL_ABOUT_PARA = _OFFICIAL_ABOUT_PREFIX + _OFFICIAL_ABOUT_SITES + "<br/>"
