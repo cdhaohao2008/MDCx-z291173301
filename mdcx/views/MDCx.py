@@ -12269,7 +12269,7 @@ class Ui_MDCx(object):
         self.nfo_lib_select_btns_layout.addWidget(self.pushButton_nfo_lib_select_none)
         self.nfo_lib_list_layout.addLayout(self.nfo_lib_select_btns_layout)
         self.listWidget_nfo_lib = QtWidgets.QListWidget(parent=self.nfo_lib_list_panel)
-        self.listWidget_nfo_lib.setMinimumSize(QtCore.QSize(280, 320))
+        self.listWidget_nfo_lib.setMinimumSize(QtCore.QSize(280, 120))
         self.listWidget_nfo_lib.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
         self.listWidget_nfo_lib.setObjectName("listWidget_nfo_lib")
         self.nfo_lib_list_layout.addWidget(self.listWidget_nfo_lib)

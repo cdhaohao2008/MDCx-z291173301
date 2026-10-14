@@ -25665,7 +25665,7 @@ p,li{white-space:pre-wrap;}
                             <property name="minimumSize">
                               <size>
                                 <width>280</width>
-                                <height>320</height>
+                                <height>120</height>
                               </size>
                             </property>
                             <property name="selectionMode">
