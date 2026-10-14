@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1 (2026-10-13)
+
+### Added
+
+- `audit_file_path` takes one more check, `untitled`, run only when `checks` names it: it lists the episode files whose name gives a season and episode number and no title, `Show - 07x08.mkv`, each with the server's title for it in `title_on_server` to rename the file by. A row says when the name has a dash after the number all the same (`Show - 07x08 - .mkv`, a renamer writing the separator for a title it did not have), and when the server holds only a placeholder or no title. Without it such files are counted in `unnamed`, as before
+
 ## 0.8.0 (2026-10-12)
 
 ### Breaking
