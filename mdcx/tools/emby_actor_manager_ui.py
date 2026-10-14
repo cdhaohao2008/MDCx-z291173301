@@ -109,6 +109,138 @@ def _child_dialog_qss() -> str:
     )
 
 
+class _FlushLogTextEdit(QPlainTextEdit):
+    """运行日志框：滚动条拖到最底时末行文字底边正好贴住视口底边，下方不留空白。
+
+    现象（最小化 >9 行 / 最大化 >11 行，日志下方恒有 10~20px 空白）与根因：Qt 的竖向
+    滚动按**整行**换档（一档一个行距，单位不是像素），而它给竖向滚动条算的每页行数
+    比视口真正装得下的整行数少一行——`pageStep = (视口高 - 1) // 行距`（离屏实测：
+    视口 120/行距 15 → pageStep 7 而非 8；90 → 5 而非 6；84（非整除）→ 5）。于是滚到
+    上限时，末行下面恒空出一整行（视口 120、行距 15 实测 15px，即用户报的 10~20px），
+    视口高不是行距整数倍时再多空出「视口高 % 行距」（实测 84 → 9px）。
+
+    空白由两个独立来源叠加而成，各治各的：
+
+    1. 「整行」部分——Qt 自己少算的那一行（`_flush_tail`）。每次内容/视口/滚动范围
+       变化后，按公式把滚动上限压到「末行贴视口底」的那一档。滚动上限本来就是 Qt
+       少算一行造成的，压到贴底档并不少给任何一行内容：用户仍能上滚看全部历史，
+       末行也不会被裁掉（贴底档取的是位移够用的最小档）。
+    2. 「亚行」部分——视口高除不尽行距时那点余量。Qt 只能整行换档，这部分压滚动
+       上限压不掉，只能让视口高度落到行距整数倍：正常走 `_fit_visible_rows` 时由
+       本控件的文档边距归零顺带达成（见下），余下情形由对话框的
+       `_snap_log_viewport_to_whole_lines`（缩日志窗格、余量给演员表）与本控件的
+       `_absorb_viewport_residue`（窗格已到 `minimumSizeHint` 缩不动时并进下侧视口
+       边距）兜底。
+
+    文档边距归零（原 4px 视觉留白改由 `setViewportMargins` 给出）正是为了第 2 条的
+    第一段：文档边距是尾部空白的一部分（首块自带上边距、末块高度里多含同尺寸下边
+    距），归零后 `_fit_visible_rows` 的目标视口 `行数 x 行距 + 文档边距` 恰好等于
+    `行数 x 行距`——`log_chrome` 是实测值、已含视口边距，故最终
+    `viewport().height()` 精确落在整行上。视口边距属于 chrome，会被 `log_chrome`
+    扣掉，不参与 Qt 的滚动余量。
+
+    量法（Qt 没给可用的滚动位移接口，但换算关系是确定的）：文档内容底 = 各块
+    `blockBoundingRect` 高度之和（离屏实测九种场景——单行块、换行块、空块、尾部空块、
+    500 块上限——该和都精确等于「可视行数 x 行距」）；滚动位移 = 档位 x 行距。故
+    贴底所需档位 = `ceil((内容底 - 视口高) / 行距)`，内容不满视口、或 Qt 自己的上限
+    已经更严（取数/换行等场合）时一律不动。
+    """
+
+    # 文档边距归零后，用视口边距补回同样的视觉留白（只影响 chrome，不参与滚动计算）
+    _INSET = 4
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._flush_busy = False
+        self._flush_queued = False
+        self._inset_bottom = self._INSET  # 当前下侧视口边距（余量吸收后会大于 _INSET）
+        self.document().setDocumentMargin(0.0)
+        self.setViewportMargins(self._INSET, self._INSET, self._INSET, self._inset_bottom)
+        # 三类变化都要重算贴底档：内容增删（含 maximumBlockCount 淘汰旧块）改内容底、
+        # 视口几何改每档能滚多远、Qt 自己重算滚动范围会把上限放回「多一行」那档。
+        self.document().contentsChange.connect(self._schedule_flush)
+        self.verticalScrollBar().rangeChanged.connect(self._schedule_flush)
+        self.viewport().installEventFilter(self)
+
+    def eventFilter(self, a0, a1):
+        # 竖向滚动条显隐会只改视口高度而不改控件高度（不经过 resizeEvent），须另行接住
+        if a1 is not None and a1.type() == QEvent.Type.Resize and a0 is self.viewport():
+            self._schedule_flush()
+        return super().eventFilter(a0, a1)
+
+    def resizeEvent(self, a0):
+        super().resizeEvent(a0)
+        self._schedule_flush()
+
+    def _schedule_flush(self, *_args) -> None:
+        """合并同拍多次触发只排一次：压上限会再发 rangeChanged，不排则事件风暴。"""
+        if self._flush_queued:
+            return
+        self._flush_queued = True
+        QTimer.singleShot(0, self._flush_tick)
+
+    def _flush_tick(self) -> None:
+        self._flush_queued = False
+        self._flush_tail()
+
+    def _absorb_viewport_residue(self, line_h: int) -> bool:
+        """视口高不是行距整数倍时，把这点余量并进下侧视口边距，视口即落到整行上。
+
+        Qt 只能整行换档，视口高与行距除不尽时，末行下方恒差「视口高 % 行距」，
+        滚动上限再怎么压都消不掉。对话框那边会把日志窗格缩到整行（`_snap_log_
+        viewport_to_whole_lines`，余量给演员表），只有窗格已到 `minimumSizeHint`
+        缩不动时（高度不够、行高对齐 bail 的窄窗）才落到这里：边距只影响可视区
+        高度、不影响控件高度与滚动范围，末行照样贴可视区底边。
+
+        `vp0`（边距左右对称时的可视区高度）只由控件高度决定，故目标边距是控件
+        高度的单值函数，一轮即收敛、不会来回摆：视口缩进余量后正是行距整数倍，
+        `vp0` 仍不变，下一轮算出同一个目标即空操作。
+        """
+        vp = self.viewport().height()
+        if vp <= 0:
+            return False
+        vp0 = vp + self._inset_bottom - self._INSET
+        target = self._INSET + vp0 % line_h
+        if target == self._inset_bottom:
+            return False
+        self._inset_bottom = target
+        self.setViewportMargins(self._INSET, self._INSET, self._INSET, target)
+        return True
+
+    def _flush_tail(self) -> None:
+        """把滚动上限压到「末行贴视口底」的那一档，消掉日志下方的空白。"""
+        if self._flush_busy:
+            return
+        try:
+            line_h = self.fontMetrics().lineSpacing()
+            vp = self.viewport().height()
+            if line_h <= 0 or vp <= 0:
+                return
+            if self._absorb_viewport_residue(line_h):
+                return  # 视口高度已变，贴底档留到下一轮（视口 resize 会再排一次）
+            bar = self.verticalScrollBar()
+            if bar.maximum() <= 0:
+                return  # 空文档 / 内容不满视口：没有「滚到底」可言
+            bottom = 0.0
+            block = self.document().begin()
+            while block.isValid():
+                bottom += self.blockBoundingRect(block).height()
+                block = block.next()
+            need = bottom - vp  # 末行贴视口底所需的滚动位移（像素）
+            if need <= 0:
+                return  # 内容不满视口
+            flush_at = int(-(-need // line_h))  # ceil(need / 行距)：够用的最小档位
+            if flush_at >= bar.maximum():
+                return  # Qt 自己的上限已经够严（甚至更严），不动
+            self._flush_busy = True
+            try:
+                bar.setMaximum(flush_at)  # Qt 会把 value 钳进新范围
+            finally:
+                self._flush_busy = False
+        except (RuntimeError, AttributeError):
+            pass  # C++ 对象已销毁等竞态：纯外观调整，静默放弃
+
+
 DEFAULT_CLEAN_RULES: list[tuple[str, str]] = [
     ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
     ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
@@ -1601,6 +1733,61 @@ class EmbyActorManagerDialog(QDialog):
         if getattr(self, "_setting_splitter_sizes", False):
             return
         self._user_moved_splitter = True
+        # 拖后不再重排行高，但日志下方不许留空白：视口高度仍要吸附到整行
+        self._queue_log_line_snap()
+
+    def _queue_log_line_snap(self) -> None:
+        """合并同拍多次请求，只排一次日志视口整行吸附（守卫与 fit 同款）。"""
+        try:
+            if getattr(self, "_log_snap_queued", False):
+                return
+            self._log_snap_queued = True
+        except (RuntimeError, AttributeError):
+            return
+        QTimer.singleShot(0, self._log_line_snap_tick)
+
+    def _log_line_snap_tick(self) -> None:
+        self._log_snap_queued = False
+        self._snap_log_viewport_to_whole_lines()
+
+    def _snap_log_viewport_to_whole_lines(self) -> None:
+        """把日志视口高度吸附到行距的整数倍：这是尾部空白归零的唯一手段。
+
+        Qt 竖向滚动按整行换档、上限恰好落在「末行贴视口底」的那一档，故
+        `空白 = 视口高 % 行距`（见 `_FlushLogTextEdit` 实测记录）。`_fit_visible_rows`
+        正常落定时视口本就是 `行数 x 行距`（文档边距归零后），余下两种情形会留下
+        余数：用户手拖分隔条（行高对齐让位）、高度不够时 fit bail（连可读下限都
+        塞不下）。此处把这两种情形的余数像素从日志窗格挪给演员表窗格——表格多/
+        少十几像素不会引入半行（行高始终由 fit 的整数除法给出）。
+
+        与 fit 互为固定点：fit 的目标视口恒是整行，吸附后再跑 fit 是空操作；已
+        整行、量不到、最小化、日志窗格比余数还矮——都是空操作，绝不循环。
+        """
+        log = getattr(self, "log_text", None)
+        splitter = getattr(self, "_splitter", None)
+        if log is None or splitter is None:
+            return
+        if getattr(self, "_setting_splitter_sizes", False):
+            return
+        try:
+            if self.isMinimized() or (self.windowState() & Qt.WindowState.WindowMinimized):
+                return
+            line_h = log.fontMetrics().lineSpacing()
+            if line_h <= 0:
+                return
+            over = log.viewport().height() % line_h
+            if over == 0:
+                return
+            sizes = splitter.sizes()
+            if len(sizes) < 2 or sizes[1] <= over:
+                return  # 日志窗格比这点余数还矮：吸了会压掉末行，不动
+            self._setting_splitter_sizes = True
+            try:
+                splitter.setSizes([int(sizes[0] + over), int(sizes[1] - over)])
+            finally:
+                self._setting_splitter_sizes = False
+        except (RuntimeError, AttributeError):
+            return
 
     def eventFilter(self, a0, a1):
         """议题 #160: viewport 尺寸变化(含纵向滚动条显隐/DPI 变化)后重算列宽，
@@ -1623,6 +1810,9 @@ class EmbyActorManagerDialog(QDialog):
 
     def _queue_viewport_refit(self) -> None:
         """视口几何变化后的补对：合并同拍多次事件，只排一次，守卫与 fit 同款。"""
+        # 无论后续补对是否被守卫挡下（用户拖过分隔条 / 我们自己正在 setSizes），
+        # 整行吸附都要排：它只挪余数像素，不改用户选的分配。
+        self._queue_log_line_snap()
         try:
             if getattr(self, "_user_moved_splitter", False):
                 return
@@ -1790,6 +1980,8 @@ class EmbyActorManagerDialog(QDialog):
         log_widget = getattr(self, "_log_widget", None)
         if table is None or log is None or splitter is None or list_widget is None or log_widget is None:
             return
+        # 本次 fit 无论成不成（提前 bail 也算），日志视口都得落到整行上
+        self._queue_log_line_snap()
         # 用户拖过分隔条：本次打开保持拖后位置，取数/缩放都不抢回；
         # 重开是新实例，天然回到默认行数。
         if getattr(self, "_user_moved_splitter", False):
@@ -1909,7 +2101,7 @@ class EmbyActorManagerDialog(QDialog):
         group = QGroupBox("运行日志")
         layout = QVBoxLayout(group)
         layout.setContentsMargins(4, 2, 4, 2)
-        self.log_text = QPlainTextEdit()
+        self.log_text = _FlushLogTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setMaximumBlockCount(500)
         layout.addWidget(self.log_text)

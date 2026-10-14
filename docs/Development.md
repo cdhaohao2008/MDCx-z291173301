@@ -193,6 +193,30 @@ UI 层 (PyQt6)         → 界面展示、用户操作
   3. 禁止持久化记忆拖动位置：对话框 `WA_DeleteOnClose`，关闭即销毁、重开新实例天然回默认行数。
 - 回归：`tests/test_actor_manager_row_count.py::test_user_drag_survives_repopulate`（自有 `setSizes` 不置位/发信号即置位/取数重填与直接重对都不抢回）。注意 QSplitter 会按最小值/手柄归一化几 px，断言必须以落定值为准、不得写死像素。
 
+**运行日志贴底不留缝：压滚动上限 + 视口高吸附整行（演员管理器 `运行日志`）**
+
+- 现象：最小化（日志超过 9 条）与最大化（超过 11 条）两种状态，滚动条拉到最底，末行下面恒浮 10~20px 空白。
+- 根因：Qt 竖向滚动按**整行**换档（一档一个 `fontMetrics().lineSpacing()`，单位不是像素），而它给滚动条算的
+  pageStep 比视口真正装得下的整行数少一行——`pageStep = (视口高 - 1) // 行距`。滚到上限时末行下方恒空出一整行；
+  视口高不是行距整数倍时再多空「视口高 % 行距」。两段来源不同：**整行那段只能靠压滚动上限消掉，亚行那段 Qt
+  整行换档压不动，只能让视口高度落到行距整数倍**。
+- 改法（`mdcx/tools/emby_actor_manager_ui.py`）：
+  1. `QPlainTextEdit` 子类 `_FlushLogTextEdit`：文档边距归零（4px 视觉留白改由 `setViewportMargins` 补——
+     视口边距只进 chrome、不参与 Qt 的滚动余量），四路变化合拍后把滚动上限压到「末行贴视口底」的那一档
+     `ceil((内容底 - 视口高) / 行距)`。Qt 少算的那一行被补掉后并不少给任何一行内容，用户仍能上滚看全部历史。
+  2. 对话框 `_snap_log_viewport_to_whole_lines`：把 `视口高 % 行距` 那几像素从日志窗格挪给演员表窗格。
+  3. 控件内 `_absorb_viewport_residue`：日志窗格已到 `minimumSizeHint` 缩不动时（窄窗 fit bail），并进下侧视口边距。
+- 规则（`QPlainTextEdit` 有整行滚动余量时通用）：
+  1. 想让末行贴边，先看视口高除不除得尽行距——除不尽时 Qt 物理上滚不到贴底，**光调滚动上限是徒劳的**，
+     必须把视口高度也整行化。
+  2. 量「文档内容底」用 Σ 各块 `blockBoundingRect(block).height()`；`contentOffset()` 在 `QPlainTextEdit` 上
+     返回 0/跳变值、`documentLayout().documentSize()` 的 height 是行/块计数，**都不可用**。
+  3. `QScrollBar.maximum()` 的单位不是像素（pageStep 实测恰等于可见行数），**任何按像素换算 value 的公式都不成立**，
+     只能落屏实测取关系。
+  4. 已验证无效的杠杆：`setBottomMargin`/`setLineHeight`（不改 `blockBoundingRect` 高度）、尾部加空块
+     （可视行与滚动档同步 +1，净效果不变）、直接 `bar.setMaximum(像素值)`、改 pageStep（Qt 每次 `updateScrollBars` 覆写）。
+- 回归：`tests/test_actor_manager_log_flush.py` 21 例（量法：拉到底后 `视口高 − (内容底 − 档位 x 行距) == 0`）。
+
 ### 左下角状态区图标规范
 
 主界面左下角状态区（`label_show_version`，`show_scrape_info` 组装文本后经
