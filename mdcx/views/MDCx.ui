@@ -25415,7 +25415,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;目录命名&lt;/b&gt;：存放视频的文件夹名，支持多层目录与自定义符号，例：[actor]/studio/number-【title】。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;媒体标题&lt;/b&gt;：NFO中的标题，例：number-[title]。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;本地标题&lt;/b&gt;：本地视频与图片的命名，例：number-[title]。&lt;/li&gt;
-&lt;li&gt;可用变量：number番号、bold加黑、title标题、originaltitle原标题、actor演员、first_actor首位演员、all_actor全部演员、letters番号前缀、first_letter番号首字符、outline简介、director导演、definition清晰度、publisher发行商、series系列、studio片商、year年份、mosaic有码/无码、runtime时长、score评分、release发行日期、cnword字幕标识、wanted想看人数、four_k（4K标识）、filename原文件名、moword版本标识，支持Jinja2模板与自定义符号。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;可用变量&lt;/b&gt;：number番号、title标题、originaltitle原标题、actor演员、first_actor首位演员、all_actor全部演员、letters番号前缀、first_letter番号首字符、outline简介、director导演、definition清晰度、publisher发行商、series系列、studio片商、year年份、mosaic有码/无码、runtime时长、score评分、release发行日期、cnword字幕标识、wanted想看人数、four_k（4K标识）、filename原文件名、moword版本标识，支持Jinja2模板与自定义符号。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;四、网站选择&lt;/h4&gt;
 &lt;p&gt;网站下拉框由已注册的爬虫自动生成，当前52个，可按需选用全部网站或指定网站，主要来源包括：&lt;/p&gt;
