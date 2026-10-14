@@ -78,7 +78,7 @@ def win(app, monkeypatch, tmp_path):
 
 @pytest.fixture()
 def nfo_lib_page(win, app, tmp_path):
-    """切到信息管理页，灌一批番号，并同步一次布局。"""
+    """切到信息管理页，灌一批番号，展开分组，并同步一次布局。"""
     for index in range(win.Ui.stackedWidget.count()):
         page = win.Ui.stackedWidget.widget(index)
         if page.objectName() == "page_nfo_library":
@@ -87,6 +87,8 @@ def nfo_lib_page(win, app, tmp_path):
     else:
         raise AssertionError("page_nfo_library not found")
 
+    # 分组默认折叠：本文件测的是展开态下的收紧，先走用户真实路径勾选展开
+    win.Ui.groupBox_nfo_lib_batch.setChecked(True)
     for number in range(1, 40):
         win.Ui.listWidget_nfo_lib.addItem(f"MKBD-S{number:02d}-U")
     win.resize(1030, 700)

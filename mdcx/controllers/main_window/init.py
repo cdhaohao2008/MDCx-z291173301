@@ -792,6 +792,8 @@ def Init_Singal(self: "MyMAinWindow"):
     self.Ui.pushButton_nfo_lib_batch_del_tag.clicked.connect(self.pushButton_nfo_lib_batch_del_tag_clicked)
     self.Ui.pushButton_nfo_lib_batch_series.clicked.connect(self.pushButton_nfo_lib_batch_series_clicked)
     self.Ui.pushButton_nfo_lib_batch_save.clicked.connect(self.pushButton_nfo_lib_batch_save_clicked)
+    self.Ui.groupBox_nfo_lib_batch.toggled.connect(self._on_nfo_lib_batch_toggled)
+    self._on_nfo_lib_batch_toggled(False)  # .ui 声明 checkable + unchecked 即默认折叠，标题栏留给用户勾选展开
     # QLayout.setStretchFactor 只接受 QWidget/QLayout 对象；按 index 设置用 QBoxLayout.setStretch
     self.Ui.nfo_lib_content_layout.setStretch(0, 2)
     self.Ui.nfo_lib_content_layout.setStretch(1, 3)

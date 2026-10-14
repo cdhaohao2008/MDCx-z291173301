@@ -1,18 +1,16 @@
-"""信息管理页左栏「NFO 文件列表」与「批量操作」面板不得重叠。
+"""信息管理页左栏「NFO 列表」与「批量操作」面板不得重叠。
 
 症状（用户截图反馈）：窗口不够高时，左栏 QVBoxLayout 里最后一项「批量操作」
 分组的顶边被顶进列表里，分组标题「批量操作（选中多条后使用）」压在
 列表最后几行番号上（截图里正好压住 MKBD-S100-U / MKBD-S102-U）。
 
 根因：`listWidget_nfo_lib` 在 .ui 里钉了 `minimumSize = 280×320` 的硬下限，
-而左栏内容最小高合计 653px（标题 14 + 全选行 22 + 列表 320 + 分组 279 + 间隔），
-窗口一矮面板就放不下，Qt 布局引擎在约束无解时会给出互相穿插的几何（实测
-窗口 1030×700 重叠 30px、480×600 重叠 82px），于是分组盖住列表尾部。
+左栏放不下时 Qt 布局引擎在约束无解时会给出互相穿插的几何（实测窗口 1030×700
+重叠 30px、480×600 重叠 82px），于是分组盖住列表尾部。
 
-修复：把列表的硬下限从 320 降到 120（宽度下限 280 不动，保住左栏不被挤窄）。
-列表是自带滚动条的 QListWidget，本就吃富余高度（1920×1080 下仍是 663px），
-下限只在窗口矮到放不下时才起作用；120 远低于面板在任何合法窗口尺寸下的
-自然份额（480×600 时也有 183px），故列表不会再把分组顶出可视区。
+修复：列表硬下限 320 降到 120（宽度下限 280 不动）；「NFO文件列表」标题 label
+删掉，全选/全不选行顶到左栏首行；分组默认折叠。本文件统一在展开态下断言
+（最占地方的最坏情况），折叠态只会更宽松。
 """
 
 import os
@@ -72,14 +70,19 @@ def win(app, monkeypatch, tmp_path):
 
 @pytest.fixture()
 def nfo_lib_page(win, app):
-    """切到信息管理页并完成一次布局。"""
+    """切到信息管理页并完成一次布局；展开分组，测最占地方的展开态。"""
     for index in range(win.Ui.stackedWidget.count()):
         page = win.Ui.stackedWidget.widget(index)
         if page.objectName() == "page_nfo_library":
             win.Ui.stackedWidget.setCurrentIndex(index)
             app.processEvents()
-            return page
-    raise AssertionError("page_nfo_library not found")
+            break
+    else:
+        raise AssertionError("page_nfo_library not found")
+    # 分组默认折叠：重叠只可能发生在展开态，先走用户真实路径勾选展开
+    win.Ui.groupBox_nfo_lib_batch.setChecked(True)
+    app.processEvents()
+    return page
 
 
 @pytest.mark.parametrize("size", _SIZES)

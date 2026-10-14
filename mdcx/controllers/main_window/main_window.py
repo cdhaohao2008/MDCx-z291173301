@@ -1090,6 +1090,44 @@ class MyMAinWindow(QMainWindow):
             if hint.minimumHeight() == previous:
                 return
 
+    def _on_nfo_lib_batch_toggled(self, on: bool) -> None:
+        """「批量操作」分组标题勾选框：展开 / 折叠分组内容。
+
+        .ui 把分组声明成 checkable + unchecked，本意是默认折叠；但 pyuic6 在子控件
+        建好之前就调了 setCheckable / setChecked，Qt 当时无子控件可管，分组就从未
+        真正折叠过——只剩 unchecked 自带的「子控件全 disabled」效果：控件灰着，却照
+        样占满 200 多 px 高度。
+
+        这里把 toggled 接成真正的折叠：收起时藏起全部直属子控件（含状态行，文本保留，
+        分组只剩标题栏约 40px，省下的高度回到 NFO 列表），展开时恢复。Qt 自己管
+        enabled（勾选自动 enable、去勾自动 disable），与这里的显隐管理不冲突。
+        展开时状态行（label_nfo_lib_batch_status）不由这里定显隐：它空文本时本来就
+        该藏，统一交给 _sync_nfo_lib_batch_status 按文本说了算。"""
+        box = self.Ui.groupBox_nfo_lib_batch
+        status = self.Ui.label_nfo_lib_batch_status
+        if on:
+            for child in box.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+                if child is status:
+                    continue
+                child.setVisible(True)
+            self._sync_nfo_lib_batch_status()  # 状态行按有没有文本单独定
+            # 刚展开：先强制走一遍分组布局让宽度就位，再按当前宽度重算 hint 下限
+            layout = box.layout()
+            if layout is not None:
+                layout.invalidate()
+                layout.activate()
+            self._sync_nfo_lib_batch_panel()
+        else:
+            for child in box.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+                child.setVisible(False)
+        # 子控件显隐只 post LayoutRequest 不标脏布局，此时直接 activate 会因布局仍是
+        # clean 而返回 False 无所作为（实测）；必须先 invalidate 再 activate，才能同步
+        # 重排，让高度在分组与列表之间立刻重新分配（窗口未 show 时尤其靠这一步）。
+        outer = box.parentWidget()
+        if outer is not None and outer.layout() is not None:
+            outer.layout().invalidate()
+            outer.layout().activate()
+
     def _nfo_lib_form_rows(self) -> list[tuple[QWidget | None, QWidget | None]]:
         """列出信息管理表单 QFormLayout 每一行的 (标签控件, 字段控件)。
 
