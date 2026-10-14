@@ -14606,7 +14606,7 @@ class Ui_MDCx(object):
                 "<p>网站下拉框由已注册的爬虫自动生成，当前52个，可按需选用全部网站或指定网站，主要来源包括：</p>\n"
                 "<ul>\n"
                 "<li><b>有码</b>：仅能有码：AVBase、AVMOO、DMM、DMM_API、FreeJavBT、Getchu、JavLibrary、LibreDMM、Lulubar、MGStage、Prestige、R18.dev、TheJavDB_API、Xcity；综合（有码+无码）：7mmtv、airav.cc、AVSex、IQQTV、JavBus、JavDB系、JavDay、JavFree、MissAV系、Official</li>\n"
-                "<li><b>无码</b>：AVSOX、AVEntertainments及综合站（JavBus、JavDB系、MissAV系、AVSex、Official、JavDay、IQQTV、7mmtv）</li>\n"
+                "<li><b>无码</b>：AVEntertainments、AVSOX及综合站（7mmtv、AVSex、IQQTV、JavBus、JavDB系、JavDay、MissAV系、Official）</li>\n"
                 "<li><b>素人</b>：MGStage（259LUXU等）、Prestige、JavBus、JavDB系、DMM、DMM_API、AVBase、MissAV系、MyWife、IQQTV、7mmtv</li>\n"
                 "<li><b>FC2</b>：FC2、FC2PPVDB、JavDB系、JavFree、7mmtv</li>\n"
                 "<li><b>国产</b>：Madouqu、Madou_Club、AVSex、IQQTV、JavDay</li>\n"
