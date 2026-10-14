@@ -14609,7 +14609,7 @@ class Ui_MDCx(object):
                 "<li><b>无码</b>：AVSOX、AVEntertainments及综合站（JavBus、JavDB系、MissAV系、AVSex、Official、JavDay、IQQTV、7mmtv）</li>\n"
                 "<li><b>素人</b>：MGStage（259LUXU等）、Prestige、JavBus、JavDB系、DMM、DMM_API、AVBase、MissAV系、MyWife、IQQTV、7mmtv</li>\n"
                 "<li><b>FC2</b>：FC2、FC2PPVDB、JavDB系、JavFree、7mmtv</li>\n"
-                "<li><b>国产</b>：MADOUQU、Madou_Club、AVSex、IQQTV、JavDay</li>\n"
+                "<li><b>国产</b>：Madouqu、Madou_Club、AVSex、IQQTV、JavDay</li>\n"
                 "<li><b>欧美</b>：THEPORNDB、AVHEAT</li>\n"
                 "</ul>\n"
                 "<p><b>Official综合：有码+无码，按番号前缀自动路由到各番号官网，全部走代理：有码片商官网30家：Attackers、AV Opera、BeeFree、Bi、Bibian、Dasdas、E-Body、Fitch、HHH、Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、MKO-Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、Prestige、Rookie、S1S1S1、Tameikegoro、To-Satsu、V-AV、Wanz Factory<br/>\n"
