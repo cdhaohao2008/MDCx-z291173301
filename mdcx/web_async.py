@@ -221,6 +221,36 @@ def _safe_float(value: object, default: float) -> float:
         return default
 
 
+def _record_attempt_error(attempt_errors: list[str], error_msg: str) -> str:
+    """把单轮失败原因记入累积列表（去重保序），返回该轮剥离出的响应体预览（无则空串）。
+
+    重试各轮的错误全部累积，不再只留最后一轮：直连可能先拿到 HTTP 403 挑战页、
+    后续几轮变成 curl: (35) TLS connect error，只留末轮会把传输层真因丢掉，
+    上层（网络检测/失败分类）无从判断到底是 CF 拦截还是链路层被 RST。
+
+    ` body=` 响应体不进入累积列表，统一由调用方挂到最终错误串末尾。否则
+    network_check 按首个 ` body=` 截断（core/network_check.py）时，会把其后
+    的累积项一并切掉，等于没累积。
+    """
+    core, _, body = error_msg.partition(" body=")
+    core = core.strip()
+    if core and core not in attempt_errors:
+        attempt_errors.append(core)
+    return body.strip()
+
+
+def _join_attempt_errors(attempt_errors: list[str], error_msg: str, body_preview: str) -> str:
+    """把累积的各轮失败原因拼成最终错误串，响应体预览统一挂在末尾。
+
+    分隔符沿用既有多错误格式「、」（如 bypass 错误 `HTTP 502、GET ... 失败: HTTP 502`）。
+    响应体必须留在最后：上层按首个 ` body=` 截断以剔除响应体，挂末尾才能保住
+    前面累积的失败原因（见 _record_attempt_error 注释）。代价是响应体不与它所属的
+    那一轮绑定——末轮多为无响应体的传输错误，body 挂在整串末尾只作诊断线索。
+    """
+    core = "、".join(attempt_errors) or error_msg.strip()
+    return f"{core} body={body_preview}" if body_preview else core
+
+
 # 维基媒体（Wikidata/Wikipedia）按客户端类型限速：未识别 10 req/min、
 # 仅合规 User-Agent 200 req/min。通用 8 req/s 远高于其限额，批量补全演员信息
 # 时会触发 429。现对 wiki 域名用「双桶」限速（议题 #137，取代 #125 的 1 req/s）：
@@ -2025,6 +2055,9 @@ class AsyncWebClient:
             limiter = self.limiters.get(u.host)
             retry_count = max(int(self.retry if retry_count is None else retry_count), 1)
             error_msg = ""
+            # 各轮失败原因累积（去重），末轮覆盖式赋值会把前面的传输层真因丢掉
+            attempt_errors: list[str] = []
+            last_body_preview = ""
             bypass_round = 0
             # 兜底分支用到的末轮请求上下文：先给初值，防首轮极早抛异常导致未绑定。
             req_headers: dict = {}
@@ -2250,6 +2283,12 @@ class AsyncWebClient:
                     error_msg = f"curl-cffi 异常: {e!s}"
                     retry = True
                     await self._record_transport_failure(error_msg, pool_key=pool_key)
+                # 每轮结束统一入账：成功分支在上面已 return，走不到这里
+                body_preview = _record_attempt_error(attempt_errors, error_msg)
+                if body_preview:
+                    # 取最近一次非空的响应体：末轮常是传输错误（无响应体），
+                    # 直接覆盖会把前面 4xx 的诊断响应体一并丢掉
+                    last_body_preview = body_preview
                 if not retry:
                     if stream:
                         await self._close_response(resp)
@@ -2319,7 +2358,7 @@ class AsyncWebClient:
                         f"⚠️ bypass 兜底失败: {bypass_error}，保留原始传输错误",
                         host,
                     )
-            return None, f"{method} {url} 失败: {error_msg}"
+            return None, f"{method} {url} 失败: {_join_attempt_errors(attempt_errors, error_msg, last_body_preview)}"
         except Exception as e:
             error_msg = f"{method} {url} 未知错误:  {e!s}"
             self._log(f"🔴 {error_msg}")

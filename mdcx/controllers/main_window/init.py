@@ -3,7 +3,7 @@ import traceback
 import webbrowser
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QObject, QEvent, QRect, QSize, Qt
+from PyQt6.QtCore import QObject, QEvent, QPoint, QRect, QSize, Qt
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QScreen
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QStyle,
     QStyleOptionViewItem,
     QSystemTrayIcon,
+    QToolTip,
     QTreeWidgetItem,
 )
 
@@ -345,6 +346,88 @@ class _SiteUrlClickFilter(QObject):
         return super().eventFilter(obj, event)
 
 
+def _event_pos(event) -> QPoint:
+    """取事件的控件内坐标：QMouseEvent 等给的是 QPointF（position()），QHelpEvent 只给 QPoint（pos()）。"""
+    point = (getattr(event, "position", None) or getattr(event, "pos", None))()
+    to_point = getattr(point, "toPoint", None)  # QPointF 才有，QPoint 直接就是坐标
+    return to_point() if callable(to_point) else point
+
+
+class _SiteComboTipFilter(QObject):
+    """站点下拉弹窗悬停提示：光标落到哪一行就立刻显示哪一行的 ToolTipRole 文本。
+
+    此前完全交给 Qt 默认链路（平台侧合成 QEvent::ToolTip → `QStyledItemDelegate.helpEvent`
+    → `QToolTip`），在「软件设置→网络→网站设置→当前网站」等站点下拉里实测 hover 不出
+    提示：弹窗是 Qt::Popup 顶层窗，Windows 侧要停住约 1s 才合成该事件，事件还未必送达
+    弹窗 viewport；即便偶发显示，也常是上一行/空白处遗留的旧文本（提示与光标所指行对不
+    上）。这里改为自管：viewport 的 MouseMove 直接按 `view.indexAt()` 取光标所在行自己
+    弹（行内移动不重弹、换行即换内容，无提示文本则收起），平台侧的 ToolTip 事件也一并
+    接管掉，保证同一时刻只有一份提示、且与光标所在行一致；移出列表/弹窗关闭即隐藏。
+    """
+
+    def __init__(self, combo: QComboBox) -> None:
+        super().__init__(combo)
+        self._combo = combo
+        self._shown_row: int = -1  # 已显示提示所在行（-1 = 无提示）；行内移动据此跳过重弹
+
+    def _index_at(self, pos):
+        """光标所在行的 index；空白处/无 view 返回 None。"""
+        view = self._combo.view()
+        if view is None:
+            return None
+        index = view.indexAt(pos)
+        return index if index.isValid() else None
+
+    def _show_tip_for(self, index) -> None:
+        """按 index 显示 tooltip；index 为 None 或文本为空则收起提示。"""
+        view = self._combo.view()
+        if view is None:
+            return
+        row = index.row() if index is not None else -1
+        if row == self._shown_row and row != -1:
+            return  # 同一行内移动：不重复弹（重弹会让提示闪一下并重置位置）
+        self._shown_row = row
+        text = str(index.data(Qt.ItemDataRole.ToolTipRole) or "").strip() if index is not None else ""
+        if not text:
+            QToolTip.hideText()
+            return
+        viewport = view.viewport()
+        rect = view.visualRect(index)
+        # 贴着该行下沿弹出：定位说明 + 上次检测结果，鼠标停在本行即持续可见
+        QToolTip.showText(viewport.mapToGlobal(rect.bottomLeft()), text, viewport, rect)
+
+    def eventFilter(self, obj, event) -> bool:
+        try:
+            event_type = event.type()
+            if event_type == QEvent.Type.MouseMove and not event.buttons():
+                # 无按键移动才做提示（拖拽选择过程中不打扰）
+                self._show_tip_for(self._index_at(_event_pos(event)))
+                return False  # 交给其余过滤器（如网址列的 _SiteUrlClickFilter）继续处理
+            if event_type == QEvent.Type.ToolTip:
+                self._show_tip_for(self._index_at(_event_pos(event)))
+                return True  # 接管：不走 Qt 默认 delegate，避免同一处出现第二份/过期提示
+            if event_type in (QEvent.Type.Hide, QEvent.Type.Leave):
+                self._shown_row = -1
+                QToolTip.hideText()
+                return False
+        except Exception:
+            pass
+        return super().eventFilter(obj, event)
+
+
+def _install_site_combo_tips(combo: QComboBox) -> None:
+    """给站点下拉框装悬停提示（按光标所在行实时显示 ToolTipRole）。
+
+    必须在 `_setup_combo_boxes` 换过 view 之后调用（过滤器装在 view.viewport() 上）。
+    """
+    view = combo.view()
+    if view is None or getattr(combo, "_site_tip_filter_installed", False) is True:
+        return
+    view.viewport().setMouseTracking(True)  # 无按键也要有 MouseMove，才能定位光标所在行
+    view.viewport().installEventFilter(_SiteComboTipFilter(combo))
+    combo._site_tip_filter_installed = True  # type: ignore[attr-defined]
+
+
 def _install_site_url_columns(combo: QComboBox) -> None:
     """给站点下拉框装网址列（delegate + 点击/悬停处理 + 弹窗宽度适配）。"""
     combo.setItemDelegate(_SiteUrlItemDelegate(combo))
@@ -582,6 +665,14 @@ def Init_Ui(self: "MyMAinWindow"):
     # 连接选择事件
     self.Ui.comboBox_no_proxy_sites.currentTextChanged.connect(self._add_no_proxy_site)
     _setup_combo_boxes(self)
+    # 三个站点下拉框的悬停提示：光标落到哪行就显示哪行（定位说明 + 上次检测），
+    # 必须装在 _setup_combo_boxes 换过 view 之后（指定网站框不装网址列，同样要提示）
+    for _site_combo in (
+        self.Ui.comboBox_website_all,
+        self.Ui.comboBox_custom_website,
+        self.Ui.comboBox_no_proxy_sites,
+    ):
+        _install_site_combo_tips(_site_combo)
     # 指定网站（comboBox_website_all）下拉右侧不显示网址：只装另外两框的网址列
     for _site_combo in (
         self.Ui.comboBox_custom_website,
@@ -619,7 +710,7 @@ def Init_Ui(self: "MyMAinWindow"):
     self.Ui.scrollArea_nfo_lib_form.set_content_bottom_margin(8)
     # 软件工具页卡片与软件设置页卡片右缘齐平：设置页滚动区加宽 4px（tab 右边距
     # 20→16，滚动条右缘收到页宽-18）后，两侧视口差消失、自然齐平，不再需要内收
-    #（曾用 scrollArea_10.set_content_right_trim(4) 补偿恒定 4px 差，见测试文件说明）。
+    # （曾用 scrollArea_10.set_content_right_trim(4) 补偿恒定 4px 差，见测试文件说明）。
     # 软件工具页滚动区底部无浮框遮挡（页脚在滚动区外单独留了 75px），默认 72px
     # 底部余量（给设置页浮框带留的）会变成刮削缓存管理下方的空白滚动区。
     # 收紧到 20px（= 设计内容高 2309 - 末组框底边 2289），保留设计呼吸感。
@@ -855,16 +946,14 @@ def Init_Singal(self: "MyMAinWindow"):
     self.Ui.pushButton_nfo_close.clicked.connect(self._close_nfo_editor)
     self.Ui.pushButton_nfo_save.clicked.connect(self.save_nfo_info)
     # 关闭按钮刻意不设 shortcut：ESC 由主窗口唯一的全局 QShortcut
-    #（hide_tips_widget_on_escape）统一处理，NFO 可见时等同点关闭；按钮上再挂一条
+    # （hide_tips_widget_on_escape）统一处理，NFO 可见时等同点关闭；按钮上再挂一条
     # 相同键序列的 shortcut 会被 Qt 判为 ambiguous，两条都不触发。
     # endregion
 
     # region 鼠标点击
     def n(a): ...  # mousePressEvent 的返回值必须是 None, 用这个包装一下
 
-    self.Ui.label_show_version.mousePressEvent = lambda ev: n(
-        webbrowser.open(GITHUB_RELEASES_URL)
-    )
+    self.Ui.label_show_version.mousePressEvent = lambda ev: n(webbrowser.open(GITHUB_RELEASES_URL))
     self.Ui.label_local_number.mousePressEvent = self.label_local_number_clicked
 
     self.Ui.label_download_actor_zip.mousePressEvent = lambda ev: n(
