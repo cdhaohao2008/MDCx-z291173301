@@ -3,7 +3,7 @@ import traceback
 import webbrowser
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QObject, QEvent, QPoint, QRect, QSize, Qt
+from PyQt6.QtCore import QObject, QEvent, QPoint, QRect, QSize, QTimer, Qt
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QScreen
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -373,6 +373,18 @@ def _event_pos(event) -> QPoint:
     return to_point() if callable(to_point) else point
 
 
+def _tip_label() -> QWidget | None:
+    """QToolTip 内部复用的那个提示窗（QTipLabel，全进程只有这一个）。
+
+    它每次显示都按当前排版结果自行 `resize()`；Windows 侧首显那次与随后几次排出的高度
+    可能不同（同一段「上次检测：…」提示框忽高忽低），所以站点下拉的提示高度由我们自己钉。
+    """
+    for widget in QApplication.allWidgets():
+        if widget.metaObject().className() == "QTipLabel":
+            return widget
+    return None
+
+
 class _SiteComboTipFilter(QObject):
     """站点下拉弹窗悬停提示：光标落到哪一行就立刻显示哪一行的 ToolTipRole 文本。
 
@@ -389,6 +401,7 @@ class _SiteComboTipFilter(QObject):
         super().__init__(combo)
         self._combo = combo
         self._shown_row: int = -1  # 已显示提示所在行（-1 = 无提示）；行内移动据此跳过重弹
+        self._tip_height: int = 0  # 首显时提示窗的高度，之后每次显示都锁成这个高度（0 = 尚未记录）
 
     def _index_at(self, pos):
         """光标所在行的 index；空白处/无 view 返回 None。"""
@@ -413,8 +426,44 @@ class _SiteComboTipFilter(QObject):
             return
         viewport = view.viewport()
         rect = view.visualRect(index)
-        # 贴着该行下沿弹出：定位说明 + 上次检测结果，鼠标停在本行即持续可见
+        # 贴着该行下沿弹出：只有「上次检测：…」一行（定位说明已在显示文本里），鼠标停在本行即持续可见
         QToolTip.showText(viewport.mapToGlobal(rect.bottomLeft()), text, viewport, rect)
+        self._pin_tip_height()
+
+    def _pin_tip_height(self, *, allow_defer: bool = True) -> None:
+        """把提示窗高度钉成首显那次的自然高度，之后每次显示都一样高。
+
+        Qt 每次显示都会按当下排版结果 `resize()` 提示窗，首显与后续几次排出的高度可能不同，
+        同一段文字的提示框就会忽高忽低。钉上固定高度后 `resize()` 被上下限夹住，视觉高度恒定；
+        取 max(已钉高度, 本次自然高度) 是为了兜住万一某次排版更高的情况，不把文字裁掉。
+        """
+        label = _tip_label()
+        if label is None:
+            if allow_defer:
+                # 首显这一次提示窗还没挂上控件树，下一轮事件循环再钉（趁用户还没移到下一行）
+                QTimer.singleShot(0, lambda: self._pin_tip_height(allow_defer=False))
+            return
+        pinned = label.minimumHeight()
+        if pinned > 0:
+            # 临时解除再读：钉死后 sizeHint 会被固定高度夹住，读出来没意义。
+            # 解除与复原都在同一轮事件内完成，Qt 本来每次显示也会 resize，看不到闪烁。
+            label.setFixedHeight(0)
+        natural = label.sizeHint().height()
+        if self._tip_height <= 0:
+            self._tip_height = natural  # 首显高度为准
+            if pinned > 0:  # 已有钉高却还没记录过（理论上不该发生），按新值复原
+                label.setFixedHeight(self._tip_height)
+            return
+        height = max(self._tip_height, natural)
+        self._tip_height = height
+        if pinned != height:
+            label.setFixedHeight(height)
+
+    def _release_tip_height(self) -> None:
+        """解除钉高：QTipLabel 是全进程共用的，不能把固定高度留给应用里其它提示。"""
+        label = _tip_label()
+        if label is not None and label.minimumHeight() > 0:
+            label.setFixedHeight(0)
 
     def eventFilter(self, obj, event) -> bool:
         try:
@@ -429,6 +478,7 @@ class _SiteComboTipFilter(QObject):
             if event_type in (QEvent.Type.Hide, QEvent.Type.Leave):
                 self._shown_row = -1
                 QToolTip.hideText()
+                self._release_tip_height()
                 return False
         except Exception:
             pass

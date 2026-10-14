@@ -36,11 +36,12 @@ from mdcx.controllers.main_window.init import (
 
 _app: QApplication | None = None
 
-# 三行样例：前两行有上次检测结果，第三行故意留空（模拟没检测过的站点 → 不弹提示）
+# 四行样例：前三行有上次检测结果，第四行故意留空（模拟没检测过的站点 → 不弹提示）
 _ROWS = (
     ("AVBase 有码：有码+素人", "上次检测：2026-10-09 20:51✅可连通·走代理"),
     ("AVSOX 无码：仅能无码", "上次检测：2026-10-09 20:53❌连不通·直连"),
     ("DMM 有码：仅能有码", ""),
+    ("MissAV 综合：有码+无码", "上次检测：2026-10-09 20:55⚠️有需关注项·走代理"),
 )
 
 
@@ -184,6 +185,30 @@ def test_install_is_idempotent_and_enables_mouse_tracking():
     # 二次安装直接返回（标记为真即代表已装过），过滤行为仍正常
     _hover(combo, 0)
     assert callable(first)
+
+
+def test_tip_height_pinned_to_first_display():
+    """提示窗高度按首显钉死：后续不再忽高忽低（用户反馈 1/2/3 次显示高度不一致）。
+
+    用真实 QToolTip（不替换成假对象）才能拿到 QTipLabel；先手动把提示窗撑高来模拟
+    「某次排版算出更大高度」，再悬停下一行，断言被钉回首显高度；弹窗关闭后钉高要解除。
+    """
+    combo = _make_combo()
+    _hover(combo, 0)
+    label = init_mod._tip_label()
+    assert label is not None, "首显后应能拿到 QTipLabel"
+    first_height = label.sizeHint().height()
+    assert first_height > 0
+
+    label.setFixedHeight(first_height + 12)  # 模拟某次算出的高度更大
+    _hover(combo, 1)
+    # 钉高体现为上下限（Qt 每次显示的 resize 会被夹住），故断言 minimumHeight/maximumHeight：
+    # 离屏平台提示窗从不真正显示，height() 不会随上下限更新，拿它断言会假失败。
+    assert label.minimumHeight() == first_height, "后续显示应被钉回首显高度"
+    assert label.maximumHeight() == first_height
+
+    QApplication.sendEvent(combo.view().viewport(), QEvent(QEvent.Type.Hide))
+    assert label.minimumHeight() == 0, "弹窗关闭要解除钉高，别影响应用里其它提示"
 
 
 def test_populated_site_combo_tooltip_only_carries_check_result(monkeypatch):
