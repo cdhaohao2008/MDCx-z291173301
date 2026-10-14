@@ -401,7 +401,7 @@ class _SiteComboTipFilter(QObject):
         super().__init__(combo)
         self._combo = combo
         self._shown_row: int = -1  # 已显示提示所在行（-1 = 无提示）；行内移动据此跳过重弹
-        self._tip_height: int = 0  # 首显时提示窗的高度，之后每次显示都锁成这个高度（0 = 尚未记录）
+        self._tip_height: int = 0  # 提示窗钉高：历次自然高度的最大值，0 = 尚未记录
 
     def _index_at(self, pos):
         """光标所在行的 index；空白处/无 view 返回 None。"""
