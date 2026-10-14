@@ -341,6 +341,8 @@ class MyMAinWindow(QMainWindow):
         self._nfo_lib_save_result: bool = False  # NFO 库管理：后台保存结果
         self._nfo_lib_batch_result: tuple[int, int, int] = (0, 0, 0)  # NFO 库管理：批量结果 (成功, 失败, 总数)
         self._nfo_lib_original_data: CrawlersResult | None = None  # NFO 库管理：加载时的原始数据（diff 基准）
+        self._nfo_lib_poster_pix: QPixmap | None = None  # NFO 库管理：海报原图（预览按 label 边界等比缩放的源）
+        self._nfo_lib_thumb_pix: QPixmap | None = None  # NFO 库管理：缩略图原图（同上）
         # self.window_marjin = 0 窗口外边距，为0时不往里缩
         self.show_flag = True  # 是否加载刷新样式
 
@@ -1163,7 +1165,9 @@ class MyMAinWindow(QMainWindow):
         宽度 1:1:1 由三栏 stretch 保证，高度 36 由 _sync_nfo_lib_action_buttons
         保证，这里只管 y 对齐。
 
-        折叠态（分组未勾选）下批量保存藏着，对齐无意义，两个间隙归零。
+        折叠态（分组未勾选）下批量保存藏着，左间隙归零；但右间隙照样按基准
+        重算——右列海报/缩略图 stretch 会吸走富余高度把裁剪封面顶下去，不垫的
+        话裁剪封面与保存按钮错开（需求：勾不勾选都必须水平对齐）。
         必须跑在 _sync_nfo_lib_batch_panel 之后——hint 下限变化会改分组高，进而改
         左按钮底边，排前面量到的是旧值（见 _sync_page_layouts 调用序）。
         """
@@ -1171,23 +1175,29 @@ class MyMAinWindow(QMainWindow):
         left_gap = ui.widget_nfo_lib_left_gap
         preview_gap = ui.widget_nfo_lib_preview_gap
         content = ui.nfo_lib_content
+        if content.height() <= 0:
+            return
+        origin = QPoint(0, 0)
         if not ui.groupBox_nfo_lib_batch.isChecked():
-            changed = False
+            # 折叠态：只归零左间隙，右间隙继续按下走主分支同样的增量重算。
             if left_gap.height() != 0:
                 left_gap.setFixedHeight(0)
-                changed = True
-            if preview_gap.height() != 0:
-                preview_gap.setFixedHeight(0)
-                changed = True
-            if changed:
-                # 间隙从非零归零改了布局，外层必须同步重排，否则高度还按旧间隙分
-                # （与主分支末尾同理；子控件显隐/定高都只抛 LayoutRequest）。
-                layout = content.layout()
-                if layout is not None:
-                    layout.invalidate()
-                    layout.activate()
-            return
-        if content.height() <= 0:
+            # 先落定一次再量：间隙变化只抛 LayoutRequest，此时量到的是旧几何。
+            layout = content.layout()
+            if layout is not None:
+                layout.invalidate()
+                layout.activate()
+            ref = ui.pushButton_nfo_lib_save.mapTo(content, origin).y() + ui.pushButton_nfo_lib_save.height()
+            crop_bottom = (
+                ui.pushButton_nfo_lib_crop.mapTo(content, origin).y() + ui.pushButton_nfo_lib_crop.height()
+            )
+            preview_want = max(0, preview_gap.height() + (crop_bottom - ref))
+            if preview_gap.height() != preview_want:
+                preview_gap.setFixedHeight(preview_want)
+            layout = content.layout()
+            if layout is not None:
+                layout.invalidate()
+                layout.activate()
             return
         # 先落定一次再量：排在前面的 _sync_nfo_lib_batch_panel 刚改过 hint 下限，
         # 只调了 setMinimumHeight（只抛 LayoutRequest），此时量到的是旧几何。
@@ -1195,7 +1205,6 @@ class MyMAinWindow(QMainWindow):
         if layout is not None:
             layout.invalidate()
             layout.activate()
-        origin = QPoint(0, 0)
         ref = ui.pushButton_nfo_lib_save.mapTo(content, origin).y() + ui.pushButton_nfo_lib_save.height()
         left_bottom = (
             ui.pushButton_nfo_lib_batch_save.mapTo(content, origin).y()
@@ -1212,6 +1221,33 @@ class MyMAinWindow(QMainWindow):
         if layout is not None:
             layout.invalidate()
             layout.activate()
+
+    def _sync_nfo_lib_preview_pixmaps(self) -> None:
+        """海报/缩略图预览按 label 当前边界等比缩放（图片贴边、保持长宽比）。
+
+        载图处（on_nfo_lib_data_loaded / _refresh_nfo_lib_previews）只存原图
+        （_nfo_lib_poster_pix / _nfo_lib_thumb_pix），这里按 label.contentsRect()
+        的实时尺寸 KeepAspectRatio 重缩放：窗口变化后 label 变大变小，图片都
+        重新贴边；QLabel 自己不会跟几何重缩放，以前载图时按固定 200×280 /
+        200×120 缩一次就不管了，窗口一变图片就贴不上边。
+        原图为空（无图）时不动 label，占位文字由载图处负责。
+        只在目标尺寸变化时 setPixmap，避免每遍同步都重设引发闪烁/重排。
+        跑在 _sync_page_layouts 末尾（预览与按钮行无关，排最后即可），载图后
+        也调一次让新图立刻贴边。
+        """
+        for pix, label in (
+            (self._nfo_lib_poster_pix, self.Ui.label_nfo_lib_poster_preview),
+            (self._nfo_lib_thumb_pix, self.Ui.label_nfo_lib_thumb_preview),
+        ):
+            if pix is None or pix.isNull():
+                continue
+            size = label.contentsRect().size()
+            if size.width() <= 0 or size.height() <= 0:
+                continue
+            scaled = pix.scaled(size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            current = label.pixmap()
+            if current is None or current.isNull() or current.size() != scaled.size():
+                label.setPixmap(scaled)
 
     def _nfo_lib_form_rows(self) -> list[tuple[QWidget | None, QWidget | None]]:
         """列出信息管理表单 QFormLayout 每一行的 (标签控件, 字段控件)。
@@ -5619,6 +5655,10 @@ class MyMAinWindow(QMainWindow):
         # 必须排在 _sync_nfo_lib_batch_panel 之后——hint 下限变化会改分组高，
         # 进而改左按钮底边，排前面量到的是旧值。
         self._sync_nfo_lib_action_row()
+
+        # 预览图按 label 边界等比贴边：窗口变化后 label 尺寸变了，载图时按固定
+        # 尺寸缩好的 pixmap 不会自己跟变。排最后，与按钮行无关。
+        self._sync_nfo_lib_preview_pixmaps()
 
         # ============ page_setting / 命名页: 模板预览固定高度 + 说明文字贴合 ============
         self._sync_naming_template_section()

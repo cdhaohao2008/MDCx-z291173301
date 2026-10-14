@@ -603,6 +603,87 @@ def test_select_dir_auto_shows_first_nfo(win, app, tmp_path):
     assert not win.Ui.label_nfo_lib_thumb_preview.pixmap().isNull(), "缩略图预览未自动填充"
 
 
+# ============= 6. 预览图按 label 边界等比贴边 + 长文本光标归零 =============
+
+
+def _assert_pixmap_fits(label, src_w: int, src_h: int) -> tuple[int, int]:
+    """pixmap 不得超出 label 内容矩形、至少一边贴满、长宽比与源图一致。"""
+    pixmap = label.pixmap()
+    assert not pixmap.isNull(), f"{label.objectName()} 没有图片"
+    bounds = label.contentsRect()
+    assert pixmap.width() <= bounds.width() and pixmap.height() <= bounds.height(), (
+        f"{label.objectName()} 图片溢出边界: 图 {pixmap.width()}x{pixmap.height()} > 框 {bounds.width()}x{bounds.height()}"
+    )
+    assert pixmap.width() == bounds.width() or pixmap.height() == bounds.height(), (
+        f"{label.objectName()} 图片没有贴边: 图 {pixmap.width()}x{pixmap.height()} vs 框 {bounds.width()}x{bounds.height()}"
+    )
+    assert abs(pixmap.width() / pixmap.height() - src_w / src_h) < 0.02, (
+        f"{label.objectName()} 长宽比被破坏: 图 {pixmap.width()}x{pixmap.height()} vs 源 {src_w}x{src_h}"
+    )
+    return pixmap.width(), pixmap.height()
+
+
+def test_preview_pixmaps_fit_label_bounds_keep_aspect(win, app, tmp_path):
+    """海报（源 300x420）/缩略图（源 400x225）按 label 边界等比缩放贴边。"""
+    folder = tmp_path / "preview_fit"
+    _make_library_folder(folder, [("FIT-001", "贴边")])
+
+    _goto_nfo_lib(win, app)
+    win.resize(1030, 700)
+    win.Ui.lineEdit_nfo_lib_dir.setText(str(folder))
+    win.pushButton_nfo_lib_refresh_clicked()
+    assert _wait_until(app, lambda: not win.Ui.label_nfo_lib_poster_preview.pixmap().isNull()), "海报未载入"
+    assert _wait_until(app, lambda: not win.Ui.label_nfo_lib_thumb_preview.pixmap().isNull()), "缩略图未载入"
+
+    _assert_pixmap_fits(win.Ui.label_nfo_lib_poster_preview, 300, 420)
+    _assert_pixmap_fits(win.Ui.label_nfo_lib_thumb_preview, 400, 225)
+
+
+def test_preview_pixmaps_rescale_after_resize(win, app, tmp_path):
+    """窗口放大后预览图跟着重缩放（仍贴边不断裂），而不是停在旧尺寸。"""
+    folder = tmp_path / "preview_rescale"
+    _make_library_folder(folder, [("RS-001", "重缩放")])
+
+    _goto_nfo_lib(win, app)
+    win.resize(1030, 700)
+    win.Ui.lineEdit_nfo_lib_dir.setText(str(folder))
+    win.pushButton_nfo_lib_refresh_clicked()
+    assert _wait_until(app, lambda: not win.Ui.label_nfo_lib_poster_preview.pixmap().isNull()), "海报未载入"
+    before = (
+        win.Ui.label_nfo_lib_poster_preview.pixmap().size().width(),
+        win.Ui.label_nfo_lib_thumb_preview.pixmap().size().width(),
+    )
+
+    win.resize(1920, 1080)
+    app.processEvents()
+    win._sync_page_layouts()
+    app.processEvents()
+    after = _assert_pixmap_fits(win.Ui.label_nfo_lib_poster_preview, 300, 420)
+    _assert_pixmap_fits(win.Ui.label_nfo_lib_thumb_preview, 400, 225)
+    assert after[0] > before[0], f"放大窗口后海报没有跟着变大: {before[0]} -> {after[0]}"
+
+
+def test_long_url_title_cursor_at_start(win, app):
+    """标题/封面URL/海报URL 填长文本后光标归零，优先展示开头的 http(s)://。"""
+    from mdcx.models.model_types import CrawlersResult
+
+    data = CrawlersResult.empty()
+    data.title = "标" * 200
+    data.thumb = "https://example.com/" + "c" * 200 + ".jpg"
+    data.poster = "http://example.com/" + "p" * 200 + ".jpg"
+    win._nfo_lib_pending_data = data
+    win._nfo_lib_pending_info = None
+    win.on_nfo_lib_data_loaded("dummy")
+
+    ui = win.Ui
+    assert ui.lineEdit_nfo_lib_title.text() == data.title
+    assert ui.lineEdit_nfo_lib_cover_url.text() == data.thumb
+    assert ui.lineEdit_nfo_lib_poster_url.text() == data.poster
+    assert ui.lineEdit_nfo_lib_title.cursorPosition() == 0, "标题光标不在开头"
+    assert ui.lineEdit_nfo_lib_cover_url.cursorPosition() == 0, "封面URL光标不在开头"
+    assert ui.lineEdit_nfo_lib_poster_url.cursorPosition() == 0, "海报URL光标不在开头"
+
+
 def test_dir_box_manual_input_confirmed_by_enter(win, app, tmp_path):
     """显示框手动输入目录后回车（returnPressed），与选目录同链路扫描展示。"""
     folder = tmp_path / "manual_input"

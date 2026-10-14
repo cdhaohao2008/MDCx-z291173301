@@ -215,13 +215,34 @@ def test_previews_split_evenly_above_crop(win, app, nfo_lib_page, size):
     assert crop_bottom <= panel_bottom, f"窗口 {size} 下裁剪封面掉出右栏: {crop_bottom} > {panel_bottom}"
 
 
-def test_collapsed_action_row_gaps_zero(win, app, nfo_lib_page):
-    """折叠态下批量保存藏着，对齐无意义，两个间隙归零。"""
+def test_collapsed_action_row_left_gap_zero_but_crop_stays_aligned(win, app, nfo_lib_page):
+    """折叠态下批量保存藏着，左间隙归零；但右间隙照样按保存按钮底边重算——
+    右列海报/缩略图 stretch 会吸走富余高度把裁剪封面顶下去，不垫的话裁剪封面
+    与保存按钮错开（需求：勾不勾选都必须水平对齐）。"""
     ui = win.Ui
     ui.groupBox_nfo_lib_batch.setChecked(False)
     app.processEvents()
     assert ui.widget_nfo_lib_left_gap.height() == 0, "折叠后左间隙没有归零"
-    assert ui.widget_nfo_lib_preview_gap.height() == 0, "折叠后右间隙没有归零"
+    assert _content_y(win, ui.pushButton_nfo_lib_crop) == _content_y(win, ui.pushButton_nfo_lib_save), (
+        "折叠后裁剪封面与保存按钮错开: "
+        f"{_content_y(win, ui.pushButton_nfo_lib_crop)} != {_content_y(win, ui.pushButton_nfo_lib_save)}"
+    )
+
+
+@pytest.mark.parametrize("size", _ALL_SIZES)
+def test_collapsed_crop_aligned_at_all_sizes(win, app, nfo_lib_page, size):
+    """折叠态全尺寸下裁剪封面与保存按钮 y 严格相等。"""
+    ui = win.Ui
+    ui.groupBox_nfo_lib_batch.setChecked(False)
+    app.processEvents()
+    win.resize(*size)
+    app.processEvents()
+    win._sync_page_layouts()
+    app.processEvents()
+    assert _content_y(win, ui.pushButton_nfo_lib_crop) == _content_y(win, ui.pushButton_nfo_lib_save), (
+        f"窗口 {size} 折叠后错开: {_content_y(win, ui.pushButton_nfo_lib_crop)} != "
+        f"{_content_y(win, ui.pushButton_nfo_lib_save)}"
+    )
 
 
 @pytest.mark.parametrize("size", _ALL_SIZES)

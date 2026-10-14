@@ -281,6 +281,9 @@ def on_nfo_lib_data_loaded(self: MyMAinWindow, nfo_path_str: str) -> None:
 
     self.Ui.lineEdit_nfo_lib_number.setText(data.number or "")
     self.Ui.lineEdit_nfo_lib_title.setText(data.title or "")
+    # 长文本 setText 后光标停在末尾，会把开头的 http(s):// 滚出可视区；
+    # 光标归零让值从左向右展示，优先看到前缀。
+    self.Ui.lineEdit_nfo_lib_title.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_actor.setText(data.actor or "")
     self.Ui.lineEdit_nfo_lib_release.setText(data.release or "")
     self.Ui.lineEdit_nfo_lib_year.setText(data.year or "")
@@ -293,27 +296,26 @@ def on_nfo_lib_data_loaded(self: MyMAinWindow, nfo_path_str: str) -> None:
     self.Ui.plainTextEdit_nfo_lib_outline.setPlainText(data.outline or "")
     self.Ui.plainTextEdit_nfo_lib_tag.setPlainText(data.tag or "")
     self.Ui.lineEdit_nfo_lib_cover_url.setText(data.thumb or "")
+    self.Ui.lineEdit_nfo_lib_cover_url.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_poster_url.setText(data.poster or "")
+    self.Ui.lineEdit_nfo_lib_poster_url.setCursorPosition(0)
 
-    # 加载本地封面预览
+    # 加载本地封面预览（只存原图，贴边缩放统一交给 _sync_nfo_lib_preview_pixmaps）
     poster_path = info.poster_path if info else None
     thumb_path = info.thumb_path if info else None
     if poster_path and poster_path.is_file():
         pix = QPixmap(str(poster_path))
-        if not pix.isNull():
-            self.Ui.label_nfo_lib_poster_preview.setPixmap(
-                pix.scaled(200, 280, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            )
+        self._nfo_lib_poster_pix = pix if not pix.isNull() else None
     else:
+        self._nfo_lib_poster_pix = None
         self.Ui.label_nfo_lib_poster_preview.setText("无海报")
     if thumb_path and thumb_path.is_file():
         pix = QPixmap(str(thumb_path))
-        if not pix.isNull():
-            self.Ui.label_nfo_lib_thumb_preview.setPixmap(
-                pix.scaled(200, 120, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            )
+        self._nfo_lib_thumb_pix = pix if not pix.isNull() else None
     else:
+        self._nfo_lib_thumb_pix = None
         self.Ui.label_nfo_lib_thumb_preview.setText("无缩略图")
+    self._sync_nfo_lib_preview_pixmaps()
 
     # 保留原始数据副本作为保存前 diff 的基准
     self._nfo_lib_original_data = copy.deepcopy(data)
@@ -344,20 +346,17 @@ def _refresh_nfo_lib_previews(self: MyMAinWindow) -> None:
     thumb_path = _resolve_nfo_image(nfo_path, "thumb")
     if poster_path is not None:
         pix = QPixmap(str(poster_path))
-        if not pix.isNull():
-            self.Ui.label_nfo_lib_poster_preview.setPixmap(
-                pix.scaled(200, 280, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            )
+        self._nfo_lib_poster_pix = pix if not pix.isNull() else None
     else:
+        self._nfo_lib_poster_pix = None
         self.Ui.label_nfo_lib_poster_preview.setText("无海报")
     if thumb_path is not None:
         pix = QPixmap(str(thumb_path))
-        if not pix.isNull():
-            self.Ui.label_nfo_lib_thumb_preview.setPixmap(
-                pix.scaled(200, 120, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            )
+        self._nfo_lib_thumb_pix = pix if not pix.isNull() else None
     else:
+        self._nfo_lib_thumb_pix = None
         self.Ui.label_nfo_lib_thumb_preview.setText("无缩略图")
+    self._sync_nfo_lib_preview_pixmaps()
 
 
 def _collect_form_data(self: MyMAinWindow) -> CrawlersResult:

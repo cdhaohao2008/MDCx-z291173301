@@ -14709,7 +14709,7 @@ class Ui_MDCx(object):
         self.pushButton_nfo_lib_batch_del_tag.setText(_translate("MDCx", "删除旧标签"))
         self.lineEdit_nfo_lib_batch_del_tag.setPlaceholderText(_translate("MDCx", "标签内容（逗号分隔）"))
         self.pushButton_nfo_lib_batch_series.setText(_translate("MDCx", "统一系列名"))
-        self.lineEdit_nfo_lib_batch_series.setPlaceholderText(_translate("MDCx", "系列名"))
+        self.lineEdit_nfo_lib_batch_series.setPlaceholderText(_translate("MDCx", "新系列名"))
         self.label_nfo_lib_batch_hint.setText(
             _translate(
                 "MDCx",
