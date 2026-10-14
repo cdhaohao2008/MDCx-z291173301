@@ -906,8 +906,8 @@ _OFFICIAL_ABOUT_PREFIX = "<p><b>Official综合：有码+无码，按番号前缀
 _OFFICIAL_ABOUT_SITES = (
     "Attackers、AV Opera、BeeFree、Bi-AV、Bibian、Dasdas、E-Body、Fitch、HHH-AV、"
     "Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、"
-    "MKO Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai-AV、Premium Beauty、"
-    "Prestige、Rookie、S1S1S1、Tameikegoro、To-Satsu、V-AV、Wanz Factory"
+    "MKO Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、"
+    "Prestige、Rookie、S1S1S1、Tamei kegoro、To-Satsu、V-AV、Wanz Factory"
 )
 _OFFICIAL_ABOUT_PARA = _OFFICIAL_ABOUT_PREFIX + _OFFICIAL_ABOUT_SITES + "<br/>"
 # 修复前形态：片商名后跟「（域名）」、且 Official 后带括号注释——任一复现即为文案回退。
