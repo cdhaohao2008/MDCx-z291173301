@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QSystemTrayIcon,
     QToolTip,
     QTreeWidgetItem,
+    QWidget,
 )
 
 from mdcx.config.extend import get_movie_path_setting
@@ -35,18 +36,49 @@ if TYPE_CHECKING:
     from .main_window import MyMAinWindow
 
 
-def _site_status_icon(level: str) -> QIcon:
-    """站点检测状态圆点图标：ok 绿 / warn 黄 / fail 红；未知或 skip 返回空图标。"""
+_SITE_STATUS_DOT_PX = 8  # 状态圆点边长（逻辑像素）
+
+
+def _effective_dpr(widget: "QWidget | None" = None) -> float:
+    """图标绘制用的有效缩放比。
+
+    优先取图标所在控件的 `devicePixelRatioF()`：多屏时各屏 dpr 不同，按控件取才准；
+    没有控件时退到主屏。Qt6 下 `QScreen.devicePixelRatio()` 已含 main.py 写入的
+    QT_SCALE_FACTOR（实测 1/1.25/2 三档与控件一致），取不到时按 1.0 退化为不缩放。
+    """
+    dpr = 0.0
+    if widget is not None:
+        try:
+            dpr = widget.devicePixelRatioF()
+        except Exception:
+            dpr = 0.0
+    if dpr <= 0:
+        screen = QApplication.primaryScreen()
+        dpr = screen.devicePixelRatio() if screen is not None else 0.0
+    return dpr if dpr > 0 else 1.0
+
+
+def _site_status_icon(level: str, widget: "QWidget | None" = None) -> QIcon:
+    """站点检测状态圆点图标：ok 绿 / warn 黄 / fail 红；未知或 skip 返回空图标。
+
+    画布按 dpr 放大到设备像素并挂上 `setDevicePixelRatio`，绘制仍在逻辑坐标系里做，
+    于是圆点物理观感恒为 `_SITE_STATUS_DOT_PX` 逻辑像素（高 DPI 下不再被二次拉伸发虚）。
+    `QIcon` 只缩不放（实测 `paint()` 进任意大小的 rect 都按图标原始尺寸绘制），
+    所以画布尺寸就是下拉里圆点的实际大小。
+    """
     color = {"ok": "#43a047", "warn": "#f9a825", "fail": "#e53935"}.get(level)
     if not color:
         return QIcon()
-    pixmap = QPixmap(QSize(8, 8))
+    dpr = _effective_dpr(widget)
+    pixmap = QPixmap(QSize(max(1, round(_SITE_STATUS_DOT_PX * dpr)), max(1, round(_SITE_STATUS_DOT_PX * dpr))))
+    if dpr != 1.0:
+        pixmap.setDevicePixelRatio(dpr)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setBrush(QColor(color))
     painter.setPen(Qt.PenStyle.NoPen)
-    painter.drawEllipse(1, 1, 6, 6)
+    painter.drawEllipse(1, 1, _SITE_STATUS_DOT_PX - 2, _SITE_STATUS_DOT_PX - 2)
     painter.end()
     return QIcon(pixmap)
 
@@ -102,7 +134,7 @@ def _populate_site_combo(combo: QComboBox, site_values: list[str], *, check_only
     for value in site_values:
         tag = ManualConfig.SITE_REGION_TAGS.get(value, "")
         cache_entry = _load_check_cache().get(value)
-        icon = _site_status_icon(cache_entry.get("status", "")) if cache_entry else QIcon()
+        icon = _site_status_icon(cache_entry.get("status", ""), combo) if cache_entry else QIcon()
         # UserRole 存纯站点值：显示文本=站点名+区域标签+定位说明（说明直接展示，不再只藏 tooltip），
         # 消费方统一经 currentData()/itemData(UserRole) 取纯值
         description = ""
@@ -138,7 +170,7 @@ def refresh_network_check_badges(self: "MyMAinWindow") -> None:
             if not value:
                 continue
             entry = _load_check_cache().get(value)
-            combo.setItemIcon(i, _site_status_icon(entry["status"]) if entry else QIcon())
+            combo.setItemIcon(i, _site_status_icon(entry["status"], combo) if entry else QIcon())
             base = combo.itemData(i, Qt.ItemDataRole.UserRole + 1) or ""
             # 显式网址行（official 子站）：保留手工地址，只刷新图标与 tooltip
             url = combo.itemData(i, _SITE_URL_EXPLICIT_ROLE) or _resolve_site_url(value)  # 自定义网址保存后此处同步最新值
@@ -207,7 +239,7 @@ def _append_official_subsite_rows(combo: QComboBox) -> None:
     except Exception:
         return
     cache_entry = _load_check_cache().get("Official")
-    icon = _site_status_icon(cache_entry.get("status", "")) if cache_entry else QIcon()
+    icon = _site_status_icon(cache_entry.get("status", ""), combo) if cache_entry else QIcon()
     anchor = -1
     for i in range(combo.count()):
         if (combo.itemData(i, Qt.ItemDataRole.UserRole) or "") == "Official":
