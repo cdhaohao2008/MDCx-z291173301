@@ -107,7 +107,7 @@ def eff_success_file_move() -> bool:
 
 
 def eff_failed_file_move() -> bool:
-    """视频文件「刮削失败后移动」生效值：分离模式取右侧，否则取左侧。"""
+    """视频文件「失败移动文件」生效值：分离模式取右侧，否则取左侧。"""
     return manager.config.separate_failed_file_move if is_separate_mode() else manager.config.failed_file_move
 
 

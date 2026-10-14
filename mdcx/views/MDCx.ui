@@ -8055,7 +8055,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <string notr="true">color: rgb(8, 128, 128);</string>
                             </property>
                             <property name="text">
-                              <string>&lt;span&gt;适合NAS硬盘用户，本地党可以随心所欲整理&lt;br&gt;注意：选择此项，下面的「成功后移动文件」以及「失败后移动文件」才会生效&lt;/span&gt;</string>
+                              <string>&lt;span&gt;适合NAS硬盘用户，本地党可以随心所欲整理&lt;br&gt;注意：选择此项，下面的「成功后移动文件」以及「失败移动文件」才会生效&lt;/span&gt;</string>
                             </property>
                           </widget>
                         </item>
@@ -22578,7 +22578,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
                             </property>
                             <property name="text">
-                              <string>&lt;p style='line-height:20px'&gt;支持http、https、socks5代理，示例：http://127.0.0.1:7897&lt;br&gt;用户名和密码格式为: schema://username:password@host:port&lt;br&gt;"使用代理"仅控制常规网络请求代理开关，不控制CF Bypass代理&lt;br&gt;"CF Bypass代理"选项仅作用于Bypass的服务请求(mirror/html)&lt;br&gt;勾选"全部走代理"后"使用代理"列表不再生效，分流交给代理软件&lt;br&gt;Cloudflare Bypass地址留空时，配置了"CloudFlare 绕过服务"自动启动适配层，两者均留空时关闭CF Bypass功能&lt;/p&gt;</string>
+                              <string>&lt;p style='line-height:20px'&gt;支持http、https、socks5代理，示例：http://127.0.0.1:7897&lt;br&gt;用户名和密码格式为: schema://username:password@host:port&lt;br&gt;"使用代理"仅控制常规网络请求代理开关，不控制CF Bypass代理&lt;br&gt;"CF Bypass代理"选项仅作用于Bypass的服务请求(mirror/html)&lt;br&gt;勾选"全部走代理"后"使用代理"列表不再生效，分流交给代理软件&lt;br&gt;Cloudflare Bypass地址留空时，配置了"外部CloudFlare服务"自动启动适配层，两者均留空时关闭CF Bypass功能&lt;/p&gt;</string>
                             </property>
                           </widget>
                         </item>
@@ -22990,7 +22990,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
 </string>
                             </property>
                             <property name="placeholderText">
-                              <string>留空则由CloudFlare 绕过服务自动启动（高级：手动指定 cf_bypasser 协议服务地址）</string>
+                              <string>留空则由外部CloudFlare服务自动启动（高级：手动指定 cf_bypasser 协议服务地址）</string>
                             </property>
                           </widget>
                         </item>
@@ -25434,7 +25434,7 @@ p,li{white-space:pre-wrap;}
 &lt;h4&gt;五、Cloudflare Bypass&lt;/h4&gt;
 &lt;p&gt;MDCx提供多种Cloudflare绕过能力，遇到受Cloudflare保护的站点时自动尝试绕过：&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;b&gt;CloudFlare 绕过服务&lt;/b&gt;：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;外部CloudFlare服务&lt;/b&gt;：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;Selenium CF Bypass&lt;/b&gt;：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10、11+Edge浏览器，首次使用将自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;CF Bypass落地白名单&lt;/b&gt;：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配，用于校验Bypass服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;CloudFlare 直连通道&lt;/b&gt;：部分站点提供免CF的数据接口Javdb_api、Javdb_app、Missav_api、R18dev、Thejavdb_api，默认已加入网站源，可直接选用获得更稳定的抓取。&lt;/li&gt;
@@ -25461,9 +25461,9 @@ p,li{white-space:pre-wrap;}
 &lt;/ul&gt;
 &lt;h4&gt;九、其他设置&lt;/h4&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;b&gt;排除目录字符&lt;/b&gt;：多层目录刮削时跳过指定目录，命名单据时剔除指定字符，提取番号前先删除指定字符串以提高识别率，多项逗号分隔&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;排除目录字符&lt;/b&gt;：多层目录刮削时跳过指定目录；命名单据时剔除指定字符；提取番号前先删除指定字符串以提高识别率，多项用逗号分隔。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;失败移动文件&lt;/b&gt;：刮削不到信息时，可选择不移动，或自动移入失败输出目录。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;保存日志文件&lt;/b&gt;：开启后日志写入程序目录下的Log文件夹，每次运行一个txt，可随时删除，不影响运行。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;保存日志&lt;/b&gt;：开启后日志写入程序目录下的Log文件夹，每次运行一个txt，可随时删除，不影响运行。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;下载高清图片&lt;/b&gt;：官方图源兜底，勾选后当所有图源站点均无法获取封面时，程序按番号直构官方CDN高清图兜底，DMM高清封面自动学习各厂牌前缀规则，学习数据保存在userdata/dmm_prefix_learned.json+MGStage素人高清海报LUXU/OTIM等8个系列，所有图片下载统一设置50MB大小上限，防止异常大文件占用磁盘。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;十、软件工具页面&lt;/h4&gt;

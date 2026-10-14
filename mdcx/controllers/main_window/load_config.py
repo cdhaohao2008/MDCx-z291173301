@@ -553,7 +553,7 @@ def load_config(self: "MyMAinWindow"):
             (self.Ui.radioButton_succ_move_off, False),
             default=self.Ui.radioButton_succ_move_off,
         )
-        # 失败后移动文件
+        # 失败移动文件
         set_radio_buttons(
             manager.config.failed_file_move,
             (self.Ui.radioButton_fail_move_on, True),
@@ -581,7 +581,7 @@ def load_config(self: "MyMAinWindow"):
             (self.Ui.radioButton_separate_mode_succ_move_off, False),
             default=self.Ui.radioButton_separate_mode_succ_move_off,
         )
-        # 分离模式：失败后移动文件（右侧开关）
+        # 分离模式：失败移动文件（右侧开关）
         set_radio_buttons(
             manager.config.separate_failed_file_move,
             (self.Ui.radioButton_separate_mode_fail_move_on, True),

@@ -13453,7 +13453,7 @@ class Ui_MDCx(object):
         self.label_link_off.setText(
             _translate(
                 "MDCx",
-                "<span>适合NAS硬盘用户，本地党可以随心所欲整理<br>注意：选择此项，下面的「成功后移动文件」以及「失败后移动文件」才会生效</span>",
+                "<span>适合NAS硬盘用户，本地党可以随心所欲整理<br>注意：选择此项，下面的「成功后移动文件」以及「失败移动文件」才会生效</span>",
             )
         )
         self.radioButton_hard_on.setText(_translate("MDCx", "创建硬链接"))
@@ -14400,7 +14400,7 @@ class Ui_MDCx(object):
         self.label_103.setText(
             _translate(
                 "MDCx",
-                '<p style=\'line-height:20px\'>支持http、https、socks5代理，示例：http://127.0.0.1:7897<br>用户名和密码格式为: schema://username:password@host:port<br>"使用代理"仅控制常规网络请求代理开关，不控制CF Bypass代理<br>"CF Bypass代理"选项仅作用于Bypass的服务请求(mirror/html)<br>勾选"全部走代理"后"使用代理"列表不再生效，分流交给代理软件<br>Cloudflare Bypass地址留空时，配置了"CloudFlare 绕过服务"自动启动适配层，两者均留空时关闭CF Bypass功能</p>',
+                '<p style=\'line-height:20px\'>支持http、https、socks5代理，示例：http://127.0.0.1:7897<br>用户名和密码格式为: schema://username:password@host:port<br>"使用代理"仅控制常规网络请求代理开关，不控制CF Bypass代理<br>"CF Bypass代理"选项仅作用于Bypass的服务请求(mirror/html)<br>勾选"全部走代理"后"使用代理"列表不再生效，分流交给代理软件<br>Cloudflare Bypass地址留空时，配置了"外部CloudFlare服务"自动启动适配层，两者均留空时关闭CF Bypass功能</p>',
             )
         )
         self.checkBox_use_proxy.setToolTip(_translate("MDCx", "仅控制常规网络请求代理开关，不控制CF Bypass代理"))
@@ -14420,7 +14420,7 @@ class Ui_MDCx(object):
         self.lineEdit_direct_sites.setPlaceholderText(_translate("MDCx", "逗号分隔，如 google.com,github.com"))
         self.label_cf_bypass.setText(_translate("MDCx", "CF Bypass："))
         self.lineEdit_cf_bypass_url.setPlaceholderText(
-            _translate("MDCx", "留空则由CloudFlare 绕过服务自动启动（高级：手动指定 cf_bypasser 协议服务地址）")
+            _translate("MDCx", "留空则由外部CloudFlare服务自动启动（高级：手动指定 cf_bypasser 协议服务地址）")
         )
         self.label_cf_bypass_proxy.setText(_translate("MDCx", "Bypass代理："))
         self.lineEdit_cf_bypass_proxy.setPlaceholderText(_translate("MDCx", "例如: http://127.0.0.1:7890（可选）"))
@@ -14619,7 +14619,7 @@ class Ui_MDCx(object):
                 "<h4>五、Cloudflare Bypass</h4>\n"
                 "<p>MDCx提供多种Cloudflare绕过能力，遇到受Cloudflare保护的站点时自动尝试绕过：</p>\n"
                 "<ul>\n"
-                '<li><b>CloudFlare 绕过服务</b>：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址。</li>\n'
+                '<li><b>外部CloudFlare服务</b>：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址。</li>\n'
                 "<li><b>Selenium CF Bypass</b>：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10、11+Edge浏览器，首次使用将自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却。</li>\n"
                 "<li><b>CF Bypass落地白名单</b>：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配，用于校验Bypass服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验。</li>\n"
                 "<li><b>CloudFlare 直连通道</b>：部分站点提供免CF的数据接口Javdb_api、Javdb_app、Missav_api、R18dev、Thejavdb_api，默认已加入网站源，可直接选用获得更稳定的抓取。</li>\n"
@@ -14646,9 +14646,9 @@ class Ui_MDCx(object):
                 "</ul>\n"
                 "<h4>九、其他设置</h4>\n"
                 "<ul>\n"
-                "<li><b>排除目录字符</b>：多层目录刮削时跳过指定目录，命名单据时剔除指定字符，提取番号前先删除指定字符串以提高识别率，多项逗号分隔</li>\n"
+                "<li><b>排除目录字符</b>：多层目录刮削时跳过指定目录；命名单据时剔除指定字符；提取番号前先删除指定字符串以提高识别率，多项用逗号分隔。</li>\n"
                 "<li><b>失败移动文件</b>：刮削不到信息时，可选择不移动，或自动移入失败输出目录。</li>\n"
-                "<li><b>保存日志文件</b>：开启后日志写入程序目录下的Log文件夹，每次运行一个txt，可随时删除，不影响运行。</li>\n"
+                "<li><b>保存日志</b>：开启后日志写入程序目录下的Log文件夹，每次运行一个txt，可随时删除，不影响运行。</li>\n"
                 "<li><b>下载高清图片</b>：官方图源兜底，勾选后当所有图源站点均无法获取封面时，程序按番号直构官方CDN高清图兜底，DMM高清封面自动学习各厂牌前缀规则，学习数据保存在userdata/dmm_prefix_learned.json+MGStage素人高清海报LUXU/OTIM等8个系列，所有图片下载统一设置50MB大小上限，防止异常大文件占用磁盘。</li>\n"
                 "</ul>\n"
                 "<h4>十、软件工具页面</h4>\n"
