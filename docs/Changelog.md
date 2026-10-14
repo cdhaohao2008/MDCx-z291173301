@@ -1,5 +1,10 @@
 
 # Changelog
+## v2.4.5 (2026-10-20)
+### 调整
+- **版本号**：`2.4.2` → `2.4.5`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`）。
+- **检测网络除「网络连通」两项外按 A-Z 顺序依次检测、依次打印（`mdcx/core/network_check.py` 的 `run_network_check`）**：「网络连通」（GitHub Raw/通用 HTTPS）保持原有并发先行不变；其余组（站点检测/账号 API/辅助服务）按检测项名称 `name.lower()` 排序后串行逐站检测，每完成一项立即打印一行，检测顺序与打印顺序为同一 A-Z 顺序；返回结果同样按组内名称 A-Z 排序（此前按状态失败优先排序）。取消、单项异常转失败、CANCELLED 软着陆、代理不可用提示简化等语义与原并发路径一致。
+
 ## v2.4.2 (2026-10-20)
 ### 调整
 - **版本号**：`2.4.1` → `2.4.2`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`）。
