@@ -1002,7 +1002,7 @@ def pushButton_nfo_lib_batch_save_clicked(self: MyMAinWindow) -> None:
 def _run_batch(self: MyMAinWindow, paths: list[Path], modify_fn) -> None:
     """启动后台批量任务。"""
     total = len(paths)
-    self.Ui.label_nfo_lib_batch_status.setText(f"开始批量处理 {total} 个文件...")
+    self._set_nfo_lib_batch_status(f"开始批量处理 {total} 个文件...")
     signal_qt.show_log_text(f"NFO 库管理: 批量处理 {total} 个文件")
 
     async def _run():
@@ -1020,14 +1020,14 @@ def _run_batch(self: MyMAinWindow, paths: list[Path], modify_fn) -> None:
 
 def on_nfo_lib_batch_progress(self: MyMAinWindow, text: str) -> None:
     """批量进度信号槽（主线程）：更新状态标签。"""
-    self.Ui.label_nfo_lib_batch_status.setText(text)
+    self._set_nfo_lib_batch_status(text)
 
 
 def on_nfo_lib_batch_done(self: MyMAinWindow, _arg: str) -> None:
     """批量任务完成后在主线程更新状态（线程安全）。"""
     result = getattr(self, "_nfo_lib_batch_result", (0, 0, 0))
     success, failed, total = result
-    self.Ui.label_nfo_lib_batch_status.setText(f"完成: 成功 {success} / 失败 {failed} / 共 {total}")
+    self._set_nfo_lib_batch_status(f"完成: 成功 {success} / 失败 {failed} / 共 {total}")
     signal_qt.show_log_text(f"NFO 库管理: 批量完成 — 成功 {success}，失败 {failed}，共 {total}")
 
 

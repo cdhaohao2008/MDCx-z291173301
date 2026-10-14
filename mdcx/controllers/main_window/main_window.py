@@ -1034,6 +1034,62 @@ class MyMAinWindow(QMainWindow):
         if crop.minimumHeight() != height:
             crop.setMinimumHeight(height)
 
+    def _sync_nfo_lib_batch_status(self) -> None:
+        """状态 label 空文本时不占位（批量处理没在跑时白占一整行 + 6px 间隔）。
+
+        写法文本有三处（`_run_batch` 开始 / `on_nfo_lib_batch_progress` 进度 /
+        `on_nfo_lib_batch_done` 完成），一律走 `_set_nfo_lib_batch_status`，布局
+        同步时本方法再兜一遍，两边谁先写都不会失配。"""
+        status = self.Ui.label_nfo_lib_batch_status
+        want = bool(status.text().strip())
+        if status.isHidden() == want:  # 显隐与内容不符才动，避免每遍无谓触发布局
+            status.setVisible(want)
+
+    def _set_nfo_lib_batch_status(self, text: str) -> None:
+        """写批量操作状态文本并立刻同步显隐。
+
+        `QLabel` 没有 `textChanged` 信号，无法像 `QLineEdit` 那样挂连接，只能由
+        写入方自己调一次；统一走这里，免得漏掉某条写入路径。"""
+        self.Ui.label_nfo_lib_batch_status.setText(text)
+        self._sync_nfo_lib_batch_status()
+
+    def _sync_nfo_lib_batch_panel(self) -> None:
+        """让「批量操作」分组贴着内容收紧，省下的高度让给上方的 NFO 列表。
+
+        现象（用户截图）：「批量保存」下方的用法提示是 wordWrap 的说明 label，
+        .ui 给它钉了 64px 硬下限，但文字在左栏实际宽度下只要 3 行，文字底下空出
+        一片；再叠上恒定占位的空状态 label（空文本也占 14px + 6px 间隔），分组底边
+        比实际内容高出约 40px，NFO 列表被白白压矮。
+
+        做法：
+        1. 提示 label 的下限改成「真实字体在当前宽度下折行后的实测高」
+           （heightForWidth）。下限正是撑开 wordWrap 的唯一机制，不能直接删成 0
+           ——v2.2.x 加 64px 就是为了防 Windows 字体/DPI 缩放下末行被裁；改为按
+           实测高度给，既不留空白也不会裁字。
+        2. 空状态 label 隐藏（见 _sync_nfo_lib_batch_status）。
+
+        实测高度必须运行时按当前字体算，不能写死常数：offline/离屏环境没有中文字体，
+        heightForWidth 会明显低估；同一份代码在 Windows 正常字体下折行数就不同。
+
+        1 里那三行「置 0 → 量 → 写回」不能省：`QLabel::heightForWidth` 会被
+        `minimumHeight` 钳住（下限 64 时它就返回 64），不先归零量到的永远是旧下限。
+
+        分组是 nfo_lib_list_layout 末位、列表是 Expanding，故省下的高度会自动回到
+        listWidget_nfo_lib，本方法不必再手动搬运。"""
+        ui = self.Ui
+        hint = ui.label_nfo_lib_batch_hint
+        self._sync_nfo_lib_batch_status()
+        for _ in range(3):  # 「量宽→改下限」最多三轮：宽度变了下一轮量到新值
+            width = hint.width()
+            if width <= 0:
+                return
+            previous = hint.minimumHeight()
+            hint.setMinimumHeight(0)  # 绕开旧下限，纯量文字真正需要多高
+            needed = hint.heightForWidth(width)
+            hint.setMinimumHeight(needed if needed > 0 else previous)
+            if hint.minimumHeight() == previous:
+                return
+
     def _nfo_lib_form_rows(self) -> list[tuple[QWidget | None, QWidget | None]]:
         """列出信息管理表单 QFormLayout 每一行的 (标签控件, 字段控件)。
 
@@ -5430,6 +5486,11 @@ class MyMAinWindow(QMainWindow):
 
         # 目录显示框与筛选框在布局里均分宽度（.ui horstretch 均为 1），无需运行时同步。
         self._sync_nfo_lib_action_buttons()
+
+        # 「批量操作」分组贴着内容收紧（提示 label 按实测折行高、空状态 label 不占位），
+        # 省下的高度自动回到上方 Expanding 的 NFO 列表。必须排在按钮同步之后：
+        # 那里会对 gridLayout_nfo_lib_batch 做 invalidate/activate，分组宽高到此才是终态。
+        self._sync_nfo_lib_batch_panel()
 
         # ============ page_setting / 命名页: 模板预览固定高度 + 说明文字贴合 ============
         self._sync_naming_template_section()
