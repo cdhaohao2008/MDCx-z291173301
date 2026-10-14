@@ -14424,7 +14424,7 @@ class Ui_MDCx(object):
         )
         self.label_cf_bypass_proxy.setText(_translate("MDCx", "Bypass代理："))
         self.lineEdit_cf_bypass_proxy.setPlaceholderText(_translate("MDCx", "例如: http://127.0.0.1:7890（可选）"))
-        self.label_cf_bypass_trawl.setText(_translate("MDCx", "外部CloudFlare服务："))
+        self.label_cf_bypass_trawl.setText(_translate("MDCx", "CloudFlare 绕过服务："))
         self.lineEdit_cf_bypass_trawl_url.setPlaceholderText(_translate("MDCx", "例如: http://127.0.0.1:8191"))
         self.comboBox_cf_bypass_backend.setToolTip(
             _translate("MDCx", "TRAWL：走 /scrape 原生 API；FlareSolverr：走 /v1 兼容 API")
@@ -14606,10 +14606,10 @@ class Ui_MDCx(object):
                 "<p>网站下拉框由已注册的爬虫自动生成，当前52个，可按需选用全部网站或指定网站，主要来源包括：</p>\n"
                 "<ul>\n"
                 "<li><b>有码</b>：仅能有码：AVBase、AVMOO、DMM、DMM_API、FreeJavBT、Getchu、JavLibrary、LibreDMM、Lulubar、MGStage、Prestige、R18.dev、TheJavDB_API、Xcity</li>\n"
-                "<li><b>综合</b>：有码+无码：7mmtv、airav.cc、AVSex、IQQTV、JavBus、JavDB系列、JavDay、JavFree、MissAV系列、Official</li>\n"
-                "<li><b>无码</b>：AVEntertainments、AVSOX及综合站7mmtv、AVSex、IQQTV、JavBus、JavDB系列、JavDay、MissAV系列、Official</li>\n"
-                "<li><b>素人</b>：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB系、MGStage、MissAV系、MyWife、Prestige</li>\n"
-                "<li><b>FC2</b>：7mmtv、FC2、FC2PPVDB、JavDB系、JavFree</li>\n"
+                "<li><b>综合</b>：有码+无码：7mmtv、airav.cc、AVSex、IQQTV、JavBus、JavDB、JavDay、JavFree、MissAV、Official</li>\n"
+                "<li><b>无码</b>：AVEntertainments、AVSOX及综合站7mmtv、AVSex、IQQTV、JavBus、JavDB、JavDay、MissAV、Official</li>\n"
+                "<li><b>素人</b>：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MyWife、Prestige</li>\n"
+                "<li><b>FC2</b>：7mmtv、FC2、FC2PPVDB、JavDB、JavFree</li>\n"
                 "<li><b>国产</b>：AVSex、IQQTV、JavDay、Madou_Club、Madouqu</li>\n"
                 "<li><b>欧美</b>：AVheat、ThepornDB</li>\n"
                 "</ul>\n"

@@ -23062,7 +23062,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>Qt::RightToLeft</enum>
                             </property>
                             <property name="text">
-                              <string>外部CloudFlare服务：</string>
+                              <string>CloudFlare 绕过服务：</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -25421,10 +25421,10 @@ p,li{white-space:pre-wrap;}
 &lt;p&gt;网站下拉框由已注册的爬虫自动生成，当前52个，可按需选用全部网站或指定网站，主要来源包括：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;b&gt;有码&lt;/b&gt;：仅能有码：AVBase、AVMOO、DMM、DMM_API、FreeJavBT、Getchu、JavLibrary、LibreDMM、Lulubar、MGStage、Prestige、R18.dev、TheJavDB_API、Xcity&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;综合&lt;/b&gt;：有码+无码：7mmtv、airav.cc、AVSex、IQQTV、JavBus、JavDB系列、JavDay、JavFree、MissAV系列、Official&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;无码&lt;/b&gt;：AVEntertainments、AVSOX及综合站7mmtv、AVSex、IQQTV、JavBus、JavDB系列、JavDay、MissAV系列、Official&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;素人&lt;/b&gt;：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB系、MGStage、MissAV系、MyWife、Prestige&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;FC2&lt;/b&gt;：7mmtv、FC2、FC2PPVDB、JavDB系、JavFree&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;综合&lt;/b&gt;：有码+无码：7mmtv、airav.cc、AVSex、IQQTV、JavBus、JavDB、JavDay、JavFree、MissAV、Official&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;无码&lt;/b&gt;：AVEntertainments、AVSOX及综合站7mmtv、AVSex、IQQTV、JavBus、JavDB、JavDay、MissAV、Official&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;素人&lt;/b&gt;：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MyWife、Prestige&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;FC2&lt;/b&gt;：7mmtv、FC2、FC2PPVDB、JavDB、JavFree&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;国产&lt;/b&gt;：AVSex、IQQTV、JavDay、Madou_Club、Madouqu&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;欧美&lt;/b&gt;：AVheat、ThepornDB&lt;/li&gt;
 &lt;/ul&gt;
