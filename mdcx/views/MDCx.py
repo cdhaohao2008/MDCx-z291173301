@@ -14575,7 +14575,7 @@ class Ui_MDCx(object):
                 '<!DOCTYPEHTMLPUBLIC"-//W3C//DTDHTML4.0//EN""http://www.w3.org/TR/REC-html40/strict.dtd">\n'
                 '<html><head><metaname="qrichtext"content="1"/><styletype="text/css">\n'
                 "p,li{white-space:pre-wrap;}\n"
-                "</style></head><bodystyle=\"font-family:'MicrosoftYaHeiUI',PingFang SC,sans-serif; font-size:11pt;\">\n"
+                "</style></head><bodystyle=\"font-family:'MicrosoftYaHeiUI',PingFang SC,sans-serif; font-size:13px;\">\n"
                 "<h3>MDCx使用说明</h3>\n"
                 "<p>MDCx是一款本地视频元数据刮削工具：从各大网站抓取影片的标题、演员、封面、简介等信息，生成标准.nfo文件与规范命名的文件夹，供Emby、Jellyfin、Kodi、Plex等媒体服务器直接使用。支持Windows/macOS/Linux。</p>\n"
                 "<h4>一、快速开始</h4>\n"
@@ -14612,7 +14612,7 @@ class Ui_MDCx(object):
                 "<li><b>国产</b>：MADOUQU、Madou_Club、AVSex、IQQTV、JavDay</li>\n"
                 "<li><b>欧美</b>：THEPORNDB、AVHEAT</li>\n"
                 "</ul>\n"
-                "<p><b>Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：Attackers、AV Opera、BeeFree、Bi、Bibian、Dasdas、E-Body、Fitch、HHH、Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、MKO-Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、Prestige、Rookie、S1S1S1、Tameikegoro、To-Satsu、V-AV、Wanz Factory<br/>\n"
+                "<p><b>Official综合：有码+无码，按番号前缀自动路由到各番号官网，全部走代理：有码片商官网30家：Attackers、AV Opera、BeeFree、Bi、Bibian、Dasdas、E-Body、Fitch、HHH、Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、MKO-Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、Prestige、Rookie、S1S1S1、Tameikegoro、To-Satsu、V-AV、Wanz Factory<br/>\n"
                 "无码官网5站，JSON API直连：Caribbeancom、Heyzo、1Pondo、Pacopacomama、10Musume<br/>\n"
                 "番号前缀DLDSS/FNS/JIMMY还分别路由到Dahlia/Faleno官网，官网前缀表维护在代码manual.py的Official字典中，增减不影响使用说明。</p>\n"
                 "<h4>五、Cloudflare绕过（CFBypass）</h4>\n"

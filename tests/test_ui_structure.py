@@ -902,7 +902,7 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
 # 30 家官网一律写成「片商名-域名风格」的短标签（如 S1S1S1、Madonna-av、Nanpa-Japan）。
 # 真正的域名与番号前缀表在 mdcx/manual.py 的 ManualConfig.OFFICIAL，本段只是可读说明，
 # 因此这里锁的是文案本身 + .ui/.py 两份必须一字不差。
-_OFFICIAL_ABOUT_PREFIX = "<p><b>Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家："
+_OFFICIAL_ABOUT_PREFIX = "<p><b>Official综合：有码+无码，按番号前缀自动路由到各番号官网，全部走代理：有码片商官网30家："
 _OFFICIAL_ABOUT_SITES = (
     "Attackers、AV Opera、BeeFree、Bi、Bibian、Dasdas、E-Body、Fitch、HHH、"
     "Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、"
@@ -955,6 +955,6 @@ def test_about_official_site_list_red_stale_shape_gone():
         stale = [s for s in _OFFICIAL_ABOUT_STALE if s in text]
         assert not stale, f"{source} 残留修复前的「（域名）」写法: {stale}"
     # 拆行形态：上一行字面量只写到「全部走代理）：」，下一行才补「有码片商官网30家：…」
-    assert '按番号前缀自动路由到各官网，全部走代理）："\n' not in py_text, (
+    assert '按番号前缀自动路由到各番号官网，全部走代理）："\n' not in py_text, (
         "MDCx.py 不应再把 Official 段拆成两个字符串字面量"
     )
