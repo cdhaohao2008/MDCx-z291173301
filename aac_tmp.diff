@@ -1,0 +1,30 @@
+﻿diff --git a/mdcx/views/MDCx.py b/mdcx/views/MDCx.py
+index 8ac7bf2..60f397a 100644
+--- a/mdcx/views/MDCx.py
++++ b/mdcx/views/MDCx.py
+@@ -14614,9 +14614,9 @@ class Ui_MDCx(object):
+                 "<li><b>娆х編</b>锛欰Vheat銆乀hepornDB</li>\n"
+                 "</ul>\n"
+                 "<p><b>Official缁煎悎锛氭湁鐮?鏃犵爜锛屾寜鐣彿鍓嶇紑鑷姩璺敱鍒板悇鐣彿瀹樼綉锛屽叏閮ㄨ蛋浠ｇ悊锛氭湁鐮佺墖鍟嗗畼缃?0瀹讹細Attackers銆丄V Opera銆丅eeFree銆丅i-AV銆丅ibian銆丏asdas銆丒-Body銆丗itch銆丠HH-AV銆丠ajime Kikaku銆丠onnaka銆両deaPocket銆並awaii銆並irakira銆丮adonna銆丮iman銆丮KO Labo銆丮oodyz銆丮uku.tv銆丮VG銆丯anpa Japan銆丱ppai銆丳remium Beauty銆丳restige銆丷ookie銆丼1S1S1銆乀amei kegoro銆乀o-Satsu銆乂-AV銆乄anz Factory<br/>\n"
+-                "鏃犵爜瀹樼綉5绔欙紝JSON API鐩磋繛锛?0Musume銆?Pondo銆丆aribbeancom銆丠eyzo銆丳acopacomama<br/>\n"
++                "鏃犵爜瀹樼綉鍏?绔欙細JSON API鐩磋繛10Musume銆?Pondo銆丆aribbeancom銆丠eyzo銆丳acopacomama<br/>\n"
+                 "鐣彿鍓嶇紑DLDSS/FNS/JIMMY杩樺垎鍒矾鐢卞埌Dahlia/Faleno瀹樼綉锛屽畼缃戝墠缂€琛ㄧ淮鎶ゅ湪浠ｇ爜manual.py鐨凮fficial瀛楀吀涓紝澧炲噺涓嶅奖鍝嶄娇鐢ㄨ鏄庛€?/p>\n"
+-                "<h4>浜斻€丆loudflare缁曡繃锛圕loudflare Bypass锛?/h4>\n"
++                "<h4>浜斻€丆loudflare Bypass</h4>\n"
+                 "<p>MDCx鎻愪緵澶氱Cloudflare缁曡繃鑳藉姏锛岄亣鍒板彈Cloudflare淇濇姢鐨勭珯鐐规椂鑷姩灏濊瘯缁曡繃锛?/p>\n"
+                 "<ul>\n"
+                 '<li><b>澶栭儴CloudFlare鏈嶅姟</b>锛氬湪"璁剧疆鈫掔綉缁?濉啓TRAWL/FlareSolverr椋庢牸澶栭儴CF鏈嶅姟鍦板潃濡俬ttp://127.0.0.1:8191锛屽苟鍦ㄥ彸渚ч€夋嫨鍚庣绫诲瀷锛歍RAWL璧?scrape鍘熺敓API鎴朏lareSolverr璧?v1鍏煎API锛孧DCx浼氳嚜鍔ㄥ湪鏈湴鎷夎捣鍗忚閫傞厤灞傛妸璇锋眰缈昏瘧缁欏閮ㄦ湇鍔★紝鏃犻渶鑷濉?v1鍦板潃銆?/li>\n'
+@@ -14646,10 +14646,10 @@ class Ui_MDCx(object):
+                 "</ul>\n"
+                 "<h4>涔濄€佸叾浠栬缃?/h4>\n"
+                 "<ul>\n"
+-                "<li><b>鎺掗櫎鐩綍/瀛楃/瀛楃涓?/b>锛氬灞傜洰褰曞埉鍓婃椂璺宠繃鎸囧畾鐩綍锛涘懡鍚嶅崟鎹椂鍓旈櫎鎸囧畾瀛楃锛涙彁鍙栫暘鍙峰墠鍏堝垹闄ゆ寚瀹氬瓧绗︿覆浠ユ彁楂樿瘑鍒巼锛堝椤圭敤閫楀彿鍒嗛殧锛夈€?/li>\n"
+-                "<li><b>澶辫触鍚庣Щ鍔?/b>锛氬埉鍓婁笉鍒颁俊鎭椂锛屽彲閫夋嫨涓嶇Щ鍔紝鎴栬嚜鍔ㄧЩ鍏ュけ璐ヨ緭鍑虹洰褰曘€?/li>\n"
++                "<li><b>鎺掗櫎鐩綍瀛楃</b>锛氬灞傜洰褰曞埉鍓婃椂璺宠繃鎸囧畾鐩綍锛涘懡鍚嶅崟鎹椂鍓旈櫎鎸囧畾瀛楃锛涙彁鍙栫暘鍙峰墠鍏堝垹闄ゆ寚瀹氬瓧绗︿覆浠ユ彁楂樿瘑鍒巼锛屽椤圭敤閫楀彿鍒嗛殧銆?/li>\n"
++                "<li><b>澶辫触绉诲姩鏂囦欢</b>锛氬埉鍓婁笉鍒颁俊鎭椂锛屽彲閫夋嫨涓嶇Щ鍔紝鎴栬嚜鍔ㄧЩ鍏ュけ璐ヨ緭鍑虹洰褰曘€?/li>\n"
+                 "<li><b>淇濆瓨鏃ュ織</b>锛氬紑鍚悗鏃ュ織鍐欏叆绋嬪簭鐩綍涓嬬殑Log鏂囦欢澶癸紝姣忔杩愯涓€涓猼xt锛屽彲闅忔椂鍒犻櫎锛屼笉褰卞搷杩愯銆?/li>\n"
+-                "<li><b>涓嬭浇楂樻竻鍥?/b>锛氬畼鏂瑰浘婧愬厹搴曪紝鍕鹃€夊悗褰撴墍鏈夊浘婧愮珯鐐瑰潎鏃犳硶鑾峰彇灏侀潰鏃讹紝绋嬪簭鎸夌暘鍙风洿鏋勫畼鏂笴DN楂樻竻鍥惧厹搴曪紝DMM楂樻竻灏侀潰鑷姩瀛︿範鍚勫巶鐗屽墠缂€瑙勫垯锛屽涔犳暟鎹繚瀛樺湪userdata/dmm_prefix_learned.json+MGStage绱犱汉楂樻竻娴锋姤LUXU/OTIM绛?涓郴鍒楋紝鎵€鏈夊浘鐗囦笅杞界粺涓€璁剧疆50MB澶у皬涓婇檺锛岄槻姝㈠紓甯稿ぇ鏂囦欢鍗犵敤纾佺洏銆?/li>\n"
++                "<li><b>涓嬭浇楂樻竻鍥剧墖</b>锛氬畼鏂瑰浘婧愬厹搴曪紝鍕鹃€夊悗褰撴墍鏈夊浘婧愮珯鐐瑰潎鏃犳硶鑾峰彇灏侀潰鏃讹紝绋嬪簭鎸夌暘鍙风洿鏋勫畼鏂笴DN楂樻竻鍥惧厹搴曪紝DMM楂樻竻灏侀潰鑷姩瀛︿範鍚勫巶鐗屽墠缂€瑙勫垯锛屽涔犳暟鎹繚瀛樺湪userdata/dmm_prefix_learned.json+MGStage绱犱汉楂樻竻娴锋姤LUXU/OTIM绛?涓郴鍒楋紝鎵€鏈夊浘鐗囦笅杞界粺涓€璁剧疆50MB澶у皬涓婇檺锛岄槻姝㈠紓甯稿ぇ鏂囦欢鍗犵敤纾佺洏銆?/li>\n"
+                 "</ul>\n"
+                 "<h4>鍗併€佽蒋浠跺伐鍏烽〉闈?/h4>\n"
+                 "<ul>\n"
