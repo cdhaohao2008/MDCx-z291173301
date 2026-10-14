@@ -26,6 +26,7 @@ from mdcx.consts import GITHUB_RELEASES_URL, IS_WINDOWS
 from mdcx.crawlers import get_registered_crawler_site_values
 from mdcx.models.flags import Flags
 from mdcx.signals import signal_qt
+from mdcx.utils.qt_text import left_anchor_text_edits
 
 from .site_priority_dialog import setup_site_priority_ui
 from .style import build_menu_style, build_tree_widget_style
@@ -39,13 +40,13 @@ def _site_status_icon(level: str) -> QIcon:
     color = {"ok": "#43a047", "warn": "#f9a825", "fail": "#e53935"}.get(level)
     if not color:
         return QIcon()
-    pixmap = QPixmap(QSize(12, 12))
+    pixmap = QPixmap(QSize(8, 8))
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setBrush(QColor(color))
     painter.setPen(Qt.PenStyle.NoPen)
-    painter.drawEllipse(1, 1, 10, 10)
+    painter.drawEllipse(1, 1, 6, 6)
     painter.end()
     return QIcon(pixmap)
 
@@ -812,6 +813,10 @@ def Init_Singal(self: "MyMAinWindow"):
     self.Ui.nfo_lib_preview_layout.setStretch(1, 1)
     self.Ui.nfo_lib_preview_layout.setStretch(2, 0)
     self.Ui.nfo_lib_preview_layout.setStretch(3, 0)
+    # 所有显示用的文本框都「内容优先从左展示」：程序回填时控件无焦点 → 光标自动归 0，
+    # 长路径 / 长 URL 不再把开头（http://、https://）滚出可视区；用户正在输入（有焦点）
+    # 时一律不插手。覆盖设置 / 信息管理 / 软件工具 / 网络等全部页面（需求：所有显示框）。
+    left_anchor_text_edits(self)
     self.Ui.pushButton_select_local_library.clicked.connect(self.pushButton_select_local_library_clicked)
     self.Ui.pushButton_select_netdisk_path.clicked.connect(self.pushButton_select_netdisk_path_clicked)
     self.Ui.pushButton_select_localdisk_path.clicked.connect(self.pushButton_select_localdisk_path_clicked)

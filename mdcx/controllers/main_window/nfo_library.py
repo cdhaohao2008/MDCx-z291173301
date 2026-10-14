@@ -29,6 +29,7 @@ from mdcx.models.model_types import CrawlersResult, FileInfo
 from mdcx.signals import signal_qt
 from mdcx.utils import executor, get_current_time
 from mdcx.utils.file import delete_file_sync, open_file_thread
+from mdcx.utils.qt_text import anchor_if_idle
 from mdcx.views.nfo_preview_window import NfoPreviewWindow
 
 if TYPE_CHECKING:
@@ -453,6 +454,8 @@ def _show_diff_dialog(self: MyMAinWindow, diff_text: str) -> bool:
     layout = QVBoxLayout(dialog)
     text_edit = QPlainTextEdit(diff_text)
     text_edit.setReadOnly(True)
+    # 改动内容较长时也让视图停在开头，优先露出第一处改动的字段名
+    anchor_if_idle(text_edit)
     layout.addWidget(text_edit)
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
     save_btn = buttons.button(QDialogButtonBox.StandardButton.Save)

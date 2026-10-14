@@ -51,6 +51,7 @@ from ..models.emby import (
     normalize_production_year,
 )
 from ..utils import executor
+from ..utils.qt_text import left_anchor_text_edits
 from .emby_actor_manager import (
     ActorInfo,
     build_local_avatar_index,
@@ -1133,6 +1134,8 @@ class EmbyActorManagerDialog(QDialog):
         main_layout.addWidget(self.status_bar)
 
         # 初始保持「总数: 」这类空白前缀, 有数据后再由 _update_statistics 填数字。
+        # 所有显示用文本框内容优先从左展示（程序回填时无焦点 → 光标归 0）
+        left_anchor_text_edits(self)
 
     def _set_status(self, message: str):
         connected = hasattr(self, "_connected") and self._connected
@@ -3207,6 +3210,9 @@ class EmbyActorSettingsDialog(QDialog):
         btn_row.addWidget(cancel_btn)
         layout.addLayout(btn_row)
 
+        # 目录 / Gfriends 地址等显示框内容优先从左展示（长 URL 不被滚掉前缀）
+        left_anchor_text_edits(self)
+
     def _browse_photo_folder(self):
         path = QFileDialog.getExistingDirectory(self, "选择本地头像目录", self.photo_folder_edit.text())
         if path:
@@ -3631,6 +3637,8 @@ class ActorSourceTestDialog(QDialog):
         # 布局请求在事件分发中同步执行完布局，延迟一拍读到的即最终几何，
         # 兜底多帧 resize（最大化→还原）中各同步读取拿到的旧值。
         self.installEventFilter(self)
+        # 所有显示用文本框内容优先从左展示（含演员名 / 头像目录 / 结果框）
+        left_anchor_text_edits(self)
 
     def _browse_folder(self):
         path = QFileDialog.getExistingDirectory(self, "选择本地头像目录", self.folder_edit.text())
@@ -4638,6 +4646,9 @@ class ActorDetailDialog(QDialog):
         self._load_existing_avatar()
         if actor.new_image_path:
             self._show_new_avatar(actor.new_image_path)
+
+        # 所有显示用文本框内容优先从左展示（含头像目录 / 简介等编辑框）
+        left_anchor_text_edits(self)
 
     def _browse_folder(self):
         path = QFileDialog.getExistingDirectory(self, "选择本地头像目录", self.folder_edit.text())
