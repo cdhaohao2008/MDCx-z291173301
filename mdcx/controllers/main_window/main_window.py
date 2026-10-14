@@ -1016,7 +1016,7 @@ class MyMAinWindow(QMainWindow):
     def _sync_nfo_lib_action_buttons(self) -> None:
         """复位「批量保存」「保存当前nfo文件」的宽度上限，并把「裁剪封面」对齐批量保存的高度。
 
-        三按钮 1:1:1 的宽度由三栏 stretch 保证（init 里 1:1:1，三按钮各自铺满
+        三按钮 3:4:3 的宽度由三栏 stretch 保证（init 里 3:4:3，三按钮各自铺满
         所在栏）；这里解除可能残留的 maximumWidth 限制，让它们重新铺满所在
         边框（groupBox / 表单跨列区域 / 预览栏）。「裁剪封面」改用批量保存同款
         样式后，把高度对齐，保证上下留白一致（y 对齐见 _sync_nfo_lib_action_row）。
@@ -1162,7 +1162,7 @@ class MyMAinWindow(QMainWindow):
         （新间隙 = 旧间隙 + 当前底边 − 基准）：直接按「当前底边 − 基准」绝对值写会在
         0 与目标值之间来回振荡（实测三遍同步：0 → 11 → 0），因为量到的底边本身已
         经含了旧间隙的贡献。负值钳 0（例如表单内容超出视口被滚走时）。
-        宽度 1:1:1 由三栏 stretch 保证，高度 36 由 _sync_nfo_lib_action_buttons
+        宽度 3:4:3 由三栏 stretch 保证，高度 36 由 _sync_nfo_lib_action_buttons
         保证，这里只管 y 对齐。
 
         折叠态（分组未勾选）下批量保存藏着，左间隙归零；但右间隙照样按基准

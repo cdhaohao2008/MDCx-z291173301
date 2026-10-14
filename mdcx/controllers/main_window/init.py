@@ -800,12 +800,12 @@ def Init_Singal(self: "MyMAinWindow"):
     self.Ui.groupBox_nfo_lib_batch.setChecked(manager.config.nfo_lib_batch_expanded)
     self._nfo_lib_batch_ready = True
     # QLayout.setStretchFactor 只接受 QWidget/QLayout 对象；按 index 设置用 QBoxLayout.setStretch
-    # 三栏 1:1:1：左栏（列表 + 批量保存）/ 中栏（表单 + 保存当前nfo文件）/
-    # 右栏（预览 + 裁剪封面）等宽，三按钮各自铺满所在栏 → 三按钮 1:1:1，
+    # 三栏 3:4:3：左栏（列表 + 批量保存）/ 中栏（表单 + 保存当前nfo文件）/
+    # 右栏（预览 + 裁剪封面），三按钮各自铺满所在栏 → 三按钮 3:4:3，
     # 最大化时布局同步放大（需求 2）。
-    self.Ui.nfo_lib_content_layout.setStretch(0, 1)
-    self.Ui.nfo_lib_content_layout.setStretch(1, 1)
-    self.Ui.nfo_lib_content_layout.setStretch(2, 1)
+    self.Ui.nfo_lib_content_layout.setStretch(0, 3)
+    self.Ui.nfo_lib_content_layout.setStretch(1, 4)
+    self.Ui.nfo_lib_content_layout.setStretch(2, 3)
     # 右栏：海报 / 缩略图 1:1 均分裁剪封面上方的高度，裁剪封面沉底，
     # 末尾间隙 widget 高度由 _sync_nfo_lib_action_row 按对齐基准重算（需求 3）。
     self.Ui.nfo_lib_preview_layout.setStretch(0, 1)

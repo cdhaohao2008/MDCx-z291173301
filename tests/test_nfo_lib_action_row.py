@@ -1,18 +1,20 @@
-"""信息管理页底部动作行：提示在上批量保存在下，三按钮 1:1:1 水平对齐。
+"""信息管理页底部动作行：提示在上批量保存在下，三按钮 3:4:3 水平对齐。
 
 需求：
 1. 批量保存按钮与提示词调换：提示词在上、批量保存在下
    （grid row4=hint、row5=status、row6=save，save 是分组末行）。
-2. 批量保存 / 保存当前nfo文件 / 裁剪封面按 1:1:1 分配宽度，最大化同步放大
-   （三栏 stretch 1:1:1，三按钮各自铺满所在栏）。
+2. 批量保存 / 保存当前nfo文件 / 裁剪封面按 3:4:3 分配宽度，最大化同步放大
+   （三栏 stretch 3:4:3，三按钮各自铺满所在栏，中栏最宽）。
 3. 裁剪封面沉到与保存当前nfo文件齐平：右栏海报/缩略图 1:1 均分裁剪封面上方
    高度，三按钮底边严格对齐（`_sync_nfo_lib_action_row` 以表单保存按钮底边
    为基准，左右各垫一个间隙 widget）。
 
-精度说明：列宽是严格 1:1:1；按钮宽度允许 ≤8px 误差——批量保存装在 QGroupBox
-里，自身边框占掉约 6px（grid 边距已是 0），跨容器像素级绝对相等做不到；
-1920 等宽下三栏分像素还会差 1（整数像素分配余数）。人眼不可见，布局语义是
-1:1:1。y 与高度必须严格相等（这是需求 3 的字面要求）。
+精度说明：两侧列（stretch 3）严格相等（整数像素分配余数，容差 ≤2px）；
+中栏是侧栏的 4/3（按 3×中栏 ≈ 4×侧栏断言，舍入累积容差 ≤10px）。
+按钮宽度：保存当前nfo文件最宽；批量保存与裁剪封面差 ≤8px——批量保存
+装在 QGroupBox 里，自身边框占掉约 6px（grid 边距已是 0），跨容器像素级
+绝对相等做不到；比例验证用保存 vs 裁剪（两者都铺满所在栏，无边框不对称）。
+y 与高度必须严格相等（这是需求 3 的字面要求）。
 
 本文件只按「相对关系」断言，不写死像素（离屏无中文字体）。
 """
@@ -29,8 +31,11 @@ from PyQt6.QtWidgets import QApplication
 
 _app: QApplication | None = None
 
-# 按钮 1:1:1 的宽度容差（见模块 docstring：GroupBox 边框约 6px + 整数像素余数 1px）
+# 两侧按钮（批量保存 vs 裁剪封面）的宽度容差
+# （见模块 docstring：GroupBox 边框约 6px + 整数像素余数 1~2px）
 _WIDTH_TOLERANCE = 8
+# 3:4:3 比例断言的舍入累积容差（列宽各自 ±1 舍入，3×/4× 放大后 ≤7，取 10 裕量）
+_RATIO_TOLERANCE = 10
 # 宽度断言只在最小值不捣乱的尺寸下做：480x600 时左栏 200px 下限会打破均分
 _WIDE_SIZES = ((1030, 700), (1280, 800), (1920, 1080))
 _ALL_SIZES = ((480, 600), (1030, 700), (1280, 800), (1920, 1080))
@@ -132,36 +137,44 @@ def test_hint_sits_above_batch_save(win, app, nfo_lib_page):
     )
 
 
-def test_content_columns_split_1_1_1(win, app, nfo_lib_page):
-    """三栏 stretch 1:1:1，宽窗下三栏严格等宽（最小值不捣乱时）。"""
+def test_content_columns_split_3_4_3(win, app, nfo_lib_page):
+    """三栏 stretch 3:4:3：两侧等宽、中栏是侧栏的 4/3（最小值不捣乱时）。"""
     ui = win.Ui
     layout = ui.nfo_lib_content_layout
-    assert [layout.stretch(i) for i in range(3)] == [1, 1, 1], "三栏 stretch 不是 1:1:1"
+    assert [layout.stretch(i) for i in range(3)] == [3, 4, 3], "三栏 stretch 不是 3:4:3"
     for size in _WIDE_SIZES:
         win.resize(*size)
         app.processEvents()
         win._sync_page_layouts()
         app.processEvents()
         widths = (ui.nfo_lib_list_panel.width(), ui.scrollArea_nfo_lib_form.width(), ui.nfo_lib_preview_panel.width())
-        # 整数像素分配余数：三栏总宽不能被 3 整除时最多差 1（如 1920 下 559/558）。
-        assert max(widths) - min(widths) <= 1, f"窗口 {size} 下三栏不等宽: {widths}"
+        left, middle, right = widths
+        # 两侧同为 stretch 3：整数像素分配余数，最多差 2。
+        assert abs(left - right) <= 2, f"窗口 {size} 下两侧栏不等宽: {widths}"
+        # 中栏最宽，且满足 3×中栏 ≈ 4×侧栏（每栏 ±1 舍入，放大后误差 ≤7）。
+        assert middle > left and middle > right, f"窗口 {size} 下中栏不是最宽: {widths}"
+        assert abs(3 * middle - 4 * left) <= _RATIO_TOLERANCE, f"窗口 {size} 下列宽不是 3:4:3: {widths}"
+        assert abs(3 * middle - 4 * right) <= _RATIO_TOLERANCE, f"窗口 {size} 下列宽不是 3:4:3: {widths}"
 
 
 @pytest.mark.parametrize("size", _WIDE_SIZES)
-def test_three_buttons_share_width_1_1_1(win, app, nfo_lib_page, size):
-    """三按钮按 1:1:1 分配宽度（容差见模块 docstring：GroupBox 边框）。"""
+def test_three_buttons_share_width_3_4_3(win, app, nfo_lib_page, size):
+    """三按钮按 3:4:3 分配宽度：保存当前nfo文件最宽，两侧差 ≤8px（GroupBox 边框）。"""
     win.resize(*size)
     app.processEvents()
     win._sync_page_layouts()
     app.processEvents()
 
-    widths = [button.width() for button in _action_buttons(win)]
-    assert max(widths) - min(widths) <= _WIDTH_TOLERANCE, f"窗口 {size} 下三按钮不等宽: {widths}"
-    assert min(widths) > 0, "有按钮宽度被压成 0"
+    batch, save, crop = (button.width() for button in _action_buttons(win))
+    assert save > batch and save > crop, f"窗口 {size} 下保存按钮不是最宽: {(batch, save, crop)}"
+    assert abs(batch - crop) <= _WIDTH_TOLERANCE, f"窗口 {size} 下两侧按钮不等宽: {(batch, save, crop)}"
+    # 比例用保存 vs 裁剪验证（两者都铺满所在栏，无边框不对称）：3×保存 ≈ 4×裁剪。
+    assert abs(3 * save - 4 * crop) <= _RATIO_TOLERANCE, f"窗口 {size} 下三按钮不是 3:4:3: {(batch, save, crop)}"
+    assert min((batch, save, crop)) > 0, "有按钮宽度被压成 0"
 
 
 def test_three_buttons_grow_together_on_maximize(win, app, nfo_lib_page):
-    """最大化时三按钮同步放大：都变宽，且仍保持 1:1:1。"""
+    """最大化时三按钮同步放大：都变宽，且仍保持 3:4:3（中按钮最宽、两侧差 ≤8px）。"""
     win.resize(1030, 700)
     app.processEvents()
     win._sync_page_layouts()
@@ -175,7 +188,10 @@ def test_three_buttons_grow_together_on_maximize(win, app, nfo_lib_page):
     wide = [button.width() for button in _action_buttons(win)]
 
     assert all(w > n for w, n in zip(wide, narrow, strict=True)), f"最大化后按钮没有同步放大: {narrow} -> {wide}"
-    assert max(wide) - min(wide) <= _WIDTH_TOLERANCE, f"最大化后三按钮不等宽: {wide}"
+    batch, save, crop = wide
+    assert save > batch and save > crop, f"最大化后保存按钮不是最宽: {wide}"
+    assert abs(batch - crop) <= _WIDTH_TOLERANCE, f"最大化后两侧按钮不等宽: {wide}"
+    assert abs(3 * save - 4 * crop) <= _RATIO_TOLERANCE, f"最大化后三按钮不是 3:4:3: {wide}"
 
 
 @pytest.mark.parametrize("size", _ALL_SIZES)
