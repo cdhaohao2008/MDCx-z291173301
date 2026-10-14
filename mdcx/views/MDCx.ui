@@ -23115,7 +23115,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 </property>
                                 <item>
                                   <property name="text">
-                                    <string>trawl</string>
+                                    <string>TRAWL</string>
                                   </property>
                                 </item>
                                 <item>

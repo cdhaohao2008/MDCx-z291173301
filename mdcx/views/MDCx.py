@@ -14429,7 +14429,7 @@ class Ui_MDCx(object):
         self.comboBox_cf_bypass_backend.setToolTip(
             _translate("MDCx", "TRAWL：走 /scrape 原生 API；FlareSolverr：走 /v1 兼容 API")
         )
-        self.comboBox_cf_bypass_backend.setItemText(0, _translate("MDCx", "trawl"))
+        self.comboBox_cf_bypass_backend.setItemText(0, _translate("MDCx", "TRAWL"))
         self.comboBox_cf_bypass_backend.setItemText(1, _translate("MDCx", "flaresolverr"))
         self.label_cf_bypass_trusted_hosts.setText(_translate("MDCx", "Bypass 白名单："))
         self.lineEdit_cf_bypass_trusted_hosts.setPlaceholderText(

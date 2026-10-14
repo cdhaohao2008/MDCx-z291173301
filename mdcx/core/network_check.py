@@ -746,7 +746,7 @@ def format_summary(
     if any(cause_counts.values()):
         if cause_counts["cf"]:
             lines.append(
-                f"  • Cloudflare 拦截 ×{cause_counts['cf']}：请配置「外部CF服务」（flaresolverr/trawl），程序会自动走 bypass"
+                f"  • Cloudflare拦截×{cause_counts['cf']}：请配置「外部CF服务」Flaresolverr/TRWAL，程序会自动走Bypass"
             )
         if cause_counts["cf_unsolved"]:
             lines.append(

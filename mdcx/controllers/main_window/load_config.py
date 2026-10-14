@@ -966,8 +966,16 @@ def load_config(self: "MyMAinWindow"):
         self.Ui.lineEdit_cf_bypass_proxy.setText(manager.config.cf_bypass_proxy)
         # TRAWL/FlareSolverr 外部CF服务地址
         self.Ui.lineEdit_cf_bypass_trawl_url.setText(manager.config.cf_bypass_trawl_url)
-        # 外部CF服务后端类型
-        backend_index = self.Ui.comboBox_cf_bypass_backend.findText(manager.config.cf_bypass_trawl_backend)
+        # 外部CF服务后端类型（配置里存的是小写标识，UI 显示为 TRAWL，匹配时忽略大小写）
+        backend = (manager.config.cf_bypass_trawl_backend or "").strip().lower()
+        backend_index = next(
+            (
+                i
+                for i in range(self.Ui.comboBox_cf_bypass_backend.count())
+                if self.Ui.comboBox_cf_bypass_backend.itemText(i).strip().lower() == backend
+            ),
+            -1,
+        )
         self.Ui.comboBox_cf_bypass_backend.setCurrentIndex(backend_index if backend_index >= 0 else 0)
         # Bypass 落地域名白名单
         self.Ui.lineEdit_cf_bypass_trusted_hosts.setText(manager.config.cf_bypass_trusted_hosts)
