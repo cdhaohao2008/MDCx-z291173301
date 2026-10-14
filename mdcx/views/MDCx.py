@@ -13478,7 +13478,7 @@ class Ui_MDCx(object):
         self.label_232.setText(
             _translate(
                 "MDCx",
-                "<span>「网站偏好」-「指定网站」指定Madouqu、madou_club或者文件路径里含有「国产」、「麻豆」时，将自动使用以上网站刮削国产番号</span>",
+                "<span>「网站偏好」-「指定网站」指定Madouqu、Madou_club或者文件路径里含有「国产」、「麻豆」时，将自动使用以上网站刮削国产番号</span>",
             )
         )
         self.label_156.setText(_translate("MDCx", "比如：259LUXU-1111"))
@@ -14606,11 +14606,11 @@ class Ui_MDCx(object):
                 "<p>网站下拉框由已注册的爬虫自动生成，当前52个，可按需选用全部网站或指定网站，主要来源包括：</p>\n"
                 "<ul>\n"
                 "<li><b>有码</b>：AVBase、AVMOO、DMM、DMM_API、FreeJavBT、Getchu、JavLibrary、LibreDMM、Lulubar、MGStage、Prestige、R18.Dev、TheJavDB_API、Xcity</li>\n"
-                "<li><b>综合</b>：7mmtv、Airav.cc、AVsex、IQQTV、JavBus、JavDay、JavDB、JavFree、MissAV、Official</li>\n"
+                "<li><b>综合</b>：7mmtv、Airav.cc、AVSEX、IQQTV、JavBus、JavDay、JavDB、JavFree、MissAV、Official</li>\n"
                 "<li><b>无码</b>：AVEntertainments、AVSOX</li>\n"
                 "<li><b>素人</b>：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MyWife、Prestige</li>\n"
                 "<li><b>FC2 ：</b>7mmtv、FC2、FC2PPVDB、JavDB、JavFree</li>\n"
-                "<li><b>国产</b>：AVsex、IQQTV、JavDay、Madou_club、Madouqu</li>\n"
+                "<li><b>国产</b>：AVSEX、IQQTV、JavDay、Madou_club、Madouqu</li>\n"
                 "<li><b>欧美</b>：AVheat、ThepornDB</li>\n"
                 "</ul>\n"
                 "<p><b>Official综合：有码+无码，按番号前缀自动路由到各番号官网，全部走代理：有码片商官网30家：Attackers、AV Opera、BeeFree、Bi-AV、Bibian、Dasdas、E-Body、Fitch、HHH-AV、Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、MKO Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、Prestige、Rookie、S1S1S1、Tamei kegoro、To-Satsu、V-AV、Wanz Factory<br/>\n"

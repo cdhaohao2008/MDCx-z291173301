@@ -4,12 +4,12 @@ import mdcx.crawlers.dmm as dmm_module
 from mdcx.config.enums import DownloadableFile
 from mdcx.config.manager import manager
 from mdcx.config.models import Website
-from mdcx.crawlers.thejavdb_api import TheJavdbApiCrawler, TheJavdbMovie
+from mdcx.crawlers.thejavdb_api import TheJavDBAPICrawler, TheJavdbMovie
 from mdcx.models.model_types import CrawlerInput
 
 
 def test_to_crawler_data_maps_api_response():
-    crawler = TheJavdbApiCrawler(client=None)
+    crawler = TheJavDBAPICrawler(client=None)
     data = crawler._to_crawler_data(
         TheJavdbMovie.model_validate(
             {
@@ -83,7 +83,7 @@ async def test_run_calls_api_and_reuses_dmm_image_processing(monkeypatch: pytest
         [DownloadableFile.POSTER, DownloadableFile.THUMB, DownloadableFile.EXTRAFANART],
     )
 
-    crawler = TheJavdbApiCrawler(client=FakeClient())
+    crawler = TheJavDBAPICrawler(client=FakeClient())
     input_data = CrawlerInput.empty()
     input_data.number = "SSIS-001"
 
@@ -105,7 +105,7 @@ async def test_run_calls_api_and_reuses_dmm_image_processing(monkeypatch: pytest
 @pytest.mark.asyncio
 async def test_number_context_set_for_aws_thumb_upgrade(monkeypatch: pytest.MonkeyPatch):
     """_set_number_context 应正确设置 number_00/number_no_00 供 AWS 高清图升级使用。"""
-    crawler = TheJavdbApiCrawler(client=None)
+    crawler = TheJavDBAPICrawler(client=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     ctx.input.number = "SSIS-001"
     crawler._set_number_context(ctx)
@@ -117,7 +117,7 @@ async def test_number_context_set_for_aws_thumb_upgrade(monkeypatch: pytest.Monk
 @pytest.mark.asyncio
 async def test_number_context_handles_5digit_with_00_prefix():
     """4位数字（如 SNIS-0027）走 elif 分支，replace("-","0") -> snis00027。"""
-    crawler = TheJavdbApiCrawler(client=None)
+    crawler = TheJavDBAPICrawler(client=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     ctx.input.number = "SNIS-0027"
     crawler._set_number_context(ctx)

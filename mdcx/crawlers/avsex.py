@@ -143,14 +143,14 @@ def get_real_url(html, number):
 
 
 @dataclass
-class AvsexContext(Context):
+class AVSEXContext(Context):
     number: str = ""
     site_url: str = ""
     detail_url: str = ""
     poster_url: str = ""
 
 
-class AvsexCrawler(BaseCrawler[AvsexContext]):
+class AVSEXCrawler(BaseCrawler[AVSEXContext]):
     description = "综合：有码+无码+国产"
     # avsex.cc 缺 SSNI-647（用户实测），SSNI-452 已确认收录
     probe_number = "SSNI-452"
@@ -169,10 +169,10 @@ class AvsexCrawler(BaseCrawler[AvsexContext]):
     @classmethod
     @override
     def display_name(cls) -> str:
-        return "AVsex"
+        return "AVSEX"
 
     @override
-    def new_context(self, input: CrawlerInput) -> AvsexContext:
+    def new_context(self, input: CrawlerInput) -> AVSEXContext:
         number = input.number if re.match(r"n\d{4}", input.number) else input.number.upper()
         site_url = self.base_url_()
         detail_url = input.appoint_url
@@ -182,10 +182,10 @@ class AvsexCrawler(BaseCrawler[AvsexContext]):
             else:
                 site_url = "https://" + re.findall(r"([^/]*)/", detail_url)[0]
                 detail_url = "https://" + detail_url
-        return AvsexContext(input=input, number=number, site_url=site_url, detail_url=detail_url)
+        return AVSEXContext(input=input, number=number, site_url=site_url, detail_url=detail_url)
 
     @override
-    async def _run(self, ctx: AvsexContext):
+    async def _run(self, ctx: AVSEXContext):
         if ctx.detail_url:
             ctx.debug_info.detail_urls = [ctx.detail_url]
             data = await self._detail(ctx, [ctx.detail_url])
@@ -196,11 +196,11 @@ class AvsexCrawler(BaseCrawler[AvsexContext]):
         return await super()._run(ctx)
 
     @override
-    async def _generate_search_url(self, ctx: AvsexContext) -> list[str] | str | None:
+    async def _generate_search_url(self, ctx: AVSEXContext) -> list[str] | str | None:
         return f"{ctx.site_url}/tw/search?query={ctx.number.lower()}"
 
     @override
-    async def _parse_search_page(self, ctx: AvsexContext, html: Selector, search_url: str) -> list[str] | str | None:
+    async def _parse_search_page(self, ctx: AVSEXContext, html: Selector, search_url: str) -> list[str] | str | None:
         page_text = html.get()
         lower_text = page_text.lower()
         # CF 挑战页也是 200，不能一律报"搜索页未解析到结果"误导（挑战页里没有 ul 结果列表，
@@ -212,7 +212,7 @@ class AvsexCrawler(BaseCrawler[AvsexContext]):
             or "/cdn-cgi/challenge" in lower_text
         ):
             raise CrawlerException("搜索页为 Cloudflare 挑战页（未能解开验证），自动跳过")
-        search_page = etree.fromstring(page_text, AvsexCrawler.UTF8_PARSER)
+        search_page = etree.fromstring(page_text, AVSEXCrawler.UTF8_PARSER)
         detail_url, poster_url = get_real_url(search_page, ctx.number)
         if not detail_url:
             ctx.debug("avsex 搜索页没有匹配结果")
@@ -221,8 +221,8 @@ class AvsexCrawler(BaseCrawler[AvsexContext]):
         return [detail_url]
 
     @override
-    async def _parse_detail_page(self, ctx: AvsexContext, html: Selector, detail_url: str) -> CrawlerData | None:
-        detail_page = etree.fromstring(html.get(), AvsexCrawler.UTF8_PARSER)
+    async def _parse_detail_page(self, ctx: AVSEXContext, html: Selector, detail_url: str) -> CrawlerData | None:
+        detail_page = etree.fromstring(html.get(), AVSEXCrawler.UTF8_PARSER)
         title = get_title(detail_page)
         if not title:
             raise CrawlerException("获取失败: 没有获取到番号标题")

@@ -1676,7 +1676,7 @@ async def extrafanart_download(
         return True
 
     # 议题 #131：按来源优先级组装候选。主来源剧照可能已被站点删除（下载 404），
-    # 整组失败时依次回退到下一来源（如 javdb → avbase），任一来源整组成功即采用。
+    # 整组失败时依次回退到下一来源（如 JavDB → AVBase），任一来源整组成功即采用。
     ordered_sources: list[tuple[str, list[str]]] = []
     seen_urls: set[tuple[str, ...]] = set()
     for source, urls in [(extrafanart_from, extrafanart), *(candidates or [])]:

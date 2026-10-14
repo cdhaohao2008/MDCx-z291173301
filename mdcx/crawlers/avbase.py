@@ -16,12 +16,12 @@ from .base import BaseCrawler, CrawlerData, CrawlerException
 SEARCH_FIRST_RESULT_ID_XPATH = "/html/body/div/div/main/div/div[2]/div[2]/div/div/div[1]/div[1]/div[1]/div"
 
 
-class AvbaseCrawler(BaseCrawler):
+class AVBaseCrawler(BaseCrawler):
     description = "有码：有码+素人"
 
     @staticmethod
     def _log(message: str) -> None:
-        signal.add_log(f"🌐 [AVBASE] {message}")
+        signal.add_log(f"🌐 [AVBase] {message}")
 
     @classmethod
     @override
@@ -316,7 +316,7 @@ class AvbaseCrawler(BaseCrawler):
         poster_url = str(poster or "").strip()
 
         for candidate_url in (thumb_url, poster_url):
-            split = AvbaseCrawler._split_cover_base_url(candidate_url)
+            split = AVBaseCrawler._split_cover_base_url(candidate_url)
             if split:
                 base_url, _ = split
                 return base_url + "pl.jpg", base_url + "ps.jpg"

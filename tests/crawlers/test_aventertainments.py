@@ -7,14 +7,14 @@ from parsel import Selector
 
 from mdcx.config.enums import Website
 from mdcx.crawlers import get_crawler
-from mdcx.crawlers.aventertainments import AventertainmentsCrawler
+from mdcx.crawlers.aventertainments import AVEntertainmentsCrawler
 from mdcx.models.model_types import CrawlerInput
 
 
 def test_aventertainments_crawler_is_registered():
     """测试爬虫已注册"""
     crawler_cls = get_crawler(Website.AVENTERTAINMENTS)
-    assert crawler_cls is AventertainmentsCrawler
+    assert crawler_cls is AVEntertainmentsCrawler
 
 
 def test_aventertainments_ppv_vs_dvd_detection():
@@ -51,7 +51,7 @@ async def test_aventertainments_generate_ppv_search_url():
     from mdcx.web_async import AsyncWebClient
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     inp = CrawlerInput.empty()
     inp.number = "082226_001"
@@ -73,7 +73,7 @@ async def test_aventertainments_generate_dvd_search_url():
     from mdcx.web_async import AsyncWebClient
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     inp = CrawlerInput.empty()
     inp.number = "SSDV-120"
@@ -103,7 +103,7 @@ async def test_aventertainments_parse_search_page():
     """
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     inp = CrawlerInput.empty()
     inp.number = "082226_001"
@@ -149,7 +149,7 @@ async def test_aventertainments_parse_ppv_detail():
     """
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     inp = CrawlerInput.empty()
     inp.number = "082226_001"
@@ -196,7 +196,7 @@ async def test_aventertainments_parse_dvd_detail():
     """
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     inp = CrawlerInput.empty()
     inp.number = "SSDV-120"
@@ -223,7 +223,7 @@ async def test_aventertainments_number_matching():
     from mdcx.web_async import AsyncWebClient
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     # 测试精确匹配（下划线）
     assert crawler._match_number("082226_001", "DL1pon_082226_001") is True
@@ -248,7 +248,7 @@ async def test_aventertainments_ppv_real_search():
     from mdcx.web_async import AsyncWebClient
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     inp = CrawlerInput.empty()
     inp.number = "082226_001"
@@ -274,7 +274,7 @@ async def test_aventertainments_ppv_carib_search():
     from mdcx.web_async import AsyncWebClient
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     inp = CrawlerInput.empty()
     inp.number = "082226-001"  # 横杠格式，应只匹配 carib
@@ -296,7 +296,7 @@ async def test_aventertainments_dvd_real_search():
     from mdcx.web_async import AsyncWebClient
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     inp = CrawlerInput.empty()
     inp.number = "SSDV-120"
@@ -327,7 +327,7 @@ async def test_aventertainments_parse_search_page_bot_wall():
     """
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     inp = CrawlerInput.empty()
     inp.number = "082226_001"
@@ -354,7 +354,7 @@ async def test_aventertainments_parse_search_page_404():
     """
 
     client = AsyncWebClient(timeout=30)
-    crawler = AventertainmentsCrawler(client=client, browser=None)
+    crawler = AVEntertainmentsCrawler(client=client, browser=None)
 
     inp = CrawlerInput.empty()
     inp.number = "082226_001"

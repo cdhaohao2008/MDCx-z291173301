@@ -152,6 +152,11 @@ class MadouquCrawler(BaseCrawler[MadouquContext]):
 
     @classmethod
     @override
+    def display_name(cls) -> str:
+        return "Madouqu"
+
+    @classmethod
+    @override
     async def check_urls(cls) -> list[str]:
         """网络检测用发布页实时解析的域名列表."""
         try:

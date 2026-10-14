@@ -4,7 +4,7 @@ from parsel import Selector
 from mdcx.config.enums import Website
 from mdcx.crawlers.base import get_crawler
 from mdcx.crawlers.javday import (
-    JavdayCrawler,
+    JavDayCrawler,
     get_cover,
     get_some_info,
     get_title,
@@ -45,7 +45,7 @@ class FakeJavdayClient:
 @pytest.mark.asyncio
 async def test_javday_run_maps_fields_and_thumb(monkeypatch):
     _mock_dmm_upgrade(monkeypatch)
-    crawler = JavdayCrawler(client=FakeJavdayClient(), base_url="https://javday.app")
+    crawler = JavDayCrawler(client=FakeJavdayClient(), base_url="https://javday.app")
     data_input = CrawlerInput.empty()
     data_input.number = "MXGS-319"
 
@@ -64,7 +64,7 @@ async def test_javday_run_maps_fields_and_thumb(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_javday_search_miss_returns_none():
-    crawler = JavdayCrawler(client=None, base_url="https://javday.app")
+    crawler = JavDayCrawler(client=None, base_url="https://javday.app")
     ctx = crawler.new_context(CrawlerInput.empty())
     html = Selector(text="<html><body>你似乎來到了沒有視頻存在的荒原</body></html>")
 
@@ -83,4 +83,4 @@ def test_javday_pure_helpers():
 
 
 def test_javday_crawler_is_registered():
-    assert get_crawler(Website.JAVDAY) is JavdayCrawler
+    assert get_crawler(Website.JAVDAY) is JavDayCrawler

@@ -2,7 +2,7 @@ import pytest
 
 from mdcx.config.enums import Language, Website
 from mdcx.crawlers.base import get_crawler
-from mdcx.crawlers.mywife import MywifeCrawler
+from mdcx.crawlers.mywife import MyWifeCrawler
 from mdcx.models.model_types import CrawlerInput
 
 
@@ -30,7 +30,7 @@ class FakeMywifeClient:
 
 @pytest.mark.asyncio
 async def test_mywife_crawler_uses_direct_new_number_url():
-    crawler = MywifeCrawler(client=FakeMywifeClient())
+    crawler = MyWifeCrawler(client=FakeMywifeClient())
     res = await crawler.run(
         CrawlerInput(
             appoint_number="",
@@ -58,4 +58,4 @@ async def test_mywife_crawler_uses_direct_new_number_url():
 
 
 def test_mywife_crawler_is_registered():
-    assert get_crawler(Website.MYWIFE) is MywifeCrawler
+    assert get_crawler(Website.MYWIFE) is MyWifeCrawler

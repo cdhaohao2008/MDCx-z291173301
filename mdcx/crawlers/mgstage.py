@@ -202,7 +202,7 @@ def build_candidate_numbers(number: str, short_number: str) -> list[str]:
     return candidates
 
 
-class MgstageCrawler(BaseCrawler):
+class MGStageCrawler(BaseCrawler):
     description = "有码：有码+素人"
     # 探测番号取自 /product/product_detail/{番号}/ 详情页（实测收录且长期在售）
     probe_number = "ABF-389"

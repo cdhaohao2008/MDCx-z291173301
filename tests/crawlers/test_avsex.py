@@ -5,7 +5,7 @@ from parsel import Selector
 
 from mdcx.config.enums import Website
 from mdcx.crawlers import get_crawler
-from mdcx.crawlers.avsex import AvsexCrawler
+from mdcx.crawlers.avsex import AVSEXCrawler
 from mdcx.crawlers.base import CrawlerException
 from mdcx.models.model_types import CrawlerInput
 
@@ -14,7 +14,7 @@ def _make_crawler():
     from mdcx.web_async import AsyncWebClient
 
     client = AsyncWebClient(timeout=30)
-    crawler = AvsexCrawler(client=client, browser=None)
+    crawler = AVSEXCrawler(client=client, browser=None)
     inp = CrawlerInput.empty()
     inp.number = "SSNI-452"
     ctx = crawler.new_context(inp)
@@ -23,7 +23,7 @@ def _make_crawler():
 
 def test_avsex_crawler_is_registered():
     """测试爬虫已注册"""
-    assert get_crawler(Website.AVSEX) is AvsexCrawler
+    assert get_crawler(Website.AVSEX) is AVSEXCrawler
 
 
 @pytest.mark.asyncio

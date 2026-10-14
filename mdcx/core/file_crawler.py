@@ -629,7 +629,7 @@ class FileScraper:
                 reduced.poster_list.append((data.source, data.poster, data.image_download))
 
         # 议题 #131：剧照候选按剧照字段优先级收集各站 URL 列表。主来源剧照被站点删除
-        # 导致下载失败时，下载层可依次回退到下一来源（如 javdb → avbase）。
+        # 导致下载失败时，下载层可依次回退到下一来源（如 JavDB → AVBase）。
         ef_config = self.config.get_field_config(CrawlerResultFields.EXTRAFANART)
         ef_priority_config: FieldConfig | FieldPriorityConfig
         if use_type_field_config and hasattr(self.config, "get_type_field_config"):

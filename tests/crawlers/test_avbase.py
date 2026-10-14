@@ -1,7 +1,7 @@
 import pytest
 
 import mdcx.crawlers.avbase as avbase_module
-from mdcx.crawlers.avbase import AvbaseCrawler
+from mdcx.crawlers.avbase import AVBaseCrawler
 from mdcx.models.model_types import CrawlerInput
 
 
@@ -17,7 +17,7 @@ from mdcx.models.model_types import CrawlerInput
     ],
 )
 def test_parse_runtime(raw: str, expected: str):
-    assert AvbaseCrawler._parse_runtime(raw) == expected
+    assert AVBaseCrawler._parse_runtime(raw) == expected
 
 
 @pytest.mark.asyncio
@@ -32,7 +32,7 @@ async def test_post_process_uses_dmm_validation_for_dmm_thumb_and_poster(monkeyp
 
     monkeypatch.setattr(avbase_module, "check_url", fake_check_url)
 
-    crawler = AvbaseCrawler(client=None)
+    crawler = AVBaseCrawler(client=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     result = avbase_module.CrawlerData(
         title="VR SAMPLE",
@@ -63,7 +63,7 @@ async def test_sanitize_extrafanart_urls_upgrades_full_batch_without_probe(
         return url
 
     monkeypatch.setattr(avbase_module, "check_url", fake_check_url)
-    crawler = AvbaseCrawler(client=None)
+    crawler = AVBaseCrawler(client=None)
 
     result = await crawler._sanitize_extrafanart_urls(
         [
@@ -88,7 +88,7 @@ async def test_sanitize_extrafanart_urls_upgrades_full_batch_without_probe(
 @pytest.mark.asyncio
 async def test_sanitize_extrafanart_urls_dedupes_and_skips_blank():
     """重复剧照去重，非 DMM 原样保留。"""
-    crawler = AvbaseCrawler(client=None)
+    crawler = AVBaseCrawler(client=None)
 
     result = await crawler._sanitize_extrafanart_urls(
         [
@@ -118,7 +118,7 @@ async def test_upgrade_dmm_image_url_falls_back_to_prefix_table(monkeypatch: pyt
 
     monkeypatch.setattr(avbase_module, "check_url", fake_check_url)
 
-    crawler = AvbaseCrawler(client=None)
+    crawler = AVBaseCrawler(client=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     ctx.input.number = "ABF-042"
 
@@ -133,7 +133,7 @@ async def test_upgrade_dmm_image_url_falls_back_to_prefix_table(monkeypatch: pyt
 @pytest.mark.asyncio
 async def test_sanitize_extrafanart_urls_keeps_blank_aws_urls_for_download_layer():
     """剧照全量升级后，失效图（aws 404/占位）交由下载层 now_printing/404 识别，抽检环节不再按字节丢弃。"""
-    crawler = AvbaseCrawler(client=None)
+    crawler = AVBaseCrawler(client=None)
 
     result = await crawler._sanitize_extrafanart_urls(
         [

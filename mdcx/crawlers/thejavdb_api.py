@@ -36,7 +36,7 @@ class TheJavdbMovie(BaseModel):
     samples: list[str | None] | None = None
 
 
-class TheJavdbApiCrawler(DmmCrawler):
+class TheJavDBAPICrawler(DmmCrawler):
     description = "有码：仅能有码"
 
     @staticmethod

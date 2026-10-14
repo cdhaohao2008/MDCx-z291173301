@@ -1,7 +1,7 @@
 import pytest
 
 from mdcx.config.enums import Language
-from mdcx.crawlers.javbus import JavbusCrawler
+from mdcx.crawlers.javbus import JavBusCrawler
 from mdcx.models.model_types import CrawlerInput
 
 
@@ -35,7 +35,7 @@ class FakeJavbusClient:
 
 @pytest.mark.asyncio
 async def test_javbus_crawler_maps_detail_page():
-    crawler = JavbusCrawler(client=FakeJavbusClient(), base_url="https://www.javbus.com")
+    crawler = JavBusCrawler(client=FakeJavbusClient(), base_url="https://www.javbus.com")
     res = await crawler.run(
         CrawlerInput(
             appoint_number="",
@@ -96,7 +96,7 @@ class RotatingJavbusClient:
 @pytest.mark.asyncio
 async def test_javbus_crawler_rotates_domain_on_failure():
     client = RotatingJavbusClient()
-    crawler = JavbusCrawler(client=client, base_url="https://www.dmmsee.cyou")
+    crawler = JavBusCrawler(client=client, base_url="https://www.dmmsee.cyou")
     # 用第一个域名初始化，验证失败后自动切到下一个
     res = await crawler.run(
         CrawlerInput(

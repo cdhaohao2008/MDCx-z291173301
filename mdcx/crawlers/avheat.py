@@ -5,7 +5,7 @@ from ..config.models import Website
 from .aio_site import AioSiteCrawler
 
 
-class AvheatCrawler(AioSiteCrawler):
+class AVheatCrawler(AioSiteCrawler):
     description = "欧美：欧美番号"
     namespace = "wav"
     domain_site = "avheat"
@@ -18,3 +18,8 @@ class AvheatCrawler(AioSiteCrawler):
     @override
     def site(cls) -> Website:
         return Website.AVHEAT
+
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "AVheat"

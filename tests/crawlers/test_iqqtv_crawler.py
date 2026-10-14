@@ -2,7 +2,7 @@ import pytest
 from lxml import etree
 
 from mdcx.config.enums import Language
-from mdcx.crawlers.iqqtv import IqqtvCrawler, get_real_url
+from mdcx.crawlers.iqqtv import IQQTVCrawler, get_real_url
 from mdcx.models.model_types import CrawlerInput
 
 
@@ -45,7 +45,7 @@ def _detail_html(title: str, outline: str) -> str:
 
 @pytest.mark.asyncio
 async def test_iqqtv_crawler_keeps_jp_original_fields_for_zh_cn():
-    crawler = IqqtvCrawler(client=FakeIqqtvClient(), base_url="https://iqqq3.quest")
+    crawler = IQQTVCrawler(client=FakeIqqtvClient(), base_url="https://iqqq3.quest")
     res = await crawler.run(
         CrawlerInput(
             appoint_number="",

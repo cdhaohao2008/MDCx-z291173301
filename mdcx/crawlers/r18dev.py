@@ -183,7 +183,7 @@ async def _upgrade_dmm_cover(ctx, data: CrawlerData) -> None:
     data.poster = poster
 
 
-class R18devCrawler(BaseCrawler):
+class R18DevCrawler(BaseCrawler):
     description = "有码：仅能有码"
     _last_request_at: float = 0.0
 

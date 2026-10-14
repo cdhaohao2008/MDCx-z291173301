@@ -139,6 +139,6 @@ async def test_search_failure_collapses_same_cause_fingerprints():
 
 async def test_mywife_probe_number_updated_to_live_model_page():
     """探测番号: 1500 已被站点下架(500), 2306 用户实测有效。"""
-    from mdcx.crawlers.mywife import MywifeCrawler
+    from mdcx.crawlers.mywife import MyWifeCrawler
 
-    assert MywifeCrawler.probe_number == "mywife-2306"
+    assert MyWifeCrawler.probe_number == "mywife-2306"

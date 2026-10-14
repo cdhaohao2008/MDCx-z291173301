@@ -2,7 +2,7 @@ import pytest
 from parsel import Selector
 
 from mdcx.config.models import Website
-from mdcx.crawlers.javdb import JavdbCrawler
+from mdcx.crawlers.javdb import JavDBCrawler
 from mdcx.models.model_types import CrawlerInput
 
 
@@ -13,12 +13,12 @@ def _load_html(name: str) -> Selector:
 
 
 def test_site_enum():
-    assert JavdbCrawler.site() == Website.JAVDB
+    assert JavDBCrawler.site() == Website.JAVDB
 
 
 @pytest.mark.asyncio
 async def test_parse_search_page_matches_exact():
-    crawler = JavdbCrawler(client=None)
+    crawler = JavDBCrawler(client=None)
     html = _load_html("search_list.html")
     from mdcx.crawlers.base.base_types import Context
 
@@ -31,7 +31,7 @@ async def test_parse_search_page_matches_exact():
 
 @pytest.mark.asyncio
 async def test_parse_search_page_bf_not_matched_by_abf():
-    crawler = JavdbCrawler(client=None)
+    crawler = JavDBCrawler(client=None)
     html = _load_html("search_list.html")
     from mdcx.crawlers.base.base_types import Context
 
@@ -43,7 +43,7 @@ async def test_parse_search_page_bf_not_matched_by_abf():
 
 @pytest.mark.asyncio
 async def test_parse_search_page_abf_still_matches():
-    crawler = JavdbCrawler(client=None)
+    crawler = JavDBCrawler(client=None)
     html = _load_html("search_list.html")
     from mdcx.crawlers.base.base_types import Context
 
@@ -56,8 +56,8 @@ async def test_parse_search_page_abf_still_matches():
 
 def test_search_candidates_adds_base_for_dmm_z_suffix():
     # 议题 #106：DMM `z` 尾缀番号在 javdb 收录为基础番号，搜索候选应附带
-    assert JavdbCrawler._search_candidates("IBW-786Z") == ["IBW-786Z", "IBW-786"]
-    assert JavdbCrawler._search_candidates("BF-030") == ["BF-030"]
+    assert JavDBCrawler._search_candidates("IBW-786Z") == ["IBW-786Z", "IBW-786"]
+    assert JavDBCrawler._search_candidates("BF-030") == ["BF-030"]
 
 
 @pytest.mark.asyncio

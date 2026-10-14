@@ -3,7 +3,7 @@ import pytest
 from mdcx.config.enums import Language, Website
 from mdcx.config.manager import manager
 from mdcx.crawlers.base import get_crawler
-from mdcx.crawlers.javlibrary import JavlibraryCrawler
+from mdcx.crawlers.javlibrary import JavLibraryCrawler
 from mdcx.gen.field_enums import CrawlerResultFields
 from mdcx.models.model_types import CrawlerInput
 
@@ -92,7 +92,7 @@ def _mock_dmm_upgrade(monkeypatch):
 @pytest.mark.asyncio
 async def test_javlibrary_crawler_keeps_jp_original_title_for_zh_cn():
     manager.config.set_field_language(CrawlerResultFields.TITLE, Language.ZH_CN)
-    crawler = JavlibraryCrawler(client=FakeJavlibraryClient(), base_url="https://www.javlibrary.com")
+    crawler = JavLibraryCrawler(client=FakeJavlibraryClient(), base_url="https://www.javlibrary.com")
     res = await crawler.run(_make_input())
 
     assert res.debug_info.error is None
@@ -190,7 +190,7 @@ async def test_javlibrary_xpath_compat_without_tbody():
 
 
 def test_javlibrary_crawler_is_registered():
-    assert get_crawler(Website.JAVLIBRARY) is JavlibraryCrawler
+    assert get_crawler(Website.JAVLIBRARY) is JavLibraryCrawler
 
 
 def test_parse_javlibcom_domain():
@@ -278,7 +278,7 @@ async def test_browser_bypass_disabled_when_config_off(monkeypatch):
         async def get_text(self, url, **kwargs):
             return "<html><title>Just a moment...</title></html>", ""
 
-    crawler = JavlibraryCrawler(client=FakeClientWithCF(), base_url="https://www.javlibrary.com")
+    crawler = JavLibraryCrawler(client=FakeClientWithCF(), base_url="https://www.javlibrary.com")
     res = await crawler.run(_make_input(language=Language.JP))
 
     assert res.data is None
@@ -310,7 +310,7 @@ async def test_browser_bypass_cookies_threaded_to_detail(monkeypatch):
             return _detail_html("FSDSS-200 Japanese Title", "女優A"), ""
 
     client = CookieCaptureClient()
-    crawler = JavlibraryCrawler(client=client, base_url="https://www.javlibrary.com")
+    crawler = JavLibraryCrawler(client=client, base_url="https://www.javlibrary.com")
     res = await crawler.run(_make_input(language=Language.JP))
 
     assert res.data is not None
@@ -364,7 +364,7 @@ async def test_post_process_upgrades_dmm_cover(monkeypatch):
         external_id="",
     )
 
-    crawler = JavlibraryCrawler(client=FakeJavlibraryClient(), base_url="https://www.javlibrary.com")
+    crawler = JavLibraryCrawler(client=FakeJavlibraryClient(), base_url="https://www.javlibrary.com")
     result = await crawler.post_process(None, res)  # type: ignore[arg-type]
 
     assert upgrade_called

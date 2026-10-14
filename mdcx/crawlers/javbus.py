@@ -448,7 +448,7 @@ async def get_real_url(client, ctx: Context, number, url_type, javbus_url, heade
     raise CrawlerException("搜索结果: 未匹配到番号！")
 
 
-class JavbusCrawler(BaseCrawler):
+class JavBusCrawler(BaseCrawler):
     description = "综合：有码+无码"
     _domains: list[str] = _JAVBUS_DOMAINS
 

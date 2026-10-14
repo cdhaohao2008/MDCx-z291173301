@@ -94,7 +94,7 @@ async def test_failed_site_dedup_still_names_every_site(monkeypatch: pytest.Monk
         {
             Website.JAVDB: _build_result(Website.JAVDB, "成功标题"),
             Website.JAVBUS: (None, RuntimeError("javbus 失败原因A")),
-            Website.AVBASE: (None, RuntimeError("avbase 失败原因B")),
+            Website.AVBASE: (None, RuntimeError("AVBase 失败原因B")),
         }
     )
 
@@ -120,7 +120,7 @@ async def test_failed_site_dedup_still_names_every_site(monkeypatch: pytest.Monk
 async def test_failed_site_mark_includes_cause(monkeypatch: pytest.MonkeyPatch):
     """议题 #101：失败标记必须区分失败类因——「请求超时/被拦截/解析失败/请求异常」。
 
-    用户把「avbase/thejavdb_api/javdb_app 已失败，后续字段将跳过该站」误解为
+    用户把「AVBase/TheJavDB_API/javdb_app 已失败，后续字段将跳过该站」误解为
     逻辑 bug，实际是这些站在其网络下请求级失败。标注原因后一眼可分辨。
     """
     monkeypatch.setattr(

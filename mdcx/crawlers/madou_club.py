@@ -81,6 +81,11 @@ class MadouClubCrawler(BaseCrawler[MadouClubContext]):
     def base_url_(cls) -> str:
         return "https://madou.club"
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "Madou_club"
+
     @override
     def new_context(self, input: CrawlerInput) -> MadouClubContext:
         return MadouClubContext(input=input)

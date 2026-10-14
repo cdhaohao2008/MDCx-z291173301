@@ -1,7 +1,7 @@
 import pytest
 
 from mdcx.config.models import Website
-from mdcx.crawlers.r18dev import R18devCrawler, _generate_content_id_variations, _normalize_id, _series_number
+from mdcx.crawlers.r18dev import R18DevCrawler, _generate_content_id_variations, _normalize_id, _series_number
 from mdcx.models.model_types import CrawlerInput
 
 
@@ -42,19 +42,19 @@ def test_series_number():
 
 
 def test_site_enum():
-    assert R18devCrawler.site() == Website.R18DEV
+    assert R18DevCrawler.site() == Website.R18DEV
 
 
 def test_display_name():
-    assert R18devCrawler.display_name() == "R18.dev"
+    assert R18DevCrawler.display_name() == "R18.Dev"
 
 
 def test_supports_custom_url():
-    assert R18devCrawler.supports_custom_url() is True
+    assert R18DevCrawler.supports_custom_url() is True
 
 
 def test_parse_json_full_data():
-    crawler = R18devCrawler(client=None)
+    crawler = R18DevCrawler(client=None)
     data = crawler._parse_json(
         {
             "dvd_id": "ipx00535",
@@ -106,7 +106,7 @@ def test_parse_json_full_data():
 
 
 def test_parse_json_minimal_data():
-    crawler = R18devCrawler(client=None)
+    crawler = R18DevCrawler(client=None)
     data = crawler._parse_json(
         {
             "dvd_id": "ssis001",
@@ -128,7 +128,7 @@ def test_parse_json_minimal_data():
 
 
 def test_parse_json_title_ja_missing_uses_uncensored_en():
-    crawler = R18devCrawler(client=None)
+    crawler = R18DevCrawler(client=None)
     data = crawler._parse_json(
         {
             "dvd_id": "1hbad00051",
@@ -145,7 +145,7 @@ def test_parse_json_title_ja_missing_uses_uncensored_en():
 
 
 def test_parse_json_uncensored_en_missing_falls_back_to_en():
-    crawler = R18devCrawler(client=None)
+    crawler = R18DevCrawler(client=None)
     data = crawler._parse_json(
         {
             "dvd_id": "1hbad00051",
@@ -161,7 +161,7 @@ def test_parse_json_uncensored_en_missing_falls_back_to_en():
 
 
 def test_parse_json_title_ja_wins_over_en():
-    crawler = R18devCrawler(client=None)
+    crawler = R18DevCrawler(client=None)
     data = crawler._parse_json(
         {
             "dvd_id": "1hbad00051",
@@ -178,7 +178,7 @@ def test_parse_json_title_ja_wins_over_en():
 
 
 def test_parse_json_uses_jacket_from_images():
-    crawler = R18devCrawler(client=None)
+    crawler = R18DevCrawler(client=None)
     data = crawler._parse_json(
         {
             "dvd_id": "test001",
@@ -198,7 +198,7 @@ def test_parse_json_uses_jacket_from_images():
 
 
 def test_parse_json_trailer_from_sample_object():
-    crawler = R18devCrawler(client=None)
+    crawler = R18DevCrawler(client=None)
     data = crawler._parse_json(
         {
             "dvd_id": "test001",
@@ -245,7 +245,7 @@ async def test_run_with_dvd_id_match(monkeypatch):
         async def request(self, *args, **kwargs):
             return (None, "")
 
-    crawler = R18devCrawler(client=FakeClient())
+    crawler = R18DevCrawler(client=FakeClient())
     input_data = CrawlerInput.empty()
     input_data.number = "IPX-535"
     result = await crawler.run(input_data)
@@ -290,7 +290,7 @@ async def test_run_with_content_id_fallback(monkeypatch):
         async def request(self, *args, **kwargs):
             return (None, "")
 
-    crawler = R18devCrawler(client=FakeClient())
+    crawler = R18DevCrawler(client=FakeClient())
     input_data = CrawlerInput.empty()
     input_data.number = "ABF-030"
     result = await crawler.run(input_data)
@@ -306,7 +306,7 @@ async def test_run_with_content_id_fallback(monkeypatch):
 async def test_post_process_fixes_trailer():
     from mdcx.crawlers.base.base_types import CrawlerData
 
-    crawler = R18devCrawler(client=None)
+    crawler = R18DevCrawler(client=None)
     data = CrawlerData(
         number="TEST-001",
         title="Test",
@@ -322,7 +322,7 @@ async def test_post_process_fixes_trailer():
 async def test_post_process_fills_originaltitle():
     from mdcx.crawlers.base.base_types import CrawlerData
 
-    crawler = R18devCrawler(client=None)
+    crawler = R18DevCrawler(client=None)
     data = CrawlerData(
         number="TEST-001",
         title="Test Title",
@@ -437,7 +437,7 @@ async def test_search_urls_follow_custom_base_url():
     不得硬编码 _API_BASE——否则「设置→站点自定义 URL」对 r18dev 搜索路径不生效。"""
     import ast
 
-    crawler = R18devCrawler(client=None, base_url="https://r18-mirror.example", browser=None)
+    crawler = R18DevCrawler(client=None, base_url="https://r18-mirror.example", browser=None)
     inp = CrawlerInput.empty()
     inp.number = "SSNI-647"
     ctx = crawler.new_context(inp)
@@ -451,7 +451,7 @@ async def test_search_urls_follow_custom_base_url():
 
     src = Path("mdcx/crawlers/r18dev.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
-    cls = next(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "R18devCrawler")
+    cls = next(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "R18DevCrawler")
     for fn in (n for n in ast.walk(cls) if isinstance(n, ast.AsyncFunctionDef | ast.FunctionDef)):
         if fn.name == "base_url_":
             continue

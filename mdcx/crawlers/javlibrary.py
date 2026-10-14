@@ -145,7 +145,7 @@ def language_path(language: Language) -> str:
     return "ja"
 
 
-class JavlibraryCrawler(BaseCrawler):
+class JavLibraryCrawler(BaseCrawler):
     description = "有码：仅能有码"
 
     @classmethod

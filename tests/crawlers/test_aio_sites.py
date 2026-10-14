@@ -1,8 +1,8 @@
 import pytest
 
-from mdcx.crawlers.avheat import AvheatCrawler
+from mdcx.crawlers.avheat import AVheatCrawler
 from mdcx.crawlers.avmoo import AvmooCrawler
-from mdcx.crawlers.avsox import AvsoxCrawler
+from mdcx.crawlers.avsox import AVSOXCrawler
 from mdcx.models.model_types import CrawlerInput
 
 SEARCH_RESPONSE = {
@@ -81,8 +81,8 @@ def _run(crawler_cls, number: str = "SSNI-804"):
     ("crawler_cls", "site_value", "mosaic"),
     [
         (AvmooCrawler, "AVMOO", "有码"),
-        (AvsoxCrawler, "avsox", "无码"),
-        (AvheatCrawler, "avheat", "欧美"),
+        (AVSOXCrawler, "avsox", "无码"),
+        (AVheatCrawler, "avheat", "欧美"),
     ],
 )
 async def test_run_search_then_get_movie(crawler_cls, site_value, mosaic):
@@ -130,7 +130,7 @@ async def test_search_request_uses_json_array_body():
 @pytest.mark.asyncio
 async def test_warmup_called_before_search():
     client = FakeClient()
-    crawler = AvsoxCrawler(client=client, base_url="https://avsox.click")
+    crawler = AVSOXCrawler(client=client, base_url="https://avsox.click")
     input_data = CrawlerInput.empty()
     input_data.number = "MKBD-S39"
     await crawler.run(input_data)
@@ -167,7 +167,7 @@ async def test_search_prefers_exact_fanhao():
             "genre": [],
         },
     }
-    crawler = AvsoxCrawler(client=FakeClient(search=search, detail=detail), base_url="https://avsox.click")
+    crawler = AVSOXCrawler(client=FakeClient(search=search, detail=detail), base_url="https://avsox.click")
     input_data = CrawlerInput.empty()
     input_data.number = "MKBD-S39"
     response = await crawler.run(input_data)
@@ -205,7 +205,7 @@ async def test_mojibake_fields_fall_back_to_clean_language():
         },
     }
     search = {"code": 200, "data": [{"movieId": "dnaapdn", "movieFanHao": "MKBD-S39"}]}
-    crawler = AvsoxCrawler(client=FakeClient(search=search, detail=detail), base_url="https://avsox.click")
+    crawler = AVSOXCrawler(client=FakeClient(search=search, detail=detail), base_url="https://avsox.click")
     input_data = CrawlerInput.empty()
     input_data.number = "MKBD-S39"
     response = await crawler.run(input_data)
@@ -230,7 +230,7 @@ async def test_dynamic_domain_miss_falls_back_to_default():
                 return self.search, ""
             return self.detail, ""
 
-    crawler = AvsoxCrawler(client=RoutingClient(), base_url="https://stale.example")
+    crawler = AVSOXCrawler(client=RoutingClient(), base_url="https://stale.example")
     input_data = CrawlerInput.empty()
     input_data.number = "SSNI-804"
     response = await crawler.run(input_data)
@@ -245,17 +245,17 @@ async def test_dynamic_domain_miss_falls_back_to_default():
 async def test_namespace_and_fallback_domain():
     assert AvmooCrawler.namespace == "jav"
     assert AvmooCrawler.fallback_domain == "https://avmoo.shop"
-    assert AvheatCrawler.namespace == "wav"
-    assert AvheatCrawler.fallback_domain == "https://avheat.shop"
-    assert AvsoxCrawler.namespace == "javu"
-    assert AvsoxCrawler.fallback_domain == "https://avsox.click"
+    assert AVheatCrawler.namespace == "wav"
+    assert AVheatCrawler.fallback_domain == "https://avheat.shop"
+    assert AVSOXCrawler.namespace == "javu"
+    assert AVSOXCrawler.fallback_domain == "https://avsox.click"
 
 
 @pytest.mark.asyncio
 async def test_with_outline_flags():
     assert AvmooCrawler.with_outline is False
-    assert AvheatCrawler.with_outline is True
-    assert AvsoxCrawler.with_outline is True
+    assert AVheatCrawler.with_outline is True
+    assert AVSOXCrawler.with_outline is True
 
 
 @pytest.mark.asyncio
@@ -268,7 +268,7 @@ async def test_outline_only_loaded_when_enabled(monkeypatch: pytest.MonkeyPatch)
     assert response.data is not None
     assert not response.data.outline
 
-    avheat = AvheatCrawler(client=FakeClient(), base_url="https://avheat.shop")
+    avheat = AVheatCrawler(client=FakeClient(), base_url="https://avheat.shop")
     input_data = CrawlerInput.empty()
     input_data.number = "SSNI-804"
     response = await avheat.run(input_data)

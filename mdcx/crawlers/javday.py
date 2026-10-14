@@ -132,13 +132,13 @@ def get_real_title(title, number_list, lable_list, tag, actor, series):
 
 
 @dataclass
-class JavdayContext(Context):
+class JavDayContext(Context):
     label_list: list[str] = field(default_factory=list)
     number_list: list[str] = field(default_factory=list)
     file_path_text: str = ""
 
 
-class JavdayCrawler(BaseCrawler[JavdayContext]):
+class JavDayCrawler(BaseCrawler[JavDayContext]):
     description = "综合：有码+无码+国产"
 
     @classmethod
@@ -157,10 +157,10 @@ class JavdayCrawler(BaseCrawler[JavdayContext]):
         return "JavDay"
 
     @override
-    def new_context(self, input: CrawlerInput) -> JavdayContext:
+    def new_context(self, input: CrawlerInput) -> JavDayContext:
         file_path = str(input.file_path or "")
         number_list, filename_list = get_number_list(input.number, input.appoint_number, file_path)
-        return JavdayContext(
+        return JavDayContext(
             input=input,
             label_list=get_lable_list(),
             number_list=number_list,
@@ -168,7 +168,7 @@ class JavdayCrawler(BaseCrawler[JavdayContext]):
         )
 
     @override
-    async def _generate_search_url(self, ctx: JavdayContext) -> list[str] | str | None:
+    async def _generate_search_url(self, ctx: JavDayContext) -> list[str] | str | None:
         number_list, filename_list = get_number_list(ctx.input.number, ctx.input.appoint_number, ctx.file_path_text)
         total_number_list = number_list + filename_list
         number_candidates = list(set(total_number_list))
@@ -176,14 +176,14 @@ class JavdayCrawler(BaseCrawler[JavdayContext]):
         return [f"{self.base_url}/videos/{number}/" for number in number_candidates]
 
     @override
-    async def _parse_search_page(self, ctx: JavdayContext, html: Selector, search_url: str) -> list[str] | str | None:
+    async def _parse_search_page(self, ctx: JavDayContext, html: Selector, search_url: str) -> list[str] | str | None:
         if "你似乎來到了沒有視頻存在的荒原" in html.get():
             ctx.debug(f"Javday 找不到番号: {search_url}")
             return None
         return [search_url]
 
     @override
-    async def _parse_detail_page(self, ctx: JavdayContext, html: Selector, detail_url: str) -> CrawlerData | None:
+    async def _parse_detail_page(self, ctx: JavDayContext, html: Selector, detail_url: str) -> CrawlerData | None:
         html_info = etree.fromstring(html.get(), etree.HTMLParser())
         title = get_title(html_info)
         if not title:

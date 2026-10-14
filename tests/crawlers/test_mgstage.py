@@ -12,14 +12,14 @@ import pytest
 from parsel import Selector
 
 from mdcx.crawlers.base import CrawlerException
-from mdcx.crawlers.mgstage import MgstageCrawler
+from mdcx.crawlers.mgstage import MGStageCrawler
 from mdcx.models.model_types import CrawlerInput
 
 pytestmark = pytest.mark.asyncio
 
 
 def _crawler_and_ctx(number: str = "259LUXU-1111", client=None):
-    crawler = MgstageCrawler(client=client, browser=None)
+    crawler = MGStageCrawler(client=client, browser=None)
     inp = CrawlerInput.empty()
     inp.number = number
     return crawler, crawler.new_context(inp)
@@ -124,7 +124,7 @@ async def test_get_cookies_sends_adc_like_real_scrape():
 
 async def test_probe_number_points_at_live_product_page():
     """探测番号必须是站点真实收录的详情页番号，否则探测永远失败"""
-    assert MgstageCrawler.probe_number == "ABF-389"
+    assert MGStageCrawler.probe_number == "ABF-389"
 
 
 async def test_probe_number_search_url_shape():

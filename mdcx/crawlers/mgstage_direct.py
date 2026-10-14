@@ -5,7 +5,7 @@ MGStage 官方图片托管在 image.mgstage.com，URL 规律:
     https://image.mgstage.com/images/{folder}/{cid}/{num}/pf_e_{cid}-{num}.jpg   (小封面)
 
 cid = {id}{series}（如 LUXU 系列 cid=259luxu），id/folder 由品牌(series)决定。
-系列映射表来自 JavDB 高清图替换油猴脚本的实测数据，与 MgstageCrawler 网页抓取互为补充，
+系列映射表来自 JavDB 高清图替换油猴脚本的实测数据，与 MGStageCrawler 网页抓取互为补充，
 用于站点图源全部失败时的直构兜底（尤其 DMM 不收录的素人番号）。
 """
 

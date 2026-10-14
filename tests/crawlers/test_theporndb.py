@@ -4,7 +4,7 @@ import pytest
 from mdcx.config.enums import Language, Switch, Website
 from mdcx.config.manager import manager
 from mdcx.crawlers.base import get_crawler
-from mdcx.crawlers.theporndb import TheporndbCrawler
+from mdcx.crawlers.theporndb import ThepornDBCrawler
 from mdcx.models.model_types import CrawlerInput
 
 
@@ -76,7 +76,7 @@ async def test_theporndb_crawler_reads_scene_detail_url():
     old_token = manager.config.theporndb_api_token
     manager.config.theporndb_api_token = "token"
     try:
-        crawler = TheporndbCrawler(client=FakeTheporndbClient())
+        crawler = ThepornDBCrawler(client=FakeTheporndbClient())
         res = await crawler.run(_input("https://theporndb.net/scenes/test-scene"))
     finally:
         manager.config.theporndb_api_token = old_token
@@ -114,7 +114,7 @@ async def test_theporndb_appoint_url_works_without_api_token():
             return None, f"unexpected url: {url}"
 
     try:
-        crawler = TheporndbCrawler(client=NoTokenClient())
+        crawler = ThepornDBCrawler(client=NoTokenClient())
         res = await crawler.run(_input("https://theporndb.net/scenes/test-scene"))
     finally:
         manager.config.theporndb_api_token = old_token
@@ -129,7 +129,7 @@ async def test_theporndb_crawler_falls_back_to_movies():
     old_token = manager.config.theporndb_api_token
     manager.config.theporndb_api_token = "token"
     try:
-        crawler = TheporndbCrawler(client=FakeTheporndbClient())
+        crawler = ThepornDBCrawler(client=FakeTheporndbClient())
         res = await crawler.run(_input("https://theporndb.net/movies/test-movie"))
     finally:
         manager.config.theporndb_api_token = old_token
@@ -148,7 +148,7 @@ async def test_theporndb_crawler_continues_search_when_hash_misses(monkeypatch: 
     manager.config.theporndb_api_token = "token"
     manager.config.switch_on = [switch for switch in manager.config.switch_on if switch != Switch.THEPORNDB_NO_HASH]
     try:
-        crawler = TheporndbCrawler(client=FakeTheporndbSearchClient())
+        crawler = ThepornDBCrawler(client=FakeTheporndbSearchClient())
         res = await crawler.run(_file_input())
     finally:
         manager.config.theporndb_api_token = old_token
@@ -164,7 +164,7 @@ async def test_theporndb_crawler_continues_search_when_hash_misses(monkeypatch: 
 
 
 def test_theporndb_crawler_is_registered():
-    assert get_crawler(Website.THEPORNDB) is TheporndbCrawler
+    assert get_crawler(Website.THEPORNDB) is ThepornDBCrawler
 
 
 def _scene_hit(slug: str, title: str, date: str, site_short: str, site_url: str, performers: list[str]) -> dict:
@@ -348,7 +348,7 @@ async def test_theporndb_search_falls_through_when_date_bucket_mismatches(monkey
         "U:/Service/欧美转移/FapHouse.25.06.28.Comatozze.Fucking.My.Big.Tit.Best.Friend.Friendship.Is.Over.strm"
     )
     try:
-        crawler = TheporndbCrawler(client=Issue94Client())
+        crawler = ThepornDBCrawler(client=Issue94Client())
         res = await crawler.run(data)
     finally:
         manager.config.theporndb_api_token = old_token

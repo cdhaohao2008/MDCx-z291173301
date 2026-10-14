@@ -5,7 +5,7 @@ from ..config.models import Website
 from .aio_site import AioSiteCrawler
 
 
-class AvsoxCrawler(AioSiteCrawler):
+class AVSOXCrawler(AioSiteCrawler):
     description = "无码：仅能无码"
     """
     avsox（无码）爬虫.

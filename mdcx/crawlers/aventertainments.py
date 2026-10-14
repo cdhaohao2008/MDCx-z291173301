@@ -21,14 +21,14 @@ from .base.parser import get_year
 
 
 @dataclass
-class AventertainmentsContext(Context):
+class AVEntertainmentsContext(Context):
     """AVEntertainments 爬虫上下文"""
 
     is_ppv: bool = False  # 是否为 PPV 番号
     search_keyword: str = ""  # 搜索关键词
 
 
-class AventertainmentsCrawler(BaseCrawler[AventertainmentsContext]):
+class AVEntertainmentsCrawler(BaseCrawler[AVEntertainmentsContext]):
     description = "无码：DVD"
     probe_number = "TRG-095"
 
@@ -48,11 +48,11 @@ class AventertainmentsCrawler(BaseCrawler[AventertainmentsContext]):
         return "AVEntertainments"
 
     @override
-    def new_context(self, input: CrawlerInput) -> AventertainmentsContext:
-        return AventertainmentsContext(input=input)
+    def new_context(self, input: CrawlerInput) -> AVEntertainmentsContext:
+        return AVEntertainmentsContext(input=input)
 
     @override
-    async def _generate_search_url(self, ctx: AventertainmentsContext) -> list[str] | str | None:
+    async def _generate_search_url(self, ctx: AVEntertainmentsContext) -> list[str] | str | None:
         number = ctx.input.number
         if not number:
             ctx.debug("番号为空")
@@ -73,7 +73,7 @@ class AventertainmentsCrawler(BaseCrawler[AventertainmentsContext]):
 
     @override
     async def _parse_search_page(
-        self, ctx: AventertainmentsContext, html: Selector, search_url: str
+        self, ctx: AVEntertainmentsContext, html: Selector, search_url: str
     ) -> list[str] | str | None:
         page_text = html.get()
         lower_text = page_text.lower()
@@ -115,7 +115,7 @@ class AventertainmentsCrawler(BaseCrawler[AventertainmentsContext]):
 
     @override
     async def _parse_detail_page(
-        self, ctx: AventertainmentsContext, html: Selector, detail_url: str
+        self, ctx: AVEntertainmentsContext, html: Selector, detail_url: str
     ) -> CrawlerData | None:
         # 1. 番号（tag-title）
         raw_cid = html.xpath('//span[@class="tag-title"]/text()').get()

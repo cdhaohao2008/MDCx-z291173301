@@ -10,7 +10,7 @@
   动漫: JavDB 移动端 API 关键字搜索
   FC2:  avsox(getFilterMovies) → JavDB 移动端 API 关键字搜索兜底(仅 FC2- 番号)
 
-javbus 使用 12 镜像轮询（与 JavbusCrawler 一致），不写死单域名。
+javbus 使用 12 镜像轮询（与 JavBusCrawler 一致），不写死单域名。
 
 动漫与 FC2 没有「演员→作品」页可抓，这两类统一走 JavDB 的**关键字**搜索，
 所以用户填的是社团名/作品关键词（动漫）或卖家名（FC2），不是演员名。

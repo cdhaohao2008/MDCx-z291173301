@@ -199,7 +199,7 @@ def get_search_keyword(file_path):
     return keyword_list, series_ex, date
 
 
-class TheporndbCrawler(BaseCrawler):
+class ThepornDBCrawler(BaseCrawler):
     description = "欧美：欧美番号"
 
     @classmethod
@@ -211,6 +211,11 @@ class TheporndbCrawler(BaseCrawler):
     @override
     def base_url_(cls) -> str:
         return "https://api.theporndb.net"
+
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "ThepornDB"
 
     def _headers(self, ctx: Context):
         api_token = manager.config.theporndb_api_token

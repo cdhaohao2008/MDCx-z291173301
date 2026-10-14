@@ -270,7 +270,7 @@ _MISSAV_DOMAINS = [
 ]
 
 
-class MissavCrawler(BaseCrawler):
+class MissAVCrawler(BaseCrawler):
     description = "综合：有码+无码"
     _domains: list[str] = _MISSAV_DOMAINS
     parser = Parser()
@@ -327,7 +327,7 @@ class MissavCrawler(BaseCrawler):
 
     @staticmethod
     def _log(message: str) -> None:
-        signal.add_log(f"🌐 [MISSAV] {message}")
+        signal.add_log(f"🌐 [MissAV] {message}")
 
     @classmethod
     @override

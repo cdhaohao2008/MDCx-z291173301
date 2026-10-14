@@ -85,7 +85,7 @@ def test_r18dev_no_hardcoded_use_proxy_false():
     """r18dev 不得再硬编码 use_proxy=False：代理路由交由 request 按配置判定。"""
     src = Path("mdcx/crawlers/r18dev.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
-    cls = next(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "R18devCrawler")
+    cls = next(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "R18DevCrawler")
     bad: list[str] = []
     for node in ast.walk(cls):
         if (

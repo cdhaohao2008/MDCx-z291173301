@@ -202,7 +202,7 @@ class Parser(DetailPageParser):
         return extract_text(html, _SELECTOR_COVER)
 
     async def extrafanart(self, ctx, html: Selector) -> list[str]:
-        # 与 JavdbCrawler 同源 markup：href 是原图优先，裸 CDN 根占位逐个丢弃、
+        # 与 JavDBCrawler 同源 markup：href 是原图优先，裸 CDN 根占位逐个丢弃、
         # 回退内层 img src（MKBD-S39 /v/eprkM 实测 51 个裸 href 全靠 img 兜底）。
         urls: list[str] = []
         anchors = html.xpath("//div[@class='tile-images preview-images']/a[@class='tile-item']")

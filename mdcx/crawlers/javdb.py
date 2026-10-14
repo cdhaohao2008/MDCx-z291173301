@@ -154,7 +154,7 @@ class Parser(DetailPageParser):
         return False
 
 
-class JavdbCrawler(BaseCrawler):
+class JavDBCrawler(BaseCrawler):
     description = "综合：有码+无码"
     parser = Parser()
 

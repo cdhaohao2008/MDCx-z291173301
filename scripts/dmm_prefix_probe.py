@@ -6,7 +6,7 @@
 
 流程:
     1. dmmapi（thejavdb API）按番号反推真实 cid（快）
-    2. dmmapi 查不到时用 avbase 搜系列名拿 product_id（兜底）
+    2. dmmapi 查不到时用 AVBase 搜系列名拿 product_id（兜底）
     3. 反推的前缀最终以 awsimgsrc 直连多编号验证为准（唯一采信标准）
 
 用法:
@@ -105,7 +105,7 @@ async def _probe_dmmapi(number: str) -> str | None:
 
 
 async def _probe_avbase(series: str) -> str | None:
-    """avbase 搜系列名，返回首个匹配 product_id（完整 DMM cid）."""
+    """AVBase 搜系列名，返回首个匹配 product_id（完整 DMM cid）."""
     try:
         r = requests.get(f"{_AVBASE}?q={series}", impersonate="chrome", timeout=25)
         tree = lxml_html.fromstring(r.text)
@@ -205,7 +205,7 @@ def _emit_code(rows: list[dict]) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="DMM cid 前缀探测（dmmapi + avbase + awsimgsrc 验证）")
+    parser = argparse.ArgumentParser(description="DMM cid 前缀探测（dmmapi + AVBase + awsimgsrc 验证）")
     parser.add_argument("series", nargs="*", help="系列名（逗号分隔），或 @文件路径（每行一个）")
     parser.add_argument("--no-verify", action="store_true", help="跳过 awsimgsrc 验证（只反推前缀）")
     parser.add_argument("--emit-code", action="store_true", help="输出推荐补表代码片段")

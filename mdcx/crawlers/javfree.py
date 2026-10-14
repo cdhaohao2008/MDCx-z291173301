@@ -123,13 +123,13 @@ def parse_metadata_lines(blockquote_html: str) -> tuple[dict[str, str], str]:
 
 
 @dataclass
-class JavfreeContext(Context):
+class JavFreeContext(Context):
     number_candidates: list[str] = field(default_factory=list)
     search_cover_url: str = ""
     category_path: str = ""
 
 
-class JavfreeCrawler(BaseCrawler[JavfreeContext]):
+class JavFreeCrawler(BaseCrawler[JavFreeContext]):
     description = "综合：有码+FC2"
     probe_number = "SSNI-647"
 
@@ -149,11 +149,11 @@ class JavfreeCrawler(BaseCrawler[JavfreeContext]):
         return "JavFree"
 
     @override
-    def new_context(self, input: CrawlerInput) -> JavfreeContext:
-        return JavfreeContext(input=input)
+    def new_context(self, input: CrawlerInput) -> JavFreeContext:
+        return JavFreeContext(input=input)
 
     @override
-    async def _generate_search_url(self, ctx: JavfreeContext) -> list[str] | str | None:
+    async def _generate_search_url(self, ctx: JavFreeContext) -> list[str] | str | None:
         ctx.number_candidates = extract_number_candidates(
             ctx.input.number, ctx.input.appoint_number, str(ctx.input.file_path or "")
         )
@@ -163,7 +163,7 @@ class JavfreeCrawler(BaseCrawler[JavfreeContext]):
         return [f"{self.base_url}/?{urlencode({'s': keyword})}" for keyword in ctx.number_candidates]
 
     @override
-    async def _parse_search_page(self, ctx: JavfreeContext, html: Selector, search_url: str) -> list[str] | str | None:
+    async def _parse_search_page(self, ctx: JavFreeContext, html: Selector, search_url: str) -> list[str] | str | None:
         candidates = [_no_sep(n) for n in ctx.number_candidates]
         detail_urls: list[str] = []
         for article in html.xpath('//article[contains(concat(" ", normalize-space(@class), " "), " hentry ")]'):
@@ -190,7 +190,7 @@ class JavfreeCrawler(BaseCrawler[JavfreeContext]):
         return detail_urls
 
     @override
-    async def _parse_detail_page(self, ctx: JavfreeContext, html: Selector, detail_url: str) -> CrawlerData | None:
+    async def _parse_detail_page(self, ctx: JavFreeContext, html: Selector, detail_url: str) -> CrawlerData | None:
         raw_title = html.xpath('//h1[contains(@class,"entry-title")]//text()').get()
         if not raw_title:
             raise CrawlerException("数据获取失败: 未获取到标题")

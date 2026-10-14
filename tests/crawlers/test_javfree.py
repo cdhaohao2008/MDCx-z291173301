@@ -5,7 +5,7 @@ from parsel import Selector
 from mdcx.config.enums import Website
 from mdcx.crawlers.base import get_crawler
 from mdcx.crawlers.javfree import (
-    JavfreeCrawler,
+    JavFreeCrawler,
     _match_number,
     classify_mosaic,
     extract_number_candidates,
@@ -104,7 +104,7 @@ def test_classify_mosaic():
 
 
 def test_generate_search_url_standard():
-    crawler = JavfreeCrawler(client=None, base_url="https://javfree.me", browser=None)
+    crawler = JavFreeCrawler(client=None, base_url="https://javfree.me", browser=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     ctx.input.number = "SSNI-647"
     urls = asyncio.run(crawler._generate_search_url(ctx))
@@ -112,7 +112,7 @@ def test_generate_search_url_standard():
 
 
 def test_generate_search_url_fc2():
-    crawler = JavfreeCrawler(client=None, base_url="https://javfree.me", browser=None)
+    crawler = JavFreeCrawler(client=None, base_url="https://javfree.me", browser=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     ctx.input.number = "FC2-4965111"
     urls = asyncio.run(crawler._generate_search_url(ctx))
@@ -156,7 +156,7 @@ def test_parse_search_page_matching_result():
         </body></html>
         """
     )
-    crawler = JavfreeCrawler(client=None, base_url="https://javfree.me", browser=None)
+    crawler = JavFreeCrawler(client=None, base_url="https://javfree.me", browser=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     ctx.number_candidates = ["SSNI-647"]
     urls = asyncio.run(crawler._parse_search_page(ctx, html, "https://javfree.me/?s=SSNI-647"))
@@ -178,7 +178,7 @@ def test_parse_search_page_no_match_returns_none():
         </body></html>
         """
     )
-    crawler = JavfreeCrawler(client=None, base_url="https://javfree.me", browser=None)
+    crawler = JavFreeCrawler(client=None, base_url="https://javfree.me", browser=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     ctx.number_candidates = ["IPX-078"]
     urls = asyncio.run(crawler._parse_search_page(ctx, html, "https://javfree.me/?s=IPX-078"))
@@ -210,7 +210,7 @@ def test_parse_detail_page_extracts_fields():
         </body></html>
         """
     )
-    crawler = JavfreeCrawler(client=None, base_url="https://javfree.me", browser=None)
+    crawler = JavFreeCrawler(client=None, base_url="https://javfree.me", browser=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     ctx.number_candidates = ["SSNI-647"]
     ctx.category_path = "mosaic/s1"
@@ -245,7 +245,7 @@ def test_parse_detail_page_fc2_fields():
         </body></html>
         """
     )
-    crawler = JavfreeCrawler(client=None, base_url="https://javfree.me", browser=None)
+    crawler = JavFreeCrawler(client=None, base_url="https://javfree.me", browser=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     ctx.category_path = "avi/fc2"
     data = asyncio.run(crawler._parse_detail_page(ctx, html, "https://javfree.me/447225/fc2-ppv-4965111"))
@@ -274,11 +274,11 @@ def test_parse_detail_page_category_fallback_uses_deepest_parent():
         </body></html>
         """
     )
-    crawler = JavfreeCrawler(client=None, base_url="https://javfree.me", browser=None)
+    crawler = JavFreeCrawler(client=None, base_url="https://javfree.me", browser=None)
     ctx = crawler.new_context(CrawlerInput.empty())
     data = asyncio.run(crawler._parse_detail_page(ctx, html, "https://javfree.me/127653/ipx-078"))
     assert data.mosaic == "有码"
 
 
 def test_javfree_crawler_is_registered():
-    assert get_crawler(Website.JAVFREE) is JavfreeCrawler
+    assert get_crawler(Website.JAVFREE) is JavFreeCrawler
