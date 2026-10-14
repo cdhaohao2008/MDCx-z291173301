@@ -1,7 +1,8 @@
 """站点下拉框悬停提示回归（软件设置→网络→网站设置→当前网站 等三个站点下拉）。
 
-用户反馈：下拉列表里把鼠标放在某个选项上，不显示「有码：有码+素人」「无码：仅能无码」
-这类定位说明提示（截图里偶发弹出的还是别的行的旧文本）。
+用户反馈：下拉列表里把鼠标放在某个选项上，不显示提示（截图里偶发弹出的还是别的行的旧文本）。
+提示内容按用户要求只保留「上次检测：…」（定位说明已在选项显示文本里，不重复）；
+没检测过的站点不弹提示。
 
 原实现把提示完全交给 Qt 默认链路（平台侧合成 QEvent::ToolTip → delegate.helpEvent →
 QToolTip），弹窗是 Qt::Popup 顶层窗，这条链路在项目里不可靠。现改为
@@ -35,11 +36,11 @@ from mdcx.controllers.main_window.init import (
 
 _app: QApplication | None = None
 
-# 三行样例：前两行有提示，第三行故意留空（模拟无说明站点）
+# 三行样例：前两行有上次检测结果，第三行故意留空（模拟没检测过的站点 → 不弹提示）
 _ROWS = (
-    ("avbase 有码：有码+素人", "有码：有码+素人\n上次检测：2026-10-09 20:51 ✅可连通·走代理"),
-    ("avsox 无码：仅能无码", "无码：仅能无码"),
-    ("dmm 有码：仅能有码", ""),
+    ("AVBase 有码：有码+素人", "上次检测：2026-10-09 20:51✅可连通·走代理"),
+    ("AVSOX 无码：仅能无码", "上次检测：2026-10-09 20:53❌连不通·直连"),
+    ("DMM 有码：仅能有码", ""),
 )
 
 
@@ -114,7 +115,7 @@ def fake_tip(monkeypatch) -> _FakeToolTip:
 
 
 def test_hover_shows_tooltip_of_row_under_cursor(fake_tip):
-    """悬停哪一行就弹哪一行的说明+上次检测结果（用户要的就是这个）。"""
+    """悬停哪一行就弹哪一行的上次检测结果（用户要的就是这个）。"""
     combo = _make_combo()
     _hover(combo, 0)
     assert fake_tip.shown[-1] == _ROWS[0][1]
@@ -185,18 +186,28 @@ def test_install_is_idempotent_and_enables_mouse_tracking():
     assert callable(first)
 
 
-def test_populated_site_combo_rows_carry_tooltip_text():
-    """真实填充的站点下拉每行都带 tooltip 文本，否则悬停仍然什么都不显示。"""
+def test_populated_site_combo_tooltip_only_carries_check_result(monkeypatch):
+    """tooltip 只留「上次检测」一行：定位说明按用户要求删除（选项显示文本里本来就有）。"""
     _ensure_app()
+    monkeypatch.setattr(
+        init_mod,
+        "_CHECK_CACHE",
+        {"AVBase": {"status": "ok", "route": "proxy", "checked_at": "2026-10-09T20:51:00"}},
+    )
     combo = QComboBox()
     combo.setView(QListView(combo))
     _populate_site_combo(combo, ["AVBase", "AVSOX", "DMM"])
+
+    assert combo.itemData(0, Qt.ItemDataRole.ToolTipRole) == "上次检测：2026-10-09 20:51✅可连通·走代理"
+    # 没检测过的站点不弹提示（tooltip 为空）
+    assert combo.itemData(1, Qt.ItemDataRole.ToolTipRole) == ""
     for i in range(combo.count()):
         tip = str(combo.itemData(i, Qt.ItemDataRole.ToolTipRole) or "")
-        assert tip.strip(), f"第 {i} 行（{combo.itemText(i)}）没有 tooltip 文本"
-    # 提示首行即爬虫定位说明（悬停提示的主体）
-    assert combo.itemData(0, Qt.ItemDataRole.ToolTipRole).splitlines()[0] == "有码：有码+素人"
-    assert combo.itemData(1, Qt.ItemDataRole.ToolTipRole).splitlines()[0] == "无码：仅能无码"
+        assert tip == "" or tip.startswith("上次检测："), f"第 {i} 行提示混入了别的内容：{tip!r}"
+        for label in ("有码：", "无码：", "综合：", "麻豆：", "MyWife："):
+            assert label not in tip, f"第 {i} 行提示里不该再出现定位说明「{label}」：{tip!r}"
+    # 定位说明仍在显示文本里，删的只是提示里的重复
+    assert "有码：有码+素人" in combo.itemText(0)
 
 
 def test_init_ui_installs_tips_on_all_three_site_combos():

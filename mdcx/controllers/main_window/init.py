@@ -83,25 +83,23 @@ def _site_status_icon(level: str, widget: "QWidget | None" = None) -> QIcon:
     return QIcon(pixmap)
 
 
-def _site_combo_item_tooltip(value: str, description: str, *, check_only: bool = False) -> str:
-    """拼装站点项 tooltip：站点定位说明 + 区域标签 + 上次检测结果（check_only 时只留后者）。"""
-    from mdcx.manual import ManualConfig
+def _site_combo_item_tooltip(value: str) -> str:
+    """下拉项 tooltip：只留上次检测结果。
 
-    parts = [] if check_only else [p for p in (description, ManualConfig.SITE_REGION_TAGS.get(value, "")) if p]
-    tip = "\n".join(parts)
-    cache = _load_check_cache()
-    entry = cache.get(value)
-    if entry:
-        label = {"ok": "✅可连通", "warn": "⚠️有需关注项", "fail": "❌连不通", "skip": "⏭上次未测"}.get(
-            str(entry.get("status") or ""), ""
-        )
-        if label:
-            route = {"proxy": "走代理", "direct": "直连"}.get(str(entry.get("route") or ""), "")
-            when = str(entry.get("checked_at") or "")[:16].replace("T", " ")
-            if when:
-                check_line = f"上次检测：{when}{label}" + (f"·{route}" if route else "")
-                tip = f"{tip}\n{check_line}" if tip else check_line
-    return tip
+    定位说明（有码：有码+素人 / 无码：仅能无码 / 综合：…）已直接拼进选项显示文本，
+    按用户要求不再在提示里重复，提示只剩「上次检测：…」；没检测过的站点返回空串。
+    """
+    entry = _load_check_cache().get(value)
+    if not entry:
+        return ""
+    label = {"ok": "✅可连通", "warn": "⚠️有需关注项", "fail": "❌连不通", "skip": "⏭上次未测"}.get(
+        str(entry.get("status") or ""), ""
+    )
+    when = str(entry.get("checked_at") or "")[:16].replace("T", " ")
+    if not (label and when):
+        return ""
+    route = {"proxy": "走代理", "direct": "直连"}.get(str(entry.get("route") or ""), "")
+    return f"上次检测：{when}{label}" + (f"·{route}" if route else "")
 
 
 _CHECK_CACHE: dict | None = None
@@ -122,11 +120,8 @@ def invalidate_check_cache() -> None:
     _CHECK_CACHE = None
 
 
-def _populate_site_combo(combo: QComboBox, site_values: list[str], *, check_only: bool = False) -> None:
-    """填充站点下拉框：区域标签与定位说明直接拼入显示文本，检测状态入图标，上次检测结果入 tooltip。
-
-    check_only=True 的下拉框（网络页使用代理网站）：tooltip 只留上次检测一行，不带定位说明。
-    """
+def _populate_site_combo(combo: QComboBox, site_values: list[str]) -> None:
+    """填充站点下拉框：区域标签与定位说明直接拼入显示文本，检测状态入图标，上次检测结果入 tooltip。"""
     from mdcx.config.models import Website
     from mdcx.crawlers import get_crawler
     from mdcx.manual import ManualConfig
@@ -150,8 +145,7 @@ def _populate_site_combo(combo: QComboBox, site_values: list[str], *, check_only
         combo.addItem(icon, name, value)
         url = _resolve_site_url(value)
         combo.setItemData(combo.count() - 1, url, _SITE_URL_ROLE)  # 当前网址：右侧网址列显示+点击跳转
-        combo.setItemData(combo.count() - 1, _site_combo_tip(value, description, url, check_only=check_only), Qt.ItemDataRole.ToolTipRole)
-        combo.setItemData(combo.count() - 1, description, Qt.ItemDataRole.UserRole + 1)  # 纯说明供刷新时重建 tooltip
+        combo.setItemData(combo.count() - 1, _site_combo_item_tooltip(value), Qt.ItemDataRole.ToolTipRole)
     view = combo.view()
     if view is not None:
         view.setTextElideMode(Qt.TextElideMode.ElideRight)
@@ -160,10 +154,10 @@ def _populate_site_combo(combo: QComboBox, site_values: list[str], *, check_only
 def refresh_network_check_badges(self: "MyMAinWindow") -> None:
     """检测完成后刷新三个站点下拉框的状态图标与 tooltip（不重排文本，保留当前选中项）。"""
     invalidate_check_cache()
-    for combo, check_only in (
-        (self.Ui.comboBox_website_all, False),
-        (self.Ui.comboBox_custom_website, False),
-        (self.Ui.comboBox_no_proxy_sites, True),  # 网络页：tooltip 只要上次检测，不要定位说明
+    for combo in (
+        self.Ui.comboBox_website_all,
+        self.Ui.comboBox_custom_website,
+        self.Ui.comboBox_no_proxy_sites,
     ):
         for i in range(combo.count()):
             value = combo.itemData(i, Qt.ItemDataRole.UserRole) or combo.itemText(i).split(" ")[0].split("（")[0].strip()
@@ -171,11 +165,10 @@ def refresh_network_check_badges(self: "MyMAinWindow") -> None:
                 continue
             entry = _load_check_cache().get(value)
             combo.setItemIcon(i, _site_status_icon(entry["status"], combo) if entry else QIcon())
-            base = combo.itemData(i, Qt.ItemDataRole.UserRole + 1) or ""
             # 显式网址行（official 子站）：保留手工地址，只刷新图标与 tooltip
             url = combo.itemData(i, _SITE_URL_EXPLICIT_ROLE) or _resolve_site_url(value)  # 自定义网址保存后此处同步最新值
             combo.setItemData(i, url, _SITE_URL_ROLE)
-            combo.setItemData(i, _site_combo_tip(value, base, url, check_only=check_only), Qt.ItemDataRole.ToolTipRole)
+            combo.setItemData(i, _site_combo_item_tooltip(value), Qt.ItemDataRole.ToolTipRole)
         _fit_site_url_popup(combo)
 
 
@@ -214,11 +207,6 @@ def _resolve_site_url(value: str) -> str:
     return url
 
 
-def _site_combo_tip(value: str, description: str, url: str = "", *, check_only: bool = False) -> str:
-    """下拉项 tooltip：原有说明 + 上次检测结果（网址右侧已展示，不再重复）。"""
-    return _site_combo_item_tooltip(value, description, check_only=check_only)
-
-
 # official 无码官网子站行的下拉展示名（仅展示用；抓取落盘的 studio 仍用 spec.studio，
 # 见 official_uncensored.py 的 studio 回退值，未列出的站名原样显示）
 _OFFICIAL_STUDIO_DISPLAY: dict[str, str] = {
@@ -245,7 +233,6 @@ def _append_official_subsite_rows(combo: QComboBox) -> None:
         if (combo.itemData(i, Qt.ItemDataRole.UserRole) or "") == "Official":
             anchor = i
     insert_at = anchor + 1 if anchor >= 0 else combo.count()
-    check_only = False  # official 子站行只出现在自定义网站框，tooltip 保留说明
     for offset, (name, spec) in enumerate(sorted(UNCENSORED_OFFICIAL_SITES.items())):
         url = spec.base_url.rstrip("/") + "/"
         description = f"无码：{_OFFICIAL_STUDIO_DISPLAY.get(spec.studio, spec.studio)}"
@@ -253,8 +240,7 @@ def _append_official_subsite_rows(combo: QComboBox) -> None:
         combo.insertItem(row, icon, f"Official·{spec.studio} {description}", "Official")
         combo.setItemData(row, url, _SITE_URL_ROLE)
         combo.setItemData(row, url, _SITE_URL_EXPLICIT_ROLE)
-        combo.setItemData(row, _site_combo_tip("Official", description, url, check_only=check_only), Qt.ItemDataRole.ToolTipRole)
-        combo.setItemData(row, description, Qt.ItemDataRole.UserRole + 1)  # 纯说明供刷新时重建 tooltip
+        combo.setItemData(row, _site_combo_item_tooltip("Official"), Qt.ItemDataRole.ToolTipRole)
     # official 本行不显示：只留 5 个子站行（插入位置均在 anchor 之后，anchor 下标仍有效）
     if anchor >= 0:
         combo.removeItem(anchor)
@@ -695,7 +681,7 @@ def Init_Ui(self: "MyMAinWindow"):
     # 初始化使用代理网站下拉框
     self.Ui.comboBox_no_proxy_sites.clear()
     self.Ui.comboBox_no_proxy_sites.addItem("选择网站...", "")
-    _populate_site_combo(self.Ui.comboBox_no_proxy_sites, sorted(supported_websites), check_only=True)
+    _populate_site_combo(self.Ui.comboBox_no_proxy_sites, sorted(supported_websites))
     # 连接选择事件
     self.Ui.comboBox_no_proxy_sites.currentTextChanged.connect(self._add_no_proxy_site)
     _setup_combo_boxes(self)
