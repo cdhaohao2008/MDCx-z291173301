@@ -1838,7 +1838,7 @@
                   </rect>
                 </property>
                 <property name="title">
-                  <string>检查演员缺失番号（检查资源库中指定演员本地缺失的番号）</string>
+                  <string>检查演员缺失番号（检查本地媒体资源库中指定演员本地缺失的番号）</string>
                 </property>
                 <widget class="QWidget" name="gridLayoutWidget_18">
                   <property name="geometry">
@@ -25477,7 +25477,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;裁剪封面图片&lt;/b&gt;：将图片裁剪为2:3标准封面图大小，支持加水印。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;链接生成助手&lt;/b&gt;：将挂载的网盘文件目录及子目录中的所有视频一键创建软链接到本地。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;移动视频字幕&lt;/b&gt;：将待刮削目录下所有子目录中的视频文件移动到一个目录中方便查看。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;检查演员番号&lt;/b&gt;：检查资源库中指定演员本地缺失的番号。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;检查演员番号&lt;/b&gt;：检查本地媒体资源库中指定演员本地缺失的番号。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;十一、常见番号命名参考&lt;/h4&gt;
 &lt;p&gt;刮削前尽量命名规范、不区分大小写：&lt;/p&gt;
@@ -25494,7 +25494,7 @@ p,li{white-space:pre-wrap;}
 &lt;ul&gt;
 &lt;li&gt;项目主页：https://github.com/z291173301/MDCx&lt;/li&gt;
 &lt;li&gt;Release：https://github.com/z291173301/MDCx/releases&lt;/li&gt;
-&lt;li&gt;常见问题：docs/User_Guide.md（使用手册）、docs/Configuration.md（配置参考）、docs/Features.md（功能总览）&lt;/li&gt;
+&lt;li&gt;常见问题：使用手册docs/User_Guide.md、配置参考docs/Configuration.md、功能总览docs/Features.md&lt;/li&gt;
 &lt;li&gt;问题反馈：GitHubIssues&lt;/li&gt;
 &lt;/ul&gt;
 &lt;pstyle="color:#888888;"&gt;MDCx由DADA基于开源社区项目sqzw-x/mdcx→Hazard804/mdcx→ZiPenOk/mdcx持续维护，仅供学习与技术交流，向相关开发者表示敬意&lt;/p&gt;

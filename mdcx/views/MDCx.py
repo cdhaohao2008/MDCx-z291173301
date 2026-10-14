@@ -13087,7 +13087,7 @@ class Ui_MDCx(object):
         self.groupBox_13.setTitle(_translate("MDCx", "裁剪图片（将某个图片裁剪为封面图大小，支持加水印）"))
         self.pushButton_select_thumb.setText(_translate("MDCx", "选择图片"))
         self.label_6.setText(_translate("MDCx", "此工具支持拖动选择裁剪范围，可将图片裁剪为Poster封面图"))
-        self.groupBox_19.setTitle(_translate("MDCx", "检查演员缺失番号（检查资源库中指定演员本地缺失的番号）"))
+        self.groupBox_19.setTitle(_translate("MDCx", "检查演员缺失番号（检查本地媒体资源库中指定演员本地缺失的番号）"))
         self.label_53.setText(_translate("MDCx", "演员名查缺："))
         self.label_72.setText(_translate("MDCx", "本地资源库："))
         self.pushButton_find_missing_number.setText(_translate("MDCx", "检查缺失番号"))
@@ -14662,7 +14662,7 @@ class Ui_MDCx(object):
                 "<li><b>裁剪封面图片</b>：将图片裁剪为2:3标准封面图大小，支持加水印。</li>\n"
                 "<li><b>链接生成助手</b>：将挂载的网盘文件目录及子目录中的所有视频一键创建软链接到本地。</li>\n"
                 "<li><b>移动视频字幕</b>：将待刮削目录下所有子目录中的视频文件移动到一个目录中方便查看。</li>\n"
-                "<li><b>检查演员番号</b>：检查资源库中指定演员本地缺失的番号。</li>\n"
+                "<li><b>检查演员番号</b>：检查本地媒体资源库中指定演员本地缺失的番号。</li>\n"
                 "</ul>\n"
                 "<h4>十一、常见番号命名参考</h4>\n"
                 "<p>刮削前尽量命名规范、不区分大小写：</p>\n"
