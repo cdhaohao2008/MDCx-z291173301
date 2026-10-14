@@ -14713,7 +14713,7 @@ class Ui_MDCx(object):
         self.label_nfo_lib_batch_hint.setText(
             _translate(
                 "MDCx",
-                "用法：先在左侧列表选中多条记录，再填写内容点对应按钮，替换演员名/加标签/删标签/统一系列名，最后点击批量保存生效",
+                "用法：先在左侧列表选中多条记录，再填写内容点对应按钮，替换演员名/加标签/删标签/统一系列名，点击批量保存写盘生效",
             )
         )
         self.pushButton_nfo_lib_batch_save.setText(_translate("MDCx", "批量保存"))
