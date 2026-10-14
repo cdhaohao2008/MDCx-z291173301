@@ -14429,7 +14429,7 @@ class Ui_MDCx(object):
         )
         self.label_cf_bypass_proxy.setText(_translate("MDCx", "Bypass代理："))
         self.lineEdit_cf_bypass_proxy.setPlaceholderText(_translate("MDCx", "例如: http://127.0.0.1:7890（可选）"))
-        self.label_cf_bypass_trawl.setText(_translate("MDCx", "CloudFlare 绕过服务："))
+        self.label_cf_bypass_trawl.setText(_translate("MDCx", "CF绕过服务："))
         self.lineEdit_cf_bypass_trawl_url.setPlaceholderText(_translate("MDCx", "例如: http://127.0.0.1:8191"))
         self.comboBox_cf_bypass_backend.setToolTip(
             _translate("MDCx", "TRAWL：走 /scrape 原生 API；FlareSolverr：走 /v1 兼容 API")

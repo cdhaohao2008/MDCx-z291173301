@@ -530,7 +530,7 @@ def test_proxy_toggle_ui_texts_regression():
     assert prop_of("checkBox_use_proxy", "toolTip") == _PROXY_TOGGLE_HINT
     # 网络页标签去掉 "CF" 前缀、去掉多余空格。
     assert prop_of("label_cf_bypass_proxy", "text") == "Bypass代理："
-    assert prop_of("label_cf_bypass_trawl", "text") == "CloudFlare 绕过服务："
+    assert prop_of("label_cf_bypass_trawl", "text") == "CF绕过服务："
     # 代理说明段同样带这句提示。
     proxy_hint = prop_of("label_103", "text") or ""
     assert _PROXY_TOGGLE_HINT in proxy_hint
