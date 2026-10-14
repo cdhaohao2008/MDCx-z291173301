@@ -3526,7 +3526,6 @@ def test_settings_scrollbars_uniform_width_across_tabs(win, app):
     assert {name: bar.width() for name, bar in found} == fixed, "非幂等"
 
 
-<<<<<<< Updated upstream
 def test_settings_scrollbars_use_declared_thickness_not_stale_geometry(win, app):
     """滚动条厚度取 QSS 声明值，不被"未布局页"的陈旧几何拉低（随机页签变窄回归）。
 
@@ -4217,16 +4216,20 @@ def test_xiazai_row_align_hook_installed_on_scroll_area(win, app):
 
 
 def _goto_naming_tab(win, app):
-    """切到软件设置-命名页（三个命名规则组所在 tab）。"""
-    ui = win.Ui
-    _goto(win, app, "page_setting")
-    for i in range(ui.tabWidget.count()):
-        if ui.tabWidget.widget(i).objectName() == "tab_3":
-            ui.tabWidget.setCurrentIndex(i)
+    """切到「设置→命名」页签（走真实入口，触发 tabChanged 钩子）。"""
+    page = _goto(win, app, "page_setting")
+    tabs = win.Ui.tabWidget
+    for i in range(tabs.count()):
+        if tabs.widget(i).objectName() == "tab_3":
+            tabs.setCurrentIndex(i)
+            app.processEvents()
             break
     else:
-        raise AssertionError("命名 tab_3 not found")
-    app.processEvents()
+        raise AssertionError("tab_3 not found")
+    # singleShot(0) 排队的重算需要再转一圈事件循环
+    for _ in range(3):
+        app.processEvents()
+    return page
 
 
 @pytest.mark.parametrize("width", [1000, 1920])
@@ -4248,39 +4251,10 @@ def test_naming_filename_checkboxes_column_align(win, app, width):
     注：此前「小数点与空格保持 140 设计间距、等距右随」的约定已被新需求取代——
     窄态下该约定本来也从未成立（空格被左移 47 而小数点纹丝不动，point-space 实测
     187 ≠ 140，正是本用例 [1000] 之前挂掉的原因）。
-=======
-# ---------- 命名页「视频命名规则」组无大片空白（_sync_naming_template_section）----------
-
-
-def _goto_naming_tab(win, app):
-    """切到「设置→命名」页签（走真实入口，触发 tabChanged 钩子）。"""
-    page = _goto(win, app, "page_setting")
-    tabs = win.Ui.tabWidget
-    for i in range(tabs.count()):
-        if tabs.widget(i).objectName() == "tab_3":
-            tabs.setCurrentIndex(i)
-            app.processEvents()
-            break
-    else:
-        raise AssertionError("tab_3 not found")
-    # singleShot(0) 排队的重算需要再转一圈事件循环
-    for _ in range(3):
-        app.processEvents()
-    return page
-
-
-def _naming_gaps(win):
-    """测量命名页「视频命名规则」组两处空白（统一换算到 gridLayoutWidget_8 坐标系）。
-
-    返回 (空白1, 空白2, 预览高, 组高)：
-      空白1 = 视频文件名 行顶缘 - 长说明文字 label_66 底缘
-      空白2 = 网格底缘 - 模板预览结果 label 底缘
->>>>>>> Stashed changes
     """
     from PyQt6.QtCore import QPoint
 
     ui = win.Ui
-<<<<<<< Updated upstream
     win.show()
     _goto_naming_tab(win, app)
     win.resize(width, 1170 if width > 1200 else 700)
@@ -4428,7 +4402,24 @@ def test_site_pref_combo_ignored_until_tab_opened(win, app):
         app.processEvents()
     combo_right, ref_right = _site_pref_rights(win)
     assert abs(combo_right - ref_right) <= 200, f"首次打开未对齐: 指定网站 {combo_right} vs 锁定类型 {ref_right}"
-=======
+
+
+
+# ---------- 命名页「视频命名规则」组无大片空白（_sync_naming_template_section）----------
+
+
+
+
+def _naming_gaps(win):
+    """测量命名页「视频命名规则」组两处空白（统一换算到 gridLayoutWidget_8 坐标系）。
+
+    返回 (空白1, 空白2, 预览高, 组高)：
+      空白1 = 视频文件名 行顶缘 - 长说明文字 label_66 底缘
+      空白2 = 网格底缘 - 模板预览结果 label 底缘
+    """
+    from PyQt6.QtCore import QPoint
+
+    ui = win.Ui
     box, gridw = ui.groupBox_8, ui.gridLayoutWidget_8
     lbl, row, res = ui.label_66, ui.label_63, ui.label_name_template_preview_result
 
@@ -4528,4 +4519,3 @@ def test_naming_gaps_stay_tight_across_widths(win, app, width):
     gap1, gap2, _prev_h, _box_h = _naming_gaps(win)
     assert gap1 <= 24, f"width={width} 空白1 回归: {gap1}px"
     assert gap2 <= 2, f"width={width} 空白2 回归: {gap2}px"
->>>>>>> Stashed changes

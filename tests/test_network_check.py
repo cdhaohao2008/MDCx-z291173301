@@ -361,7 +361,8 @@ def test_format_summary_groups_failure_causes():
     text = "\n".join(lines)
     assert "根因分组" in text
     assert "Cloudflare" in text
-    assert "Cloudflare 拦截 ×1" in text
+    # 汇总文案已统一为无空格品牌写法「Cloudflare拦截×N」（与 format_summary 输出一致）
+    assert "Cloudflare拦截×1" in text
     # bypass 已尝试但未解开：不再让人去配服务，单独成组
     assert "CF Bypass 已尝试但未解开 ×1" in text
     assert "节点" in text
