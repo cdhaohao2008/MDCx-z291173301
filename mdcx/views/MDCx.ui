@@ -25396,8 +25396,8 @@ p,li{white-space:pre-wrap;}
 &lt;h4&gt;一、快速开始&lt;/h4&gt;
 &lt;ol&gt;
 &lt;li&gt;&lt;b&gt;媒体路径&lt;/b&gt;：软件设置→刮削目录，配置「待刮削视频目录」「成功输出目录」和「失败输出目录」。也可以在软件界面点击「选择目录」临时选择待刮削目录。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;刮削网站&lt;/b&gt;：软件设置→刮削网站，为不同类型（有码/无码/素人/FC2/欧美/国产）分别选择数据源网站。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;下载选项&lt;/b&gt;：软件设置→下载，勾选需要下载的元数据、图片与字幕。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;选择刮削网站&lt;/b&gt;：软件设置→刮削网站，为不同类型（有码/无码/素人/FC2/欧美/国产）分别选择数据源网站。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;选择下载选项&lt;/b&gt;：软件设置→下载，勾选需要下载的元数据、图片与字幕。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;开始刮削&lt;/b&gt;：软件界面点击「选择目录」选择待刮削目录，再点击「开始」。建议先用1~3个文件测试效果。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;h4&gt;二、刮削模式&lt;/h4&gt;
@@ -25415,7 +25415,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;目录命名&lt;/b&gt;：存放视频的文件夹名，支持多层目录与自定义符号，例：[actor]/studio/number-【title】。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;媒体标题&lt;/b&gt;：NFO中的标题，例：number-[title]。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;本地标题&lt;/b&gt;：本地视频与图片的命名，例：number-[title]。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;可用变量&lt;/b&gt;：number番号、title标题、originaltitle原标题、actor演员、first_actor首位演员、all_actor全部演员、letters番号前缀、first_letter番号首字符、outline简介、director导演、definition清晰度、publisher发行商、series系列、studio片商、year年份、mosaic有码/无码、runtime时长、score评分、release发行日期、cnword字幕标识、wanted想看人数、four_k（4K标识）、filename原文件名、moword版本标识，支持Jinja2模板与自定义符号。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;可用变量&lt;/b&gt;：&lt;b&gt;number&lt;/b&gt;番号、&lt;b&gt;title&lt;/b&gt;标题、&lt;b&gt;originaltitle&lt;/b&gt;原标题、&lt;b&gt;actor&lt;/b&gt;演员、&lt;b&gt;first_actor&lt;/b&gt;首位演员、&lt;b&gt;all_actor&lt;/b&gt;全部演员、&lt;b&gt;letters&lt;/b&gt;番号前缀、&lt;b&gt;first_letter&lt;/b&gt;番号首字符、&lt;b&gt;outline&lt;/b&gt;简介、&lt;b&gt;director&lt;/b&gt;导演、&lt;b&gt;definition&lt;/b&gt;清晰度、&lt;b&gt;publisher&lt;/b&gt;发行商、&lt;b&gt;series&lt;/b&gt;系列、&lt;b&gt;studio&lt;/b&gt;片商、&lt;b&gt;year&lt;/b&gt;年份、&lt;b&gt;mosaic&lt;/b&gt;有码/无码、&lt;b&gt;runtime&lt;/b&gt;时长、&lt;b&gt;score&lt;/b&gt;评分、&lt;b&gt;release&lt;/b&gt;发行日期、&lt;b&gt;cnword&lt;/b&gt;字幕标识、&lt;b&gt;wanted&lt;/b&gt;想看人数、&lt;b&gt;four_k&lt;/b&gt;（4K标识）、&lt;b&gt;filename&lt;/b&gt;原文件名、&lt;b&gt;moword&lt;/b&gt;版本标识，支持Jinja2模板与自定义符号。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;四、网站选择&lt;/h4&gt;
 &lt;p&gt;网站下拉框由已注册的爬虫自动生成，当前52个，可按需选用全部网站或指定网站，主要来源包括：&lt;/p&gt;
@@ -25437,7 +25437,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;外部CloudFlare服务&lt;/b&gt;：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;Selenium CF Bypass&lt;/b&gt;：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10、11+Edge浏览器，首次使用将自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;CF Bypass落地白名单&lt;/b&gt;：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配，用于校验Bypass服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;CloudFlare 直连通道&lt;/b&gt;：部分站点提供免CF的数据接口Javdb_api、Javdb_app、Missav_api、R18dev、Thejavdb_api，默认已加入网站源，可直接选用获得更稳定的抓取。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;CloudFlare直连通道&lt;/b&gt;：部分站点提供免CF的数据接口Javdb_api、Javdb_app、Missav_api、R18dev、Thejavdb_api，默认已加入网站源，可直接选用获得更稳定的抓取。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;六、代理设置&lt;/h4&gt;
 &lt;p&gt;在"设置→网络"中配置：&lt;/p&gt;
