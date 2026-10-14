@@ -798,6 +798,7 @@ def save_config(self: "MyMAinWindow"):
     manager.config.actor_db_sync_limit = self.Ui.spinBox_actor_db_sync_limit.value()  # 限量
     manager.config.cover_backfill_overwrite = get_checkbox(self.Ui.checkBox_cover_backfill_overwrite)  # 覆盖已有图片
     manager.config.cover_backfill_watermark = get_checkbox(self.Ui.checkBox_cover_backfill_watermark)  # 添加水印
+    manager.config.nfo_lib_batch_expanded = self.Ui.groupBox_nfo_lib_batch.isChecked()  # 信息管理批量操作展开态
 
     # 保存
     manager.save()

@@ -25657,7 +25657,7 @@ p,li{white-space:pre-wrap;}
                           <widget class="QListWidget" name="listWidget_nfo_lib">
                             <property name="minimumSize">
                               <size>
-                                <width>280</width>
+                                <width>200</width>
                                 <height>120</height>
                               </size>
                             </property>
@@ -25678,9 +25678,18 @@ p,li{white-space:pre-wrap;}
                               <bool>true</bool>
                             </property>
                             <property name="checked">
-                              <bool>false</bool>
+                              <bool>true</bool>
                             </property>
                             <layout class="QGridLayout" name="gridLayout_nfo_lib_batch">
+                              <property name="leftMargin">
+                                <number>0</number>
+                              </property>
+                              <property name="rightMargin">
+                                <number>0</number>
+                              </property>
+                              <property name="bottomMargin">
+                                <number>0</number>
+                              </property>
                               <item row="0" column="0">
                                 <widget class="QPushButton" name="pushButton_nfo_lib_batch_actor">
                                   <property name="text">
@@ -25738,19 +25747,6 @@ p,li{white-space:pre-wrap;}
                                 </widget>
                               </item>
                               <item row="4" column="0" colspan="2">
-                                <widget class="QPushButton" name="pushButton_nfo_lib_batch_save">
-                                  <property name="minimumSize">
-                                    <size>
-                                      <width>0</width>
-                                      <height>36</height>
-                                    </size>
-                                  </property>
-                                  <property name="text">
-                                    <string>批量保存</string>
-                                  </property>
-                                </widget>
-                              </item>
-                              <item row="5" column="0" colspan="2">
                                 <widget class="QLabel" name="label_nfo_lib_batch_hint">
                                   <property name="minimumSize">
                                     <size>
@@ -25770,6 +25766,19 @@ p,li{white-space:pre-wrap;}
                                   </widget>
                               </item>
                               <item row="6" column="0" colspan="2">
+                                <widget class="QPushButton" name="pushButton_nfo_lib_batch_save">
+                                  <property name="minimumSize">
+                                    <size>
+                                      <width>0</width>
+                                      <height>36</height>
+                                    </size>
+                                  </property>
+                                  <property name="text">
+                                    <string>批量保存</string>
+                                  </property>
+                                </widget>
+                              </item>
+                              <item row="5" column="0" colspan="2">
                                 <widget class="QLabel" name="label_nfo_lib_batch_status">
                                   <property name="text">
                                     <string/>
@@ -25779,11 +25788,30 @@ p,li{white-space:pre-wrap;}
                             </layout>
                           </widget>
                         </item>
+                        <item>
+                          <widget class="QWidget" name="widget_nfo_lib_left_gap" native="true">
+                            <property name="minimumSize">
+                              <size>
+                                <width>0</width>
+                                <height>0</height>
+                              </size>
+                            </property>
+                            <property name="maximumSize">
+                              <size>
+                                <width>16777215</width>
+                                <height>0</height>
+                              </size>
+                            </property>
+                          </widget>
+                        </item>
                       </layout>
                     </widget>
                   </item>
                   <item>
                     <widget class="CustomScrollArea" name="scrollArea_nfo_lib_form">
+                      <property name="frameShape">
+                        <enum>QFrame::NoFrame</enum>
+                      </property>
                       <property name="widgetResizable">
                         <bool>true</bool>
                       </property>
@@ -26031,7 +26059,7 @@ p,li{white-space:pre-wrap;}
                             <property name="minimumSize">
                               <size>
                                 <width>200</width>
-                                <height>280</height>
+                                <height>120</height>
                               </size>
                             </property>
                             <property name="frameShape">
@@ -26078,17 +26106,20 @@ p,li{white-space:pre-wrap;}
                           </widget>
                         </item>
                         <item>
-                          <spacer name="verticalSpacer_nfo_lib">
-                            <property name="orientation">
-                              <enum>Qt::Vertical</enum>
-                            </property>
-                            <property name="sizeHint" stdset="0">
+                          <widget class="QWidget" name="widget_nfo_lib_preview_gap" native="true">
+                            <property name="minimumSize">
                               <size>
-                                <width>20</width>
-                                <height>40</height>
+                                <width>0</width>
+                                <height>0</height>
                               </size>
                             </property>
-                          </spacer>
+                            <property name="maximumSize">
+                              <size>
+                                <width>16777215</width>
+                                <height>0</height>
+                              </size>
+                            </property>
+                          </widget>
                         </item>
                       </layout>
                     </widget>

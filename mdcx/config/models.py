@@ -855,6 +855,11 @@ class Config(BaseModel):
     netdisk_path: str = Field(default="", title="网盘路径")
     localdisk_path: str = Field(default="", title="本地磁盘路径")
     window_title: str = Field(default="hide", title="窗口标题")
+    nfo_lib_batch_expanded: bool = Field(
+        default=True,
+        title="信息管理批量操作展开",
+        description="记住批量操作分组上次的展开/折叠状态，重启后恢复",
+    )
     ui_scale_factor: float = Field(
         default=0.0,
         ge=0.0,

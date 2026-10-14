@@ -1014,9 +1014,10 @@ class MyMAinWindow(QMainWindow):
     def _sync_nfo_lib_action_buttons(self) -> None:
         """复位「批量保存」「保存当前nfo文件」的宽度上限，并把「裁剪封面」对齐批量保存的高度。
 
-        两个保存按钮在布局里都是跨列的，宽度由布局撑满；这里解除可能残留的
-        maximumWidth 限制，让它们重新铺满所在边框（groupBox / 表单跨列区域）。
-        「裁剪封面」改用批量保存同款样式后，把高度对齐，保证上下留白一致。
+        三按钮 1:1:1 的宽度由三栏 stretch 保证（init 里 1:1:1，三按钮各自铺满
+        所在栏）；这里解除可能残留的 maximumWidth 限制，让它们重新铺满所在
+        边框（groupBox / 表单跨列区域 / 预览栏）。「裁剪封面」改用批量保存同款
+        样式后，把高度对齐，保证上下留白一致（y 对齐见 _sync_nfo_lib_action_row）。
         """
         ui = self.Ui
         batch = ui.pushButton_nfo_lib_batch_save
@@ -1056,7 +1057,7 @@ class MyMAinWindow(QMainWindow):
     def _sync_nfo_lib_batch_panel(self) -> None:
         """让「批量操作」分组贴着内容收紧，省下的高度让给上方的 NFO 列表。
 
-        现象（用户截图）：「批量保存」下方的用法提示是 wordWrap 的说明 label，
+        现象（用户截图）：「批量保存」上方的用法提示是 wordWrap 的说明 label，
         .ui 给它钉了 64px 硬下限，但文字在左栏实际宽度下只要 3 行，文字底下空出
         一片；再叠上恒定占位的空状态 label（空文本也占 14px + 6px 间隔），分组底边
         比实际内容高出约 40px，NFO 列表被白白压矮。
@@ -1120,6 +1121,14 @@ class MyMAinWindow(QMainWindow):
         else:
             for child in box.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
                 child.setVisible(False)
+            # 折叠分支同样要先落定 grid：隐藏子控件只抛 LayoutRequest，grid 缓存的
+            # 还是旧最小高；若直接排外层，activate 会按旧值排，分组高度卡住不收
+            # （实测 enframed：minHint 已是 32，高度仍冻在 226）。必须先 invalidate
+            # 再 activate，把 grid 的最小高同步刷掉，外层才能按新值分配。
+            grid = box.layout()
+            if grid is not None:
+                grid.invalidate()
+                grid.activate()
         # 子控件显隐只 post LayoutRequest 不标脏布局，此时直接 activate 会因布局仍是
         # clean 而返回 False 无所作为（实测）；必须先 invalidate 再 activate，才能同步
         # 重排，让高度在分组与列表之间立刻重新分配（窗口未 show 时尤其靠这一步）。
@@ -1127,6 +1136,82 @@ class MyMAinWindow(QMainWindow):
         if outer is not None and outer.layout() is not None:
             outer.layout().invalidate()
             outer.layout().activate()
+        self._sync_nfo_lib_action_row()  # 展开/折叠改了左按钮底边，按钮行重对齐
+        if getattr(self, "_nfo_lib_batch_ready", False):
+            # 用户亲手勾选/去勾：记入配置文件，重启恢复。初始化恢复期间不写盘
+            # （Init_Singal 里 _nfo_lib_batch_ready 置 False，避免启动就无谓落盘）。
+            try:
+                manager.config.nfo_lib_batch_expanded = on
+                manager.save()
+            except Exception:
+                signal_qt.show_traceback_log(traceback.format_exc())
+
+    def _sync_nfo_lib_action_row(self) -> None:
+        """让「批量保存 / 保存当前nfo文件 / 裁剪封面」三按钮底边严格对齐。
+
+        三按钮分属三列不同容器（左分组 grid / 中表单末行 / 右预览 VBox），列等高
+        但各自内容高度不同，天然 y 各异（实测 1030×700：600 / 629 / 478）。又不能
+        靠拉伸表单去凑——`test_minimized_layout_untouched_and_restores` 把非最大化态
+        简介/标签锁死 60px，表单内容该多高就多高，谁都别去动它。
+
+        做法：以「保存当前nfo文件」底边为基准，左列分组下方、右列裁剪封面下方各垫
+        一个间隙 widget（.ui 里的 widget_nfo_lib_left_gap / widget_nfo_lib_preview_gap，
+        默认高 0），把左按钮和裁剪封面顶到与基准同一高度。间隙必须按增量式重算
+        （新间隙 = 旧间隙 + 当前底边 − 基准）：直接按「当前底边 − 基准」绝对值写会在
+        0 与目标值之间来回振荡（实测三遍同步：0 → 11 → 0），因为量到的底边本身已
+        经含了旧间隙的贡献。负值钳 0（例如表单内容超出视口被滚走时）。
+        宽度 1:1:1 由三栏 stretch 保证，高度 36 由 _sync_nfo_lib_action_buttons
+        保证，这里只管 y 对齐。
+
+        折叠态（分组未勾选）下批量保存藏着，对齐无意义，两个间隙归零。
+        必须跑在 _sync_nfo_lib_batch_panel 之后——hint 下限变化会改分组高，进而改
+        左按钮底边，排前面量到的是旧值（见 _sync_page_layouts 调用序）。
+        """
+        ui = self.Ui
+        left_gap = ui.widget_nfo_lib_left_gap
+        preview_gap = ui.widget_nfo_lib_preview_gap
+        content = ui.nfo_lib_content
+        if not ui.groupBox_nfo_lib_batch.isChecked():
+            changed = False
+            if left_gap.height() != 0:
+                left_gap.setFixedHeight(0)
+                changed = True
+            if preview_gap.height() != 0:
+                preview_gap.setFixedHeight(0)
+                changed = True
+            if changed:
+                # 间隙从非零归零改了布局，外层必须同步重排，否则高度还按旧间隙分
+                # （与主分支末尾同理；子控件显隐/定高都只抛 LayoutRequest）。
+                layout = content.layout()
+                if layout is not None:
+                    layout.invalidate()
+                    layout.activate()
+            return
+        if content.height() <= 0:
+            return
+        # 先落定一次再量：排在前面的 _sync_nfo_lib_batch_panel 刚改过 hint 下限，
+        # 只调了 setMinimumHeight（只抛 LayoutRequest），此时量到的是旧几何。
+        layout = content.layout()
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
+        origin = QPoint(0, 0)
+        ref = ui.pushButton_nfo_lib_save.mapTo(content, origin).y() + ui.pushButton_nfo_lib_save.height()
+        left_bottom = (
+            ui.pushButton_nfo_lib_batch_save.mapTo(content, origin).y()
+            + ui.pushButton_nfo_lib_batch_save.height()
+        )
+        crop_bottom = ui.pushButton_nfo_lib_crop.mapTo(content, origin).y() + ui.pushButton_nfo_lib_crop.height()
+        left_want = max(0, left_gap.height() + (left_bottom - ref))
+        if left_gap.height() != left_want:
+            left_gap.setFixedHeight(left_want)
+        preview_want = max(0, preview_gap.height() + (crop_bottom - ref))
+        if preview_gap.height() != preview_want:
+            preview_gap.setFixedHeight(preview_want)
+        layout = content.layout()
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
 
     def _nfo_lib_form_rows(self) -> list[tuple[QWidget | None, QWidget | None]]:
         """列出信息管理表单 QFormLayout 每一行的 (标签控件, 字段控件)。
@@ -5529,6 +5614,11 @@ class MyMAinWindow(QMainWindow):
         # 省下的高度自动回到上方 Expanding 的 NFO 列表。必须排在按钮同步之后：
         # 那里会对 gridLayout_nfo_lib_batch 做 invalidate/activate，分组宽高到此才是终态。
         self._sync_nfo_lib_batch_panel()
+
+        # 三按钮底边对齐：左间隙/右间隙按表单保存按钮底边重算（需求 3）。
+        # 必须排在 _sync_nfo_lib_batch_panel 之后——hint 下限变化会改分组高，
+        # 进而改左按钮底边，排前面量到的是旧值。
+        self._sync_nfo_lib_action_row()
 
         # ============ page_setting / 命名页: 模板预览固定高度 + 说明文字贴合 ============
         self._sync_naming_template_section()

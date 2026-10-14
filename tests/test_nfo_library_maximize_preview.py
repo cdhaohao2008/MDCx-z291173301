@@ -70,6 +70,12 @@ def win(app, monkeypatch, tmp_path):
         "qtr",
         lambda relative_path: str(MAIN_PATH / "resources" / relative_path),
     )
+    from mdcx.config.manager import manager
+
+    # 展开态 deterministic：本文件多处断言展开态几何，不钉死就会读到
+    # 开发者本机的真实配置导致几何漂移；落盘桩防止测试写脏仓库 config.json。
+    monkeypatch.setattr(manager.config, "nfo_lib_batch_expanded", True)
+    monkeypatch.setattr(manager, "save", lambda: None, raising=False)
     monkeypatch.chdir(tmp_path)
 
     window = mw_mod.MyMAinWindow()

@@ -65,6 +65,12 @@ def win(app, monkeypatch, tmp_path):
         "qtr",
         lambda relative_path: str(MAIN_PATH / "resources" / relative_path),
     )
+    from mdcx.config.manager import manager
+
+    # 展开态 deterministic：init 会从 manager.config 恢复上次的勾选状态，
+    # 不钉死就会读到开发者本机的真实配置；落盘桩防止测试写脏仓库 config.json。
+    monkeypatch.setattr(manager.config, "nfo_lib_batch_expanded", True)
+    monkeypatch.setattr(manager, "save", lambda: None, raising=False)
     monkeypatch.chdir(tmp_path)
 
     window = mw_mod.MyMAinWindow()
@@ -87,7 +93,7 @@ def nfo_lib_page(win, app, tmp_path):
     else:
         raise AssertionError("page_nfo_library not found")
 
-    # 分组默认折叠：本文件测的是展开态下的收紧，先走用户真实路径勾选展开
+    # 默认展开（config 已钉 True）：仍显式勾选一次确保展开态
     win.Ui.groupBox_nfo_lib_batch.setChecked(True)
     for number in range(1, 40):
         win.Ui.listWidget_nfo_lib.addItem(f"MKBD-S{number:02d}-U")
@@ -175,7 +181,11 @@ def test_writing_status_text_does_not_need_manual_sync(win, app, nfo_lib_page):
 
 
 def test_height_is_transferred_from_panel_to_list(win, app, nfo_lib_page, monkeypatch):
-    """省下的高度确实回到 NFO 列表：分组高 + 列表高恒定（既没丢也没多）。"""
+    """省下的高度确实回到 NFO 列表：分组高 + 列表高 + 左间隙恒定（既没丢也没多）。
+
+    左间隙（widget_nfo_lib_left_gap）是按钮行对齐垫的，收紧/钉死两态下基准
+    （表单保存按钮底边）不动，间隙高度跟着变，故恒定式里要把它算上。
+    """
     ui = win.Ui
     hint = ui.label_nfo_lib_batch_hint
     win.resize(1280, 800)
@@ -185,24 +195,32 @@ def test_height_is_transferred_from_panel_to_list(win, app, nfo_lib_page, monkey
 
     tight_group = ui.groupBox_nfo_lib_batch.height()
     tight_list = ui.listWidget_nfo_lib.height()
+    tight_gap = ui.widget_nfo_lib_left_gap.height()
 
     # 屏蔽本轮同步、把下限钉回 .ui 设计值 = 还原「收紧前」的旧状态。
     # 必须屏蔽：_sync_page_layouts 内含 _sync_nfo_lib_batch_panel，会把下限又按实测改回去。
+    # （_sync_nfo_lib_action_row 不屏蔽：它只按基准重算间隙，基准没动就不捣乱。）
     monkeypatch.setattr(win, "_sync_nfo_lib_batch_panel", lambda: None)
     hint.setMinimumHeight(_DESIGN_FLOOR)
     app.processEvents()
 
     loose_group = ui.groupBox_nfo_lib_batch.height()
     loose_list = ui.listWidget_nfo_lib.height()
+    loose_gap = ui.widget_nfo_lib_left_gap.height()
     assert loose_group > tight_group, f"钉回 {_DESIGN_FLOOR}px 下限后分组没有变高: {tight_group} -> {loose_group}"
     assert loose_list < tight_list, f"分组变高时列表没有让出等量高度: {tight_list} -> {loose_list}"
-    assert loose_group + loose_list == tight_group + tight_list, (
-        f"高度没有等量转移: 收紧 {tight_group}+{tight_list} vs 钉死 {loose_group}+{loose_list}"
+    assert loose_group + loose_list + loose_gap == tight_group + tight_list + tight_gap, (
+        f"高度没有等量转移: 收紧 {tight_group}+{tight_list}+{tight_gap} vs 钉死 {loose_group}+{loose_list}+{loose_gap}"
     )
 
 
-def test_blank_actually_removed_below_batch_save(win, app, nfo_lib_page, monkeypatch):
-    """收紧后「批量保存」下缘到分组底边的空白要比钉死 64px 时小。"""
+def test_no_blank_below_batch_save_regardless_of_hint_floor(win, app, nfo_lib_page, monkeypatch):
+    """批量保存下方无空白：状态行已移到保存上方、grid 底边距为 0，
+    保存下缘到分组底边只剩 GroupBox 自身边框——与 hint 下限无关（恒定且小）。
+
+    历史形态：状态行在保存下方占一整行 + grid 底边距 9px，hint 下限 64 时
+    下方空白巨大；现结构上就不可能再空出来，本用例锁死这条性质。
+    """
     ui = win.Ui
     save = ui.pushButton_nfo_lib_batch_save
     group = ui.groupBox_nfo_lib_batch
@@ -219,7 +237,10 @@ def test_blank_actually_removed_below_batch_save(win, app, nfo_lib_page, monkeyp
     app.processEvents()
     loose_gap = group.height() - (save.geometry().y() + save.height())
 
-    assert tight_gap < loose_gap, f"「批量保存」下方空白未减少: {tight_gap} vs {loose_gap}"
+    assert tight_gap == loose_gap, f"保存下方空白随 hint 下限变化: {tight_gap} vs {loose_gap}"
+    # 只剩 GroupBox 边框：远小于旧形态（状态行 14 + 间隔 6 + 底边距 9）。
+    # 上限按边框量级给（离屏 Fusion 下实测 3），字体无关。
+    assert tight_gap <= 8, f"「批量保存」下方仍有空白: {tight_gap}"
 
 
 @pytest.mark.parametrize("size", _SIZES)

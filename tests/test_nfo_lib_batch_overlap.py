@@ -57,6 +57,12 @@ def win(app, monkeypatch, tmp_path):
         "qtr",
         lambda relative_path: str(MAIN_PATH / "resources" / relative_path),
     )
+    from mdcx.config.manager import manager
+
+    # 展开态 deterministic：init 会从 manager.config 恢复上次的勾选状态，
+    # 不钉死就会读到开发者本机的真实配置；落盘桩防止测试写脏仓库 config.json。
+    monkeypatch.setattr(manager.config, "nfo_lib_batch_expanded", True)
+    monkeypatch.setattr(manager, "save", lambda: None, raising=False)
     monkeypatch.chdir(tmp_path)
 
     window = mw_mod.MyMAinWindow()
@@ -79,7 +85,7 @@ def nfo_lib_page(win, app):
             break
     else:
         raise AssertionError("page_nfo_library not found")
-    # 分组默认折叠：重叠只可能发生在展开态，先走用户真实路径勾选展开
+    # 默认展开（config 已钉 True）：仍显式勾选一次确保展开态，测最占地方的状态
     win.Ui.groupBox_nfo_lib_batch.setChecked(True)
     app.processEvents()
     return page

@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 )
 
 from mdcx.config.extend import get_movie_path_setting
+from mdcx.config.manager import manager
 from mdcx.config.resources import resources
 from mdcx.consts import GITHUB_RELEASES_URL, IS_WINDOWS
 from mdcx.crawlers import get_registered_crawler_site_values
@@ -793,11 +794,24 @@ def Init_Singal(self: "MyMAinWindow"):
     self.Ui.pushButton_nfo_lib_batch_series.clicked.connect(self.pushButton_nfo_lib_batch_series_clicked)
     self.Ui.pushButton_nfo_lib_batch_save.clicked.connect(self.pushButton_nfo_lib_batch_save_clicked)
     self.Ui.groupBox_nfo_lib_batch.toggled.connect(self._on_nfo_lib_batch_toggled)
-    self._on_nfo_lib_batch_toggled(False)  # .ui 声明 checkable + unchecked 即默认折叠，标题栏留给用户勾选展开
+    # 批量操作默认勾选展开，去勾隐藏；状态记入配置文件，重启恢复（需求 4）。
+    # manager 在导入时已从磁盘加载配置，这里读到的是上次退出的真实值。
+    self._nfo_lib_batch_ready = False  # 恢复期间 toggled 只做显隐，不写盘
+    self.Ui.groupBox_nfo_lib_batch.setChecked(manager.config.nfo_lib_batch_expanded)
+    self._nfo_lib_batch_ready = True
     # QLayout.setStretchFactor 只接受 QWidget/QLayout 对象；按 index 设置用 QBoxLayout.setStretch
-    self.Ui.nfo_lib_content_layout.setStretch(0, 2)
-    self.Ui.nfo_lib_content_layout.setStretch(1, 3)
-    self.Ui.nfo_lib_content_layout.setStretch(2, 0)
+    # 三栏 1:1:1：左栏（列表 + 批量保存）/ 中栏（表单 + 保存当前nfo文件）/
+    # 右栏（预览 + 裁剪封面）等宽，三按钮各自铺满所在栏 → 三按钮 1:1:1，
+    # 最大化时布局同步放大（需求 2）。
+    self.Ui.nfo_lib_content_layout.setStretch(0, 1)
+    self.Ui.nfo_lib_content_layout.setStretch(1, 1)
+    self.Ui.nfo_lib_content_layout.setStretch(2, 1)
+    # 右栏：海报 / 缩略图 1:1 均分裁剪封面上方的高度，裁剪封面沉底，
+    # 末尾间隙 widget 高度由 _sync_nfo_lib_action_row 按对齐基准重算（需求 3）。
+    self.Ui.nfo_lib_preview_layout.setStretch(0, 1)
+    self.Ui.nfo_lib_preview_layout.setStretch(1, 1)
+    self.Ui.nfo_lib_preview_layout.setStretch(2, 0)
+    self.Ui.nfo_lib_preview_layout.setStretch(3, 0)
     self.Ui.pushButton_select_local_library.clicked.connect(self.pushButton_select_local_library_clicked)
     self.Ui.pushButton_select_netdisk_path.clicked.connect(self.pushButton_select_netdisk_path_clicked)
     self.Ui.pushButton_select_localdisk_path.clicked.connect(self.pushButton_select_localdisk_path_clicked)
