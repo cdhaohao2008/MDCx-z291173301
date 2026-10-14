@@ -177,5 +177,5 @@ def test_window_titles_unchanged(dlg):
     """两处窗口标题（系统窗口框绘制, 不随 QSS 放大）文案保持原样。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorSettingsDialog
 
-    assert dlg.windowTitle() == "Emby/Jellyfin演员管理工具"
+    assert dlg.windowTitle() == "Emby/Jellyfin演员管理器"
     assert EmbyActorSettingsDialog(dlg).windowTitle() == "Emby/Jellyfin 演员设置"

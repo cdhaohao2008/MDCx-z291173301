@@ -156,7 +156,7 @@ def test_update_probe_fail_prompts_connect(dlg, monkeypatch):
     captured = _patch_server(monkeypatch, probe_ok=False, detail=None)
     ok, msg = asyncio.run(dlg._do_update_async("测试演员", None, "新简介", "", "", [], []))
     assert ok is False
-    assert "演员管理工具主页面" in msg
+    assert "演员管理器主页面" in msg
     assert captured == {}
 
 
