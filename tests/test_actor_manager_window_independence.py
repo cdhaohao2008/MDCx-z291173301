@@ -1,4 +1,4 @@
-"""议题 #79：演员管理器（单独弹窗）不干扰主窗最小化状态.
+"""议题 #79：演员管理工具（单独弹窗）不干扰主窗最小化状态.
 
 根因（Windows 原生边框）：主窗最小化后，对 actor manager 调 raise_()/
 activateWindow() 会联动升起最小化的主窗（Qt 派自 native window 处理）。

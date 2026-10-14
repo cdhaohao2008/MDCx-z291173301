@@ -1,10 +1,10 @@
 """
-议题 #57 回归测试：NFO 库管理保存后字段丢失检测
+议题 #57 回归测试：NFO 文件管理保存后字段丢失检测
 
 覆盖场景：
 - P1：单条保存后 originalplot 丢失（表单没有该字段，但从空 CrawlersResult 组装时未保留原值）
 - P2：get_nfo_data 读取时 outline 为空、只有 originalplot 时无法读取简介
-- P3：标签顺序在 NFO 库管理保存时被 prioritize_nfo_tags 重排
+- P3：标签顺序在 NFO 文件管理保存时被 prioritize_nfo_tags 重排
 """
 
 from types import SimpleNamespace
@@ -125,7 +125,7 @@ async def test_nfo_read_falls_back_to_originalplot(monkeypatch: pytest.MonkeyPat
 
 @pytest.mark.asyncio
 async def test_nfo_save_preserves_user_tag_order(monkeypatch: pytest.MonkeyPatch, tmp_path):
-    """P3：NFO 库管理保存后标签顺序不应被 prioritize_nfo_tags 重排。"""
+    """P3：NFO 文件管理保存后标签顺序不应被 prioritize_nfo_tags 重排。"""
     _configure_nfo_writer(monkeypatch)
     # 确保 priority mapping 不是空的（否则不会触发重排）
     monkeypatch.setattr(
@@ -162,7 +162,7 @@ async def test_nfo_save_preserves_user_tag_order(monkeypatch: pytest.MonkeyPatch
     assert tag_texts[0] == "M女", f"主刮削路径标签应重排优先, 实际: {tag_texts}"
     assert tag_texts == ["M女", "巨乳", "其他标签"]
 
-    # NFO 库管理场景：用户手动把"其他标签"调整到最后 -> 保存后顺序不变
+    # NFO 文件管理场景：用户手动把"其他标签"调整到最后 -> 保存后顺序不变
     loaded, _ = await nfo_module.get_nfo_data(file_info.file_path, "ABC-123")
     assert loaded is not None
     # 模拟用户在表单中把 tag 改为 "巨乳,M女,其他标签"（把 M女 放巨乳后）
@@ -172,5 +172,5 @@ async def test_nfo_save_preserves_user_tag_order(monkeypatch: pytest.MonkeyPatch
     )
     root2 = etree.fromstring(nfo_file.read_text(encoding="utf-8").encode("utf-8"))
     tag_texts2 = root2.xpath("//tag/text()")
-    # NFO库管理保存后顺序应被完整保留（哪怕 M女 在优先级列表中仍被 Relocate 到前部）
-    assert tag_texts2 == ["巨乳", "M女", "其他标签"], f"NFO库管理应保留用户顺序, 实际: {tag_texts2}"
+    # NFO 文件管理保存后顺序应被完整保留（哪怕 M女 在优先级列表中仍被 Relocate 到前部）
+    assert tag_texts2 == ["巨乳", "M女", "其他标签"], f"NFO 文件管理应保留用户顺序, 实际: {tag_texts2}"

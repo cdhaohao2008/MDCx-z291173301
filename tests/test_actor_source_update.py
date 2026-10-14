@@ -2,7 +2,7 @@
 
 需求：获取头像/简介完成后，点更新数据把数据写回 Emby/Jellyfin 对应演员；
 空字段保留服务器原数据，只有有具体值/图像的字段才更新；未连接时提示去
-演员管理器主页面连接；未获取到数据时不执行。
+演员管理工具主页面连接；未获取到数据时不执行。
 """
 
 from __future__ import annotations
@@ -156,7 +156,7 @@ def test_update_probe_fail_prompts_connect(dlg, monkeypatch):
     captured = _patch_server(monkeypatch, probe_ok=False, detail=None)
     ok, msg = asyncio.run(dlg._do_update_async("测试演员", None, "新简介", "", "", [], []))
     assert ok is False
-    assert "演员管理器主页面" in msg
+    assert "演员管理工具主页面" in msg
     assert captured == {}
 
 

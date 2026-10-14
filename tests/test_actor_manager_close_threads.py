@@ -1,4 +1,4 @@
-"""议题 #175 回归：获取数据中关闭演员管理器不得拆掉仍在跑的 QThread。
+"""议题 #175 回归：获取数据中关闭演员管理工具不得拆掉仍在跑的 QThread。
 
 根因：窗口 WA_DeleteOnClose，工作线程 parent=窗口；closeEvent 只等
 _fetch/_preview/_sync 三根，且 FetchActorsThread 没有可打断的 cancel，

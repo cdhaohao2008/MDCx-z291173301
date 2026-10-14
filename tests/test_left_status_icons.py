@@ -32,7 +32,7 @@ OLD_REPO = "cdlongbow/mdcx-diy"
 # show_scrape_info / new_version 中必须逐字存在的图标行（删任一即报红）。
 # 与 docs/Development.md「左下角状态区图标规范」保持同步，改规范先改文档再改此处。
 _REQUIRED_ICON_LITERALS = (
-    "💡 单文件刮削",
+    "💡 单个文件刮削",
     "💠 {Flags.main_mode_text}",
     "💡 {manager.config.website_single} 刮削",
     "🍯 软链接·开",

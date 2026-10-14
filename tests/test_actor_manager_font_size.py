@@ -1,7 +1,7 @@
-"""演员管理器整体字号放大一号回归。
+"""演员管理工具整体字号放大一号回归。
 
-需求: 演员管理器（主窗 + 设置 / 数据源测试 / 演员详情 / 选择媒体库 等子窗口）字体
-全部大一号; 例外只有左上角窗口标题「Emby/Jellyfin演员管理器」与设置窗口标题
+需求: 演员管理工具（主窗 + 设置 / 数据源测试 / 演员详情 / 选择媒体库 等子窗口）字体
+全部大一号; 例外只有左上角窗口标题「Emby/Jellyfin演员管理工具」与设置窗口标题
 「Emby/Jellyfin 演员设置」——两者都由系统窗口框绘制, QSS 天然不覆盖, 无需额外排除代码
 (下方 test_window_titles_unchanged 把这两条标题文案钉住, 防止有人改用「换标题」绕开)。
 
@@ -177,5 +177,5 @@ def test_window_titles_unchanged(dlg):
     """两处窗口标题（系统窗口框绘制, 不随 QSS 放大）文案保持原样。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorSettingsDialog
 
-    assert dlg.windowTitle() == "Emby/Jellyfin演员管理器"
+    assert dlg.windowTitle() == "Emby/Jellyfin演员管理工具"
     assert EmbyActorSettingsDialog(dlg).windowTitle() == "Emby/Jellyfin 演员设置"

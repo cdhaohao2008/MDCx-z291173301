@@ -59,7 +59,7 @@ def test_main_window_startup_no_crash(app, monkeypatch, tmp_path):
 
 
 def test_emby_actor_manager_dialog_startup_no_crash(app):
-    """Emby 演员管理器对话框完整构造不抛异常。
+    """Emby 演员管理工具对话框完整构造不抛异常。
 
     覆盖 _init_ui 全部 Qt 控件构造路径（QSplitter/表格/日志区等），
     配合主窗口冒烟测试，防止 PyQt6 签名不兼容类问题推迟到用户
@@ -69,7 +69,7 @@ def test_emby_actor_manager_dialog_startup_no_crash(app):
 
     dlg = EmbyActorManagerDialog()
     try:
-        assert dlg.windowTitle() == "Emby/Jellyfin演员管理器"
+        assert dlg.windowTitle() == "Emby/Jellyfin演员管理工具"
     finally:
         dlg.close()
         dlg.deleteLater()
@@ -77,7 +77,7 @@ def test_emby_actor_manager_dialog_startup_no_crash(app):
 
 
 def test_emby_actor_settings_dialog_startup_no_crash(app):
-    """Emby 演员管理器设置对话框完整构造不抛异常。"""
+    """Emby 演员管理工具设置对话框完整构造不抛异常。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorSettingsDialog
 
     dlg = EmbyActorSettingsDialog()

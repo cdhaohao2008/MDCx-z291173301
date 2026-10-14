@@ -1,8 +1,8 @@
-"""话题 #159：主窗隐藏后关闭演员管理器不得退出主程序。
+"""话题 #159：主窗隐藏后关闭演员管理工具不得退出主程序。
 
 根因：Qt 默认 quitOnLastWindowClosed=True，关闭最后一个**可见**顶层窗口
 即触发 `QApplication.quit()`。主窗经托盘 `hide()` 后不再是可见窗口，
-演员管理器（无父级、非模态 `show()` 的 QDialog）成为最后一个可见窗口，
+演员管理工具（无父级、非模态 `show()` 的 QDialog）成为最后一个可见窗口，
 用户关闭它 → Qt 判定"最后窗口已关闭" → 事件 loop 退出 → 整个程序退出。
 
 修复：`main.py::_create_application` 设置 `setQuitOnLastWindowClosed(False)`，

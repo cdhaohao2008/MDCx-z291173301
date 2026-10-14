@@ -1,7 +1,7 @@
 """封面补图组三选项行：上移归属 + 最大化等距拉开的回归测试。
 
 背景（用户截图两条诉求）：
-1) 「刮削过程中自动创建软链接」从软链接助手组 groupBox_21 上移到封面补图组
+1) 「刮削过程中自动创建软链接」从链接生成助手组 groupBox_21 上移到封面补图组
    groupBox_cover_backfill 内「添加水印」右侧，左右位置不变（两组的 .ui 设计 x
    同为 30、宽同为 701，故屏上绝对位置不变；设计态三框 y 中心同为 135 保持同心）。
 2) 最大化（组框被 CustomScrollArea 通用逻辑拉宽）时三枚复选框的间距同步拉开。
@@ -121,7 +121,7 @@ def test_create_link_moved_into_cover_backfill_group(win, app):
     ui = _tool_page_sync(win, app, 1170)
     box = ui.groupBox_cover_backfill
     assert ui.checkBox_create_link.parentWidget() is box, "软链接复选框应已移入封面补图组"
-    # 软链接助手组内不得再留同名控件（否则 setGeometry 走错父组）
+    # 链接生成助手组内不得再留同名控件（否则 setGeometry 走错父组）
     assert ui.groupBox_21.findChild(type(ui.checkBox_create_link), "checkBox_create_link") is None
 
 

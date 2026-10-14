@@ -1,4 +1,4 @@
-"""议题 #25 回归：演员管理器任务会话代数，防旧线程排队回调覆盖新会话状态。
+"""议题 #25 回归：演员管理工具任务会话代数，防旧线程排队回调覆盖新会话状态。
 
 背景：cancel→快速重开场景下，旧 QThread 已 emit 进事件队列的 progress/done 回调
 会晚于新线程启动到达，覆盖 self._actors/进度条/按钮态（mdcz MaintenanceSession
