@@ -14608,7 +14608,7 @@ class Ui_MDCx(object):
                 "<li><b>有码</b>：仅能有码：AVBase、AVMOO、DMM、DMM_API、FreeJavBT、Getchu、JavLibrary、LibreDMM、Lulubar、MGStage、Prestige、R18.dev、TheJavDB_API、Xcity</li>\n"
                 "<li><b>综合</b>：有码+无码：7mmtv、airav.cc、AVSex、IQQTV、JavBus、JavDB系列、JavDay、JavFree、MissAV系列、Official</li>\n"
                 "<li><b>无码</b>：AVEntertainments、AVSOX及综合站（7mmtv、AVSex、IQQTV、JavBus、JavDB系、JavDay、MissAV系、Official）</li>\n"
-                "<li><b>素人</b>：MGStage（259LUXU等）、Prestige、JavBus、JavDB系、DMM、DMM_API、AVBase、MissAV系、MyWife、IQQTV、7mmtv</li>\n"
+                "<li><b>素人</b>：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB系、MGStage、MissAV系、MyWife、Prestige</li>\n"
                 "<li><b>FC2</b>：FC2、FC2PPVDB、JavDB系、JavFree、7mmtv</li>\n"
                 "<li><b>国产</b>：Madouqu、Madou_Club、AVSex、IQQTV、JavDay</li>\n"
                 "<li><b>欧美</b>：ThepornDB、AVheat</li>\n"
