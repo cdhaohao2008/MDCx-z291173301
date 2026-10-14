@@ -380,6 +380,7 @@ _SITE_TIP_QSS = (
     "QWidget#siteTip{border:1px solid #D8DEE9;border-radius:8px;background:#FFFFFF;color:#111827;padding:9px 10px;}"
 )
 _UNLIMITED_SIZE = 1 << 30  # 放开 setFixedXxx 用；PyQt6 没有导出 QWIDGETSIZE_MAX
+_TIP_GAP_PX = 5  # 提示窗与 anchor（选项/框体下沿）之间的间隔：原 16px 太远，贴着选项下沿 5px
 
 
 class _SiteTipLabel(QLabel):
@@ -458,16 +459,16 @@ class _SiteTipLabel(QLabel):
 
 
 def _clamp_tip_pos(anchor: QPoint, width: int, height: int) -> QPoint:
-    """提示窗贴 anchor 下沿弹出，并夹在所在屏幕可用区内（夹到屏外就等于没显示）。"""
+    """提示窗贴 anchor 下沿弹出（间隔 `_TIP_GAP_PX`），并夹在所在屏幕可用区内（夹到屏外就等于没显示）。"""
     x = anchor.x()
-    y = anchor.y() + 16
+    y = anchor.y() + _TIP_GAP_PX
     screen = QApplication.screenAt(anchor) or QApplication.primaryScreen()
     geo = screen.availableGeometry() if screen is not None else QRect()
     if geo.isValid():
         if x + width > geo.right():
             x = geo.right() - width + 1
         if y + height > geo.bottom():
-            y = anchor.y() - height - 8  # 下方放不下就翻到上方
+            y = anchor.y() - height - _TIP_GAP_PX  # 下方放不下就翻到上方（间隔同样取 _TIP_GAP_PX）
         x = max(geo.left(), x)
         y = max(geo.top(), y)
     return QPoint(x, y)

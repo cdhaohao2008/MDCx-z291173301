@@ -395,6 +395,27 @@ def test_tip_pos_clamped_inside_screen(tip):
     assert pos.x() >= geo.left() and pos.y() >= geo.top()
 
 
+def test_tip_sits_five_px_below_anchor(tip):
+    """提示窗上边界紧贴选项下沿、间隔 5px（用户要求；原 16px 看着离选项太远）。
+
+    下方放不下翻到上方时，间隔同样取 5px，两个方向不能一边近一边远。
+    """
+    _ensure_app()
+    screen = QApplication.primaryScreen()
+    assert screen is not None
+    geo = screen.availableGeometry()
+    gap = init_mod._TIP_GAP_PX
+    assert gap == 5, "间隔按用户要求固定 5px"
+
+    anchor = QPoint(geo.left() + 100, geo.top() + 100)
+    pos = init_mod._clamp_tip_pos(anchor, 300, 40)
+    assert pos.y() - anchor.y() == gap, "弹在下方时上边界应距 anchor 下沿 5px"
+
+    anchor_low = QPoint(geo.left() + 100, geo.bottom() - 10)
+    pos = init_mod._clamp_tip_pos(anchor_low, 300, 40)
+    assert anchor_low.y() - (pos.y() + 40) == gap, "翻到上方时下边界应距 anchor 上沿 5px"
+
+
 def test_populated_site_combo_tooltip_only_carries_check_result(monkeypatch):
     """tooltip 只留「上次检测」一行：定位说明按用户要求删除（选项显示文本里本来就有）。"""
     _ensure_app()
