@@ -374,14 +374,14 @@ def test_select_fingerprint_lulubar_retry_excludes_last():
 
 def test_select_fingerprint_madou_club_uses_safari_pool():
     """madou.club 的 CF 对桌面指纹拦截强，应命中 Safari 专属池."""
-    from mdcx.network_fingerprint import _Madou_Club_FINGERPRINTS, select_fingerprint
+    from mdcx.network_fingerprint import _Madou_club_FINGERPRINTS, select_fingerprint
 
     for _ in range(8):
         fp = select_fingerprint("madou.club")
-        assert fp in _Madou_Club_FINGERPRINTS
+        assert fp in _Madou_club_FINGERPRINTS
         assert fp.impersonate in ("safari17_2_ios", "chrome131")
 
-    assert select_fingerprint("www.madou.club") in _Madou_Club_FINGERPRINTS
+    assert select_fingerprint("www.madou.club") in _Madou_club_FINGERPRINTS
 
 
 def test_select_fingerprint_missav_uses_safari_firefox_pool():

@@ -192,7 +192,7 @@ _MADOUQU_FINGERPRINTS = (_CHROME_136_WIN, _FIREFOX_133_WIN)
 _LULUBAR_FINGERPRINTS = (_SAFARI_17_2_IOS, _CHROME_131_WIN)
 # madou.club 的 CF 对桌面指纹拦截较强，实测仅 Safari iOS 指纹稳定通过（2026-08），
 # 附带 chrome131 提供重试轮换空间
-_Madou_Club_FINGERPRINTS = (_SAFARI_17_2_IOS, _CHROME_131_WIN)
+_Madou_club_FINGERPRINTS = (_SAFARI_17_2_IOS, _CHROME_131_WIN)
 # missav 的 CF 对 Chrome 系指纹拦截强（chrome123/124/136 实测全拦），Safari iOS 与
 # Firefox133 稳定通过（各 3/3，2026-08），双池随机降低单指纹被针对识别的风险
 _MISSAV_FINGERPRINTS = (_SAFARI_17_2_IOS, _FIREFOX_133_WIN)
@@ -228,7 +228,7 @@ def select_fingerprint(
     if normalized_host == "madouqu.com" or normalized_host.endswith(".madouqu.com"):
         return _choose_fingerprint(_MADOUQU_FINGERPRINTS, exclude_fingerprint_id=exclude_fingerprint_id)
     if normalized_host == "madou.club" or normalized_host.endswith(".madou.club"):
-        return _choose_fingerprint(_Madou_Club_FINGERPRINTS, exclude_fingerprint_id=exclude_fingerprint_id)
+        return _choose_fingerprint(_Madou_club_FINGERPRINTS, exclude_fingerprint_id=exclude_fingerprint_id)
     if normalized_host == "lulubar.co" or normalized_host.endswith(".lulubar.co"):
         return _choose_fingerprint(_LULUBAR_FINGERPRINTS, exclude_fingerprint_id=exclude_fingerprint_id)
     # missav 多镜像域名（DomainRotator 轮换），指纹池需全覆盖避免切换后回落通用池
