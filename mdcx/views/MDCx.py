@@ -14609,7 +14609,7 @@ class Ui_MDCx(object):
                 "<li><b>综合</b>：7mmtv、airav.cc、AVSex、IQQTV、JavBus、JavDay、JavDB、JavFree、MissAV、Official</li>\n"
                 "<li><b>无码</b>：AVEntertainments、AVSOX</li>\n"
                 "<li><b>素人</b>：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MyWife、Prestige</li>\n"
-                "<li><b>FC2</b>：7mmtv、FC2、FC2PPVDB、JavDB、JavFree</li>\n"
+                "<li><b>FC2 ：</b>7mmtv、FC2、FC2PPVDB、JavDB、JavFree</li>\n"
                 "<li><b>国产</b>：AVSex、IQQTV、JavDay、Madou_club、Madouqu</li>\n"
                 "<li><b>欧美</b>：AVheat、ThepornDB</li>\n"
                 "</ul>\n"

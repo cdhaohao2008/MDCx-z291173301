@@ -423,13 +423,69 @@ signals_module.set_signal = lambda signal_instance: None
 sys.modules.setdefault("mdcx.signals", signals_module)
 
 
+def _teardown_qt():
+    """解释器退出前按正确顺序销毁 Qt 对象，避免 Windows 下 DLL 卸载时析构崩溃。
+
+    实证：用例构造过 MyMAinWindow/QDialog 后（各含 QSystemTrayIcon、未关闭的顶层
+    窗口），即使走 os._exit(0) 跳过解释器收尾，进程退出时 Qt DLL 卸载仍会因存活
+    的 C++ 对象而 access violation。因此先在 Python 侧主动清理：隐藏托盘图标、
+    关闭顶层窗口、处理延后删除、退出 QApplication，最后 gc 回收。
+    任何一步遇到已销毁的 C++ 对象（RuntimeError）都跳过，保证清理本身不抛异常。
+    """
+    try:
+        from PyQt6.QtWidgets import QApplication, QSystemTrayIcon
+    except ImportError:
+        return
+    try:
+        app = QApplication.instance()
+        if app is None:
+            return
+        for widget in app.topLevelWidgets():
+            try:
+                for tray in widget.findChildren(QSystemTrayIcon):
+                    try:
+                        tray.hide()
+                    except RuntimeError:
+                        pass
+                widget.close()
+                widget.deleteLater()
+            except RuntimeError:
+                pass
+        try:
+            app.processEvents()
+        except RuntimeError:
+            pass
+        try:
+            app.quit()
+        except RuntimeError:
+            pass
+        # QApplication 自身必须也在 Python 侧销毁：若留给 DLL 卸载时析构必崩。
+        # 各测试模块的 _app 全局引用此时已成悬空包装，os._exit 前不再触碰 Qt 即安全。
+        try:
+            from PyQt6 import sip
+
+            inst = QApplication.instance()
+            if inst is not None:
+                sip.delete(inst)
+        except (RuntimeError, ValueError, ImportError):
+            pass
+    except Exception:
+        pass
+    finally:
+        import gc
+
+        gc.collect()
+
+
 def pytest_sessionfinish(session, exitstatus):
     # Windows runner 实证：同进程构造多个 MyMAinWindow（各含 QSystemTrayIcon）
     # 时，解释器收尾阶段的 Qt C++ 对象析构会段错误——Linux 表现为 SIGSEGV(139)、
     # Windows 表现为 abort(退码 1)，且都发生在"全部用例已通过、汇总已打印"之后。
-    # 全部通过时直接 os._exit(0) 跳过解释器收尾，绕开析构崩溃；有失败时走正常
-    # 退出路径，保留 pytest 的完整失败报告与退出码语义。
+    # 因此退出前先 _teardown_qt() 主动销毁 Qt 对象；全部通过时再 os._exit(0)
+    # 跳过解释器收尾，绕开残余析构崩溃；有失败时走正常退出路径，保留 pytest 的
+    # 完整失败报告与退出码语义。
     import os
 
+    _teardown_qt()
     if exitstatus == 0:
         os._exit(0)

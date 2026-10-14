@@ -11255,7 +11255,7 @@ class MyMAinWindow(QMainWindow):
   <p>· 动漫/里番：getchu、javdb、javdb_api（锁定「动漫」用此三站；DLID 开头或路径含 getchu/里番/动漫自动用 getchu 单站）</p>
   <p>· Mywife：mywife </p>
   <p>· 素人：7mmtv、avbase、dmm、dmm_api、iqqtv、javbus、javdb、mgstage、missav、missav_api、mywife、prestige </p>
-  <p>· FC2：7mmtv、fc2、fc2ppvdb、javdb、javfree </p>
+  <p>· <b>FC2 ：</b>7mmtv、fc2、fc2ppvdb、javdb、javfree </p>
 </body>
 </html>""")
 

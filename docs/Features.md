@@ -72,7 +72,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 - **无码专属**：aventertainments、avsox
 - **综合（有码+无码）**：javbus、javdb、javdb_api、javdb_app、missav、missav_api、javday、javfree、airav_cc、avsex、official、iqqtv、7mmtv
 - **素人**：7mmtv、avbase、dmm、dmm_api、iqqtv、javbus、javdb、mgstage、missav、missav_api、mywife、prestige
-- **FC2**：7mmtv、fc2、fc2ppvdb、javdb、javfree
+- **FC2 ：**7mmtv、fc2、fc2ppvdb、javdb、javfree
 - **欧美**：avheat、theporndb
 - **国产**：avsex、iqqtv、javday、madou_club、madouqu
 

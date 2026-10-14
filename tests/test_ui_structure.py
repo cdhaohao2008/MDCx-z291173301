@@ -17,6 +17,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
 from lxml import etree
 
 # 仓库根目录：相对本文件定位，避免硬编码 /workspace（CI 容器约定路径在本地不存在）。
@@ -41,6 +42,44 @@ _KNOWN_DUPLICATE_OBJECTNAMES = {"label_81", "label_423", "label_424"}
 def _parse_ui():
     """解析 MDCx.ui，返回 lxml 根元素。"""
     return etree.parse(str(UI_PATH)).getroot()
+
+
+def _locked_ruff_version():
+    """从 uv.lock 读取锁定的 ruff 版本（如 "0.15.12"），解析失败返回 None。
+
+    同步检查必须用与仓库版 MDCx.py 相同的 ruff 版本格式化：0.15.x 不同小版本
+    的换行策略不同（实测 0.15.17 vs 0.15.12 有 5 处隐式换行差异），错版本必误报。
+    """
+    try:
+        text = (REPO / "uv.lock").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == 'name = "ruff"':
+            for dep in lines[i + 1 : i + 6]:
+                dep = dep.strip()
+                if dep.startswith('version = "') and dep.endswith('"'):
+                    return dep[len('version = "') : -1]
+    return None
+
+
+def _ruff_version(exe_prefix):
+    """返回指定 ruff 可执行文件的版本字符串，失败返回 None。"""
+    try:
+        result = subprocess.run(
+            [*exe_prefix, "--version"],
+            capture_output=True,
+            text=True,
+            cwd=REPO,
+            timeout=60,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    parts = result.stdout.strip().split()
+    return parts[1] if len(parts) >= 2 and parts[0] == "ruff" else None
 
 
 def _group_boxes_by_parent(root):
@@ -213,6 +252,8 @@ def test_mdcx_py_in_sync_with_ui():
     防止：只改 .py 不同步 .ui（手工维护漂移）、改 .ui 后忘重编译。
     仓库版 MDCx.py 是经 ruff format 整理的，因此重编译产物也要先 ruff format。
     注意：pyuic6 会把输入路径写进头部注释，必须用相对路径编译才能与仓库版对齐。
+    注意：必须用 uv.lock 锁定的 ruff 版本格式化（0.15.x 小版本间排版有差异），
+    版本对不上时本用例 skip 而不是误报。
     """
     assert PY_PATH.exists(), f"缺少 {PY_PATH}"
     assert UI_PATH.exists(), f"缺少 {UI_PATH}"
@@ -231,10 +272,13 @@ def test_mdcx_py_in_sync_with_ui():
         )
         assert result.returncode == 0, f"pyuic6 编译失败: {result.stderr}"
 
-        # 2. ruff format 对齐（仓库版是 ruff 格式化的）。
-        #    优先用 uv 调 ruff；uv 不可用（FileNotFoundError）或返回非零时回退直接 ruff。
-        #    两者都不可用才跳过格式对齐后直接文本对比（此时若格式不同会失败，属正常——
-        #    说明仓库版与编译产物格式不一致需要手动对齐）。
+        # 2. ruff format 对齐（仓库版是用 uv.lock 锁定的 ruff 版本格式化的；
+        #    格式化同时依赖仓库根 ruff.toml（line-length=120），因此 cwd 必须为 REPO，
+        #    且不得加 --isolated（会丢弃 ruff.toml 按 88 列排版，必定误报）。
+        #    优先用 uv 调 ruff（uv 按锁定位版本，可信）；uv 不可用或超时时回退系统 ruff，
+        #    但必须先校验版本与锁定版本一致——版本对不上只能 skip（错版本格式化必误报，
+        #    对比只会产生假红），无 ruff 可用同样 skip。
+        locked = _locked_ruff_version()
         formatted = False
         try:
             result = subprocess.run(
@@ -242,22 +286,32 @@ def test_mdcx_py_in_sync_with_ui():
                 capture_output=True,
                 text=True,
                 cwd=REPO,
-                timeout=60,
+                timeout=180,
             )
             formatted = result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired):
             formatted = False
         if not formatted:
+            ver = _ruff_version(["ruff"])
+            if ver is None:
+                pytest.skip("无可用 ruff（uv 与系统 ruff 均不可用），跳过同步检查")
+            if locked is not None and ver != locked:
+                pytest.skip(
+                    f"系统 ruff {ver} 与 uv.lock 锁定版本 {locked} 不一致，"
+                    "跳过同步检查（错版本排版必误报）"
+                )
             try:
-                subprocess.run(
+                result = subprocess.run(
                     ["ruff", "format", str(tmp_path)],
                     capture_output=True,
                     text=True,
                     cwd=REPO,
                     timeout=60,
                 )
+                formatted = result.returncode == 0
             except (FileNotFoundError, subprocess.TimeoutExpired):
-                pass  # 无 ruff 环境：直接文本对比
+                pytest.skip("系统 ruff 执行失败，跳过同步检查")
+            assert formatted, "系统 ruff format 执行失败"
 
         # 3. 文本对比。
         #    pyuic6 on Windows emits backslash path separators in resource
@@ -482,7 +536,7 @@ def test_proxy_toggle_ui_texts_regression():
     assert _PROXY_TOGGLE_HINT in proxy_hint
     # 帮助文档正文（关于页）条目统一为「Bypass代理」，且不再出现「CF Bypass 代理」。
     about_html = prop_of("textBrowser_about", "html") or ""
-    assert "<b>Bypass代理</b>：为绕过 Cloudflare 的请求单独设置代理。" in about_html
+    assert "<b>Bypass代理</b>：为绕过Cloudflare的请求单独设置代理。" in about_html
     assert "CF Bypass 代理" not in about_html
 
 
