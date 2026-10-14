@@ -374,7 +374,10 @@ def _event_pos(event) -> QPoint:
 
 
 _SITE_TIP_QSS = (
-    "QWidget#siteTip{border:1px solid #D8DEE9;border-radius:8px;background:#FFFFFF;color:#111827;padding:4px 10px;}"
+    # 上下内边距 9px：原 4px 时单行提示只有 36px 高（用户机器实测），字贴着上下边沿、看着
+    # 又扁又窄；用户要求「再加高 10px 到 46px」，即上下各 +5px——写成内边距而不是给高度
+    # 加常数，折行时每一行也跟着一起长高，仍是行高的整数倍。
+    "QWidget#siteTip{border:1px solid #D8DEE9;border-radius:8px;background:#FFFFFF;color:#111827;padding:9px 10px;}"
 )
 _UNLIMITED_SIZE = 1 << 30  # 放开 setFixedXxx 用；PyQt6 没有导出 QWIDGETSIZE_MAX
 
