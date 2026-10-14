@@ -188,33 +188,37 @@ def test_install_is_idempotent_and_enables_mouse_tracking():
 
 
 def test_tip_height_pinned_to_first_display():
-    """提示窗高度按首显钉死：后续不再忽高忽低（用户反馈 1/2/3 次显示高度不一致）。
+    """提示窗高度按首显钉死、提示文字恒居中（用户反馈 1/2/3 次显示高度不一致）。
 
-    用真实 QToolTip（不替换成假对象）才能拿到 QTipLabel；先手动把提示窗撑高来模拟
-    「某次排版算出更大高度」，再悬停下一行，断言被钉回首显高度；弹窗关闭后钉高要解除。
+    用真实 QToolTip（不替换成假对象）才能拿到 QTipLabel；钉高体现为上下限，离屏平台提示窗
+    从不真正显示，height() 不会随上下限更新，拿它断言会假失败。Qt 每次 showText 都会重新
+    排版提示窗，所以每次悬停后都要重新取，不能缓存引用。
     """
     combo = _make_combo()
     _hover(combo, 0)
     first = init_mod._tip_label()
     assert first is not None, "首显后应能拿到 QTipLabel"
-    first_height = first.sizeHint().height()
-    assert first_height > 0
+    first_height = first.minimumHeight()
+    assert first_height > 0, "首显就要钉住高度，否则忽高忽低的那一次仍会露出来"
+    assert first.maximumHeight() == first_height
+    centered = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter
+    assert first.alignment() == centered, "提示文字要恒为居中，不能随排版漂到上边沿"
 
-    # 钉高体现为上下限（Qt 每次显示的 resize 会被夹住），故断言 minimumHeight：
-    # 离屏平台提示窗从不真正显示，height() 不会随上下限更新，拿它断言会假失败。
-    # Qt 每次 showText 会新建 QTipLabel，所以每次悬停后都要重新取，不能缓存引用。
     _hover(combo, 1)
     label = init_mod._tip_label()
     assert label is not None
     assert label.minimumHeight() == first_height, "后续显示应被钉回首显高度"
+    assert label.alignment() == centered
 
-    _hover(combo, 3)  # 文本更长的另一行，高度同样不能变
-    assert init_mod._tip_label().minimumHeight() == first_height
+    _hover(combo, 3)  # 文本更长的另一行，高度与对齐同样不能变
+    label = init_mod._tip_label()
+    assert label.minimumHeight() == first_height
+    assert label.alignment() == centered
 
-    # 人为把提示窗撑高，模拟「某次排版算出更大高度」，下一次悬停要钉回首显高度
+    # 万一某次排版更高（字体还没加载完走了 fallback），钉高只涨不跌：宁可统一偏高也不裁字
     label.setFixedHeight(first_height + 12)
     _hover(combo, 0)
-    assert init_mod._tip_label().minimumHeight() == first_height
+    assert init_mod._tip_label().minimumHeight() == first_height + 12
 
     # 弹窗关闭要解除钉高：QTipLabel 全进程共用，不能把固定高度留给应用里其它提示
     label = init_mod._tip_label()

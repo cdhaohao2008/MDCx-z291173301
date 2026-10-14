@@ -428,36 +428,38 @@ class _SiteComboTipFilter(QObject):
         rect = view.visualRect(index)
         # 贴着该行下沿弹出：只有「上次检测：…」一行（定位说明已在显示文本里），鼠标停在本行即持续可见
         QToolTip.showText(viewport.mapToGlobal(rect.bottomLeft()), text, viewport, rect)
-        self._pin_tip_height()
+        self._sync_tip_label()
 
-    def _pin_tip_height(self, *, allow_defer: bool = True) -> None:
-        """把提示窗高度钉成首显那次的自然高度，之后每次显示都一样高。
+    def _sync_tip_label(self, *, allow_defer: bool = True) -> None:
+        """把 QToolTip 那个提示窗收拾成稳定的样子：文字恒居中 + 高度按首显钉死。
 
-        Qt 每次显示都会按当下排版结果 `resize()` 提示窗，首显与后续几次排出的高度可能不同，
-        同一段文字的提示框就会忽高忽低。钉上固定高度后 `resize()` 被上下限夹住，视觉高度恒定；
-        取 max(已钉高度, 本次自然高度) 是为了兜住万一某次排版更高的情况，不把文字裁掉。
+        QTipLabel 每次显示都按当下排版结果自己 `resize()`，字体刚加载/没加载完会排出不同
+        高度，同一段「上次检测：…」的提示框就忽高忽低（用户反馈第 1/2/3 次显示高度不一致）。
+        钉上固定高度后 `resize()` 被上下限夹住、视觉高度恒定；取历次最大值是兜住万一某次
+        排版更高，不把文字裁掉。文字对齐则钉成水平+垂直居中：QTipLabel 默认只 AlignLeft，
+        钉高后多出来的那点空白会把字顶到上边沿（看着就是「飘」），居中后每次显示都稳在同一
+        位置；水平居中在提示窗宽度正好等于文字宽度时是无害的。
         """
         label = _tip_label()
         if label is None:
             if allow_defer:
-                # 首显这一次提示窗还没挂上控件树，下一轮事件循环再钉（趁用户还没移到下一行）
-                QTimer.singleShot(0, lambda: self._pin_tip_height(allow_defer=False))
+                # 首显这一次提示窗还没挂上控件树，下一轮事件循环再来（趁用户还没移到下一行）
+                QTimer.singleShot(0, lambda: self._sync_tip_label(allow_defer=False))
             return
+        label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
         pinned = label.minimumHeight()
         if pinned > 0:
-            # 临时解除再读：钉死后 sizeHint 会被固定高度夹住，读出来没意义。
+            # 临时解除再量：钉死后 sizeHint 会被固定高度夹住，读出来没意义。
             # 解除与复原都在同一轮事件内完成，Qt 本来每次显示也会 resize，看不到闪烁。
             label.setFixedHeight(0)
         natural = label.sizeHint().height()
-        if self._tip_height <= 0:
-            self._tip_height = natural  # 首显高度为准
-            if pinned > 0:  # 已有钉高却还没记录过（理论上不该发生），按新值复原
-                label.setFixedHeight(self._tip_height)
+        if natural <= 0:
+            if pinned > 0:
+                label.setFixedHeight(pinned)  # 量不出来就把原钉高还回去，别把提示窗压扁
             return
-        height = max(self._tip_height, natural)
-        self._tip_height = height
-        if pinned != height:
-            label.setFixedHeight(height)
+        self._tip_height = max(self._tip_height, natural)  # 首显那次的自然高度为准
+        if label.minimumHeight() != self._tip_height or label.maximumHeight() != self._tip_height:
+            label.setFixedHeight(self._tip_height)
 
     def _release_tip_height(self) -> None:
         """解除钉高：QTipLabel 是全进程共用的，不能把固定高度留给应用里其它提示。"""
