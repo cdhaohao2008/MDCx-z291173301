@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QPixmap
+from PyQt6.QtGui import QAction, QPixmap, QTextCursor
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -36,6 +36,23 @@ if TYPE_CHECKING:
 
 # NFO 列表项中存储的 data role
 NFO_PATH_ROLE = Qt.ItemDataRole.UserRole + 1
+
+
+def _natural_sort_key(text: str) -> list[tuple[int, object]]:
+    """自然排序键：数字段按数值比，其余按小写文本比，避免 S100 排在 S11 前。
+
+    元组首元素区分类型（0=数字，1=文本），防止数字块与文本块直接比较时
+    抛 TypeError；空块跳过，保证同前缀下短名排在前面。"""
+
+    key: list[tuple[int, object]] = []
+    for part in re.split(r"(\d+)", text):
+        if not part:
+            continue
+        if part.isdigit():
+            key.append((0, int(part)))
+        else:
+            key.append((1, part.lower()))
+    return key
 
 # diff 对比的字段：(属性名, 显示名, 是否列表类型)
 _DIFF_FIELDS: list[tuple[str, str, bool]] = [
@@ -192,7 +209,7 @@ def _scan_nfo_directory(self: MyMAinWindow, folder: Path, select_first: bool = T
         signal_qt.show_log_text(f"目录不存在: {folder}")
         return
 
-    nfo_files = sorted(folder.rglob("*.nfo"), key=lambda p: p.name.lower())
+    nfo_files = sorted(folder.rglob("*.nfo"), key=lambda p: _natural_sort_key(p.stem.lower()))
     count = 0
     for nfo_path in nfo_files:
         item = QListWidgetItem(nfo_path.stem)
@@ -280,21 +297,35 @@ def on_nfo_lib_data_loaded(self: MyMAinWindow, nfo_path_str: str) -> None:
         return
 
     self.Ui.lineEdit_nfo_lib_number.setText(data.number or "")
+    self.Ui.lineEdit_nfo_lib_number.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_title.setText(data.title or "")
-    # 长文本 setText 后光标停在末尾，会把开头的 http(s):// 滚出可视区；
-    # 光标归零让值从左向右展示，优先看到前缀。
+    # 回填展示框一律光标归零：长文本 setText 后光标停在末尾，会把开头的
+    # http(s):// 等前缀滚出可视区；归零让值从左向右展示，优先看到前缀。
     self.Ui.lineEdit_nfo_lib_title.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_actor.setText(data.actor or "")
+    self.Ui.lineEdit_nfo_lib_actor.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_release.setText(data.release or "")
+    self.Ui.lineEdit_nfo_lib_release.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_year.setText(data.year or "")
+    self.Ui.lineEdit_nfo_lib_year.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_runtime.setText(data.runtime or "")
+    self.Ui.lineEdit_nfo_lib_runtime.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_director.setText(",".join(data.directors) if data.directors else "")
+    self.Ui.lineEdit_nfo_lib_director.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_studio.setText(data.studio or "")
+    self.Ui.lineEdit_nfo_lib_studio.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_publisher.setText(data.publisher or "")
+    self.Ui.lineEdit_nfo_lib_publisher.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_series.setText(data.series or "")
+    self.Ui.lineEdit_nfo_lib_series.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_score.setText(data.score or "")
+    self.Ui.lineEdit_nfo_lib_score.setCursorPosition(0)
     self.Ui.plainTextEdit_nfo_lib_outline.setPlainText(data.outline or "")
+    self.Ui.plainTextEdit_nfo_lib_outline.setTextCursor(
+        QTextCursor(self.Ui.plainTextEdit_nfo_lib_outline.document())
+    )
     self.Ui.plainTextEdit_nfo_lib_tag.setPlainText(data.tag or "")
+    self.Ui.plainTextEdit_nfo_lib_tag.setTextCursor(QTextCursor(self.Ui.plainTextEdit_nfo_lib_tag.document()))
     self.Ui.lineEdit_nfo_lib_cover_url.setText(data.thumb or "")
     self.Ui.lineEdit_nfo_lib_cover_url.setCursorPosition(0)
     self.Ui.lineEdit_nfo_lib_poster_url.setText(data.poster or "")
@@ -810,7 +841,7 @@ def _nfo_lib_image_entries(self: MyMAinWindow) -> list[tuple[Path, list[Path]]]:
         dir_text = self.Ui.lineEdit_nfo_lib_dir.text().strip()
         root = Path(dir_text) if dir_text else None
         if root is not None and root.is_dir():
-            candidates = sorted(root.rglob("*.nfo"), key=lambda path: str(path).lower())
+            candidates = sorted(root.rglob("*.nfo"), key=lambda path: _natural_sort_key(str(path).lower()))
 
     entries: list[tuple[Path, list[Path]]] = []
     for nfo_path in candidates:

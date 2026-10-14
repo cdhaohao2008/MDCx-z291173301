@@ -25665,7 +25665,7 @@ p,li{white-space:pre-wrap;}
                               <enum>QAbstractItemView::ExtendedSelection</enum>
                             </property>
                             <property name="sortingEnabled">
-                              <bool>true</bool>
+                              <bool>false</bool>
                             </property>
                           </widget>
                         </item>
@@ -25758,7 +25758,7 @@ p,li{white-space:pre-wrap;}
                                     <string notr="true">color: rgb(8, 128, 128);</string>
                                   </property>
                                   <property name="text">
-                                    <string>用法：先在左侧列表选中多条记录，再填写内容点对应按钮，替换演员名/加标签/删标签/统一系列名，最后点击批量保存写盘生效</string>
+                                    <string>用法：先在左侧列表选中多条记录，再填写内容点对应按钮，替换演员名/加标签/删标签/统一系列名，最后点击批量保存生效</string>
                                   </property>
                                     <property name="wordWrap">
                                       <bool>true</bool>
