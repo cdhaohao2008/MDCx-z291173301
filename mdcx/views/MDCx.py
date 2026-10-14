@@ -14614,7 +14614,7 @@ class Ui_MDCx(object):
                 "</ul>\n"
                 "<p><b>Official综合：有码+无码，按番号前缀自动路由到各官网，全部走代理：有码片商官网30家：Attackers、AV Opera、BeeFree、Bi、Bibian、Dasdas、E-Body、Fitch、HHH、Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、MKO-Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、Prestige、Rookie、S1S1S1、Tameikegoro、To-Satsu、V-AV、Wanz Factory<br/>\n"
                 "无码官网5站，JSON API直连：Caribbeancom、Heyzo、1Pondo、Pacopacomama、10Musume<br/>\n"
-                "番号前缀DLDSS/FNS/JIMMY还分别路由到Dahlia/Faleno官网，官网前缀表维护在代码manual.py的OFFICIAL字典中，增减不影响使用说明。</p>\n"
+                "番号前缀DLDSS/FNS/JIMMY还分别路由到Dahlia/Faleno官网，官网前缀表维护在代码manual.py的Official字典中，增减不影响使用说明。</p>\n"
                 "<h4>五、Cloudflare绕过（CFBypass）</h4>\n"
                 "<p>MDCx提供多种Cloudflare绕过能力，遇到受Cloudflare保护的站点时自动尝试绕过：</p>\n"
                 "<ul>\n"
