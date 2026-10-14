@@ -25392,17 +25392,17 @@ QSpinBox::down-button { margin-right: 5px; }</string>
 p,li{white-space:pre-wrap;}
 &lt;/style&gt;&lt;/head&gt;&lt;bodystyle="font-family:'MicrosoftYaHeiUI',PingFangSC,sans-serif;font-size:13px;"&gt;
 &lt;h3&gt;MDCx使用说明&lt;/h3&gt;
-&lt;p&gt;MDCx是一款本地视频元数据刮削工具：从各大网站抓取影片的标题、演员、封面、简介等信息，生成标准.nfo文件与规范命名的文件夹，供Emby、Jellyfin、Kodi、Plex等媒体服务器直接使用。支持Windows/macOS/Linux。&lt;/p&gt;
+&lt;p&gt;MDCx是一款本地视频元数据刮削工具：从各大网站抓取影片的标题、演员、封面、简介等信息，生成标准.nfo文件与规范命名的文件夹，供Emby、Jellyfin、Kodi、Plex等媒体服务器直接使用，支持Windows/macOS/Linux。&lt;/p&gt;
 &lt;h4&gt;一、快速开始&lt;/h4&gt;
 &lt;ol&gt;
-&lt;li&gt;&lt;b&gt;媒体路径&lt;/b&gt;：软件设置→刮削目录，配置「待刮削视频目录」「成功输出目录」和「失败输出目录」。也可以在软件界面点击「选择目录」临时选择待刮削目录。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;媒体路径&lt;/b&gt;：软件设置→刮削目录，配置「待刮削视频目录」「成功输出目录」和「失败输出目录」，也可以在软件界面点击「选择目录」临时选择待刮削目录。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;刮削网站&lt;/b&gt;：软件设置→刮削网站，为不同类型，有码/无码/素人/FC2/欧美/国产/动漫，分别选择数据源网站。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;下载选项&lt;/b&gt;：软件设置→下载，勾选需要下载的元数据、图片与字幕。&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;开始刮削&lt;/b&gt;：软件界面点击「选择目录」选择待刮削目录，再点击「开始」。建议先用1~3个文件测试效果。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;开始刮削&lt;/b&gt;：软件界面点击「选择目录」选择待刮削目录，再点击「开始」按钮，建议先用1~3个文件测试效果。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;h4&gt;二、刮削模式&lt;/h4&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;b&gt;正常模式&lt;/b&gt;：通过番号联网抓取元数据、封面、缩略图、背景图，并整理文件。适合新下载的视频建立完整海报墙。&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;正常模式&lt;/b&gt;：通过番号联网抓取元数据、封面、缩略图、背景图，并整理文件适合新下载的视频建立完整海报墙&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;视频模式：&lt;/b&gt;整理模式，仅联网刮削番号用于命名，然后重命名和移动视频文件，不下载图片、不生成NFO文件，适合不需要海报墙、只想归类文件的用户。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;更新模式&lt;/b&gt;：对已有NFO的影片在不改动文件位置结构的前提下重新整理文件结构，按更新规则重新命名目录和文件，适合已刮过但想调整目录结构的情况。&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;读取模式&lt;/b&gt;：通过读取本地NFO文件实现无需联网的查看或更新，有4个独立选项可自由组合，有NFO时更新并按更新规则整理、无NFO时刮削对没NFO的文件联网刮、重新下载图片、更新NFO内容如补演员TMDB ID，读取模式不受断点续刮缓存干扰，始终处理全部选中文件。&lt;/li&gt;
