@@ -526,8 +526,8 @@ async def test_call_crawlers_records_failure_reasons_when_all_sites_fail(monkeyp
     assert result is None
     error_text = LogBuffer.error().get()
     assert "所有刮削来源均未返回可用数据" in error_text
-    assert "avbase: 搜索结果未匹配" in error_text
-    assert "javdb: 请求超时" in error_text
+    assert "AVBase: 搜索结果未匹配" in error_text
+    assert "JavDB: 请求超时" in error_text
 
 
 @pytest.mark.asyncio
@@ -671,7 +671,7 @@ async def test_call_crawlers_collects_poster_candidates_only_from_type_poster_pr
     )
 
     assert result is not None
-    assert result.title == "fc2 title"
+    assert result.title == "FC2 title"
     assert result.poster == "https://example.test/fcppvdb-poster.jpg"
     assert result.poster_from == Website.FC2PPVDB.value
     assert result.poster_list == [

@@ -174,19 +174,19 @@ def test_is_proxy_host_direct_sites_priority():
     ("site_value", "host"),
     [
         # 议题附检测日志中的失配证据逐条锁定
-        ("missav", "missav.ai"),
-        ("missav", "missav.ws"),
-        ("javday", "javday.app"),
-        ("mywife", "mywife.cc"),
+        ("MissAV", "missav.ai"),
+        ("MissAV", "missav.ws"),
+        ("JavDay", "javday.app"),
+        ("MyWife", "mywife.cc"),
         ("7mmtv", "www.7mmtv.sx"),
         ("7mmtv", "7mmtv.sx"),
         ("7mmtv", "7tv022.com"),
-        ("madou_club", "madou.club"),
-        ("javlibrary", "www.f101w.com"),
-        ("javlibrary", "f101w.com"),
+        ("Madou_Club", "madou.club"),
+        ("JavLibrary", "www.f101w.com"),
+        ("JavLibrary", "f101w.com"),
         # 原有命中路径不回退（WEB_DIC 映射与 TLD 兜底）
-        ("lulubar", "lulubar.co"),
-        ("javdb", "javdb.com"),
+        ("Lulubar", "lulubar.co"),
+        ("JavDB", "javdb.com"),
     ],
 )
 def test_proxy_host_matches_crawler_declared_domains(site_value, host):

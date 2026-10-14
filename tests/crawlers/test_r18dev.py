@@ -46,7 +46,7 @@ def test_site_enum():
 
 
 def test_display_name():
-    assert R18DevCrawler.display_name() == "R18.Dev"
+    assert R18DevCrawler.display_name() == "R18dev"
 
 
 def test_supports_custom_url():

@@ -35,7 +35,7 @@ def test_site_enum():
 
 
 def test_display_name():
-    assert JavdbApiCrawler.display_name() == "JavDB API"
+    assert JavdbApiCrawler.display_name() == "JavDB_API"
 
 
 def test_supports_custom_url():

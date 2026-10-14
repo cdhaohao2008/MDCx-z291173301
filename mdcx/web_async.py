@@ -74,7 +74,9 @@ def _web_dic_domains_by_value() -> dict[str, frozenset[str]]:
     if _WEB_DIC_DOMAINS_BY_VALUE is None:
         mapping: dict[str, set[str]] = {}
         for domain_key, website_enum in ManualConfig.WEB_DIC.items():
-            value = website_enum.value
+            # 键归一化小写：is_proxy_host 入参统一 .lower() 后查表；
+            # Website.value 自 2026-10 起为混合大小写（如 JavBus），不归一化会失配。
+            value = website_enum.value.lower()
             domains = {domain_key}
             for tld in _PROXY_TLDS:
                 domains.add(domain_key + tld)
@@ -85,7 +87,7 @@ def _web_dic_domains_by_value() -> dict[str, frozenset[str]]:
 
             for site, crawler_cls in crawler_registry.items():
                 try:
-                    mapping.setdefault(site.value, set()).update(crawler_cls.known_hosts())
+                    mapping.setdefault(site.value.lower(), set()).update(crawler_cls.known_hosts())
                 except Exception:  # 单个爬虫的域名收集失败不阻断代理判断
                     continue
         except ImportError:

@@ -36,10 +36,11 @@ from .tag_priority import prioritize_nfo_tags
 
 
 def get_external_id_tag_name(site: Website | str) -> str:
-    site_name = re.sub(r"^\d+", "", str(site))
+    raw = site.value if isinstance(site, Website) else str(site)
+    site_name = re.sub(r"^\d+", "", raw).lower()
     # 确保 site_name 非空，兜底使用 site 的原始字符串
     if not site_name:
-        site_name = str(site)
+        site_name = raw.lower()
     return f"{site_name}id"
 
 
