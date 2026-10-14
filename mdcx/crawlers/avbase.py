@@ -19,9 +19,14 @@ SEARCH_FIRST_RESULT_ID_XPATH = "/html/body/div/div/main/div/div[2]/div[2]/div/di
 class AvbaseCrawler(BaseCrawler):
     description = "有码：有码+素人"
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "AVBase"
+
     @staticmethod
     def _log(message: str) -> None:
-        signal.add_log(f"🌐 [AVBASE] {message}")
+        signal.add_log(f"🌐 [AVBase] {message}")
 
     @classmethod
     @override
