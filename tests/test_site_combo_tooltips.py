@@ -195,18 +195,29 @@ def test_tip_height_pinned_to_first_display():
     """
     combo = _make_combo()
     _hover(combo, 0)
-    label = init_mod._tip_label()
-    assert label is not None, "首显后应能拿到 QTipLabel"
-    first_height = label.sizeHint().height()
+    first = init_mod._tip_label()
+    assert first is not None, "首显后应能拿到 QTipLabel"
+    first_height = first.sizeHint().height()
     assert first_height > 0
 
-    label.setFixedHeight(first_height + 12)  # 模拟某次算出的高度更大
-    _hover(combo, 1)
-    # 钉高体现为上下限（Qt 每次显示的 resize 会被夹住），故断言 minimumHeight/maximumHeight：
+    # 钉高体现为上下限（Qt 每次显示的 resize 会被夹住），故断言 minimumHeight：
     # 离屏平台提示窗从不真正显示，height() 不会随上下限更新，拿它断言会假失败。
+    # Qt 每次 showText 会新建 QTipLabel，所以每次悬停后都要重新取，不能缓存引用。
+    _hover(combo, 1)
+    label = init_mod._tip_label()
+    assert label is not None
     assert label.minimumHeight() == first_height, "后续显示应被钉回首显高度"
-    assert label.maximumHeight() == first_height
 
+    _hover(combo, 3)  # 文本更长的另一行，高度同样不能变
+    assert init_mod._tip_label().minimumHeight() == first_height
+
+    # 人为把提示窗撑高，模拟「某次排版算出更大高度」，下一次悬停要钉回首显高度
+    label.setFixedHeight(first_height + 12)
+    _hover(combo, 0)
+    assert init_mod._tip_label().minimumHeight() == first_height
+
+    # 弹窗关闭要解除钉高：QTipLabel 全进程共用，不能把固定高度留给应用里其它提示
+    label = init_mod._tip_label()
     QApplication.sendEvent(combo.view().viewport(), QEvent(QEvent.Type.Hide))
     assert label.minimumHeight() == 0, "弹窗关闭要解除钉高，别影响应用里其它提示"
 
