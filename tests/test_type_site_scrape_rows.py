@@ -529,15 +529,17 @@ _GUOCHAN_TIP = "label_232"
 _DONGMAN_LABEL = "label_316"  # 「动漫里番：」块标签，用户要求上移的那一行
 # 收敛只允许动这一行下方的东西；这三项必须在宽窄两态保持一致（间距不得变化）
 _STATE_INVARIANTS = ("lineEdit_website_youma", "label_154", "lineEdit_website_guochan")
-# 宽窄分档按「本测试环境（offscreen，QFontDatabase 为空、CJK 落 .notdef）实测
-# label_232 折几行」划分，而非按真实 Windows 字体的折行结果划分：
-#   860 / 1014 / 1400 → heightForWidth 实测 45 / 30 / 30（两行），单行高 fontMetrics().height()=13，
-#                        13 + _SITE_TYPE_SINGLE_LINE_SLACK(3) = 16 < 30，故不收敛，maxH 保持 .ui 的 34；
-#   1920              → 实测 15（=一行高 13 + 零头），15 <= 16 成立，才发生收敛。
-# 故 1400 由「宽态」改列入「窄态」：_sync_site_type_tip_single_line 的前置条件在 1400 宽下本来就不成立，
-# 该宽度的覆盖改由 test_narrow_state_keeps_declared_row_height[1400] 以「上限 34 / 下边距 0」严格断言。
-_NARROW_WIDTHS = [860, 1014, 1400]  # 说明仍需两行 → 不收敛
-_WIDE_SINGLE_LINE_WIDTHS = [1920]  # 说明只需一行 → 收敛
+# 宽窄分档按「本测试环境（offscreen）实测 label_232 折几行 + 是否被拉宽」划分，
+# 而非按真实 Windows 字体的折行结果划分：
+#   860 / 1014 → 不收敛：860 的 heightForWidth 实测 30（仍需两行）；1014 虽已单行
+#                （need=15）但页面未被拉宽（_scroll_stretch_extra ≤ 0，前置条件不成立），
+#                maxH 保持 .ui 的 34；
+#   1400 / 1920 → 实测 need=15（单行，≤ 单行高 + 容差 3）且页面被拉宽，前置条件成立，
+#                发生收敛（maxH 收到 need，下边距归还 34 - need）。
+# 注：1400 曾被列入窄态（旧实测 need=30）；当前代码/字体下 1400 已是单行且收敛，
+# 故改列入宽态，由 test_wide_state_collapses/moves[1400] 覆盖。
+_NARROW_WIDTHS = [860, 1014]  # 不收敛（860 需两行；1014 未拉宽）
+_WIDE_SINGLE_LINE_WIDTHS = [1400, 1920]  # 说明只需一行且已拉宽 → 收敛
 
 
 def _tip_state(win):

@@ -4,6 +4,8 @@
 ### 调整
 - **版本号**：`2.4.2` → `2.4.5`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`）。
 - **检测网络除「网络连通」两项外按 A-Z 顺序依次检测、依次打印（`mdcx/core/network_check.py` 的 `run_network_check`）**：「网络连通」（GitHub Raw/通用 HTTPS）保持原有并发先行不变；其余组（站点检测/账号 API/辅助服务）按检测项名称 `name.lower()` 排序后串行逐站检测，每完成一项立即打印一行，检测顺序与打印顺序为同一 A-Z 顺序；返回结果同样按组内名称 A-Z 排序（此前按状态失败优先排序）。取消、单项异常转失败、CANCELLED 软着陆、代理不可用提示简化等语义与原并发路径一致。
+- **网络检测 Bypass 兜底错误去 HTML 体并用真实错误（`mdcx/core/network_check.py`）**：直连失败触发 Bypass 兜底仍失败时，错误串原为 `GET {url} 失败: HTTP 403 body=<html>…，CloudFlare Bypass兜底失败：HTTP 500、HTTP 502`——前半截 `body=` 把整页 403 HTML 塞进检测行，后半截兜底状态码是写死的 `HTTP 500、HTTP 502`。现直连错误与 Bypass 错误双双截掉 ` body=` 后的响应体，兜底后缀改用真实 `bypass_error`（`"; GET "` 归一为 `"、"`），即 `GET {url} 失败: HTTP 403 CloudFlare Bypass兜底失败：HTTP 500、HTTP 502`；`bypass_error` 为空时只留 `CloudFlare Bypass兜底失败`。
+- **刮削网站页宽窄分档：1400 宽改列入宽态（`tests/test_type_site_scrape_rows.py`，仅测试、无产品改动）**：`_NARROW_WIDTHS` 由 `[860, 1014, 1400]` 收为 `[860, 1014]`，`_WIDE_SINGLE_LINE_WIDTHS` 由 `[1920]` 扩为 `[1400, 1920]`。原因：当前代码/字体下 1400 宽实测 `label_232` 的 `heightForWidth` 已是 15（单行，≤单行高＋容差 3）且页面被拉宽（`_scroll_stretch_extra > 0`），`_sync_site_type_tip_single_line` 的前置条件成立、收敛实际发生；旧注释按 `need=30`（两行）把 1400 归入窄态已不符合实测。1014 虽已单行但未被拉宽、前置条件不成立，仍属窄态；860 仍需两行。1400 的覆盖改由 `test_wide_state_collapses/moves[1400]` 锁定，33 项全过。
 
 ## v2.4.2 (2026-10-20)
 ### 调整
