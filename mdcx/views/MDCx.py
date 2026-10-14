@@ -14620,13 +14620,13 @@ class Ui_MDCx(object):
                 "<ul>\n"
                 '<li><b>外部CloudFlare服务</b>：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址。</li>\n'
                 "<li><b>Selenium CF Bypass</b>：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10/11+Edge浏览器，首次使用自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却。</li>\n"
-                "<li><b>CF Bypass白名单项</b>：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配，用于校验Bypass服务落地/重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验。</li>\n"
+                "<li><b>CF Bypass落地白名单</b>：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配，用于校验Bypass服务落地/重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验。</li>\n"
                 "<li><b>CloudFlare直连通道</b>：部分站点提供免CF的数据接口Javdb_api、Javdb_app、Missav_api、R18dev、Thejavdb_api，默认已加入网站源，可直接选用获得更稳定的抓取。</li>\n"
                 "</ul>\n"
                 "<h4>六、代理设置</h4>\n"
                 '<p>在"设置→网络"中配置：</p>\n'
                 "<ul>\n"
-                "<li><b>使用代理</b>：开启后填写HTTP/HTTPS或SOCKS5代理地址（如http://127.0.0.1:7890）。</li>\n"
+                "<li><b>全部走代理</b>：开启后填写HTTP/HTTPS或SOCKS5代理地址，如http://127.0.0.1:7890。</li>\n"
                 "<li><b>走代理网站</b>：仅指定域名走代理，其余直连，默认包含amazon.co.jp、m.media-amazon.com、xcity.jp、minnano-av.com、avbase.net、javbus.com、javdb.com、javlibrary.com、r18.dev、mgstage.com、prestige-av.com、seesaawiki.jp、avsox.click、avsox.com、avmoo.shop、avmoo.com、avheat.shop、avheat.com、caribbeancom.com、heyzo.com、1pondo.tv、pacopacomama.com、10musume.com、mywife.cc、github.com、raw.githubusercontent.com、google.com、missav.ws、missav.ai、missav.live、aventertainments.com、javfree.me、7mmtv.sx、7tv022.com，可按需增删也可直接填数据源名，如missav、javdb，站点及其镜像域名将整体走代理。</li>\n"
                 "<li><b>Bypass代理</b>：为绕过Cloudflare的请求单独设置代理。</li>\n"
                 "</ul>\n"
