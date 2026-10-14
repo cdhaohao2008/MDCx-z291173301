@@ -25487,8 +25487,8 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;素人番号&lt;/b&gt;：MGStage:259LUXU-1111；JavDB:LUXU-1111；FC2:FC2-111111、FC2-PPV-111111&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;欧美番号&lt;/b&gt;：JavDB/JavBus:sexart.11.11.11，系列.年.月.日&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;字幕影片&lt;/b&gt;：SSNI-xxx-c.mp4/-C.mp4，字幕标记靠近扩展名&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;分集影片&lt;/b&gt;：SSNI-xxx-cd1.mp4、SSNI-xxx-cd2.mp4默认支持-cdN/-partN/-hdN/单数字结尾-1等形式；如需-A字母分集或-01两位数字分集，可在设置→命名中勾选『允许识别分集』对应选项&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;外挂字幕&lt;/b&gt;：字幕文件名需与影片一致，支持srt/ass/sub，方可随影片一起移动&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;分集影片&lt;/b&gt;：SSNI-xxx-cd1.mp4默认支持-cdN/-partN/-hdN/-1等形式；-A或-01分集可在设置→命名中勾选『允许识别分集』对应选项&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;外挂字幕&lt;/b&gt;：字幕文件名需与影片一致方可随影片一起移动，支持srt/ass/sub等格式&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;十二、获取帮助&lt;/h4&gt;
 &lt;ul&gt;
