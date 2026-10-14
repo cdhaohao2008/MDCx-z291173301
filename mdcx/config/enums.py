@@ -462,7 +462,7 @@ class Website(Enum):
     LIBREDMM = "LibreDMM"
     LULUBAR = "Lulubar"
     MADOUQU = "Madouqu"
-    MADOUCLUB = "Madou_Club"
+    MADOUCLUB = "MADOU_CLUB"
     MISSAV = "MissAV"
     MISSAV_API = "MissAV_API"
     MMTV = "7mmtv"
@@ -508,7 +508,7 @@ class Website(Enum):
                 "libredmm": "LibreDMM",
                 "lulubar": "Lulubar",
                 "madouqu": "Madouqu",
-                "madou_club": "Madou_Club",
+                "madou_club": "MADOU_CLUB",
                 "missav": "MissAV",
                 "missav_api": "MissAV_API",
                 "mgstage": "MGStage",

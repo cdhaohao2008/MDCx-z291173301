@@ -334,7 +334,7 @@ def test_declared_geometry_is_compacted_and_followers_shifted():
 # 三段会换行的绿色说明文案（`.ui` 里以 &lt;p&gt; 富文本存储）
 _WRAPPED_DESC_TEXTS = {
     "label_232": (
-        "<span>「网站偏好」-「指定网站」指定Madouqu、Madou_Club或者文件路径里含有「国产」、「麻豆」时，"
+        "<span>「网站偏好」-「指定网站」指定Madouqu、MADOU_CLUB或者文件路径里含有「国产」、「麻豆」时，"
         "将自动使用以上网站刮削国产番号</span>"
     ),
     "label_318": (

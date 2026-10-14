@@ -84,7 +84,7 @@ _SITE_RENAMES = {
     "libredmm": "LibreDMM",
     "lulubar": "Lulubar",
     "madouqu": "Madouqu",
-    "madou_club": "Madou_Club",
+    "madou_club": "MADOU_CLUB",
     "missav": "MissAV",
     "missav_api": "MissAV_API",
     "mgstage": "MGStage",

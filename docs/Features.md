@@ -52,7 +52,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 | FC2 | fc2.com | FC2：FC2官网 |
 | FC2PPVDB | fc2cmadb.com | FC2：FC2网站 |
 | Madouqu | madouqu.com | 国产：仅能国产 |
-| Madou_Club | madou.club | 麻豆：国产番号 |
+| MADOU_CLUB | madou.club | 麻豆：国产番号 |
 | Lulubar | lulubar.net | 综合：仅能有码 |
 | IQQTV | iqqtv.com | 综合：有码+无码+素人+国产 |
 | JavDay | javday.tv | 综合：有码+无码+国产 |
@@ -74,7 +74,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 - **素人**：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MissAV_API、MyWife、Prestige
 - **FC2 ：**7mmtv、FC2、FC2PPVDB、JavDB、JavFree
 - **欧美**：AVheat、ThepornDB
-- **国产**：AVSEX、IQQTV、JavDay、Madou_Club、Madouqu
+- **国产**：AVSEX、IQQTV、JavDay、MADOU_CLUB、Madouqu
 
 ### DMM 官方高清直链
 

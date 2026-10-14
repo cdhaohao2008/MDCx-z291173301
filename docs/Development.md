@@ -389,6 +389,8 @@ Jinja2 模板引擎，支持条件渲染、智能截断。三类命名目标：�
 
 依赖方向：`emby_shared.py` ← `emby_actor_manager.py` ← `emby_actor_image.py` / `emby_actor_info.py`（单向，无循环）。
 
+- **数据源显示名大小写**：`emby_actor_manager_ui.py` 中 `minnano` 的 6 处用户可见文案保持 `Minnano-av.com` 首字母大写（`IMAGE_SOURCE_NAMES`/`INFO_SOURCE_NAMES`/`_IMAGE_RESULT_NAMES`/`_INFO_RESULT_NAMES` 的显示名、`_IMAGE_PROGRESS`/`_INFO_PROGRESS` 的"正在从Minnano-av.com获取…"进度提示）——这是数据源品牌显示名，不随代理域名全小写规则改动；代理域名（`proxy_sites` 默认值、使用说明页、网络层）一律全小写。
+
 ## 爬虫框架
 
 ### 基类
