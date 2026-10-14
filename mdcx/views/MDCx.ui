@@ -11665,7 +11665,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       </size>
                     </property>
                     <property name="title">
-                      <string>下载高清图</string>
+                      <string>下载高清图片</string>
                     </property>
                     <widget class="QWidget" name="horizontalLayoutWidget_24">
                       <property name="geometry">
