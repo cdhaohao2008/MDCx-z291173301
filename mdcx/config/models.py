@@ -32,7 +32,7 @@ from .enums import (
     Translator,
     Website,
 )
-from .migrations import migrate_config_data
+from .migrations import _rename_site, migrate_config_data
 
 
 def str_to_list(v: str | list[Any] | None, sep: Literal[",", "|"] = ",", unique: bool = True) -> list[str]:
@@ -1176,13 +1176,16 @@ class Config(BaseModel):
             elif isinstance(rule, Remove):
                 data.pop(rule.name, None)
 
-        # 处理 site_configs
+        # 处理 site_configs（custom url 键旧小写归一化为新站点值）
         site_configs: dict[Website, SiteConfig] = {}
         for key, value in data.items():
             # custom url
-            if key.endswith("_website") and key[:-8] in Website:
-                site_name = key.replace("_website", "")
-                site_configs[Website(site_name)] = SiteConfig(custom_url=value)
+            if key.endswith("_website"):
+                try:
+                    member = Website(_rename_site(key[:-8]))
+                except ValueError:
+                    continue
+                site_configs[member] = SiteConfig(custom_url=value)
         data["site_configs"] = site_configs
 
         # 格式转换

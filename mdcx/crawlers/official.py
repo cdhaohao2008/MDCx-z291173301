@@ -127,6 +127,11 @@ class OfficialCrawler(BaseCrawler):
     def base_url_(cls) -> str:
         return ""
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "Official"
+
     @override
     async def _run(self, ctx: Context):
         number = ctx.input.number

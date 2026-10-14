@@ -339,6 +339,11 @@ class MissavCrawler(BaseCrawler):
     def base_url_(cls) -> str:
         return manager.config.get_site_url(Website.MISSAV, _MISSAV_DOMAINS[0])
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "MissAV"
+
     @override
     def __init__(self, client, base_url: str = "", browser=None):
         super().__init__(client, base_url=base_url, browser=browser)

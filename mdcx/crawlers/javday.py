@@ -151,6 +151,11 @@ class JavdayCrawler(BaseCrawler[JavdayContext]):
     def base_url_(cls) -> str:
         return manager.config.get_site_url(Website.JAVDAY, "https://javday.app")
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "JavDay"
+
     @override
     def new_context(self, input: CrawlerInput) -> JavdayContext:
         file_path = str(input.file_path or "")

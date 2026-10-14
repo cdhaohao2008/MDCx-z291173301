@@ -25,3 +25,8 @@ class AvsoxCrawler(AioSiteCrawler):
     @override
     def site(cls) -> Website:
         return Website.AVSOX
+
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "AVSOX"

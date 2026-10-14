@@ -77,7 +77,7 @@ async def test_skip_field_does_not_fetch(monkeypatch: pytest.MonkeyPatch):
     assert result.runtime == ""
     # 只请求了 1 次（TITLE），RUNTIME 被跳过不请求
     assert len(records) == 1
-    assert records[0] == ("dmm", "ABF-001")
+    assert records[0] == ("DMM", "ABF-001")
 
 
 @pytest.mark.asyncio

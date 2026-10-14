@@ -212,7 +212,7 @@ def test_removed_site_dropped_from_website_lists(removed_site: str):
     data = {"website_youma": ["dmm", removed_site, "javdb"]}
     migrate_config_data(data)
     assert removed_site not in data["website_youma"], f"{removed_site} 未被剔除，会导致配置校验整体失败"
-    assert data["website_youma"] == ["dmm", "javdb"], "剔除后须保持原有顺序且不误删有效站点"
+    assert data["website_youma"] == ["DMM", "javdb"], "剔除后须保持原有顺序且不误删有效站点"
 
 
 @pytest.mark.parametrize("removed_site", REMOVED_SITES)
@@ -223,7 +223,7 @@ def test_removed_site_dropped_from_field_configs(removed_site: str):
         "type_field_configs": {"fc2": {"studio": {"site_prority": [removed_site, "fc2"]}}},
     }
     migrate_config_data(data)
-    assert data["field_configs"]["actors"]["site_prority"] == ["dmm"]
+    assert data["field_configs"]["actors"]["site_prority"] == ["DMM"]
     assert data["type_field_configs"]["fc2"]["studio"]["site_prority"] == ["fc2"]
 
 
@@ -251,7 +251,7 @@ def test_site_rename_still_applied():
     """既有的重命名迁移不得被清洗逻辑破坏。"""
     data = {"website_youma": ["javdbapi", "dmm"]}
     migrate_config_data(data)
-    assert data["website_youma"] == ["dmm_api", "dmm"]
+    assert data["website_youma"] == ["DMM_API", "DMM"]
 
 
 def test_config_with_all_removed_sites_validates():

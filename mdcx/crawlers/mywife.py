@@ -76,6 +76,11 @@ class MywifeCrawler(BaseCrawler):
     def base_url_(cls) -> str:
         return "https://mywife.cc"
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "MyWife"
+
     async def get_wiki_data(self):
         url = "https://seesaawiki.jp/av_neme/d/%C9%F1%A5%EF%A5%A4%A5%D5"
         html_search, error = await self.async_client.get_text(url, encoding="euc-jp")

@@ -64,7 +64,7 @@ async def test_freejavbt_crawler_maps_detail_page():
     assert res.data.publisher == "发行商"
     assert res.data.thumb == "https://example.test/cover.jpg"
     assert res.data.extrafanart == ["https://example.test/extra.jpg"]
-    assert res.data.source == "freejavbt"
+    assert res.data.source == "FreeJavBT"
 
 
 class RotatingFreejavbtClient:

@@ -53,6 +53,11 @@ class TheJavdbApiCrawler(DmmCrawler):
     def base_url_(cls) -> str:
         return "https://api.thejavdb.net/v1"
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "TheJavDB_API"
+
     @staticmethod
     def _clean_text(value: object) -> str:
         text = html_utils.unescape(str(value or "").strip())

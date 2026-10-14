@@ -441,19 +441,19 @@ class Website(Enum):
     AIRAV = "airav"
     AIRAV_CC = "airav_cc"
     AVHEAT = "avheat"
-    AVMOO = "avmoo"
+    AVMOO = "AVMOO"
     AVSEX = "avsex"
     AVSOX = "avsox"
-    DMM = "dmm"
+    DMM = "DMM"
     FC2 = "fc2"
     FC2PPVDB = "fc2ppvdb"
-    FREEJAVBT = "freejavbt"
-    GETCHU = "getchu"
+    FREEJAVBT = "FreeJavBT"
+    GETCHU = "Getchu"
     IQQTV = "iqqtv"
     JAVBUS = "javbus"
     JAVDAY = "javday"
     JAVDB = "javdb"
-    DMM_API = "dmm_api"
+    DMM_API = "DMM_API"
     THEJAVDB_API = "thejavdb_api"
     JAVDB_API = "javdb_api"
     JAVDB_APP = "javdb_app"
@@ -474,6 +474,27 @@ class Website(Enum):
     XCITY = "xcity"
 
     OFFICIAL = "official"
+
+    @classmethod
+    def _missing_(cls, value):
+        # 旧配置兼容：5 个站点改名前的全小写值仍可解析为新成员。
+        # 新值写入后迁移逻辑会归一化，此处仅保证旧文件可读、不触发校验失败。
+        if isinstance(value, str):
+            legacy = {
+                "avmoo": "AVMOO",
+                "dmm": "DMM",
+                "dmm_api": "DMM_API",
+                "javdbapi": "DMM_API",
+                "freejavbt": "FreeJavBT",
+                "getchu": "Getchu",
+            }
+            mapped = legacy.get(value) or legacy.get(value.lower())
+            if mapped is not None:
+                try:
+                    return cls(mapped)
+                except ValueError:
+                    return None
+        return None
 
     @classmethod
     def __get_pydantic_json_schema__(cls, core_schema, handler):

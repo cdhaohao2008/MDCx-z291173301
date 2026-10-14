@@ -150,6 +150,11 @@ class AiravCcCrawler(BaseCrawler):
     def base_url_(cls) -> str:
         return manager.config.get_site_url(Website.AIRAV_CC, "https://airav.io")
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "Airav.cc"
+
     def _language_base_url(self, language: str) -> str:
         base_url = self.base_url
         return base_url + "/cn" if language == "zh_cn" else base_url

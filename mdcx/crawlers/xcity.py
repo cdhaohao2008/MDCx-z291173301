@@ -63,6 +63,11 @@ class XcityCrawler(BaseCrawler[XcityContext]):
     def base_url_(cls) -> str:
         return manager.config.get_site_url(Website.XCITY, "https://tc.xcity.jp")
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "Xcity"
+
     @override
     async def _generate_search_url(self, ctx: Context) -> list[str] | str | None:
         number_no_dash = ctx.input.number.replace("-", "")

@@ -23,8 +23,8 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 
 | 爬虫名 | 数据源 | 说明 |
 |--------|-------|------|
-| dmm | dmm.co.jp | 有码：仅能有码 |
-| dmm_api | DMM 官方 Affiliate API | 有码：仅能有码 |
+| DMM | dmm.co.jp | 有码：仅能有码 |
+| DMM_API | DMM 官方 Affiliate API | 有码：仅能有码 |
 | thejavdb_api | api.thejavdb.net | 有码：仅能有码 |
 | javdb | javdb.com | 综合：有码+无码 |
 | javdb_api | JavDB 镜像站 | 综合：有码+无码 |
@@ -38,13 +38,13 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 | r18dev | r18.dev | 有码：仅能有码 |
 | official | 各官网 | 综合：有码+无码 |
 | avbase | av-base.net | 有码：有码+素人 |
-| freejavbt | freejavbt.com | 有码：仅能有码 |
+| FreeJavBT | freejavbt.com | 有码：仅能有码 |
 | mywife | mywife.cc | MyWife：MyWife No.1234 |
-| getchu | getchu.com | 综合：有码+游戏+视频 |
+| Getchu | getchu.com | 综合：有码+游戏+视频 |
 | libredmm | libredmm.com | 有码：仅能有码 |
 | xcity | xcity.jp | 综合：仅能有码 |
 | avsox | avsox.click | 无码：仅能无码 |
-| avmoo | avmoo.shop | 有码：仅能有码 |
+| AVMOO | avmoo.shop | 有码：仅能有码 |
 | aventertainments | aventertainments.com | 无码：DVD |
 | avheat | avheat.shop | 欧美：欧美番号 |
 | airav_cc | airav.cc | 有码：仅能有码 |
@@ -67,11 +67,11 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 
 > 注意：javdb_api、javdb_app、missav_api、r18dev、thejavdb_api 这五条是免 CF 通道，稳定性好，建议优先选用。
 
-**各爬虫适用类型**（能力分类，统计的是该站实际能处理的番号类型，与上表「说明」列的定位标签不是同一维度，因此会出现 xcity、getchu、avbase 等同时出现在「仅能有码」与带「综合：」标签的站点里；各类型默认网站源可在「设置→刮削网站」调整，不必与上表一一对应。无码默认源不含 javfree、airav_cc）：
-- **仅能有码**：dmm、dmm_api、thejavdb_api、libredmm、r18dev、avbase、xcity、prestige、mgstage、getchu、javlibrary、freejavbt、lulubar、avmoo
+**各爬虫适用类型**（能力分类，统计的是该站实际能处理的番号类型，与上表「说明」列的定位标签不是同一维度，因此会出现 xcity、Getchu、avbase 等同时出现在「仅能有码」与带「综合：」标签的站点里；各类型默认网站源可在「设置→刮削网站」调整，不必与上表一一对应。无码默认源不含 javfree、airav_cc）：
+- **仅能有码**：DMM、DMM_API、thejavdb_api、libredmm、r18dev、avbase、xcity、prestige、mgstage、Getchu、javlibrary、FreeJavBT、lulubar、AVMOO
 - **无码专属**：aventertainments、avsox
 - **综合（有码+无码）**：javbus、javdb、javdb_api、javdb_app、missav、missav_api、javday、javfree、airav_cc、avsex、official、iqqtv、7mmtv
-- **素人**：7mmtv、avbase、dmm、dmm_api、iqqtv、javbus、javdb、mgstage、missav、missav_api、mywife、prestige
+- **素人**：7mmtv、avbase、DMM、DMM_API、iqqtv、javbus、javdb、mgstage、missav、missav_api、mywife、prestige
 - **FC2 ：**7mmtv、fc2、fc2ppvdb、javdb、javfree
 - **欧美**：avheat、theporndb
 - **国产**：avsex、iqqtv、javday、madou_club、madouqu

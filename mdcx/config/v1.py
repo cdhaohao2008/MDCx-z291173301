@@ -17,6 +17,8 @@ def load_v1(path: str | Path) -> tuple[dict[str, Any], list[str]]:
     errors = []
     unknown_fields: dict[str, str] = {}  # 原样保留未知字段
     d: dict[str, Any] = {}
+    # 站点改名后枚举值为大小写混合，ini 键一律小写：在此用小写集合做大小写无关匹配
+    supported_websites = {w.lower() for w in ManualConfig.SUPPORTED_WEBSITES}
     for section in reader.sections():
         for key, value in reader.items(section):
             try:
@@ -25,7 +27,7 @@ def load_v1(path: str | Path) -> tuple[dict[str, Any], list[str]]:
                     # 必须经 unknown_fields 通道交给 _update() setattr 消化——
                     # 直接放进 d 会让 ConfigV1(**d) 抛 TypeError（dataclass 未声明这些字段），
                     # 模块级 manager 实例化时连锁崩溃，且 v2path MARK_FILE 已写出导致旧配置永久丢失
-                    if key.endswith("_website") and key[:-8] in ManualConfig.SUPPORTED_WEBSITES and value:
+                    if key.endswith("_website") and key[:-8].lower() in supported_websites and value:
                         unknown_fields[key] = value
                         continue
                     unknown_fields[key] = value
@@ -127,45 +129,45 @@ class ConfigV1:
     # website
     scrape_like: str = r"info"
     website_single: str = r"airav_cc"
-    website_youma: str = r"airav_cc,iqqtv,javbus,freejavbt,dmm,javlibrary,javdb,avsex,avmoo,lulubar,xcity,avsox,javfree"
+    website_youma: str = r"airav_cc,iqqtv,javbus,FreeJavBT,DMM,javlibrary,javdb,avsex,AVMOO,lulubar,xcity,avsox,javfree"
 
-    website_wuma: str = r"iqqtv,javbus,freejavbt,avsox,javdb,aventertainments"
-    website_suren: str = r"mgstage,avsex,freejavbt,javbus,javdb"
-    website_fc2: str = r"fc2,freejavbt,javdb,avsox,javfree"
+    website_wuma: str = r"iqqtv,javbus,FreeJavBT,avsox,javdb,aventertainments"
+    website_suren: str = r"mgstage,avsex,FreeJavBT,javbus,javdb"
+    website_fc2: str = r"fc2,FreeJavBT,javdb,avsox,javfree"
     website_oumei: str = r"theporndb,avheat,javdb,javbus"
     website_guochan: str = r"madouqu,madou_club,javday"
     whole_fields: str = r"outline,actor,thumb,release,tag,"
     none_fields: str = r"wanted,"
     website_set: str = r"official,"
-    title_website: str = r"theporndb,mgstage,dmm,javbus,javlibrary"
+    title_website: str = r"theporndb,mgstage,DMM,javbus,javlibrary"
     title_zh_website: str = r"airav_cc,iqqtv,avsex,lulubar"
     title_website_exclude: str = r""
-    outline_website: str = r"theporndb,dmm"
+    outline_website: str = r"theporndb,DMM"
     outline_zh_website: str = r"airav_cc,avsex,iqqtv,lulubar"
-    outline_website_exclude: str = r"avsox,javbus,javdb,javlibrary,freejavbt"
+    outline_website_exclude: str = r"avsox,javbus,javdb,javlibrary,FreeJavBT"
     actor_website: str = r"theporndb,javbus,javlibrary,javdb"
     actor_website_exclude: str = r""
     thumb_website: str = r"theporndb,javbus"
     thumb_website_exclude: str = r"javdb"
     poster_website: str = r"theporndb,avsex,javbus"
     poster_website_exclude: str = r"iqqtv,javlibrary,lulubar"
-    extrafanart_website: str = r"javbus,freejavbt"
+    extrafanart_website: str = r"javbus,FreeJavBT"
     extrafanart_website_exclude: str = r"airav_cc,avsex,avsox,iqqtv,javlibrary,lulubar"
-    trailer_website: str = r"freejavbt,mgstage,dmm"
+    trailer_website: str = r"FreeJavBT,mgstage,DMM"
     trailer_website_exclude: str = r"lulubar"
-    tag_website: str = r"javbus,freejavbt"
+    tag_website: str = r"javbus,FreeJavBT"
     tag_website_exclude: str = r""
-    release_website: str = r"javbus,freejavbt"
+    release_website: str = r"javbus,FreeJavBT"
     release_website_exclude: str = r""
-    runtime_website: str = r"javbus,freejavbt"
+    runtime_website: str = r"javbus,FreeJavBT"
     runtime_website_exclude: str = r"airav_cc,fc2,lulubar"
     score_website: str = r"javlibrary,javdb"
     score_website_exclude: str = r"airav_cc,avsex,avsox,fc2,iqqtv,javbus,xcity,lulubar"
-    director_website: str = r"javbus,freejavbt"
+    director_website: str = r"javbus,FreeJavBT"
     director_website_exclude: str = r"airav_cc,avsex,avsox,fc2,iqqtv,mgstage,lulubar"
-    series_website: str = r"javbus,freejavbt"
+    series_website: str = r"javbus,FreeJavBT"
     series_website_exclude: str = r"airav_cc,avsex,iqqtv,javlibrary,lulubar"
-    studio_website: str = r"javbus,freejavbt"
+    studio_website: str = r"javbus,FreeJavBT"
     studio_website_exclude: str = r"avsex"
     publisher_website: str = r"javbus"
     publisher_website_exclude: str = r"airav_cc,avsex,iqqtv,lulubar"
@@ -322,8 +324,9 @@ class ConfigV1:
             del unknown_fields["trailer_name"]
         if "modified_time" in unknown_fields:  # 弃用
             del unknown_fields["modified_time"]
+        # unknown_fields 的键经 ConfigParser 一律小写，枚举值含大写：按小写键查找
         for site in Website:
-            if isinstance(u := unknown_fields.get(f"{site.value}_website"), str) and u:
+            if isinstance(u := unknown_fields.get(f"{site.value.lower()}_website"), str) and u:
                 setattr(self, f"{site.value}_website", u)
         # 2. 处理更名的配置字段
         self.read_mode = self.read_mode.replace("read_translate_again", "read_update_nfo")
@@ -348,10 +351,16 @@ class ConfigV1:
         self.suffix_sort = new_str
 
     def get_website_base_url(self, website: str | Website) -> str:
-        """获取指定网站的基础 URL"""
+        """获取指定网站的基础 URL（str 入参大小写无关，兼容旧小写站点名）"""
         if isinstance(website, Website):
             website = website.value
-        return getattr(self, f"{website}_website", "")
+        url = getattr(self, f"{website}_website", "")
+        if not url:
+            lowered = f"{website}_website".lower()
+            for attr in vars(self):
+                if attr.lower() == lowered:
+                    return getattr(self, attr, "")
+        return url
 
     def format_ini(self):
         buffer = StringIO()

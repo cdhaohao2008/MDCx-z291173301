@@ -143,6 +143,11 @@ class JavfreeCrawler(BaseCrawler[JavfreeContext]):
     def base_url_(cls) -> str:
         return "https://javfree.me"
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "JavFree"
+
     @override
     def new_context(self, input: CrawlerInput) -> JavfreeContext:
         return JavfreeContext(input=input)

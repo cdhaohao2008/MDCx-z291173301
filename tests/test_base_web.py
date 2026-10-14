@@ -478,14 +478,14 @@ def test_prepend_spfcas_candidates_keeps_original_as_fallback():
     """thumb 候选变换：jdbstatic 候选前置 spfcas 变体并保留原图保底；其他来源原样"""
     covers = [
         ("javdb", "https://c0.jdbstatic.com/covers/z4/z4Z5rW.jpg"),
-        ("dmm", "https://pics.dmm.co.jp/digital/video/x/xps.jpg"),
+        ("DMM", "https://pics.dmm.co.jp/digital/video/x/xps.jpg"),
         ("javdb", ""),
     ]
     result = core_web._prepend_spfcas_candidates(covers)
 
     assert result[0] == ("javdb", f"https://tp.spfcas.com/{base_web._spfcas_segment()}/covers/z4/z4Z5rW.jpg")
     assert result[1] == ("javdb", "https://c0.jdbstatic.com/covers/z4/z4Z5rW.jpg")
-    assert result[2] == ("dmm", "https://pics.dmm.co.jp/digital/video/x/xps.jpg")
+    assert result[2] == ("DMM", "https://pics.dmm.co.jp/digital/video/x/xps.jpg")
     assert result[3] == ("javdb", "")
 
 

@@ -188,7 +188,7 @@ class GetchuCrawler(BaseCrawler):
             a_elements = html.xpath("//a[@class='blueb']")
             url_list = [a.get("href", "") for a in a_elements]
             if not url_list:
-                ctx.debug("getchu 未匹配到结果，尝试 DL Getchu")
+                ctx.debug("Getchu 未匹配到结果，尝试 DL Getchu")
                 return await getchu_dl.scrape_dl_getchu(self.async_client, number, appoint_url, ctx)
 
             real_url = normalize_detail_url(self.base_url + url_list[0].replace("../", "/") + "&gc=gc")

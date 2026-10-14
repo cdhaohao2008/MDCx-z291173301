@@ -56,7 +56,14 @@ def _is_removed_airav_site(site: object) -> bool:
     return site == Website.AIRAV or site == Website.AIRAV.value
 
 
-_SITE_RENAMES = {"javdbapi": "dmm_api"}
+_SITE_RENAMES = {
+    "javdbapi": "DMM_API",
+    "avmoo": "AVMOO",
+    "dmm": "DMM",
+    "dmm_api": "DMM_API",
+    "freejavbt": "FreeJavBT",
+    "getchu": "Getchu",
+}
 
 _VALID_SITE_VALUES = frozenset(site.value for site in Website)
 
@@ -105,11 +112,16 @@ def _migrate_field_config_sites(value: Any) -> None:
 
 
 def _migrate_site_configs(data: dict[str, Any]) -> None:
-    """剔除 site_configs 中键为已移除站点的条目。"""
+    """剔除 site_configs 中键为已移除站点的条目（先改名，旧小写键归一化为新值）。"""
     site_configs = data.get("site_configs")
     if not isinstance(site_configs, dict):
         return
-    data["site_configs"] = {key: value for key, value in site_configs.items() if _is_valid_site(key)}
+    renamed: dict[str, Any] = {}
+    for key, value in site_configs.items():
+        new_key = _rename_site(str(_enum_value(key)))
+        if _is_valid_site(new_key):
+            renamed.setdefault(new_key, value)
+    data["site_configs"] = renamed
 
 
 def _migrate_removed_hd_pic_sources(data: dict[str, Any]) -> None:
@@ -227,7 +239,13 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     _migrate_builtin_naming_templates(data)
     _migrate_removed_hd_pic_sources(data)
 
-    if _is_removed_airav_site(data.get("website_single")) or not _is_valid_site(data.get("website_single")):
+    single = data.get("website_single")
+    if isinstance(single, str):
+        renamed_single = _rename_site(str(_enum_value(single)))
+        if renamed_single != single:
+            data["website_single"] = renamed_single
+            single = renamed_single
+    if _is_removed_airav_site(single) or not _is_valid_site(single):
         data["website_single"] = Website.AIRAV_CC.value
     for key, value in list(data.items()):
         if key.startswith("website_") and key != "website_single":

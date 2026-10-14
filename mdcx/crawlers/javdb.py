@@ -173,6 +173,11 @@ class JavdbCrawler(BaseCrawler):
     def base_url_(cls) -> str:
         return manager.config.get_site_url(Website.JAVDB, "https://javdb.com")
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "JavDB"
+
     @override
     def _get_headers(self, ctx) -> dict[str, str] | None:
         if manager.config.javdb:

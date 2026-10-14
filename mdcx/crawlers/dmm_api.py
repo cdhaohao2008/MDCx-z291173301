@@ -100,7 +100,7 @@ class DmmApiCrawler(DmmCrawler):
 
     @staticmethod
     def _log(message: str):
-        signal.add_log(f"[DmmApi] {message}")
+        signal.add_log(f"[DMM_API] {message}")
 
     @classmethod
     @override

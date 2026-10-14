@@ -80,7 +80,7 @@ def _run(crawler_cls, number: str = "SSNI-804"):
 @pytest.mark.parametrize(
     ("crawler_cls", "site_value", "mosaic"),
     [
-        (AvmooCrawler, "avmoo", "有码"),
+        (AvmooCrawler, "AVMOO", "有码"),
         (AvsoxCrawler, "avsox", "无码"),
         (AvheatCrawler, "avheat", "欧美"),
     ],

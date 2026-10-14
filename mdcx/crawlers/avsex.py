@@ -166,6 +166,11 @@ class AvsexCrawler(BaseCrawler[AvsexContext]):
     def base_url_(cls) -> str:
         return manager.config.get_site_url(Website.AVSEX, "https://avsex.cc")
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "AVsex"
+
     @override
     def new_context(self, input: CrawlerInput) -> AvsexContext:
         number = input.number if re.match(r"n\d{4}", input.number) else input.number.upper()

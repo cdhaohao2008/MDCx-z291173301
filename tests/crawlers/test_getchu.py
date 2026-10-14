@@ -139,7 +139,7 @@ async def test_getchu_crawler_uses_new_framework():
 
     assert res.debug_info.error is None
     assert res.data is not None
-    assert res.data.source == "getchu"
+    assert res.data.source == "Getchu"
     assert res.data.number == "TITLE-001"
     assert res.data.title == "TITLE-001 Sample"
     assert res.data.release == "2026-04-03"

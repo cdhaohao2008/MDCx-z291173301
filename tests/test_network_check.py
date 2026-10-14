@@ -587,7 +587,7 @@ async def test_dmm_api_spec_uses_real_query_url(monkeypatch: pytest.MonkeyPatch)
     assert "floor=videoa" in dmm_api.url
     assert "keyword=SSIS" in dmm_api.url
     assert "keyword=SSIS-" not in dmm_api.url
-    assert dmm_api.validator == "dmm_api"
+    assert dmm_api.validator == "DMM_API"
 
 
 @pytest.mark.anyio
@@ -1212,7 +1212,7 @@ async def test_probe_crawler_capability_warns_when_run_rewritten_and_succeeds(mo
             return SimpleNamespace(data=SimpleNamespace(), debug_info=SimpleNamespace(error=None))
 
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: RewrittenCrawler)
-    spec = NetworkCheckSpec(name="avmoo", group="刮削站点", url="https://avmoo.shop", site=Website.AVMOO)
+    spec = NetworkCheckSpec(name="AVMOO", group="刮削站点", url="https://avmoo.shop", site=Website.AVMOO)
 
     status, message = await _probe_crawler_capability(ProbeFakeClient(), spec)
 
@@ -1403,7 +1403,7 @@ def test_merge_cache_partial_overwrite_preserves_history(monkeypatch: pytest.Mon
     loaded = load_site_check_cache()
     assert loaded["javdb"]["status"] == "fail"
     assert loaded["javdb"]["route"] == "direct"
-    assert loaded["dmm"]["status"] == "ok"
+    assert loaded["DMM"]["status"] == "ok"
 
 
 def test_merge_cache_new_run_overwrites_same_site(monkeypatch: pytest.MonkeyPatch, tmp_path):
@@ -1593,7 +1593,7 @@ def test_merge_cache_includes_api_group_sites(monkeypatch, tmp_path):
         ]
     )
     cache = load_site_check_cache()
-    assert cache["dmm_api"]["status"] == "ok"
+    assert cache["DMM_API"]["status"] == "ok"
     assert cache["thejavdb_api"]["status"] == "warn"
     assert cache["missav_api"]["status"] == "fail"
     assert cache["theporndb"]["status"] == "ok"

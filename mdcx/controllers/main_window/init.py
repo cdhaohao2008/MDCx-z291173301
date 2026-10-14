@@ -156,7 +156,7 @@ _SITE_URL_MAX_W = 240  # 网址列最大文本宽，超出省略号
 # base_url_() 按设计返回空的站点，在下拉里展示这个兜底地址（official 是多站
 # 路由、没有单一官网，保持空白）。
 _SITE_URL_FALLBACK = {
-    "dmm": "https://www.dmm.co.jp/",  # 主搜索站（另有 dmm.com 写真站）
+    "DMM": "https://www.dmm.co.jp/",  # 主搜索站（另有 dmm.com 写真站）
 }
 
 

@@ -253,7 +253,7 @@ def test_deal_res_score_empty_and_zero_stay_empty(value: str, expected: str):
     [
         ("8.50", "javlibrary", "8.5(Javlibrary)"),
         ("4.25", "javdb", "4.2(Javdb)"),
-        ("4.5", "dmm", "4.5(Dmm)"),
+        ("4.5", "DMM", "4.5(Dmm)"),
         ("8.50", "", "8.5"),
     ],
 )

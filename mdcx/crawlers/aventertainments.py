@@ -42,6 +42,11 @@ class AventertainmentsCrawler(BaseCrawler[AventertainmentsContext]):
     def base_url_(cls) -> str:
         return "https://www.aventertainments.com"
 
+    @classmethod
+    @override
+    def display_name(cls) -> str:
+        return "AVEntertainments"
+
     @override
     def new_context(self, input: CrawlerInput) -> AventertainmentsContext:
         return AventertainmentsContext(input=input)
