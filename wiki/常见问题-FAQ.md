@@ -102,7 +102,7 @@ v2.0.7 已修复三个根因：旧配置残留站点值导致校验失败、迁�
 
 ## 15. JavDb 提示需要 Cookie
 
-JavDb 网页版搜索 FC2 内容需要登录 Cookie。「软件设置 → 网络 → Cookie设置」里找到 JavDb 那一行，粘贴浏览器里的 Cookie 值；或改用 javdb_app/javdb_api 源（免 Cookie）。
+JavDb 网页版搜索 FC2 内容需要登录 Cookie。「软件设置 → 网络 → Cookie设置」里找到 JavDb 那一行，粘贴浏览器里的 Cookie 值；或改用 JavDB_APP/JavDB_API 源（免 Cookie）。
 
 ## 16. 大模型翻译超时/失败
 

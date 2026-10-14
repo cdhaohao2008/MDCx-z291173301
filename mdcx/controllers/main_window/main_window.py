@@ -11248,14 +11248,14 @@ class MyMAinWindow(QMainWindow):
 <body>
   <p><span style=" font-weight:700;">所有可用网站:</span></p>
 {sites_html}  <p><span style=" font-weight:700;">指定类型影片可指定刮削网站:<span></p>
-   <p>· 有码：DMM、DMM_API、TheJavDB_API、LibreDMM、R18.Dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO，以及 JavBus、JavDB、MissAV、Official（含 Dahlia/Faleno 厂牌与无码官网路由）、Airav.cc、AVSEX、JavDay、JavFree、IQQTV、7mmtv 等综合站；javdb_api/javdb_app/missav_api/R18.Dev/TheJavDB_API 是免 CF 直连通道</p>
+   <p>· 有码：DMM、DMM_API、TheJavDB_API、LibreDMM、R18dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO，以及 JavBus、JavDB、MissAV、Official（含 Dahlia/Faleno 厂牌与无码官网路由）、Airav.cc、AVSEX、JavDay、JavFree、IQQTV、7mmtv 等综合站；JavDB_API/JavDB_APP/MissAV_API/R18dev/TheJavDB_API 是免 CF 直连通道</p>
    <p>· 无码：AVEntertainments、AVSOX，以及 JavBus、JavDB、MissAV、AVSEX、Official、JavDay、IQQTV、7mmtv 等综合站</p>
   <p>· 欧美：AVheat、ThepornDB</p>
-  <p>· 国产：AVSEX、IQQTV、JavDay、Madou_club、Madouqu</p>
-  <p>· 动漫/里番：Getchu、JavDB、javdb_api（锁定「动漫」用此三站；DLID 开头或路径含 getchu/里番/动漫自动用 Getchu 单站）</p>
-  <p>· Mywife：MyWife </p>
-  <p>· 素人：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、missav_api、MyWife、Prestige </p>
-  <p>· <b>FC2 ：</b>7mmtv、fc2、fc2ppvdb、JavDB、JavFree </p>
+  <p>· 国产：AVSEX、IQQTV、JavDay、Madou_Club、Madouqu</p>
+  <p>· 动漫/里番：Getchu、JavDB、JavDB_API（锁定「动漫」用此三站；DLID 开头或路径含 getchu/里番/动漫自动用 Getchu 单站）</p>
+  <p>· MyWife：MyWife </p>
+  <p>· 素人：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MissAV_API、MyWife、Prestige </p>
+  <p>· <b>FC2 ：</b>7mmtv、FC2、FC2PPVDB、JavDB、JavFree </p>
 </body>
 </html>""")
 
@@ -11450,12 +11450,19 @@ class MyMAinWindow(QMainWindow):
         # 显示文本格式为“站点名（区域标签） 定位说明”，先按空格取首段、再剥区域标签后缀后再转枚举
         site = site.split(" ")[0].split("（")[0].strip()
         if site not in Website:
-            # official 子行（official·heyzo 等）：自定义网址框仅作该子站地址展示，
-            # 保存时按非枚举值跳过，不会写入 official 配置
-            if site.startswith("official·"):
+            # official 子行（Official·HEYZO 等）：自定义网址框仅作该子站地址展示，
+            # 保存时按非枚举值跳过，不会写入 Official 配置
+            if site.startswith("Official·") or site.startswith("official·"):
                 from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
 
-                spec = UNCENSORED_OFFICIAL_SITES.get(site.split("·", 1)[1].strip())
+                suffix = site.split("·", 1)[1].strip()
+                spec = UNCENSORED_OFFICIAL_SITES.get(suffix)
+                if spec is None:
+                    lowered = suffix.lower()
+                    for key, candidate in UNCENSORED_OFFICIAL_SITES.items():
+                        if key.lower() == lowered or candidate.studio.lower() == lowered:
+                            spec = candidate
+                            break
                 if spec is not None:
                     self.Ui.lineEdit_site_custom_url.setText(spec.base_url.rstrip("/") + "/")
             return

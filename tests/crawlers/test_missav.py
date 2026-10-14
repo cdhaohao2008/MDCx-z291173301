@@ -145,7 +145,7 @@ async def test_missav_run_maps_fields_and_thumb():
 
     assert res.debug_info.error is None
     assert res.data is not None
-    assert res.data.source == "missav"
+    assert res.data.source == "MissAV"
     assert res.data.number == "SSNI-647"
     assert res.data.title == "Sample Title"
     assert res.data.actors == ["演员A"]

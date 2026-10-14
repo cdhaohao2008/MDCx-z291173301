@@ -69,7 +69,7 @@ async def test_iqqtv_crawler_keeps_jp_original_fields_for_zh_cn():
     assert res.data.actors == ["演员A"]
     assert res.data.tags == ["剧情"]
     assert res.data.release == "2026-04-03"
-    assert res.data.source == "iqqtv"
+    assert res.data.source == "IQQTV"
     assert res.data.thumb == "https://example.test/cover.jpg"
 
 

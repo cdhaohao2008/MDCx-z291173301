@@ -46,7 +46,7 @@ async def test_mywife_crawler_uses_direct_new_number_url():
 
     assert res.debug_info.error is None
     assert res.data is not None
-    assert res.data.source == "mywife"
+    assert res.data.source == "MyWife"
     assert res.data.number == "Mywife No.1500"
     assert res.data.title == "Sample Title"
     assert res.data.actors == ["Actor A"]

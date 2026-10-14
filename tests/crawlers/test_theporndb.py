@@ -83,7 +83,7 @@ async def test_theporndb_crawler_reads_scene_detail_url():
 
     assert res.debug_info.error is None
     assert res.data is not None
-    assert res.data.source == "theporndb"
+    assert res.data.source == "ThepornDB"
     assert res.data.number == "SeriesA.26.04.03"
     assert res.data.title == "scenes title"
     assert res.data.actors == ["Actor A"]

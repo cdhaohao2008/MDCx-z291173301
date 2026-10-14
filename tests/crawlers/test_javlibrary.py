@@ -102,7 +102,7 @@ async def test_javlibrary_crawler_keeps_jp_original_title_for_zh_cn():
         "https://www.javlibrary.com/ja/?v=javtest200",
         "https://www.javlibrary.com/cn/?v=javtest200",
     ]
-    assert res.data.source == "javlibrary"
+    assert res.data.source == "JavLibrary"
     assert res.data.number == "FSDSS-200"
     assert res.data.title == "中文标题"
     assert res.data.originaltitle == "Japanese Title"

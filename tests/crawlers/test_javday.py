@@ -53,7 +53,7 @@ async def test_javday_run_maps_fields_and_thumb(monkeypatch):
 
     assert res.debug_info.error is None
     assert res.data is not None
-    assert res.data.source == "javday"
+    assert res.data.source == "JavDay"
     assert "MXGS" in (res.data.number or "")
     assert "矢野沙紀" in (res.data.title or "")
     assert res.data.thumb == "https://cdn.example.test/cover.jpg"

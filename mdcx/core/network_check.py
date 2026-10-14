@@ -819,17 +819,17 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
                 default_url = ""
 
         base_url, customized = _configured_or_default_url(site, default_url or "")
-        # 议题 #129: official 是无码官网五站统一路由(caribbeancom/heyzo/1pondo/
-        # pacopacomama/10musume), 各站域名固定——逐站生成子检测(报告每站一行),
+        # 议题 #129: Official 是无码官网五站统一路由(Caribbeancom/HEYZO/1Pondo/
+        # Pacopacomama/10Musume), 各站域名固定——逐站生成子检测(报告每站一行),
         # 下拉徽标由 merge_site_check_cache 按"五站取最差"聚合; 用户自定义过
-        # official URL 时按单站检测处理。
+        # Official URL 时按单站检测处理。
         if site == Website.OFFICIAL and not (customized and base_url):
             from ..crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
 
             for src, official_spec in UNCENSORED_OFFICIAL_SITES.items():
                 specs.append(
                     NetworkCheckSpec(
-                        name=f"official·{src}",
+                        name=f"Official·{official_spec.studio}",
                         group="站点检测",
                         url=official_spec.base_url,
                         site=Website.OFFICIAL,
@@ -903,7 +903,7 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
                     url=url,
                     site=site,
                     headers={"Accept": "application/json"},
-                    validator="thejavdb_api",
+                    validator="TheJavDB_API",
                 )
             )
             continue
@@ -949,7 +949,7 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
                         "returnProperties": True,
                     },
                     use_proxy=False,
-                    validator="missav_api",
+                    validator="MissAV_API",
                 )
             )
             continue
@@ -1299,9 +1299,9 @@ async def run_network_check_item(
             status, message = _classify_theporndb_token(int(response.status_code), text)
         elif spec.validator == "DMM_API":
             status, message = _classify_dmm_api(int(response.status_code), text)
-        elif spec.validator == "thejavdb_api":
+        elif spec.validator == "TheJavDB_API":
             status, message = _classify_thejavdb_api(int(response.status_code), text)
-        elif spec.validator == "missav_api":
+        elif spec.validator == "MissAV_API":
             status, message = _classify_missav_api(int(response.status_code), text)
         elif spec.name == "Cloudflare Bypass" and status == NetworkCheckStatus.OK:
             message = "服务可用"
@@ -1374,7 +1374,7 @@ def _classify_thejavdb_api(status_code: int, text: str) -> tuple[NetworkCheckSta
     if status_code == 200:
         return NetworkCheckStatus.WARNING, "API 可访问，但 ssni-200 查询返回数据异常"
     return _classify_http_result(
-        NetworkCheckSpec(name="thejavdb_api", group="账号/API", url="", site=Website.THEJAVDB_API), status_code, text
+        NetworkCheckSpec(name="TheJavDB_API", group="账号/API", url="", site=Website.THEJAVDB_API), status_code, text
     )
 
 
@@ -1386,7 +1386,7 @@ def _classify_missav_api(status_code: int, text: str) -> tuple[NetworkCheckStatu
     if status_code == 200:
         return NetworkCheckStatus.WARNING, "API 可访问，但搜索返回数据异常"
     return _classify_http_result(
-        NetworkCheckSpec(name="missav_api", group="账号/API", url="", site=Website.MISSAV_API), status_code, text
+        NetworkCheckSpec(name="MissAV_API", group="账号/API", url="", site=Website.MISSAV_API), status_code, text
     )
 
 
@@ -1646,9 +1646,9 @@ def merge_site_check_cache(results: "list[NetworkCheckResult]") -> None:
     """把检测结果中带站点归属的项合并进持久化缓存。
 
     议题 #129: 由"只收集站点检测组"放宽为凡 spec.site 非空即写——
-    账号/API 组(DMM_API/thejavdb_api/missav_api/theporndb)的检测结果
+    账号/API 组(DMM_API/TheJavDB_API/MissAV_API/ThepornDB)的检测结果
     同样要回标到网站设置下拉; 基础环境/辅助服务等无站点归属项 site=None 仍排除。
-    official 为五站子检测(议题 #129), 徽标按"取最差"聚合——路由依赖全部五站,
+    Official 为五站子检测(议题 #129), 徽标按"取最差"聚合——路由依赖全部五站,
     任一不可达整条链路即有异常。
     重试失败项等部分结果按站点值覆盖更新，其余历史记录保留。
     写文件失败静默降级（缓存仅用于展示标注，不影响功能）。

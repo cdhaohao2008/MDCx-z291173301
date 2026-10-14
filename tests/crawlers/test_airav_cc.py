@@ -79,7 +79,7 @@ async def test_airav_cc_crawler_uses_airav_io_and_language_path():
     assert res.data.thumb == "https://example.test/big_pic/cover.jpg"
     assert res.data.poster == "https://example.test/small_pic/cover.jpg"
     assert res.data.mosaic == "无码"
-    assert res.data.source == "airav_cc"
+    assert res.data.source == "Airav.cc"
 
 
 def test_airav_is_no_longer_registered():

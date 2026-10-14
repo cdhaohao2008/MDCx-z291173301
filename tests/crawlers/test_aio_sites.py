@@ -81,8 +81,8 @@ def _run(crawler_cls, number: str = "SSNI-804"):
     ("crawler_cls", "site_value", "mosaic"),
     [
         (AvmooCrawler, "AVMOO", "有码"),
-        (AVSOXCrawler, "avsox", "无码"),
-        (AVheatCrawler, "avheat", "欧美"),
+        (AVSOXCrawler, "AVSOX", "无码"),
+        (AVheatCrawler, "AVheat", "欧美"),
     ],
 )
 async def test_run_search_then_get_movie(crawler_cls, site_value, mosaic):

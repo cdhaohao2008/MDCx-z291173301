@@ -84,4 +84,4 @@ async def test_fc2_crawler_maps_detail_and_sample_api(monkeypatch):
     assert res.data.thumb == "https://example.test/sample1.jpg"
     assert res.data.poster == "https://example.test/thumb.jpg"
     assert res.data.extrafanart == ["https://example.test/sample1.jpg"]
-    assert res.data.source == "fc2"
+    assert res.data.source == "FC2"

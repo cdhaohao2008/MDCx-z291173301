@@ -194,20 +194,20 @@ _OFFICIAL_STUDIO_DISPLAY: dict[str, str] = {
 
 
 def _append_official_subsite_rows(combo: QComboBox) -> None:
-    """网站设置下拉：把 official 旗下 5 个无码官网拆成独立行（official·站名 + 各自网址），official 本行隐藏。
+    """网站设置下拉：把 official 旗下 5 个无码官网拆成独立行（Official·Studio + 各自网址），Official 本行隐藏.
 
-    行 UserRole 仍存 official（选中走 official 爬虫，各消费端的 Website 防护不受影响）；
+    行 UserRole 仍存 Official（选中走 official 爬虫，各消费端的 Website 防护不受影响）；
     真实网址存显式角色，刷新徽章时不被重算覆盖。
     """
     try:
         from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
     except Exception:
         return
-    cache_entry = _load_check_cache().get("official")
+    cache_entry = _load_check_cache().get("Official")
     icon = _site_status_icon(cache_entry.get("status", "")) if cache_entry else QIcon()
     anchor = -1
     for i in range(combo.count()):
-        if (combo.itemData(i, Qt.ItemDataRole.UserRole) or "") == "official":
+        if (combo.itemData(i, Qt.ItemDataRole.UserRole) or "") == "Official":
             anchor = i
     insert_at = anchor + 1 if anchor >= 0 else combo.count()
     check_only = False  # official 子站行只出现在自定义网站框，tooltip 保留说明
@@ -215,10 +215,10 @@ def _append_official_subsite_rows(combo: QComboBox) -> None:
         url = spec.base_url.rstrip("/") + "/"
         description = f"无码：{_OFFICIAL_STUDIO_DISPLAY.get(spec.studio, spec.studio)}"
         row = insert_at + offset
-        combo.insertItem(row, icon, f"official·{name} {description}", "official")
+        combo.insertItem(row, icon, f"Official·{spec.studio} {description}", "Official")
         combo.setItemData(row, url, _SITE_URL_ROLE)
         combo.setItemData(row, url, _SITE_URL_EXPLICIT_ROLE)
-        combo.setItemData(row, _site_combo_tip("official", description, url, check_only=check_only), Qt.ItemDataRole.ToolTipRole)
+        combo.setItemData(row, _site_combo_tip("Official", description, url, check_only=check_only), Qt.ItemDataRole.ToolTipRole)
         combo.setItemData(row, description, Qt.ItemDataRole.UserRole + 1)  # 纯说明供刷新时重建 tooltip
     # official 本行不显示：只留 5 个子站行（插入位置均在 anchor 之后，anchor 下标仍有效）
     if anchor >= 0:

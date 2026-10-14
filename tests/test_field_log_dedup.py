@@ -60,7 +60,7 @@ async def test_failed_site_marked_once_across_fields(monkeypatch: pytest.MonkeyP
     # javdb 只有 title/outline；series/studio 无值——这两个字段会轮询到
     # javbus 并触发"已失败跳过"路径（这正是噪声场景：字段轮到失败站点）
     javdb_data = CrawlerResult.empty()
-    javdb_data.source = "javdb"
+    javdb_data.source = "JavDB"
     javdb_data.title = "标题"
     javdb_data.outline = "简介"
 
@@ -113,7 +113,7 @@ async def test_failed_site_dedup_still_names_every_site(monkeypatch: pytest.Monk
     assert result is not None
     # 每个失败站点恰好各 1 行，且带后续跳过说明
     assert result.field_log.count("(已失败") == 2
-    assert "javbus" in result.field_log and "avbase" in result.field_log
+    assert "JavBus" in result.field_log and "AVBase" in result.field_log
     assert "后续字段将跳过" in result.field_log
 
 

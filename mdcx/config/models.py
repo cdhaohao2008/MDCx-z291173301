@@ -439,7 +439,7 @@ class Config(BaseModel):
             Website.AIRAV_CC,
             Website.AVSEX,
             Website.MMTV,
-            # 仅能有码：AVMOO、TheJavDB API
+            # 仅能有码：AVMOO、TheJavDB_API
             Website.AVMOO,
             Website.THEJAVDB_API,
             Website.OFFICIAL,

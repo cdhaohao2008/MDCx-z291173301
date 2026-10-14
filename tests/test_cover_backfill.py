@@ -38,7 +38,7 @@ def _build_file_info(tmp_path: Path, number: str = "ABC-123") -> FileInfo:
 
 def test_cover_candidate_sites_forced_site_wins(tmp_path: Path):
     file_info = _build_file_info(tmp_path)
-    assert cb._cover_candidate_sites(file_info, forced_site="r18dev") == ["r18dev"]
+    assert cb._cover_candidate_sites(file_info, forced_site="R18dev") == ["R18dev"]
 
 
 def test_cover_candidate_sites_uses_single_website(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -47,7 +47,7 @@ def test_cover_candidate_sites_uses_single_website(monkeypatch: pytest.MonkeyPat
     classification = file_crawler.ScrapeClassification(FixedScrapingType.AUTO, "auto", website=Website.MYWIFE)
     monkeypatch.setattr(cb, "classify_scrape_task", lambda task, config: classification)
 
-    assert cb._cover_candidate_sites(file_info, forced_site=None) == ["mywife"]
+    assert cb._cover_candidate_sites(file_info, forced_site=None) == ["MyWife"]
 
 
 def test_cover_candidate_sites_orders_priority_first(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -61,10 +61,10 @@ def test_cover_candidate_sites_orders_priority_first(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(cb, "classify_scrape_task", lambda task, config: classification)
 
     assert cb._cover_candidate_sites(file_info, forced_site=None) == [
-        "official",
-        "mgstage",
-        "missav",
-        "r18dev",
+        "Official",
+        "MGStage",
+        "MissAV",
+        "R18dev",
     ]
 
 

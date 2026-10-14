@@ -212,7 +212,7 @@ def test_removed_site_dropped_from_website_lists(removed_site: str):
     data = {"website_youma": ["dmm", removed_site, "javdb"]}
     migrate_config_data(data)
     assert removed_site not in data["website_youma"], f"{removed_site} 未被剔除，会导致配置校验整体失败"
-    assert data["website_youma"] == ["DMM", "javdb"], "剔除后须保持原有顺序且不误删有效站点"
+    assert data["website_youma"] == ["DMM", "JavDB"], "剔除后须保持原有顺序且不误删有效站点"
 
 
 @pytest.mark.parametrize("removed_site", REMOVED_SITES)
@@ -224,20 +224,20 @@ def test_removed_site_dropped_from_field_configs(removed_site: str):
     }
     migrate_config_data(data)
     assert data["field_configs"]["actors"]["site_prority"] == ["DMM"]
-    assert data["type_field_configs"]["fc2"]["studio"]["site_prority"] == ["fc2"]
+    assert data["type_field_configs"]["fc2"]["studio"]["site_prority"] == ["FC2"]
 
 
 def test_removed_site_dropped_from_site_configs():
     """site_configs 中键为已移除站点的条目需剔除，有效条目保留。"""
     data = {
         "site_configs": {
-            "javbus": {"custom_url": "https://example.com/"},
+            "JavBus": {"custom_url": "https://example.com/"},
             "fc2hub": {"custom_url": "https://removed.example/"},
         }
     }
     migrate_config_data(data)
     assert "fc2hub" not in data["site_configs"]
-    assert data["site_configs"]["javbus"]["custom_url"] == "https://example.com/"
+    assert data["site_configs"]["JavBus"]["custom_url"] == "https://example.com/"
 
 
 def test_removed_website_single_falls_back():

@@ -13478,7 +13478,7 @@ class Ui_MDCx(object):
         self.label_232.setText(
             _translate(
                 "MDCx",
-                "<span>「网站偏好」-「指定网站」指定Madouqu、Madou_club或者文件路径里含有「国产」、「麻豆」时，将自动使用以上网站刮削国产番号</span>",
+                "<span>「网站偏好」-「指定网站」指定Madouqu、Madou_Club或者文件路径里含有「国产」、「麻豆」时，将自动使用以上网站刮削国产番号</span>",
             )
         )
         self.label_156.setText(_translate("MDCx", "比如：259LUXU-1111"))
@@ -14605,16 +14605,16 @@ class Ui_MDCx(object):
                 "<h4>四、网站选择</h4>\n"
                 "<p>网站下拉框由已注册的爬虫自动生成，当前52个，可按需选用全部网站或指定网站，主要来源包括：</p>\n"
                 "<ul>\n"
-                "<li><b>有码</b>：AVBase、AVMOO、DMM、DMM_API、FreeJavBT、Getchu、JavLibrary、LibreDMM、Lulubar、MGStage、Prestige、R18.Dev、TheJavDB_API、Xcity</li>\n"
+                "<li><b>有码</b>：AVBase、AVMOO、DMM、DMM_API、FreeJavBT、Getchu、JavLibrary、LibreDMM、Lulubar、MGStage、Prestige、R18dev、TheJavDB_API、Xcity</li>\n"
                 "<li><b>综合</b>：7mmtv、Airav.cc、AVSEX、IQQTV、JavBus、JavDay、JavDB、JavFree、MissAV、Official</li>\n"
                 "<li><b>无码</b>：AVEntertainments、AVSOX</li>\n"
                 "<li><b>素人</b>：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MyWife、Prestige</li>\n"
                 "<li><b>FC2 ：</b>7mmtv、FC2、FC2PPVDB、JavDB、JavFree</li>\n"
-                "<li><b>国产</b>：AVSEX、IQQTV、JavDay、Madou_club、Madouqu</li>\n"
+                "<li><b>国产</b>：AVSEX、IQQTV、JavDay、Madou_Club、Madouqu</li>\n"
                 "<li><b>欧美</b>：AVheat、ThepornDB</li>\n"
                 "</ul>\n"
                 "<p><b>Official综合：有码+无码，按番号前缀自动路由到各番号官网，全部走代理：有码片商官网30家：Attackers、AV Opera、BeeFree、Bi-AV、Bibian、Dasdas、E-Body、Fitch、HHH-AV、Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、MKO Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、Prestige、Rookie、S1S1S1、Tamei kegoro、To-Satsu、V-AV、Wanz Factory<br/>\n"
-                "无码官网共5站：JSON API直连10Musume、1Pondo、Caribbeancom、Heyzo、Pacopacomama<br/>\n"
+                "无码官网共5站：JSON API直连10Musume、1Pondo、Caribbeancom、HEYZO、Pacopacomama<br/>\n"
                 "番号前缀DLDSS/FNS/JIMMY还分别路由到Dahlia/Faleno官网，官网前缀表维护在代码manual.py的Official字典中，增减不影响使用说明。</p>\n"
                 "<h4>五、Cloudflare Bypass</h4>\n"
                 "<p>MDCx提供多种Cloudflare绕过能力，遇到受Cloudflare保护的站点时自动尝试绕过：</p>\n"
@@ -14622,13 +14622,13 @@ class Ui_MDCx(object):
                 '<li><b>CloudFlare 绕过服务</b>：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址。</li>\n'
                 "<li><b>Selenium CF Bypass</b>：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10、11+Edge浏览器，首次使用将自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却。</li>\n"
                 "<li><b>CF Bypass落地白名单</b>：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配，用于校验Bypass服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验。</li>\n"
-                "<li><b>CloudFlare 直连通道</b>：部分站点提供免CF的数据接口Javdb_api、Javdb_app、Missav_api、R18.Dev、TheJavDB_API，默认已加入网站源，可直接选用获得更稳定的抓取。</li>\n"
+                "<li><b>CloudFlare 直连通道</b>：部分站点提供免CF的数据接口JavDB_API、JavDB_APP、MissAV_API、R18dev、TheJavDB_API，默认已加入网站源，可直接选用获得更稳定的抓取。</li>\n"
                 "</ul>\n"
                 "<h4>六、代理设置</h4>\n"
                 '<p>在"设置→网络"中配置：</p>\n'
                 "<ul>\n"
                 "<li><b>全部走代理</b>：开启后填写HTTP/HTTPS或SOCKS5代理地址，如http://127.0.0.1:7890。</li>\n"
-                "<li><b>默认代理站</b>：仅指定域名走代理，其余直连，默认包含10musume.com、1pondo.tv、7mmtv.sx、7tv022.com、Amazon.co.jp、Avbase.net、Aventertainments.com、Avheat.com、Avheat.shop、Avmoo.com、Avmoo.shop、Avsox.click、Avsox.com、Caribbeancom.com、Github.com、Google.com、Heyzo.com、Javbus.com、Javdb.com、Javfree.me、Javlibrary.com、M.media-amazon.com、Mgstage.com、Minnano-av.com、Missav.ai、Missav.live、Missav.ws、Mywife.cc、Pacopacomama.com、Prestige-av.com、R18.Dev、Raw.githubusercontent.com、Seesaawiki.jp、Xcity.jp，可按需增删也可直接填数据源名，如Javdb、Missav、站点及其镜像域名将整体走代理。</li>\n"
+                "<li><b>默认代理站</b>：仅指定域名走代理，其余直连，默认包含10musume.com、1pondo.tv、7mmtv.sx、7tv022.com、Amazon.co.jp、Avbase.net、Aventertainments.com、Avheat.com、Avheat.shop、Avmoo.com、Avmoo.shop、Avsox.click、Avsox.com、Caribbeancom.com、Github.com、Google.com、Heyzo.com、Javbus.com、Javdb.com、Javfree.me、Javlibrary.com、M.media-amazon.com、Mgstage.com、Minnano-av.com、Missav.ai、Missav.live、Missav.ws、Mywife.cc、Pacopacomama.com、Prestige-av.com、R18.Dev、Raw.githubusercontent.com、Seesaawiki.jp、Xcity.jp，可按需增删也可直接填数据源名，如JavDB、MissAV、站点及其镜像域名将整体走代理。</li>\n"
                 "<li><b>Bypass代理</b>：为绕过Cloudflare的请求单独设置代理。</li>\n"
                 "</ul>\n"
                 "<p>如持续提示网络/代理错误，请检查地址与端口、确认代理软件处于全局模式，或尝试重启代理与网卡。</p>\n"

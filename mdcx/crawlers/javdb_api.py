@@ -437,7 +437,7 @@ class JavdbApiCrawler(BaseCrawler):
     @classmethod
     @override
     def display_name(cls) -> str:
-        return "JavDB API"
+        return "JavDB_API"
 
     @classmethod
     @override

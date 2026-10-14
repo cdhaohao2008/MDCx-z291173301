@@ -142,7 +142,7 @@ async def test_official_crawler_jimmy_prefix_routes_to_faleno():
 
     assert res.debug_info.error is None
     assert res.data is not None
-    assert res.data.source == "official"
+    assert res.data.source == "Official"
     assert res.data.number == "JIMMY-003"
     assert res.data.title == "Faleno Official Title"
     assert res.data.actors == ["Actor F"]

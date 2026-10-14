@@ -25,62 +25,62 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 |--------|-------|------|
 | DMM | dmm.co.jp | 有码：仅能有码 |
 | DMM_API | DMM 官方 Affiliate API | 有码：仅能有码 |
-| thejavdb_api | api.thejavdb.net | 有码：仅能有码 |
-| javdb | javdb.com | 综合：有码+无码 |
-| javdb_api | JavDB 镜像站 | 综合：有码+无码 |
-| javdb_app | JavDB 移动端 API | 综合：有码+无码 |
-| javbus | javbus.com | 综合：有码+无码 |
-| javlibrary | javlibrary.com | 有码：仅能有码 |
-| missav | missav.ws | 综合：有码+无码 |
-| missav_api | Recombee API | 综合：有码+无码 |
-| mgstage | mgstage.com | 有码：有码+素人 |
-| prestige | prestige-av.com | 有码：有码+素人 |
-| r18dev | r18.dev | 有码：仅能有码 |
-| official | 各官网 | 综合：有码+无码 |
-| avbase | av-base.net | 有码：有码+素人 |
+| TheJavDB_API | api.thejavdb.net | 有码：仅能有码 |
+| JavDB | javdb.com | 综合：有码+无码 |
+| JavDB_API | JavDB 镜像站 | 综合：有码+无码 |
+| JavDB_APP | JavDB 移动端 API | 综合：有码+无码 |
+| JavBus | javbus.com | 综合：有码+无码 |
+| JavLibrary | javlibrary.com | 有码：仅能有码 |
+| MissAV | missav.ws | 综合：有码+无码 |
+| MissAV_API | Recombee API | 综合：有码+无码 |
+| MGStage | mgstage.com | 有码：有码+素人 |
+| Prestige | prestige-av.com | 有码：有码+素人 |
+| R18dev | r18.dev | 有码：仅能有码 |
+| Official | 各官网 | 综合：有码+无码 |
+| AVBase | av-base.net | 有码：有码+素人 |
 | FreeJavBT | freejavbt.com | 有码：仅能有码 |
-| mywife | mywife.cc | MyWife：MyWife No.1234 |
+| MyWife | mywife.cc | MyWife：MyWife No.1234 |
 | Getchu | getchu.com | 综合：有码+游戏+视频 |
-| libredmm | libredmm.com | 有码：仅能有码 |
-| xcity | xcity.jp | 综合：仅能有码 |
-| avsox | avsox.click | 无码：仅能无码 |
+| LibreDMM | libredmm.com | 有码：仅能有码 |
+| Xcity | xcity.jp | 综合：仅能有码 |
+| AVSOX | avsox.click | 无码：仅能无码 |
 | AVMOO | avmoo.shop | 有码：仅能有码 |
-| aventertainments | aventertainments.com | 无码：DVD |
-| avheat | avheat.shop | 欧美：欧美番号 |
-| airav_cc | airav.cc | 有码：仅能有码 |
-| avsex | avsex.cc | 综合：有码+无码+国产 |
-| fc2 | fc2.com | FC2：FC2官网 |
-| fc2ppvdb | fc2cmadb.com | FC2：FC2网站 |
-| madouqu | madouqu.com | 国产：仅能国产 |
-| madou_club | madou.club | 麻豆：国产番号 |
-| lulubar | lulubar.net | 综合：仅能有码 |
-| iqqtv | iqqtv.com | 综合：有码+无码+素人+国产 |
-| javday | javday.tv | 综合：有码+无码+国产 |
-| javfree | javfree.me | 综合：有码+FC2 |
+| AVEntertainments | aventertainments.com | 无码：DVD |
+| AVheat | avheat.shop | 欧美：欧美番号 |
+| Airav.cc | airav.cc | 有码：仅能有码 |
+| AVSEX | avsex.cc | 综合：有码+无码+国产 |
+| FC2 | fc2.com | FC2：FC2官网 |
+| FC2PPVDB | fc2cmadb.com | FC2：FC2网站 |
+| Madouqu | madouqu.com | 国产：仅能国产 |
+| Madou_Club | madou.club | 麻豆：国产番号 |
+| Lulubar | lulubar.net | 综合：仅能有码 |
+| IQQTV | iqqtv.com | 综合：有码+无码+素人+国产 |
+| JavDay | javday.tv | 综合：有码+无码+国产 |
+| JavFree | javfree.me | 综合：有码+FC2 |
 | 7mmtv | 7mmtv.sx | 综合：有码+无码+素人+FC2 |
-| theporndb | api.theporndb.net | 欧美：欧美番号 |
+| ThepornDB | api.theporndb.net | 欧美：欧美番号 |
 
 补充说明（不在下拉标签里体现的细节）：
 
-- **official**：按番号前缀自动路由到 30 家有码片商官网 + 5 家无码官网（Caribbeancom/Heyzo/1Pondo/Pacopacomama/10Musume JSON 直连）+ Dahlia/Faleno 子爬虫；全部走代理；前缀表维护在 `manual.py` 的 `OFFICIAL` 字典。「检测网络」只逐站检测无码 5 站官网。
-- **javdb_app**：APK 逆向签名直连，封面/海报/剧照走 App CDN 无水印原图，签名失效自动诊断，详见 [Javdb_App_Signature.md](Javdb_App_Signature.md)。
+- **Official**：按番号前缀自动路由到 30 家有码片商官网 + 5 家无码官网（Caribbeancom/HEYZO/1Pondo/Pacopacomama/10Musume JSON 直连）+ Dahlia/Faleno 子爬虫；全部走代理；前缀表维护在 `manual.py` 的 `OFFICIAL` 字典。「检测网络」只逐站检测无码 5 站官网。
+- **JavDB_APP**：APK 逆向签名直连，封面/海报/剧照走 App CDN 无水印原图，签名失效自动诊断，详见 [Javdb_App_Signature.md](Javdb_App_Signature.md)。
 
-> 注意：javdb_api、javdb_app、missav_api、r18dev、thejavdb_api 这五条是免 CF 通道，稳定性好，建议优先选用。
+> 注意：JavDB_API、JavDB_APP、MissAV_API、R18dev、TheJavDB_API 这五条是免 CF 通道，稳定性好，建议优先选用。
 
-**各爬虫适用类型**（能力分类，统计的是该站实际能处理的番号类型，与上表「说明」列的定位标签不是同一维度，因此会出现 xcity、Getchu、avbase 等同时出现在「仅能有码」与带「综合：」标签的站点里；各类型默认网站源可在「设置→刮削网站」调整，不必与上表一一对应。无码默认源不含 javfree、airav_cc）：
-- **仅能有码**：DMM、DMM_API、thejavdb_api、libredmm、r18dev、avbase、xcity、prestige、mgstage、Getchu、javlibrary、FreeJavBT、lulubar、AVMOO
-- **无码专属**：aventertainments、avsox
-- **综合（有码+无码）**：javbus、javdb、javdb_api、javdb_app、missav、missav_api、javday、javfree、airav_cc、avsex、official、iqqtv、7mmtv
-- **素人**：7mmtv、avbase、DMM、DMM_API、iqqtv、javbus、javdb、mgstage、missav、missav_api、mywife、prestige
-- **FC2 ：**7mmtv、fc2、fc2ppvdb、javdb、javfree
-- **欧美**：avheat、theporndb
-- **国产**：avsex、iqqtv、javday、madou_club、madouqu
+**各爬虫适用类型**（能力分类，统计的是该站实际能处理的番号类型，与上表「说明」列的定位标签不是同一维度，因此会出现 Xcity、Getchu、AVBase 等同时出现在「仅能有码」与带「综合：」标签的站点里；各类型默认网站源可在「设置→刮削网站」调整，不必与上表一一对应。无码默认源不含 JavFree、Airav.cc）：
+- **仅能有码**：DMM、DMM_API、TheJavDB_API、LibreDMM、R18dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO
+- **无码专属**：AVEntertainments、AVSOX
+- **综合（有码+无码）**：JavBus、JavDB、JavDB_API、JavDB_APP、MissAV、MissAV_API、JavDay、JavFree、Airav.cc、AVSEX、Official、IQQTV、7mmtv
+- **素人**：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MissAV_API、MyWife、Prestige
+- **FC2 ：**7mmtv、FC2、FC2PPVDB、JavDB、JavFree
+- **欧美**：AVheat、ThepornDB
+- **国产**：AVSEX、IQQTV、JavDay、Madou_Club、Madouqu
 
 ### DMM 官方高清直链
 
 - 封面/海报统一走 DMM 官方 awsimgsrc CDN 高清直链（竖版 `ps` 通常 1032×1469，部分系列为 745×1081 等中尺寸档；横版 `pl` 通常 2184×1469），由 `mdcx/crawlers/dmm_direct.py` 的番号→DMM cid 前缀映射生成，内置静态前缀表覆盖约 110 个主流系列（含 `h_xxx`/数字特殊前缀与跨厂商附加前缀），并叠加学习表自动扩充未收录系列的前缀。升级时校验分辨率宽≥700 过滤 147×200 缩略图占位图，避免把海报覆盖成低清缩略图。
-- **LibreDMM / R18.dev / JavBus / JavDB / JavDB API / JavDB App / DMM / DMM API / JavLibrary / avbase** 十个爬虫在刮削时直接把返回的低清封面/海报升级为 DMM 高清（R18.dev 的 `jacket_full_url` 是 pics.dmm.co.jp 低清且部分系列 cid 未补零，JavBus 是自家 CDN 低清镜像，DMM/avbase 用域名替换 + dmm_direct 前缀表候选），无码番号自动跳过。
-- **JavDB 系图源无水印升级**：JavDB / JavDB API / JavDB App 三站产出/落回的 javdb 图床图片，下载时自动改走 JavDB App 专用 CDN `tp.spfcas.com` 无水印原图（加密流下载层透明解密），替代带 javdb 水印的网页版 CDN；App CDN 路径中段由 javdb_app 响应自动学习，失效时自动回退网页版。DMM 升级链覆盖不到的番号（无码/FC2/老片等）落回 javdb 图源时受益。
+- **LibreDMM / R18dev / JavBus / JavDB / JavDB API / JavDB App / DMM / DMM API / JavLibrary / AVBase** 十个爬虫在刮削时直接把返回的低清封面/海报升级为 DMM 高清（R18dev 的 `jacket_full_url` 是 pics.dmm.co.jp 低清且部分系列 cid 未补零，JavBus 是自家 CDN 低清镜像，DMM/AVBase 用域名替换 + dmm_direct 前缀表候选），无码番号自动跳过。
+- **JavDB 系图源无水印升级**：JavDB / JavDB API / JavDB App 三站产出/落回的 javdb 图床图片，下载时自动改走 JavDB App 专用 CDN `tp.spfcas.com` 无水印原图（加密流下载层透明解密），替代带 javdb 水印的网页版 CDN；App CDN 路径中段由 JavDB_APP 响应自动学习，失效时自动回退网页版。DMM 升级链覆盖不到的番号（无码/FC2/老片等）落回 javdb 图源时受益。
 - 开启「Poster 选优」（poster_auto_best）时，候选池自动注入 DMM 竖版高清候选，按尺寸自动胜过低清原图，其他爬虫也能受益。
 - DMM 图下载失败按「设置→网络→重试」次数（默认 3 次）自动重试，应对 awsimgsrc 偶发的连接抖动。
 
@@ -231,7 +231,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 
 - **HTTP 客户端**：curl-cffi 模拟浏览器 TLS 指纹，默认 7 种浏览器画像自动轮换（Chrome 124/131/136 Win + Chrome 136 Mac + Firefox 133/135 Win + Safari iOS；Amazon 刮削用专用桌面池 6 种）
 - **网络连通性检测**：网络页「开始检测」按钮逐站检查连通性与刮削能力——镜像/动态域名站点多地址检测（主站+镜像），API 类爬虫走真实刮削探测，结果按基础环境/连通性/刮削站点/账号 API/辅助服务分组展示
- - **代理**：支持 HTTP/HTTPS/SOCKS5 代理；"走代理网站"列表支持域名与数据源名称两种写法——填数据源名（可从旁边下拉框直接选择，如 missav、javdb、7mmtv）时，该数据源的主域/镜像/备用域名均自动走代理，站点换域名无需改配置（议题 #83）；默认含 amazon.co.jp、m.media-amazon.com、xcity.jp、minnano-av.com、avbase.net、javbus.com、javdb.com、javlibrary.com、r18.dev、mgstage.com、prestige-av.com、seesaawiki.jp、avsox/avmoo/avheat 主镜像、无码官网五站、mywife.cc、github.com 系、google.com、missav 三镜像、aventertainments.com、javfree.me、7mmtv.sx、7tv022.com 等共 37 个域名，完整列表见设置 → 网络页），其他直连
+ - **代理**：支持 HTTP/HTTPS/SOCKS5 代理；"走代理网站"列表支持域名与数据源名称两种写法——填数据源名（可从旁边下拉框直接选择，如 MissAV、JavDB、7mmtv）时，该数据源的主域/镜像/备用域名均自动走代理，站点换域名无需改配置（议题 #83）；默认含 amazon.co.jp、m.media-amazon.com、xcity.jp、minnano-av.com、avbase.net、javbus.com、javdb.com、javlibrary.com、r18.dev、mgstage.com、prestige-av.com、seesaawiki.jp、avsox/avmoo/avheat 主镜像、无码官网五站、mywife.cc、github.com 系、google.com、missav 三镜像、aventertainments.com、javfree.me、7mmtv.sx、7tv022.com 等共 37 个域名，完整列表见设置 → 网络页），其他直连
 - **Cloudflare 绕过**：通过CloudFlare 绕过服务（TRAWL `/scrape` 或 FlareSolverr `/v1`）自动绕过 CF 防护页，MDCx 自动拉起协议适配层翻译请求，无需内置浏览器；可选配置独立 Bypass 代理；Bypass 服务失效时自动跳过避免空等
 - **Selenium CF Bypass（JavLibrary 专用）**：JavLibrary 遇 Cloudflare JS challenge 时自动 fallback 到 Selenium+Edge headless 获取页面 HTML（cf_selenium_bypass，默认开启）。需要 Windows 10/11 + Edge 浏览器，首次使用自动安装 selenium；无 Edge 环境优雅降级，连续失败 3 次进入 5 分钟冷却
 - **Bypass 落地域名白名单**：可配置可信落地域名列表（逗号分隔，支持 `*.example.com` 子域通配），校验 Bypass 服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据；留空表示不校验

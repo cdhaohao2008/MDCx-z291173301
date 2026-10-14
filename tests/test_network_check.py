@@ -235,7 +235,7 @@ async def test_probe_crawler_strips_special_check_path_from_base_url(monkeypatch
 
     client = FakeClient()
     spec = NetworkCheckSpec(
-        name="javbus", group="刮削站点", url="https://www.javbus.com/FSDSS-660", site=Website.JAVBUS
+        name="JavBus", group="刮削站点", url="https://www.javbus.com/FSDSS-660", site=Website.JAVBUS
     )
 
     status, _ = await _probe_crawler_capability(client, spec)
@@ -263,7 +263,7 @@ async def test_mirror_sample_spec_skips_scrape_probe(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(crawlers_mod, "get_crawler", lambda site: ShouldNotBeCalled)
 
-    spec = NetworkCheckSpec(name="xcity·镜像", group="刮削站点", url="https://xcity.jp", site=Website.XCITY)
+    spec = NetworkCheckSpec(name="Xcity·镜像", group="刮削站点", url="https://xcity.jp", site=Website.XCITY)
     result = await run_network_check_item(spec, client=FakeClient())
 
     assert result.status == NetworkCheckStatus.OK
@@ -281,7 +281,7 @@ async def test_run_network_check_item_retries_probe_within_first_round(monkeypat
         return NetworkCheckStatus.WARNING, "站点可达但刮削探测超时"
 
     monkeypatch.setattr(nc, "_probe_crawler_capability", fake)
-    spec = NetworkCheckSpec(name="avbase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
+    spec = NetworkCheckSpec(name="AVBase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
 
     result = await run_network_check_item(spec, client=FakeClient())
 
@@ -617,7 +617,7 @@ async def test_missav_api_spec_uses_post_search(monkeypatch: pytest.MonkeyPatch)
     assert missav_api.method == "POST"
     assert "/search/users/anonymous/items/" in missav_api.url
     assert missav_api.json_data is not None and missav_api.json_data["searchQuery"] == "ssni-647"
-    assert missav_api.validator == "missav_api"
+    assert missav_api.validator == "MissAV_API"
 
 
 @pytest.mark.anyio
@@ -909,7 +909,7 @@ async def test_probe_crawler_capability_passes_probe_timeout_to_search_request(m
     """轮内递进重试的超时档必须落到搜索页请求上（否则第 2/3 次仍是 30s，重试无意义）。"""
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: ProbeCrawler)
     client = ProbeFakeClient()
-    spec = NetworkCheckSpec(name="avbase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
+    spec = NetworkCheckSpec(name="AVBase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
 
     await _probe_crawler_capability(client, spec, probe_timeout=45.0)
 
@@ -922,7 +922,7 @@ async def test_probe_crawler_capability_defaults_to_first_round_timeout(monkeypa
     """未指定 probe_timeout 时用首轮 30s。"""
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: ProbeCrawler)
     client = ProbeFakeClient()
-    spec = NetworkCheckSpec(name="avbase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
+    spec = NetworkCheckSpec(name="AVBase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
 
     await _probe_crawler_capability(client, spec)
 
@@ -967,7 +967,7 @@ def _stub_probe_attempts(monkeypatch: pytest.MonkeyPatch, results: list[tuple[Ne
     return seen
 
 
-_PROBE_SPEC = NetworkCheckSpec(name="avbase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
+_PROBE_SPEC = NetworkCheckSpec(name="AVBase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
 
 
 @pytest.mark.anyio
@@ -1024,7 +1024,7 @@ async def test_probe_retry_emits_no_intermediate_progress_lines(monkeypatch: pyt
     monkeypatch.setattr(nc, "_probe_crawler_capability", fake)
     emitted: list[str] = []
 
-    spec = NetworkCheckSpec(name="avbase", group="站点检测", url="https://www.avbase.net", site=Website.AVBASE)
+    spec = NetworkCheckSpec(name="AVBase", group="站点检测", url="https://www.avbase.net", site=Website.AVBASE)
     results = await run_network_check(
         specs=[spec],
         client=ProbeFakeClient(),
@@ -1078,7 +1078,7 @@ async def test_probe_retry_mixed_transient_keeps_last_reason(monkeypatch: pytest
 @pytest.mark.anyio
 async def test_probe_crawler_capability_ok_when_search_finds_detail(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: ProbeCrawler)
-    spec = NetworkCheckSpec(name="avbase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
+    spec = NetworkCheckSpec(name="AVBase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
 
     status, message = await _probe_crawler_capability(ProbeFakeClient(), spec)
 
@@ -1089,7 +1089,7 @@ async def test_probe_crawler_capability_ok_when_search_finds_detail(monkeypatch:
 @pytest.mark.anyio
 async def test_probe_crawler_capability_warns_on_cloudflare_challenge(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: ProbeCrawler)
-    spec = NetworkCheckSpec(name="avbase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
+    spec = NetworkCheckSpec(name="AVBase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
 
     status, message = await _probe_crawler_capability(
         ProbeFakeClient(
@@ -1110,7 +1110,7 @@ async def test_probe_crawler_capability_warns_when_no_search_result(monkeypatch:
             self.detail_urls = None
 
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: NoResultCrawler)
-    spec = NetworkCheckSpec(name="avbase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
+    spec = NetworkCheckSpec(name="AVBase", group="刮削站点", url="https://www.avbase.net", site=Website.AVBASE)
 
     status, message = await _probe_crawler_capability(ProbeFakeClient(), spec)
 
@@ -1125,7 +1125,7 @@ async def test_probe_crawler_capability_warns_when_search_url_unavailable(monkey
             return None
 
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: NoUrlCrawler)
-    spec = NetworkCheckSpec(name="fc2ppvdb", group="刮削站点", url="https://fc2cmadb.com", site=Website.FC2PPVDB)
+    spec = NetworkCheckSpec(name="FC2PPVDB", group="刮削站点", url="https://fc2cmadb.com", site=Website.FC2PPVDB)
 
     status, message = await _probe_crawler_capability(ProbeFakeClient(), spec)
 
@@ -1145,7 +1145,7 @@ async def test_probe_crawler_capability_falls_back_to_run_when_search_url_missin
             return SimpleNamespace(data=SimpleNamespace(), debug_info=SimpleNamespace(error=None))
 
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: RunOnlyCrawler)
-    spec = NetworkCheckSpec(name="fc2ppvdb", group="刮削站点", url="https://fc2cmadb.com", site=Website.FC2PPVDB)
+    spec = NetworkCheckSpec(name="FC2PPVDB", group="刮削站点", url="https://fc2cmadb.com", site=Website.FC2PPVDB)
 
     status, message = await _probe_crawler_capability(ProbeFakeClient(), spec)
 
@@ -1166,7 +1166,7 @@ async def test_probe_crawler_capability_falls_back_to_run_when_parse_empty(monke
             return SimpleNamespace(data=SimpleNamespace(), debug_info=SimpleNamespace(error=None))
 
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: PostSearchCrawler)
-    spec = NetworkCheckSpec(name="madouqu", group="刮削站点", url="https://madouqu.shop", site=Website.MADOUQU)
+    spec = NetworkCheckSpec(name="Madouqu", group="刮削站点", url="https://madouqu.shop", site=Website.MADOUQU)
 
     status, message = await _probe_crawler_capability(ProbeFakeClient(), spec)
 
@@ -1191,7 +1191,7 @@ async def test_probe_crawler_capability_uses_probe_number_attribute(monkeypatch:
             return ["https://example.test/works/1"]
 
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: BrandedCrawler)
-    spec = NetworkCheckSpec(name="xcity", group="刮削站点", url="https://xcity.jp", site=Website.XCITY)
+    spec = NetworkCheckSpec(name="Xcity", group="刮削站点", url="https://xcity.jp", site=Website.XCITY)
 
     status, _message = await _probe_crawler_capability(ProbeFakeClient(), spec)
 
@@ -1233,7 +1233,7 @@ async def test_probe_crawler_capability_warns_when_run_rewritten_and_fails(monke
             return SimpleNamespace(data=None, debug_info=SimpleNamespace(error="未找到匹配"))
 
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: RewrittenCrawler)
-    spec = NetworkCheckSpec(name="fc2ppvdb", group="刮削站点", url="https://fc2cmadb.com", site=Website.FC2PPVDB)
+    spec = NetworkCheckSpec(name="FC2PPVDB", group="刮削站点", url="https://fc2cmadb.com", site=Website.FC2PPVDB)
 
     status, message = await _probe_crawler_capability(ProbeFakeClient(), spec)
 
@@ -1365,9 +1365,9 @@ def test_merge_and_load_cache_roundtrip(monkeypatch: pytest.MonkeyPatch, tmp_pat
     merge_site_check_cache([_mk_cache_result(Website.JAVDB, NetworkCheckStatus.OK, used_proxy=True)])
 
     loaded = load_site_check_cache()
-    assert loaded["javdb"]["status"] == "ok"
-    assert loaded["javdb"]["route"] == "proxy"
-    assert loaded["javdb"]["checked_at"]
+    assert loaded["JavDB"]["status"] == "ok"
+    assert loaded["JavDB"]["route"] == "proxy"
+    assert loaded["JavDB"]["checked_at"]
 
 
 def test_merge_cache_includes_any_site_attributed_group(monkeypatch: pytest.MonkeyPatch, tmp_path):
@@ -1388,7 +1388,7 @@ def test_merge_cache_includes_any_site_attributed_group(monkeypatch: pytest.Monk
     )
 
     loaded = load_site_check_cache()
-    assert loaded["javdb"]["status"] == "ok"
+    assert loaded["JavDB"]["status"] == "ok"
     assert len(loaded) == 1
 
 
@@ -1401,8 +1401,8 @@ def test_merge_cache_partial_overwrite_preserves_history(monkeypatch: pytest.Mon
     merge_site_check_cache([_mk_cache_result(Website.DMM, NetworkCheckStatus.OK)])
 
     loaded = load_site_check_cache()
-    assert loaded["javdb"]["status"] == "fail"
-    assert loaded["javdb"]["route"] == "direct"
+    assert loaded["JavDB"]["status"] == "fail"
+    assert loaded["JavDB"]["route"] == "direct"
     assert loaded["DMM"]["status"] == "ok"
 
 
@@ -1413,7 +1413,7 @@ def test_merge_cache_new_run_overwrites_same_site(monkeypatch: pytest.MonkeyPatc
     merge_site_check_cache([_mk_cache_result(Website.JAVDB, NetworkCheckStatus.FAILED)])
     merge_site_check_cache([_mk_cache_result(Website.JAVDB, NetworkCheckStatus.OK)])
 
-    assert load_site_check_cache()["javdb"]["status"] == "ok"
+    assert load_site_check_cache()["JavDB"]["status"] == "ok"
 
 
 def test_load_cache_bad_or_missing_file(monkeypatch: pytest.MonkeyPatch, tmp_path):
@@ -1594,9 +1594,9 @@ def test_merge_cache_includes_api_group_sites(monkeypatch, tmp_path):
     )
     cache = load_site_check_cache()
     assert cache["DMM_API"]["status"] == "ok"
-    assert cache["thejavdb_api"]["status"] == "warn"
-    assert cache["missav_api"]["status"] == "fail"
-    assert cache["theporndb"]["status"] == "ok"
+    assert cache["TheJavDB_API"]["status"] == "warn"
+    assert cache["MissAV_API"]["status"] == "fail"
+    assert cache["ThepornDB"]["status"] == "ok"
     assert "通用 HTTPS" not in cache and all(v.get("status") for v in cache.values())
 
 
@@ -1605,22 +1605,22 @@ def test_merge_cache_official_aggregates_worst(monkeypatch, tmp_path):
     monkeypatch.setattr(nc, "_site_cache_path", lambda: tmp_path / "cache.json")
     merge_site_check_cache(
         [
-            _result(Website.OFFICIAL, NetworkCheckStatus.OK, name="official·1pondo"),
-            _result(Website.OFFICIAL, NetworkCheckStatus.FAILED, name="official·heyzo"),
-            _result(Website.OFFICIAL, NetworkCheckStatus.OK, name="official·caribbeancom"),
+            _result(Website.OFFICIAL, NetworkCheckStatus.OK, name="Official·1Pondo"),
+            _result(Website.OFFICIAL, NetworkCheckStatus.FAILED, name="Official·HEYZO"),
+            _result(Website.OFFICIAL, NetworkCheckStatus.OK, name="Official·Caribbeancom"),
         ]
     )
-    assert load_site_check_cache()["official"]["status"] == "fail"
+    assert load_site_check_cache()["Official"]["status"] == "fail"
 
     # 反序: 先 fail 后 ok 也必须保持 fail
     monkeypatch.setattr(nc, "_site_cache_path", lambda: tmp_path / "cache2.json")
     merge_site_check_cache(
         [
-            _result(Website.OFFICIAL, NetworkCheckStatus.FAILED, name="official·1pondo"),
-            _result(Website.OFFICIAL, NetworkCheckStatus.OK, name="official·heyzo"),
+            _result(Website.OFFICIAL, NetworkCheckStatus.FAILED, name="Official·1Pondo"),
+            _result(Website.OFFICIAL, NetworkCheckStatus.OK, name="Official·HEYZO"),
         ]
     )
-    assert load_site_check_cache()["official"]["status"] == "fail"
+    assert load_site_check_cache()["Official"]["status"] == "fail"
 
 
 @pytest.mark.anyio
@@ -1651,7 +1651,7 @@ async def test_official_generates_five_sub_specs(monkeypatch):
     specs = await build_network_check_specs()
     official_specs = [s for s in specs if s.site == Website.OFFICIAL]
     assert len(official_specs) == len(UNCENSORED_OFFICIAL_SITES) == 5
-    assert {s.name for s in official_specs} == {f"official·{src}" for src in UNCENSORED_OFFICIAL_SITES}
+    assert {s.name for s in official_specs} == {f"Official·{spec.studio}" for spec in UNCENSORED_OFFICIAL_SITES.values()}
     assert all(s.url and s.url.startswith("https://") for s in official_specs)
 
 
@@ -1694,7 +1694,7 @@ def test_merge_cache_uses_theporndb_token_production_spec(monkeypatch, tmp_path)
         [NetworkCheckResult(spec=spec, status=NetworkCheckStatus.OK, message="API 查询正常", used_proxy=True)]
     )
     cache = load_site_check_cache()
-    assert cache["theporndb"]["status"] == "ok"
+    assert cache["ThepornDB"]["status"] == "ok"
 
 
 @pytest.mark.anyio
@@ -1714,9 +1714,9 @@ async def test_thejavdb_api_spec_has_site_for_badge(monkeypatch: pytest.MonkeyPa
 
     specs = await build_network_check_specs()
     spec = next(s for s in specs if s.site == Website.THEJAVDB_API)
-    assert spec.name == "thejavdb_api"
+    assert spec.name == "TheJavDB_API"
     assert spec.group == "账号/API"
-    assert spec.validator == "thejavdb_api"
+    assert spec.validator == "TheJavDB_API"
     assert spec.url.endswith("/movies?q=ssni-200")
 
 

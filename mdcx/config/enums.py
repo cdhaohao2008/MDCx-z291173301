@@ -436,57 +436,88 @@ class SuffixSort(Enum):
 
 
 class Website(Enum):
-    AVBASE = "avbase"
-    AVENTERTAINMENTS = "aventertainments"
+    AVBASE = "AVBase"
+    AVENTERTAINMENTS = "AVEntertainments"
     AIRAV = "airav"
-    AIRAV_CC = "airav_cc"
-    AVHEAT = "avheat"
+    AIRAV_CC = "Airav.cc"
+    AVHEAT = "AVheat"
     AVMOO = "AVMOO"
-    AVSEX = "avsex"
-    AVSOX = "avsox"
+    AVSEX = "AVSEX"
+    AVSOX = "AVSOX"
     DMM = "DMM"
-    FC2 = "fc2"
-    FC2PPVDB = "fc2ppvdb"
+    FC2 = "FC2"
+    FC2PPVDB = "FC2PPVDB"
     FREEJAVBT = "FreeJavBT"
     GETCHU = "Getchu"
-    IQQTV = "iqqtv"
-    JAVBUS = "javbus"
-    JAVDAY = "javday"
-    JAVDB = "javdb"
+    IQQTV = "IQQTV"
+    JAVBUS = "JavBus"
+    JAVDAY = "JavDay"
+    JAVDB = "JavDB"
     DMM_API = "DMM_API"
-    THEJAVDB_API = "thejavdb_api"
-    JAVDB_API = "javdb_api"
-    JAVDB_APP = "javdb_app"
-    JAVFREE = "javfree"
-    JAVLIBRARY = "javlibrary"
-    LIBREDMM = "libredmm"
-    LULUBAR = "lulubar"
-    MADOUQU = "madouqu"
-    MADOUCLUB = "madou_club"
-    MISSAV = "missav"
-    MISSAV_API = "missav_api"
+    THEJAVDB_API = "TheJavDB_API"
+    JAVDB_API = "JavDB_API"
+    JAVDB_APP = "JavDB_APP"
+    JAVFREE = "JavFree"
+    JAVLIBRARY = "JavLibrary"
+    LIBREDMM = "LibreDMM"
+    LULUBAR = "Lulubar"
+    MADOUQU = "Madouqu"
+    MADOUCLUB = "Madou_Club"
+    MISSAV = "MissAV"
+    MISSAV_API = "MissAV_API"
     MMTV = "7mmtv"
-    MGSTAGE = "mgstage"
-    MYWIFE = "mywife"
-    PRESTIGE = "prestige"
-    R18DEV = "r18dev"
-    THEPORNDB = "theporndb"
-    XCITY = "xcity"
+    MGSTAGE = "MGStage"
+    MYWIFE = "MyWife"
+    PRESTIGE = "Prestige"
+    R18DEV = "R18dev"
+    THEPORNDB = "ThepornDB"
+    XCITY = "Xcity"
 
-    OFFICIAL = "official"
+    OFFICIAL = "Official"
 
     @classmethod
     def _missing_(cls, value):
-        # 旧配置兼容：5 个站点改名前的全小写值仍可解析为新成员。
+        # 旧配置兼容：改名前的全小写值仍可解析为新成员。
         # 新值写入后迁移逻辑会归一化，此处仅保证旧文件可读、不触发校验失败。
         if isinstance(value, str):
             legacy = {
+                "avbase": "AVBase",
+                "aventertainments": "AVEntertainments",
+                "airav.cc": "Airav.cc",
+                "airav_cc": "Airav.cc",
+                "avheat": "AVheat",
                 "avmoo": "AVMOO",
+                "avsex": "AVSEX",
+                "avsox": "AVSOX",
                 "dmm": "DMM",
-                "dmm_api": "DMM_API",
+                "fc2": "FC2",
+                "fc2ppvdb": "FC2PPVDB",
                 "javdbapi": "DMM_API",
+                "dmm_api": "DMM_API",
                 "freejavbt": "FreeJavBT",
                 "getchu": "Getchu",
+                "iqqtv": "IQQTV",
+                "javbus": "JavBus",
+                "javday": "JavDay",
+                "javdb": "JavDB",
+                "thejavdb_api": "TheJavDB_API",
+                "javdb_api": "JavDB_API",
+                "javdb_app": "JavDB_APP",
+                "javfree": "JavFree",
+                "javlibrary": "JavLibrary",
+                "libredmm": "LibreDMM",
+                "lulubar": "Lulubar",
+                "madouqu": "Madouqu",
+                "madou_club": "Madou_Club",
+                "missav": "MissAV",
+                "missav_api": "MissAV_API",
+                "mgstage": "MGStage",
+                "mywife": "MyWife",
+                "prestige": "Prestige",
+                "r18dev": "R18dev",
+                "theporndb": "ThepornDB",
+                "xcity": "Xcity",
+                "official": "Official",
             }
             mapped = legacy.get(value) or legacy.get(value.lower())
             if mapped is not None:

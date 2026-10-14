@@ -152,86 +152,86 @@
   "amazon_skip_poster_size_precheck": false,
   "scrape_like": "info",
   "field_priority_try_all_images": false,
-  "website_single": "javbus",
+  "website_single": "JavBus",
   "website_youma": [
     "DMM",
     "DMM_API",
-    "libredmm",
-    "r18dev",
-    "avbase",
-    "xcity",
-    "prestige",
-    "mgstage",
+    "LibreDMM",
+    "R18dev",
+    "AVBase",
+    "Xcity",
+    "Prestige",
+    "MGStage",
     "Getchu",
-    "javlibrary",
+    "JavLibrary",
     "FreeJavBT",
-    "lulubar",
-    "javbus",
-    "javdb",
-    "javdb_api",
-    "javdb_app",
-    "missav",
-    "missav_api",
-    "javday",
-    "javfree",
-    "airav_cc",
-    "avsex",
+    "Lulubar",
+    "JavBus",
+    "JavDB",
+    "JavDB_API",
+    "JavDB_APP",
+    "MissAV",
+    "MissAV_API",
+    "JavDay",
+    "JavFree",
+    "Airav.cc",
+    "AVSEX",
     "7mmtv",
     "AVMOO",
-    "thejavdb_api",
-    "official",
-    "iqqtv"
+    "TheJavDB_API",
+    "Official",
+    "IQQTV"
   ],
   "website_wuma": [
-    "avsox",
-    "javbus",
-    "javdb",
-    "javdb_api",
-    "javdb_app",
-    "missav",
-    "missav_api",
-    "javday",
-    "avsex",
+    "AVSOX",
+    "JavBus",
+    "JavDB",
+    "JavDB_API",
+    "JavDB_APP",
+    "MissAV",
+    "MissAV_API",
+    "JavDay",
+    "AVSEX",
     "7mmtv",
-    "official",
-    "iqqtv",
-    "aventertainments"
+    "Official",
+    "IQQTV",
+    "AVEntertainments"
   ],
   "website_suren": [
-    "mgstage",
-    "prestige",
-    "javbus",
-    "javdb",
-    "javdb_api",
-    "javdb_app",
+    "MGStage",
+    "Prestige",
+    "JavBus",
+    "JavDB",
+    "JavDB_API",
+    "JavDB_APP",
     "DMM",
     "DMM_API",
-    "avbase",
-    "missav",
-    "missav_api",
-    "mywife",
+    "AVBase",
+    "MissAV",
+    "MissAV_API",
+    "MyWife",
     "7mmtv",
-    "iqqtv"
+    "IQQTV"
   ],
   "website_fc2": [
-    "fc2",
-    "fc2ppvdb",
-    "javfree",
+    "FC2",
+    "FC2PPVDB",
+    "JavFree",
     "7mmtv",
-    "javdb",
-    "javdb_api",
-    "javdb_app"
+    "JavDB",
+    "JavDB_API",
+    "JavDB_APP"
   ],
   "website_oumei": [
-    "theporndb",
-    "avheat"
+    "ThepornDB",
+    "AVheat"
   ],
   "website_guochan": [
-    "madouqu",
-    "madou_club",
-    "avsex",
-    "iqqtv",
-    "javday"
+    "Madouqu",
+    "Madou_Club",
+    "AVSEX",
+    "IQQTV",
+    "JavDay"
   ],
   "actor_realname": false,
   "outline_format": [
@@ -240,437 +240,437 @@
   "field_configs": {
     "title": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "zh_cn",
       "translate": true
     },
     "originaltitle": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "undefined",
       "translate": true
     },
     "outline": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "zh_cn",
       "translate": true
     },
     "originalplot": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "undefined",
       "translate": true
     },
     "actors": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "zh_cn",
       "translate": true
     },
     "all_actors": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "zh_cn",
       "translate": true
     },
     "tags": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "zh_cn",
       "translate": true
     },
     "directors": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "zh_cn",
       "translate": true
     },
     "series": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "zh_cn",
       "translate": true
     },
     "studio": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "zh_cn",
       "translate": true
     },
     "publisher": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "zh_cn",
       "translate": true
     },
     "thumb": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "undefined",
       "translate": true
     },
     "poster": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "undefined",
       "translate": true
     },
     "extrafanart": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "undefined",
       "translate": true
     },
     "trailer": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "undefined",
       "translate": true
     },
     "release": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "undefined",
       "translate": true
     },
     "runtime": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "undefined",
       "translate": true
     },
     "score": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "undefined",
       "translate": true
     },
     "wanted": {
       "site_prority": [
-        "theporndb",
-        "avheat",
+        "ThepornDB",
+        "AVheat",
         "DMM",
-        "official",
-        "libredmm",
-        "mgstage",
-        "prestige",
-        "avbase",
-        "javdb",
-        "javbus",
-        "iqqtv",
+        "Official",
+        "LibreDMM",
+        "MGStage",
+        "Prestige",
+        "AVBase",
+        "JavDB",
+        "JavBus",
+        "IQQTV",
         "FreeJavBT",
-        "missav",
-        "avsox",
+        "MissAV",
+        "AVSOX",
         "AVMOO",
-        "fc2",
-        "fc2ppvdb"
+        "FC2",
+        "FC2PPVDB"
       ],
       "language": "undefined",
       "translate": true
@@ -683,19 +683,19 @@
     "airav": {
       "custom_url": null
     },
-    "official": {
+    "Official": {
       "custom_url": null
     },
-    "airav_cc": {
+    "Airav.cc": {
       "custom_url": null
     },
-    "javdb": {
+    "JavDB": {
       "custom_url": null
     },
-    "avbase": {
+    "AVBase": {
       "custom_url": null
     },
-    "javbus": {
+    "JavBus": {
       "custom_url": "https://www.dmmsee.cyou/"
     }
   },
@@ -841,8 +841,8 @@
   "timeout": 30,
   "retry": 3,
   "theporndb_api_token": "",
-  "javdb": "",
-  "javbus": "",
+  "JavDB": "",
+  "JavBus": "",
   "show_web_log": true,
   "show_from_log": true,
   "show_data_log": true,
@@ -868,54 +868,54 @@
     "youma": {
       "title": {
         "site_prority": [
-          "xcity",
+          "Xcity",
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "originaltitle": {
         "site_prority": [
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "outline": {
         "site_prority": [
-          "xcity",
-          "iqqtv",
-          "airav_cc",
+          "Xcity",
+          "IQQTV",
+          "Airav.cc",
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "originalplot": {
         "site_prority": [
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "actors": {
         "site_prority": [
-          "libredmm",
+          "LibreDMM",
           "DMM_API"
         ]
       },
       "all_actors": {
         "site_prority": [
-          "libredmm",
+          "LibreDMM",
           "DMM_API"
         ]
       },
       "thumb": {
         "site_prority": [
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "poster": {
         "site_prority": [
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "extrafanart": {
@@ -923,22 +923,22 @@
       },
       "tags": {
         "site_prority": [
-          "javdb_app",
+          "JavDB_APP",
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "release": {
         "site_prority": [
-          "javdb_app",
+          "JavDB_APP",
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "runtime": {
         "site_prority": [
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "score": {
@@ -949,23 +949,23 @@
       },
       "series": {
         "site_prority": [
-          "xcity",
+          "Xcity",
           "DMM_API",
-          "javbus"
+          "JavBus"
         ]
       },
       "studio": {
         "site_prority": [
-          "xcity",
+          "Xcity",
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "publisher": {
         "site_prority": [
-          "xcity",
+          "Xcity",
           "DMM_API",
-          "libredmm"
+          "LibreDMM"
         ]
       },
       "trailer": {
