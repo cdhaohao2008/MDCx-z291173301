@@ -3526,6 +3526,7 @@ def test_settings_scrollbars_uniform_width_across_tabs(win, app):
     assert {name: bar.width() for name, bar in found} == fixed, "非幂等"
 
 
+<<<<<<< Updated upstream
 def test_settings_scrollbars_use_declared_thickness_not_stale_geometry(win, app):
     """滚动条厚度取 QSS 声明值，不被"未布局页"的陈旧几何拉低（随机页签变窄回归）。
 
@@ -4247,10 +4248,39 @@ def test_naming_filename_checkboxes_column_align(win, app, width):
     注：此前「小数点与空格保持 140 设计间距、等距右随」的约定已被新需求取代——
     窄态下该约定本来也从未成立（空格被左移 47 而小数点纹丝不动，point-space 实测
     187 ≠ 140，正是本用例 [1000] 之前挂掉的原因）。
+=======
+# ---------- 命名页「视频命名规则」组无大片空白（_sync_naming_template_section）----------
+
+
+def _goto_naming_tab(win, app):
+    """切到「设置→命名」页签（走真实入口，触发 tabChanged 钩子）。"""
+    page = _goto(win, app, "page_setting")
+    tabs = win.Ui.tabWidget
+    for i in range(tabs.count()):
+        if tabs.widget(i).objectName() == "tab_3":
+            tabs.setCurrentIndex(i)
+            app.processEvents()
+            break
+    else:
+        raise AssertionError("tab_3 not found")
+    # singleShot(0) 排队的重算需要再转一圈事件循环
+    for _ in range(3):
+        app.processEvents()
+    return page
+
+
+def _naming_gaps(win):
+    """测量命名页「视频命名规则」组两处空白（统一换算到 gridLayoutWidget_8 坐标系）。
+
+    返回 (空白1, 空白2, 预览高, 组高)：
+      空白1 = 视频文件名 行顶缘 - 长说明文字 label_66 底缘
+      空白2 = 网格底缘 - 模板预览结果 label 底缘
+>>>>>>> Stashed changes
     """
     from PyQt6.QtCore import QPoint
 
     ui = win.Ui
+<<<<<<< Updated upstream
     win.show()
     _goto_naming_tab(win, app)
     win.resize(width, 1170 if width > 1200 else 700)
@@ -4398,3 +4428,104 @@ def test_site_pref_combo_ignored_until_tab_opened(win, app):
         app.processEvents()
     combo_right, ref_right = _site_pref_rights(win)
     assert abs(combo_right - ref_right) <= 200, f"首次打开未对齐: 指定网站 {combo_right} vs 锁定类型 {ref_right}"
+=======
+    box, gridw = ui.groupBox_8, ui.gridLayoutWidget_8
+    lbl, row, res = ui.label_66, ui.label_63, ui.label_name_template_preview_result
+
+    def _top(w):
+        return w.mapTo(gridw, QPoint(0, 0)).y()
+
+    return (
+        _top(row) - (_top(lbl) + lbl.height()),
+        gridw.height() - (_top(res) + res.height()),
+        ui.plainTextEdit_name_template_preview.height(),
+        box.height(),
+    )
+
+
+def test_naming_video_name_has_no_blank_above(win, app):
+    """空白1：「视频文件名」上方不得出现大片空白（用户截图约 90px）。
+
+    根因：label_66 是顶端对齐的可换行富文本标签，其 sizeHint 高度是按设计期
+    宽度一次性算出的常量（MDCx.ui 设计宽 680），窗口实际更窄时按当前宽度换行
+    后的真实高度更小，QGridLayout 若沿用那个 sizeHint 就会在文字下方留出
+    一段空白。修复：_sync_naming_template_section 先解除钉死高度，再按当前
+    宽度 heightForWidth 精确贴合。
+
+    断言写成「高度 == 当前宽度 heightForWidth」这一机制级不变量而非绝对像素：
+    sizeHint 与 heightForWidth 的差值随平台字体/行高而变（本仓库 offscreen 下
+    为 307 vs 287，真机更大），写死阈值会在别的机器上误报。
+    """
+    win.resize(1024, 744)
+    app.processEvents()
+    _goto_naming_tab(win, app)
+    lbl = win.Ui.label_66
+    hfw = lbl.heightForWidth(lbl.width())
+    assert lbl.height() == hfw, (
+        f"说明文字未按当前宽度贴合，下方会留白: height={lbl.height()} "
+        f"heightForWidth={hfw} sizeHint={lbl.sizeHint().height()}"
+    )
+    gap1, _gap2, _prev_h, _box_h = _naming_gaps(win)
+    assert gap1 <= 24, f"「视频文件名」上方仍有大片空白: {gap1}px"
+
+
+def test_naming_template_preview_has_no_blank_below(win, app):
+    """空白2：「模板预览」下方不得出现大片空白（用户截图约 40px）。
+
+    根因：预览框垂直策略为 Expanding，会吃满网格剩余空间并被撑得过高，
+    把结果文字推离组底。修复：预览钉到 _NAMING_PREVIEW_H，组高按 sizeHint 收缩。
+    """
+    win.resize(1024, 744)
+    app.processEvents()
+    _goto_naming_tab(win, app)
+    _gap1, gap2, prev_h, box_h = _naming_gaps(win)
+    assert prev_h == win._NAMING_PREVIEW_H, f"预览框未钉到设计高度: {prev_h}"
+    # 结果文字应紧贴网格底缘；容 2px 吸收取整
+    assert gap2 <= 2, f"「模板预览」下方仍有大片空白: {gap2}px"
+    # 组高由内容决定：必须比设计期固定高度（MDCx.ui 中 groupBox_8 = 1051）明显收缩。
+    # 阈值写成相对设计值的差量而非绝对值——label_66 换行行数随字体/宽度变化，
+    # 绝对像素会因平台字体而误报（实测同宽下 804~946）。
+    design_h = 1051
+    assert box_h <= design_h - 50, f"「视频命名规则」组未按内容收缩: {box_h} (设计 {design_h})"
+
+
+def test_naming_group_height_is_content_driven(win, app):
+    """组高恒等于「网格 sizeHint + 底部内衬」，不留 Expanding 余量。"""
+    from PyQt6.QtWidgets import QGridLayout
+
+    win.resize(1024, 744)
+    app.processEvents()
+    _goto_naming_tab(win, app)
+    grid = win.Ui.gridLayout_8
+    assert isinstance(grid, QGridLayout)
+    expected = grid.sizeHint().height() + win._NAMING_BOX_PAD
+    assert win.Ui.groupBox_8.height() == expected, f"组高与内容不符: {win.Ui.groupBox_8.height()} != {expected}"
+    # 长说明文字必须精确贴合当前宽度，否则空白1 会重新出现
+    lbl = win.Ui.label_66
+    assert lbl.height() == lbl.heightForWidth(lbl.width()), (
+        f"说明文字未贴合: {lbl.height()} != {lbl.heightForWidth(lbl.width())}"
+    )
+
+
+def test_naming_follow_groups_shift_up_without_vertical_gap(win, app):
+    """组高收缩后，后续分组必须同步上移并保持设计间距（不能留断层）。"""
+    win.resize(1024, 744)
+    app.processEvents()
+    _goto_naming_tab(win, app)
+    ui = win.Ui
+    first = ui.groupBox_40
+    gap = first.y() - (ui.groupBox_8.y() + ui.groupBox_8.height())
+    # 设计间距 19px；回归态会因组未收缩而出现数十 px 断层
+    assert 0 <= gap <= 30, f"「视频命名规则」与后续分组之间出现断层: {gap}px"
+
+
+@pytest.mark.parametrize("width", [820, 1024, 1280, 1600])
+def test_naming_gaps_stay_tight_across_widths(win, app, width):
+    """宽度变化会改变 label_66 换行行数，两处空白必须始终收紧。"""
+    win.resize(width, 744)
+    app.processEvents()
+    _goto_naming_tab(win, app)
+    gap1, gap2, _prev_h, _box_h = _naming_gaps(win)
+    assert gap1 <= 24, f"width={width} 空白1 回归: {gap1}px"
+    assert gap2 <= 2, f"width={width} 空白2 回归: {gap2}px"
+>>>>>>> Stashed changes

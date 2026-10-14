@@ -1511,6 +1511,45 @@ async def test_network_group_runs_before_site_specs_ready(monkeypatch: pytest.Mo
 
 
 @pytest.mark.anyio
+async def test_site_specs_merged_once_for_later_groups(monkeypatch: pytest.MonkeyPatch):
+    """站点 specs 全程只构建/并入一次：账号/API 组不能出现重复检测行。
+
+    根因：join_site_specs() 把 site_specs_task 置回 None，而「账号/API」「辅助服务」
+    同样不是 STATIC_ONLY_GROUPS，原先只看 task is None 的话每进一组就重建并再并入
+    一份站点 specs —— DMM_API/MissAV_API/TheJavDB_API（账号/API 组的三项）于是各被
+    检测两次、报告里打印两行，进度分母也跟着虚高。
+    """
+    calls: list[int] = []
+
+    monkeypatch.setattr(
+        "mdcx.core.network_check._build_static_specs",
+        lambda: [
+            NetworkCheckSpec(name="net", group="网络连通", url="https://net.example"),
+            NetworkCheckSpec(name="cf", group="辅助服务", url="https://cf.example"),
+        ],
+    )
+
+    async def counted_site_specs() -> list[NetworkCheckSpec]:
+        calls.append(1)
+        return [
+            NetworkCheckSpec(name="site", group="站点检测", url="https://site.example"),
+            # 与真实实现一致：API 类站点 specs 的 group 就是「账号/API」，
+            # 因此在「账号/API」组被 join 进来（重复时正是它被多跑一次）。
+            NetworkCheckSpec(name="DMM_API", group="账号/API", url="https://dmm.example"),
+        ]
+
+    monkeypatch.setattr("mdcx.core.network_check._build_site_specs", counted_site_specs)
+    lines: list[str] = []
+
+    results = await run_network_check(progress=lines.append, client=FakeClient(), emit_header=False)
+
+    assert len(calls) == 1
+    assert sorted(result.spec.name for result in results) == ["DMM_API", "cf", "net", "site"]
+    dmm_lines = [line for line in lines if "DMM_API" in line]
+    assert len(dmm_lines) == 1, dmm_lines
+
+
+@pytest.mark.anyio
 async def test_build_site_specs_uses_hardcoded_url_not_dynamic(monkeypatch: pytest.MonkeyPatch):
     """检测前先使用代码里的网址（默认域名），不覆盖为动态解析结果（议题 #132）；
     动态域名解析仅在检测失败时作为兜底重试执行（见 run_network_check_item）。"""

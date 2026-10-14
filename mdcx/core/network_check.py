@@ -725,7 +725,9 @@ def format_summary(
         if result.status not in (NetworkCheckStatus.FAILED, NetworkCheckStatus.WARNING):
             continue
         message = result.message or ""
-        if "Cloudflare" in message and ("兜底失败" in message or "已尝试 CF Bypass" in message):
+        if "Cloudflare" in message and (
+            "Bypass失败" in message or "兜底失败" in message or "已尝试 CF Bypass" in message
+        ):
             # 外部CF服务已配置且实际尝试过（bypass 返回仍是挑战页），与"没配服务"是两回事，
             # 不能再让人去配一遍服务
             cause_counts["cf_unsolved"] += 1
@@ -1127,9 +1129,9 @@ async def run_network_check_item(
                         str(bypass_error or "").split(" body=", 1)[0].strip().replace("; GET ", "、").replace("; ", "、")
                     )
                     if clean_bypass:
-                        error = f"{base_error} CloudFlare Bypass兜底失败：{clean_bypass}"
+                        error = f"{base_error} CloudFlare Bypass失败：{clean_bypass}"
                     else:
-                        error = f"{base_error} CloudFlare Bypass兜底失败"
+                        error = f"{base_error} CloudFlare Bypass失败"
         if response is None:
             # 动态域名站（javlibrary / avmoo / avsox / avheat / madouqu）：代码里的
             # 默认网址无法联通时，通过函数获取最新直连地址重试，且只在「网络连通」
@@ -1503,6 +1505,12 @@ async def run_network_check(
     # GitHub Raw，再检测各站；动态域名解析（get_javlibrary_domain 等）只在检测
     # 失败时作为兜底重试执行（见 run_network_check_item），避免十几分钟的前置等待。
     site_specs_task: asyncio.Task[list[NetworkCheckSpec]] | None = None
+    # 站点 specs 只构建/并入一次：join_site_specs() 执行完会把 site_specs_task 置回
+    # None（空任务槽），而「账号/API」「辅助服务」组同样不是 STATIC_ONLY_GROUPS，
+    # 原先只看 task is None 的话每进一组就重建+再并入一份站点 specs，于是
+    # 账号/API 组的 DMM_API/MissAV_API/TheJavDB_API 各被检测两次、报告里出现
+    # 两行（进度分母也跟着虚高）。用这个独立标志区分「还没建过」与「已经并入过」。
+    site_specs_merged = False
     try:
         for group in GROUP_ORDER:
             if group == "基础环境":
@@ -1513,10 +1521,11 @@ async def run_network_check(
             # 所以必须在 join 之后才取本组清单。
             # 站点 specs 在「网络连通」之后才开始构建（避免十几分钟前置等待）。
             # 当首次需要非静态组时（如「站点检测」）才创建任务，随后立即 join。
-            if specs is None and site_specs_task is None and group not in STATIC_ONLY_GROUPS:
+            if specs is None and not site_specs_merged and group not in STATIC_ONLY_GROUPS:
                 site_specs_task = asyncio.create_task(_build_site_specs())
             if site_specs_task is not None and group not in STATIC_ONLY_GROUPS:
                 await join_site_specs()
+                site_specs_merged = True
             group_specs = grouped_specs.get(group, [])
             if not group_specs:
                 continue

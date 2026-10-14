@@ -209,4 +209,4 @@ async def test_check_keeps_accumulated_errors_after_body_truncation(monkeypatch)
     assert client.bypass_calls == 1
     assert "HTTP 403、Failed to perform, curl: (35) TLS connect error:" in message, message
     assert "body=" not in message, "响应体不应进检测行"
-    assert "CloudFlare Bypass兜底失败：HTTP 502、GET http://127.0.0.1:7372/html 失败: HTTP 502" in message, message
+    assert "CloudFlare Bypass失败：HTTP 502、GET http://127.0.0.1:7372/html 失败: HTTP 502" in message, message
