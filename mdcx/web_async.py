@@ -1429,7 +1429,7 @@ class AsyncWebClient:
         return normalized.startswith("mirror 返回 Cloudflare 挑战页") or "Cloudflare 挑战页" in normalized
 
     def _is_trusted_bypass_landing(self, url: str) -> bool:
-        """校验 bypass 服务落地/重定向后的最终 URL 域名是否在白名单内。
+        """校验 bypass 服务落地或重定向后的最终 URL 域名是否在白名单内。
 
         - 未配置白名单（空集合）时返回 True（向后兼容，不校验）。
         - 支持精确域名与子域通配（*.example.com 匹配 a.example.com，不匹配 example.com 自身）。

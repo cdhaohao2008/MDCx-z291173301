@@ -126,7 +126,7 @@
   - **HTTP 4xx/5xx 错误串必须携带截断响应体**（#88：Emby 400 根因在 body JSON），保留 `"HTTP {status}"` 前缀不破坏匹配；定位顺序先看客户端实际发了什么。
   - **番号归一化：前导单数字双重语义**（studio 名单数字保留 vs DMM 预约版 `9` 前缀剥掉），改正则前 grep 全部分支、改后跑相邻语义既有测试防双向误伤（#84）。
   - **站点域名优先级/删站属产品取舍，查证给方案不擅动**（#85：域名顺序常有实测依据注释）；删站影响面 = 注册表 + Website 枚举 + 默认 proxy 列表 + migrations.py 清洗 + UI 列表；单站死活须真机实测，别用 devbox 结果判定。
-  - **javdb 系三源**：javdb（网页）/javdb_api（镜像站）/javdb_app（App API 免 CF 最稳）；**thejavdb_api 与 javdb 无关**。App 签名机制见 `docs/Javdb_App_Signature.md`，排障锚点=三主机同时 4xx 或 InvalidSignature；环境变量 `MDCX_JAVDB_APP_SIG_*` 免改码覆盖；搜索 limit≤50、分页须 `movie_sort_by=release`。
+  - **javdb三源**：javdb（网页）/javdb_api（镜像站）/javdb_app（App API 免 CF 最稳）；**thejavdb_api 与 javdb 无关**。App 签名机制见 `docs/Javdb_App_Signature.md`，排障锚点=三主机同时 4xx 或 InvalidSignature；环境变量 `MDCX_JAVDB_APP_SIG_*` 免改码覆盖；搜索 limit≤50、分页须 `movie_sort_by=release`。
   - **javdb 图源无水印体系**：`tp.spfcas.com` App 专用（单字节 XOR，首字节 key）vs `c0.jdbstatic.com` 带水印；解密/变换集中在 `base/web.py`；加密流尺寸探测 (0,0) 属预期勿当图失效。
 
 ## Windows 打包与发布

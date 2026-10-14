@@ -154,7 +154,7 @@ export QT_QPA_PLATFORM=xcb
 
 **配置代理**：设置 → 网络 → 代理，支持 HTTP/HTTPS/SOCKS5。只对"走代理网站"域名列表中的站点走代理，其他默认直连；默认列表包含 `Amazon.co.jp, M.media-amazon.com, Xcity.jp, Minnano-av.com, Avbase.net, Javbus.com, Javdb.com, Javlibrary.com, R18.dev, Mgstage.com, Prestige-av.com, Seesaawiki.jp, Avsox.click, Avsox.com, Avmoo.shop, Avmoo.com, Avheat.shop, Avheat.com, Heyzo.com, Caribbeancom.com, 1pondo.tv, Pacopacomama.com, 10musume.com, Mywife.cc, Github.com, Raw.githubusercontent.com, Google.com, Missav.ws, Missav.ai, Missav.live, Aventertainments.com, Javfree.me, 7mmtv.sx, 7tv022.com, Avsex.cc, Getchu.com, Dl.getchu.com`，可按需追加。
 
-**CF Bypass 落地白名单**：设置 → 网络 →「Bypass 白名单」可填写可信落地域名（逗号分隔，支持 `*.example.com` 子域通配，如 `javbus.com,*.javdb.com`）。用于校验 Bypass 服务落地/重定向后的最终域名，防止第三方 Bypass 服务被劫持时把恶意页面当数据写入 NFO；留空表示不校验（默认）。
+**CF Bypass 落地白名单**：设置 → 网络 →「Bypass 白名单」可填写可信落地域名（逗号分隔，支持 `*.example.com` 子域通配，如 `javbus.com,*.javdb.com`）。用于校验 Bypass 服务落地或重定向后的最终域名，防止第三方 Bypass 服务被劫持时把恶意页面当数据写入 NFO；留空表示不校验（默认）。
 
 **刮削中途退出，重开要重新刮一遍吗**：不用。刮削进度自动保存到本地数据库（userdata/scrape_state.db，WAL模式SQLite），程序重启或崩溃后再次刮削，会自动跳过已完成的文件、恢复上次失败的未超限文件，最多自动重试3次，从上次进度继续。读取模式不受断点续刮缓存干扰，始终处理全部选中文件，如需清除缓存重新全量刮削，可使用「软件工具」页的「刮削缓存管理」重置。
 

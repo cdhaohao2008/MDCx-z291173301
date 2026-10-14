@@ -14438,13 +14438,13 @@ class Ui_MDCx(object):
         self.lineEdit_cf_bypass_trusted_hosts.setToolTip(
             _translate(
                 "MDCx",
-                "校验 Bypass 服务落地/重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据；支持 *.example.com 子域通配；留空表示不校验（默认）",
+                "校验 Bypass 服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据；支持 *.example.com 子域通配；留空表示不校验（默认）",
             )
         )
         self.label_cf_bypass_trusted_hosts_desc.setText(
             _translate(
                 "MDCx",
-                "用途：校验Bypass服务落地/重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，支持*.example.com子域通配，逗号分隔留空表示不校验，一般不需要配置",
+                "用途：校验Bypass服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，支持*.example.com子域通配，逗号分隔留空表示不校验，一般不需要配置",
             )
         )
         self.label_65.setText(_translate("MDCx", "重试次数："))
@@ -14607,11 +14607,11 @@ class Ui_MDCx(object):
                 "<ul>\n"
                 "<li><b>有码</b>：仅能有码：AVBase、AVMOO、DMM、DMM_API、FreeJavBT、Getchu、JavLibrary、LibreDMM、Lulubar、MGStage、Prestige、R18.dev、TheJavDB_API、Xcity</li>\n"
                 "<li><b>综合</b>：有码+无码：7mmtv、airav.cc、AVSex、IQQTV、JavBus、JavDB系列、JavDay、JavFree、MissAV系列、Official</li>\n"
-                "<li><b>无码</b>：AVEntertainments、AVSOX及综合站（7mmtv、AVSex、IQQTV、JavBus、JavDB系、JavDay、MissAV系、Official）</li>\n"
+                "<li><b>无码</b>：AVEntertainments、AVSOX及综合站7mmtv、AVSex、IQQTV、JavBus、JavDB系列、JavDay、MissAV系列、Official</li>\n"
                 "<li><b>素人</b>：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB系、MGStage、MissAV系、MyWife、Prestige</li>\n"
-                "<li><b>FC2</b>：FC2、FC2PPVDB、JavDB系、JavFree、7mmtv</li>\n"
-                "<li><b>国产</b>：Madouqu、Madou_Club、AVSex、IQQTV、JavDay</li>\n"
-                "<li><b>欧美</b>：ThepornDB、AVheat</li>\n"
+                "<li><b>FC2</b>：7mmtv、FC2、FC2PPVDB、JavDB系、JavFree</li>\n"
+                "<li><b>国产</b>：AVSex、IQQTV、JavDay、Madou_Club、Madouqu</li>\n"
+                "<li><b>欧美</b>：AVheat、ThepornDB</li>\n"
                 "</ul>\n"
                 "<p><b>Official综合：有码+无码，按番号前缀自动路由到各番号官网，全部走代理：有码片商官网30家：Attackers、AV Opera、BeeFree、Bi-AV、Bibian、Dasdas、E-Body、Fitch、HHH-AV、Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、MKO Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、Prestige、Rookie、S1S1S1、Tamei kegoro、To-Satsu、V-AV、Wanz Factory<br/>\n"
                 "无码官网5站，JSON API直连：10Musume、1Pondo、Caribbeancom、Heyzo、Pacopacomama<br/>\n"
@@ -14620,8 +14620,8 @@ class Ui_MDCx(object):
                 "<p>MDCx提供多种Cloudflare绕过能力，遇到受Cloudflare保护的站点时自动尝试绕过：</p>\n"
                 "<ul>\n"
                 '<li><b>外部CloudFlare服务</b>：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址。</li>\n'
-                "<li><b>Selenium CF Bypass</b>：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10/11+Edge浏览器，首次使用自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却。</li>\n"
-                "<li><b>CF Bypass白名单项</b>：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配，用于校验Bypass服务落地/重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验。</li>\n"
+                "<li><b>Selenium CF Bypass</b>：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10/11+Edge浏览器，首次使用将自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却。</li>\n"
+                "<li><b>CF Bypass白名单项</b>：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配，用于校验Bypass服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验。</li>\n"
                 "<li><b>CloudFlare直连通道</b>：部分站点提供免CF的数据接口Javdb_api、Javdb_app、Missav_api、R18dev、Thejavdb_api，默认已加入网站源，可直接选用获得更稳定的抓取。</li>\n"
                 "</ul>\n"
                 "<h4>六、代理设置</h4>\n"

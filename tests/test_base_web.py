@@ -415,7 +415,7 @@ async def test_download_content_with_filepath_decrypts_spfcas(monkeypatch: pytes
 
 
 # ============================================================
-# 网页版 CDN → App CDN 无水印 URL 变换（javdb 系爬虫图源升级）
+# 网页版 CDN → App CDN 无水印 URL 变换（javdb爬虫图源升级）
 # ============================================================
 
 
