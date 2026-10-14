@@ -1004,14 +1004,15 @@ def test_actor_kodi_button_matches_upper_width_when_wide(win, app):
     _resize(win, app, 1030, 753)
     assert win._actor_page_stretch_extra() <= 0, "1030 宽下不是窄态，测试前提失效"
     assert ui.pushButton_add_actor_pic_kodi.width() == 50, "窄态按钮宽被改动"
+    kodi_check_narrow_w = ui.checkBox_actor_photo_kodi.width()
     _resize(win, app, 1920, 1170)
     assert win._actor_page_stretch_extra() > 0, "1920 宽下不是宽态，测试前提失效"
     assert ui.pushButton_add_actor_pic_kodi.width() == ui.pushButton_add_actor_pic.width(), (
         "宽态最下方「开始补全」未与上方同宽"
     )
     assert ui.pushButton_add_actor_pic.width() == 181, "上方按钮自身被改动"
-    # 复选框 checkBox_actor_photo_kodi 不得被连带加宽
-    assert ui.checkBox_actor_photo_kodi.width() == 141, "宽态复选框被连带加宽"
+    # 复选框 checkBox_actor_photo_kodi 不得被连带加宽（与自身窄态宽一致即可，不锁绝对像素）
+    assert ui.checkBox_actor_photo_kodi.width() == kodi_check_narrow_w, "宽态复选框被连带加宽"
     _resize(win, app, 1920, 1170)
     assert ui.pushButton_add_actor_pic_kodi.width() == ui.pushButton_add_actor_pic.width(), "宽态重复同步后宽度漂移"
     _resize(win, app, 1030, 753)
