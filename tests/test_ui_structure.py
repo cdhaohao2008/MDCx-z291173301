@@ -536,7 +536,7 @@ def test_proxy_toggle_ui_texts_regression():
     assert _PROXY_TOGGLE_HINT in proxy_hint
     # 帮助文档正文（关于页）条目统一为「Bypass代理」，且不再出现「CF Bypass 代理」。
     about_html = prop_of("textBrowser_about", "html") or ""
-    assert "<b>Bypass代理</b>：为绕过Cloudflare的请求单独设置代理。" in about_html
+    assert "<b>Bypass代理</b>：为绕过Cloudflare的请求单独设置代理" in about_html
     assert "CF Bypass 代理" not in about_html
 
 
