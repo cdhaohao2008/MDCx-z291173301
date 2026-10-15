@@ -1041,16 +1041,20 @@ def test_bypass_trusted_hosts_placeholder_example_works():
 
 
 def test_bypass_trusted_hosts_copy_states_it_is_not_a_bypass_exclusion():
-    """绿：tooltip/说明行须点明「不控制哪些站点走Bypass」，避免被误读成排除名单。
+    """绿：说明行须点明「不控制哪些站点走Bypass」，避免被误读成排除名单。
 
     语义事实：白名单只在 `_call_bypass_mirror` / `_call_bypass_html` 内校验落地域名，
-    bypass 对全局自动触发（命中 CF 挑战页即用），与本名单无关。文案若没说清，用户
+    bypass 对全局触发（命中 CF 挑战页即用），与本名单无关。文案若没说清，用户
     会以为填了 JavBus 就让它不走 Bypass，或以为填了 JavLibrary 会拦掉它的 bypass。
+
+    这段说明只留在输入框正下方的说明行里，**不再挂 tooltip**——同样的长句悬停即弹
+    既与下方可见文案重复，又遮住正在填的内容。tooltip 一旦再加回来，这里会先红。
     """
     root = _parse_ui()
     line_edit = _find_widget_by_name(root, "lineEdit_cf_bypass_trusted_hosts")
     desc = _find_widget_by_name(root, "label_cf_bypass_trusted_hosts_desc")
-    for widget, prop in ((line_edit, "toolTip"), (desc, "text")):
-        text = _widget_string_prop(widget, prop) or ""
-        assert "不控制哪些站点走" in text, f"{prop} 未点明「不控制哪些站点走Bypass」：{text!r}"
-        assert "不含裸域名" in text, f"{prop} 未点明通配不含裸域名本身：{text!r}"
+    assert (_widget_string_prop(line_edit, "toolTip") or "") == "", "该输入框不应再有 tooltip"
+
+    text = _widget_string_prop(desc, "text") or ""
+    assert "不控制哪些站点走" in text, f"说明行未点明「不控制哪些站点走Bypass」：{text!r}"
+    assert "不含裸域名" in text, f"说明行未点明通配不含裸域名本身：{text!r}"

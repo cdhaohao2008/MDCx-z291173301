@@ -23145,7 +23145,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>Qt::RightToLeft</enum>
                             </property>
                             <property name="text">
-                              <string>Bypass 白名单：</string>
+                              <string>CF Bypass校验：</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -23173,10 +23173,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
 </string>
                             </property>
                             <property name="placeholderText">
-                              <string>逗号分隔，如javbus.com,*.javbus.com，留空不校验</string>
-                            </property>
-                            <property name="toolTip">
-                              <string>只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；落地域名不在名单内则拒绝该响应。支持 *.example.com 子域通配（只匹配子域、不含裸域名本身，需同时写 example.com）；留空不校验（默认）</string>
+                              <string>默认留空不校验逗号分隔，如javbus.com,*.javbus.com</string>
                             </property>
                           </widget>
                         </item>
@@ -23192,7 +23189,26 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <string notr="true">color: rgb(8, 128, 128);</string>
                             </property>
                             <property name="text">
-                              <string>用途：只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass，防止第三方Bypass服务被劫持时把恶意页面当数据写入NFO。名单外的站点照常走Bypass，只是其落地域名必须命中名单；支持*.example.com子域通配（不含裸域名本身，需同时写example.com），逗号分隔，留空不校验，一般不需要配置</string>
+                              <string>默认留空不校验，只校验走CloudFlare Bypass的请求最终落在哪个域名，不控制哪些站点走CloudFlare  Bypass；落地域名不在名单内则拒绝该响应，支持 *.example.com 子域通配，只匹配子域、不含裸域名本身，需同时写example.com；</string>
+                            </property>
+                            <property name="wordWrap">
+                              <bool>true</bool>
+                            </property>
+                            </widget>
+                        </item>
+                        <item row="13" column="1" colspan="3">
+                          <widget class="QLabel" name="label_cf_bypass_trusted_hosts_check">
+                            <property name="sizePolicy">
+                              <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+                                <horstretch>0</horstretch>
+                                <verstretch>0</verstretch>
+                              </sizepolicy>
+                            </property>
+                            <property name="styleSheet">
+                              <string notr="true">color: rgb(8, 128, 128);</string>
+                            </property>
+                            <property name="text">
+                              <string>状态：留空不校验（默认）</string>
                             </property>
                             <property name="wordWrap">
                               <bool>true</bool>
@@ -25436,7 +25452,7 @@ p,li{white-space:pre-wrap;}
 &lt;ul&gt;
 &lt;li&gt;&lt;b&gt;CloudFlare 绕过服务&lt;/b&gt;：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;Selenium CF Bypass&lt;/b&gt;：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10、11+Edge浏览器，首次使用将自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;CF Bypass落地白名单&lt;/b&gt;：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配（只匹配子域、不含裸域名本身），只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;CF Bypass校验&lt;/b&gt;：可填写可信落地域名，逗号分隔，支持*.example.com子域通配（只匹配子域、不含裸域名本身），只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验，输入框下方实时提示写法问题&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;CloudFlare 直连通道&lt;/b&gt;：部分站点提供免CF的数据接口JavDB_API、JavDB_APP、MissAV_API、R18.dev、TheJavDB_API，默认已加入网站源，可直接选用获得更稳定的抓取&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;六、代理设置&lt;/h4&gt;

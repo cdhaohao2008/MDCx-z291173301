@@ -14448,13 +14448,7 @@ class Ui_MDCx(object):
         self.comboBox_cf_bypass_backend.setItemText(1, _translate("MDCx", "flaresolverr"))
         self.label_cf_bypass_trusted_hosts.setText(_translate("MDCx", "CF Bypass校验："))
         self.lineEdit_cf_bypass_trusted_hosts.setPlaceholderText(
-            _translate("MDCx", "默认留空不校验，逗号分隔，如javbus.com,*.javbus.com")
-        )
-        self.lineEdit_cf_bypass_trusted_hosts.setToolTip(
-            _translate(
-                "MDCx",
-                "校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；落地域名不在名单内则拒绝该响应。支持 *.example.com 子域通配（只匹配子域、不含裸域名本身，需同时写 example.com）；留空不校验（默认）。输入框下方会实时提示写法问题",
-            )
+            _translate("MDCx", "默认留空不校验逗号分隔，如javbus.com,*.javbus.com")
         )
         self.label_cf_bypass_trusted_hosts_desc.setText(
             _translate(
