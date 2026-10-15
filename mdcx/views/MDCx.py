@@ -14438,18 +14438,18 @@ class Ui_MDCx(object):
         self.comboBox_cf_bypass_backend.setItemText(1, _translate("MDCx", "flaresolverr"))
         self.label_cf_bypass_trusted_hosts.setText(_translate("MDCx", "Bypass 白名单："))
         self.lineEdit_cf_bypass_trusted_hosts.setPlaceholderText(
-            _translate("MDCx", "逗号分隔，如JavBus.com,*.JavDB.com，留空不校验")
+            _translate("MDCx", "逗号分隔，如javbus.com,*.javbus.com，留空不校验")
         )
         self.lineEdit_cf_bypass_trusted_hosts.setToolTip(
             _translate(
                 "MDCx",
-                "校验 Bypass 服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据；支持 *.example.com 子域通配；留空表示不校验（默认）",
+                "只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；落地域名不在名单内则拒绝该响应。支持 *.example.com 子域通配（只匹配子域、不含裸域名本身，需同时写 example.com）；留空不校验（默认）",
             )
         )
         self.label_cf_bypass_trusted_hosts_desc.setText(
             _translate(
                 "MDCx",
-                "用途：校验Bypass服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，支持*.example.com子域通配，逗号分隔留空表示不校验，一般不需要配置",
+                "用途：只校验走Bypass的请求最终落在哪个域名，防止第三方Bypass服务被劫持时把恶意页面当数据写入NFO。与「哪些站点走Bypass」无关，名单外的站点照常走Bypass，只是其落地域名必须命中名单（如通配只覆盖子域，裸域名要另写一条）。逗号分隔，留空不校验，一般不需要配置",
             )
         )
         self.label_65.setText(_translate("MDCx", "重试次数："))
@@ -14626,7 +14626,7 @@ class Ui_MDCx(object):
                 "<ul>\n"
                 '<li><b>CloudFlare 绕过服务</b>：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址</li>\n'
                 "<li><b>Selenium CF Bypass</b>：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10、11+Edge浏览器，首次使用将自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却</li>\n"
-                "<li><b>CF Bypass落地白名单</b>：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配，用于校验Bypass服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验</li>\n"
+                "<li><b>CF Bypass落地白名单</b>：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配（只匹配子域、不含裸域名本身），只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验</li>\n"
                 "<li><b>CloudFlare 直连通道</b>：部分站点提供免CF的数据接口JavDB_API、JavDB_APP、MissAV_API、R18.dev、TheJavDB_API，默认已加入网站源，可直接选用获得更稳定的抓取</li>\n"
                 "</ul>\n"
                 "<h4>六、代理设置</h4>\n"

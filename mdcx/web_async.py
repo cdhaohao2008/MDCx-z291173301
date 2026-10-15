@@ -623,6 +623,8 @@ class AsyncWebClient:
         self.cf_bypass_proxy = (cf_bypass_proxy or "").strip()
         self._cf_bypass_enabled = bool(self.cf_bypass_url)
         # 可信落地域名白名单（逗号分隔，支持 *.example.com 子域通配）；为空则不校验
+        # 注意：这不是"哪些站点不走 bypass"的名单。Bypass 对全局自动生效（命中 CF 挑战页即触发），
+        # 本名单只在已经走完 bypass 之后校验落地域名，命中不了则拒绝该响应。
         self._cf_bypass_trusted_hosts: set[str] = set()
         for entry in (cf_bypass_trusted_hosts or "").split(","):
             entry = entry.strip().lower()
@@ -872,11 +874,7 @@ class AsyncWebClient:
         state = self._fingerprint_states_by_pool_base.get(pool_base_key)
         now = time.monotonic()
         pinned = self._pinned_fingerprint_by_pool_base.get(pool_base_key)
-        if (
-            pinned is not None
-            and state is not None
-            and state.fingerprint.fingerprint_id == pinned[1]
-        ):
+        if pinned is not None and state is not None and state.fingerprint.fingerprint_id == pinned[1]:
             if self._is_fingerprint_state_expired(state, now=now):
                 # 钉住也有 TTL（与正常 lifetime 同界）：过期说明 cookie 很可能同步失效，
                 # 解钉并丢 jar，走正常轮换，避免永久用坏 cookie 请求（B7）
@@ -1241,9 +1239,7 @@ class AsyncWebClient:
         splitted: list[str] = []
         for value in values:
             parts = re.split(r",\s*(?=[A-Za-z0-9_\-]+\s*=)", value)
-            splitted.extend(
-                part.strip() for part in parts if part.strip() and "=" in part.split(";", 1)[0]
-            )
+            splitted.extend(part.strip() for part in parts if part.strip() and "=" in part.split(";", 1)[0])
         return splitted
 
     def _store_solver_response_cookies(
@@ -1284,9 +1280,7 @@ class AsyncWebClient:
                 # 不重建则钉住永不命中（B2）。重建后配对立即生效。
                 if self._excluded_fingerprint_by_pool_base.get(pool_base_key) == fingerprint.fingerprint_id:
                     self._excluded_fingerprint_by_pool_base.pop(pool_base_key, None)
-                self._fingerprint_states_by_pool_base[pool_base_key] = self._fresh_fingerprint_state(
-                    host, fingerprint
-                )
+                self._fingerprint_states_by_pool_base[pool_base_key] = self._fresh_fingerprint_state(host, fingerprint)
                 self._pinned_fingerprint_by_pool_base[pool_base_key] = (host, fingerprint.fingerprint_id)
                 self._log_cf(f"🍪 solver cookie 已存 jar（{stored} 个），同池指纹已钉住", host)
             else:
@@ -1462,6 +1456,9 @@ class AsyncWebClient:
 
     def _is_trusted_bypass_landing(self, url: str) -> bool:
         """校验 bypass 服务落地或重定向后的最终 URL 域名是否在白名单内。
+
+        仅在已经走过 bypass 的路径上调用（`_call_bypass_mirror` / `_call_bypass_html`），
+        不参与"是否要绕 CF"的决策——bypass 的触发与本名单无关。
 
         - 未配置白名单（空集合）时返回 True（向后兼容，不校验）。
         - 支持精确域名与子域通配（*.example.com 匹配 a.example.com，不匹配 example.com 自身）。
@@ -2350,9 +2347,7 @@ class AsyncWebClient:
                             host,
                         )
                         # 与主路径一致：solver cookie 存 jar + 钉住（B8；fingerprint 取末轮值）
-                        self._store_solver_response_cookies(
-                            host, pool_base_key, fingerprint, bypass_response
-                        )
+                        self._store_solver_response_cookies(host, pool_base_key, fingerprint, bypass_response)
                         return bypass_response, ""
                     self._log_cf(
                         f"⚠️ bypass 兜底失败: {bypass_error}，保留原始传输错误",
