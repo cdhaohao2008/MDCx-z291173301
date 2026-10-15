@@ -257,8 +257,11 @@ def _is_tls_handshake_error(error: str) -> bool:
         marker in lowered
         for marker in (
             "ssl_error_syscall",
+            "error queue empty",
             "unexpected_eof",
             "ssl connect",
+            "ssl_connect",
+            "closed abruptly",
             "tls handshake",
             "handshake failure",
             "wrong version number",
@@ -272,7 +275,7 @@ def _message_for_error(error: str) -> str:
     if _is_proxy_error(error):
         return "代理连接失败，请检查代理地址或代理软件"
     if _is_tls_handshake_error(error):
-        return "TLS 握手中断，常为代理节点与目标站不兼容（HTTP/2 指纹/SNI 策略），请更换节点"
+        return "TLS 握手中断，常为代理节点与目标站不兼容，HTTP/2 指纹/SNI 策略，请更换节点"
     if "超时" in error or "timeout" in error.lower():
         return "连接超时，请检查网络或代理节点"
     if "dns" in error.lower() or "resolve" in error.lower():
@@ -285,6 +288,14 @@ def _clean_error(error: str) -> str:
     # 截断 curl 长错误尾巴（OpenSSL 内部细节 + 参考链接）
     if "See https://curl.se/libcurl/c/libcurl-errors.html" in error:
         error = error.split("See https://curl.se/libcurl/c/libcurl-errors.html")[0].rstrip(" .")
+    # 截断 BoringSSL/OpenSSL 错误队列尾巴，如
+    # `SSL_connect: Connection closed abruptly (SSL_ERROR_SYSCALL; error queue empty) in connection to x:443`
+    error = re.sub(
+        r"\s*\([^)]*(?:SSL_ERROR_|error queue empty)[^)]*\)(?:\s+in connection to\b.*)?$",
+        "",
+        error,
+        flags=re.IGNORECASE,
+    )
     if ": " not in error:
         return error
     left, right = error.split(": ", 1)
