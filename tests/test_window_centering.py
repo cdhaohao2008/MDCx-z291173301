@@ -65,13 +65,6 @@ def _avail() -> QRect:
     return QGuiApplication.primaryScreen().availableGeometry()
 
 
-def _center_error(widget: QWidget) -> tuple[int, int]:
-    """窗口外框中心与屏幕可用区中心的偏差（曼哈顿距离，x/y 分别给出）。"""
-    avail = _avail()
-    frame = widget.frameGeometry()
-    return (frame.center().x() - avail.center().x(), frame.center().y() - avail.center().y())
-
-
 def _assert_centered(widget: QWidget, msg: str) -> None:
     """逐轴校验：某轴超出可用区时贴到该轴起点，否则要求中心偏差在容差内。
 
