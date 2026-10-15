@@ -23189,7 +23189,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <string notr="true">color: rgb(8, 128, 128);</string>
                             </property>
                             <property name="text">
-                              <string>默认留空不校验，填写域名后只在请求走完Cloudflare Bypass之后核对最终落在哪个域名防止请求被劫持、篡改等，不控制哪些站点走Bypass，落地域名不在名单内的响应将会被拒绝，支持*.example.com子域通配：只匹配子域不含裸域名本身，要同时覆盖裸域名需写一条example.com</string>
+                              <string>默认留空不校验，填写域名后只在请求走完Cloudflare Bypass之后核对最终落在哪个域名防止请求被劫持、篡改等，不控制哪些站点走Bypass，落地域名不在名单内的响应将会被拒绝，支持*.example.com子域通配：只匹配子域不含裸域名本身，要同时覆盖裸域名需另写example.com</string>
                             </property>
                             <property name="wordWrap">
                               <bool>true</bool>
