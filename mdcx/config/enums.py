@@ -1,5 +1,7 @@
 from enum import StrEnum as Enum
 
+from ..crawler_registry import registered_site_values
+
 
 class NoEscape(Enum):
     NO_SKIP_SMALL_FILE = "no_skip_small_file"
@@ -530,12 +532,8 @@ class Website(Enum):
     @classmethod
     def __get_pydantic_json_schema__(cls, core_schema, handler):
         json_schema = handler(core_schema)
-        try:
-            from mdcx.crawlers import get_registered_crawler_site_values
-
-            registered_sites = get_registered_crawler_site_values()
-        except Exception:
-            registered_sites = []
+        # 站点清单由 crawlers 层注入到中立注册表，config 不反向依赖 crawlers。
+        registered_sites = registered_site_values()
         if registered_sites:
             json_schema["enum"] = registered_sites
             json_schema["showNames"] = registered_sites

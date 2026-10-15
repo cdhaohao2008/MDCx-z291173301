@@ -12,8 +12,8 @@ from ..config.extend import get_movie_path_setting
 from ..config.manager import manager
 from ..config.resource_policy import resource_policy
 from ..config.resources import resources
+from ..log_console import log_console
 from ..models.log_buffer import LogBuffer
-from ..signals import signal
 from ..utils import get_used_time
 from ..utils.file import check_pic_async, copy_file_async, move_file_async, safe_copytree_async
 from .file import movie_lists
@@ -108,7 +108,7 @@ def _get_mark_image(mark_pic_path: Path) -> Image.Image | None:
             img = opened.convert("RGBA")
             # convert() 结果为独立内存副本，可安全缓存；关闭文件句柄即可
     except Exception:
-        signal.show_log_text(f"{traceback.format_exc()}\n Open Pic: {mark_pic_path}")
+        log_console.log_text(f"{traceback.format_exc()}\n Open Pic: {mark_pic_path}")
         return None
     finally:
         if fh is not None:
@@ -168,7 +168,7 @@ async def _add_to_pic(pic_path: Path, img_pic: Image.Image, mark_size: int, coun
             img_subt = img_subt.resize((scroll_width, scroll_high), resample=Image.Resampling.LANCZOS)
             r, g, b, a = img_subt.split()  # 获取颜色通道, 保持png的透明性
         except Exception:
-            signal.show_log_text(traceback.format_exc())
+            log_console.log_text(traceback.format_exc())
             return
 
         # 固定一个位置
@@ -217,7 +217,7 @@ async def _add_to_pic(pic_path: Path, img_pic: Image.Image, mark_size: int, coun
         try:  # 图片如果下载不完整时，这里会崩溃，跳过
             img_pic.paste(img_subt, mark_postion, mask=a)
         except Exception:
-            signal.show_log_text(traceback.format_exc())
+            log_console.log_text(traceback.format_exc())
         finally:
             # img_subt 此时为 resize 后的副本，关闭释放内存；缓存的原图不受影响
             try:
@@ -239,7 +239,7 @@ async def add_mark_thread(pic_path: Path, mark_list: list[str]):
         # 延迟解码阶段的 OSError（截断图）在 convert/load 时抛出，此处预检避免后续泄漏
         img_pic.load()
     except Exception:
-        signal.show_log_text(f"{traceback.format_exc()}\n Open Pic: {pic_path}")
+        log_console.log_text(f"{traceback.format_exc()}\n Open Pic: {pic_path}")
         return
 
     if mark_fixed == "corner":
@@ -282,9 +282,9 @@ async def add_mark_thread(pic_path: Path, mark_list: list[str]):
             converted.load()
             converted.save(temp_pic_path, quality=95, subsampling=0)
         except Exception:
-            signal.show_log_text(traceback.format_exc())
+            log_console.log_text(traceback.format_exc())
     except Exception:
-        signal.show_log_text(traceback.format_exc())
+        log_console.log_text(traceback.format_exc())
     finally:
         try:
             img_pic.close()
@@ -301,12 +301,12 @@ async def add_mark_thread(pic_path: Path, mark_list: list[str]):
 
 
 async def add_del_extrafanart_copy(mode: str) -> None:
-    signal.show_log_text(f"Start {mode} extrafanart copy! \n")
+    log_console.log_text(f"Start {mode} extrafanart copy! \n")
 
     path_settings = get_movie_path_setting()
     movie_path = path_settings.movie_path
     extrafanart_folder = path_settings.extrafanart_folder
-    signal.show_log_text(f" 🖥 Movie path: {movie_path} \n 🔎 Checking all videos, Please wait...")
+    log_console.log_text(f" 🖥 Movie path: {movie_path} \n 🔎 Checking all videos, Please wait...")
     movie_type = manager.config.media_type
     movie_list = await movie_lists([], movie_type, movie_path)  # 获取所有需要刮削的影片列表
 
@@ -328,15 +328,15 @@ async def add_del_extrafanart_copy(mode: str) -> None:
         if mode == "add":
             if not await aiofiles.os.path.exists(extrafanart_copy_folder_path):
                 await safe_copytree_async(extrafanart_folder_path, extrafanart_copy_folder_path)
-                signal.show_log_text(f" {count} new copy: \n  {extrafanart_copy_folder_path}")
+                log_console.log_text(f" {count} new copy: \n  {extrafanart_copy_folder_path}")
                 new_count += 1
             else:
-                signal.show_log_text(f" {count} old copy: \n  {extrafanart_copy_folder_path}")
+                log_console.log_text(f" {count} old copy: \n  {extrafanart_copy_folder_path}")
         else:
             if await aiofiles.os.path.exists(extrafanart_copy_folder_path):
                 await asyncio.to_thread(shutil.rmtree, extrafanart_copy_folder_path, ignore_errors=True)
-                signal.show_log_text(f" {count} del copy: \n  {extrafanart_copy_folder_path}")
+                log_console.log_text(f" {count} del copy: \n  {extrafanart_copy_folder_path}")
                 new_count += 1
 
-    signal.show_log_text(f"\nDone! \n Total: {total_count}  {mode} copy: {new_count} ")
-    signal.show_log_text("================================================================================")
+    log_console.log_text(f"\nDone! \n Total: {total_count}  {mode} copy: {new_count} ")
+    log_console.log_text("================================================================================")

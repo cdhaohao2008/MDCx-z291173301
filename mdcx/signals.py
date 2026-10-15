@@ -1,11 +1,25 @@
-import threading
-import time
-from contextlib import suppress
+"""Qt 信号总线：15 个 pyqtSignal + 各自的 emit 包装。
+
+与 `mdcx/log_console.py` / `mdcx/ui_hooks.py` 的分工
+--------------------------------------------------
+- 本模块 = **Qt 侧**，只有界面/控制器层需要它。
+- `mdcx/log_console.py` = **Qt 无关侧**，详情日志缓冲、traceback 打印、停止标志、UI 日志出口。
+- `mdcx/ui_hooks.py` = **Qt 无关侧**，按钮/标签这类界面动作的回调登记表。
+
+`Signals` 构造时把自己的 `show_log_text` 注册为 `log_console` 的 UI 日志出口，
+把四个界面动作注册为 `ui_hooks` 的回调，并把 `add_log` / `get_log` /
+`show_traceback_log` / `stop` 全部转调给 `log_console`。
+这样缓冲与停止标志只有一份实现，两侧永远同步（`signal.stop = True` 与 `log_console.stop`
+是同一个变量），而底层模块可以只导入 `log_console`，不必把 PyQt6 拖进来。
+"""
+
 from typing import Literal
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
+from .log_console import log_console
 from .models.model_types import ShowData
+from .ui_hooks import ui_hooks
 from .utils import singleton
 
 
@@ -31,36 +45,38 @@ class Signals(QObject):
     # endregion
     def __init__(self):
         super().__init__()
-        self.log_lock = threading.Lock()
-        self.detail_log_list = []
-        # 明细日志上限：UI 卡顿/高频 add_log 时丢最旧，防无界堆积 OOM（get_log 仍一次性 drain）
-        self._detail_log_max = 2000
-        self.stop = False
+        # 详情日志缓冲/停止标志的真身在 log_console，这里只做转调，保证 signal.* 与 log_console.* 同源。
+        log_console.bind_text_sink(self.show_log_text)
+        # 把四个界面动作登记到 ui_hooks，底层模块就能免 Qt 直调。
+        ui_hooks.bind(
+            change_buttons_status=self.change_buttons_status.emit,
+            reset_buttons_status=self.reset_buttons_status.emit,
+            set_label_file_path=self.set_label_file_path.emit,
+            view_success_file_settext=self.view_success_file_settext.emit,
+        )
+
+    # region Qt 无关部分（转调 log_console）
+    @property
+    def stop(self) -> bool:
+        return log_console.stop
+
+    @stop.setter
+    def stop(self, value: bool) -> None:
+        log_console.stop = value
 
     def add_log(self, *text):
         """打印日志到日志页下方详情框"""
-        if self.stop:
-            return
-        try:
-            with self.log_lock:
-                self.detail_log_list.append(f" ⏰ {time.strftime('%H:%M:%S', time.localtime())} {' '.join(text)}")
-                overflow = len(self.detail_log_list) - self._detail_log_max
-                if overflow > 0:
-                    del self.detail_log_list[:overflow]
-        except Exception:
-            pass
+        log_console.add_log(*text)
 
     def get_log(self):
-        with self.log_lock:
-            text = "\n".join(self.detail_log_list)
-            self.detail_log_list = []
-        return text
+        return log_console.get_log()
 
     def show_traceback_log(self, text):
-        with suppress(Exception):
-            print(text)
-        self.add_log(text)
+        log_console.show_traceback_log(text)
 
+    # endregion
+
+    # region Qt 侧
     def show_log_text(self, text):
         self.log_text.emit(text)
 
@@ -77,6 +93,8 @@ class Signals(QObject):
 
     def show_list_name(self, status: Literal["succ", "fail"], show_data: ShowData, real_number=""):
         self.exec_show_list_name.emit(status, show_data, real_number)
+
+    # endregion
 
 
 signal_qt = Signals()

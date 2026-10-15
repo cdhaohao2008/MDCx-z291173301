@@ -7,7 +7,7 @@ from lxml import etree
 
 from ..config.enums import Website
 from ..config.manager import manager
-from ..core.mosaic import is_plain_uncensored_mosaic
+from ..models.mosaic import is_plain_uncensored_mosaic
 from ..number import number_search_variants
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException
 from .base.base_types import split_csv

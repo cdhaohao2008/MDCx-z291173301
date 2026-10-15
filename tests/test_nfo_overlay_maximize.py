@@ -32,12 +32,13 @@ def app():
 @pytest.fixture()
 def win(app, monkeypatch, tmp_path):
     from mdcx.controllers.main_window import main_window as mw_mod
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
 
     monkeypatch.setattr(mw_mod, "run_startup_health_checks", lambda: None)
     monkeypatch.setattr(mw_mod, "show_netstatus", lambda: None)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: None)
     monkeypatch.setattr(mw_mod, "save_remain_list", lambda: None)
-    monkeypatch.setattr(mw_mod, "apply_site_priority_theme", lambda _window: None)
+    monkeypatch.setattr(window_ops_mod, "apply_site_priority_theme", lambda _window: None)
     monkeypatch.setattr(mw_mod.MyMAinWindow, "set_style", lambda self: None)
     monkeypatch.chdir(tmp_path)
 
@@ -122,7 +123,9 @@ def test_overlay_buttons_centered_and_pinned(win):
         save, close = ui.pushButton_nfo_save, ui.pushButton_nfo_close
         expect_save, expect_close = _pair_geometry(nfo.width())
         bar, bh = win._NFO_OVERLAY_BAR_H, win._NFO_OVERLAY_BTN_H
-        assert save.y() == nfo.height() - bar + (bar - bh) // 2, f"{width}x{height}: 保存按钮未在底部条内上下居中 (y={save.y()})"
+        assert save.y() == nfo.height() - bar + (bar - bh) // 2, (
+            f"{width}x{height}: 保存按钮未在底部条内上下居中 (y={save.y()})"
+        )
         assert save.x() == expect_save, f"{width}x{height}: 保存按钮未成对居中 (x={save.x()})"
         assert close.x() == expect_close, f"{width}x{height}: 关闭按钮未成对居中 (x={close.x()})"
         assert close.x() - (save.x() + save.width()) == 108, "保存/关闭间距应为 108px"
@@ -190,9 +193,10 @@ def test_overlay_syncs_on_first_open_without_resize(win, monkeypatch):
     win.main_open_nfo_click()
     nfo = ui.widget_nfo
     assert not nfo.isHidden()
-    assert ui.pushButton_nfo_save.y() == nfo.height() - win._NFO_OVERLAY_BAR_H + (
-        win._NFO_OVERLAY_BAR_H - win._NFO_OVERLAY_BTN_H
-    ) // 2, "首次打开按钮未在底部条内上下居中"
+    assert (
+        ui.pushButton_nfo_save.y()
+        == nfo.height() - win._NFO_OVERLAY_BAR_H + (win._NFO_OVERLAY_BAR_H - win._NFO_OVERLAY_BTN_H) // 2
+    ), "首次打开按钮未在底部条内上下居中"
     expect_save, _ = _pair_geometry(nfo.width())
     assert ui.pushButton_nfo_save.x() == expect_save, "首次打开按钮未成对居中"
     assert ui.scrollAreaWidgetContents_nfo_editor.layout() is not None, "首次打开未建立内容布局"

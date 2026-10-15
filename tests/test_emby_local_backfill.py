@@ -1,5 +1,6 @@
 import pytest
 
+from mdcx.log_console import log_console
 from mdcx.models.flags import Flags
 from mdcx.signals import signal
 from mdcx.tools import emby_actor_info, emby_actor_manager
@@ -9,9 +10,11 @@ from mdcx.tools import emby_actor_info, emby_actor_manager
 def reset_stop_flags():
     Flags.stop_requested = False
     signal.stop = False
+    log_console.stop = False
     yield
     Flags.stop_requested = False
     signal.stop = False
+    log_console.stop = False
 
 
 def _actor(name="演员甲"):

@@ -20,16 +20,16 @@ from ..config.enums import (
 from ..config.manager import manager
 from ..config.resource_policy import resource_policy
 from ..gen.field_enums import CrawlerResultFields
+from ..log_console import log_console
 from ..manual import ManualConfig
 from ..models.log_buffer import LogBuffer
 from ..models.model_types import CrawlersResult, FileInfo, OtherInfo
+from ..models.mosaic import normalize_mosaic
 from ..number import get_number_letters
-from ..signals import signal
 from ..utils import get_used_time, parse_score_number
 from ..utils.file import delete_file_async, write_file_atomic_async
 from ..utils.language import is_japanese
 from ..utils.xml import build_cdata, escape_xml_text, normalize_xml_text
-from .mosaic import normalize_mosaic
 from .naming import NameRenderOptions, NamingTarget, render_name
 from .nfo_merger import should_merge_nfo
 from .tag_priority import prioritize_nfo_tags
@@ -431,8 +431,8 @@ async def write_nfo(
 
     except Exception as e:
         LogBuffer.log().write(f"\n 🔴 Nfo failed! \n     {e!s}")
-        signal.show_traceback_log(traceback.format_exc())
-        signal.show_log_text(traceback.format_exc())
+        log_console.show_traceback_log(traceback.format_exc())
+        log_console.log_text(traceback.format_exc())
         return False
 
 
@@ -656,5 +656,5 @@ async def get_nfo_data(file_path: Path, movie_number: str) -> tuple[CrawlersResu
     info.thumb_path = thumb_path
     info.fanart_path = fanart_path
     LogBuffer.log().write(f"\n 📄 [NFO] {local_nfo_name}")
-    signal.show_traceback_log(f"{number} {json_data.mosaic}")
+    log_console.show_traceback_log(f"{number} {json_data.mosaic}")
     return json_data, info

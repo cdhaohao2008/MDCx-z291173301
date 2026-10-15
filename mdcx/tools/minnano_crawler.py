@@ -700,9 +700,9 @@ def _lookup_japanese_name(actor_name: str) -> str | None:
         if actor_data.get("has_name") and jp:
             return jp
     except Exception:
-        from ..signals import signal
+        from ..log_console import log_console
 
-        signal.show_log_text(f"⚠️ 演员数据库读取失败: {traceback.format_exc()}")
+        log_console.log_text(f"⚠️ 演员数据库读取失败: {traceback.format_exc()}")
     return None
 
 

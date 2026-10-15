@@ -54,13 +54,14 @@ def win(app, monkeypatch, tmp_path):
     from mdcx.consts import MAIN_PATH
     from mdcx.controllers.main_window import main_window as mw_mod
     from mdcx.controllers.main_window import style as style_mod
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
 
     monkeypatch.setattr(mw_mod, "run_startup_health_checks", lambda: None)
     monkeypatch.setattr(mw_mod, "show_netstatus", lambda: None)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: None)
     monkeypatch.setattr(mw_mod, "save_remain_list", lambda: None)
     monkeypatch.setattr(mw_mod.MyMAinWindow, "set_style", lambda self: None)
-    monkeypatch.setattr(mw_mod, "apply_site_priority_theme", lambda _window: None)
+    monkeypatch.setattr(window_ops_mod, "apply_site_priority_theme", lambda _window: None)
     monkeypatch.setattr(
         style_mod.resources,
         "qtr",

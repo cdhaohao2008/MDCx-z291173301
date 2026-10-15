@@ -7,7 +7,7 @@ from lxml import etree
 
 from ..config.enums import FieldRule, Website
 from ..config.manager import manager
-from ..signals import signal
+from ..log_console import log_console
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException
 from .base.base_types import split_csv
 from .base.parser import parse_runtime
@@ -215,7 +215,7 @@ class Fc2Crawler(BaseCrawler):
         trailer = await getTrailer(self.async_client, number)
         ctx.debug("预告片: 已获取到带时效参数的临时链接" if trailer else "预告片: 未获取到临时下载链接")
         if trailer:
-            signal.add_log("🟡 FC2 预告片链接带时效参数，仅适合立即下载，不建议长期复用远程链接。")
+            log_console.add_log("🟡 FC2 预告片链接带时效参数，仅适合立即下载，不建议长期复用远程链接。")
 
         studio = getStudio(html_info)
         actor = studio if FieldRule.FC2_SELLER in manager.config.fields_rule else ""

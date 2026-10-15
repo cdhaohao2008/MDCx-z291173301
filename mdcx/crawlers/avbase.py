@@ -10,7 +10,7 @@ from mdcx.base.web import check_url, get_url_content_length, is_dmm_image_url, n
 from ..config.enums import DownloadableFile
 from ..config.manager import manager
 from ..config.models import Website
-from ..signals import signal
+from ..log_console import log_console
 from .base import BaseCrawler, CrawlerData, CrawlerException
 
 SEARCH_FIRST_RESULT_ID_XPATH = "/html/body/div/div/main/div/div[2]/div[2]/div/div/div[1]/div[1]/div[1]/div"
@@ -21,7 +21,7 @@ class AVBaseCrawler(BaseCrawler):
 
     @staticmethod
     def _log(message: str) -> None:
-        signal.add_log(f"🌐 [AVBase] {message}")
+        log_console.add_log(f"🌐 [AVBase] {message}")
 
     @classmethod
     @override

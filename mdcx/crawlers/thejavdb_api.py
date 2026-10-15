@@ -8,8 +8,8 @@ from pydantic import BaseModel, ConfigDict
 from mdcx.config.enums import DownloadableFile
 from mdcx.config.manager import manager
 from mdcx.config.models import Website
+from mdcx.log_console import log_console
 from mdcx.models.model_types import CrawlerResult
-from mdcx.signals import signal
 
 from .base import CrawlerData, CrawlerException
 from .dmm import DMMContext, DmmCrawler
@@ -41,7 +41,7 @@ class TheJavDBAPICrawler(DmmCrawler):
 
     @staticmethod
     def _log(message: str):
-        signal.add_log(f"[TheJavdbApi] {message}")
+        log_console.add_log(f"[TheJavdbApi] {message}")
 
     @classmethod
     @override

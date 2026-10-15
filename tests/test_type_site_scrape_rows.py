@@ -146,6 +146,8 @@ def app():
 
 @pytest.fixture()
 def win(app, monkeypatch, tmp_path):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """离屏真实主窗口（几何断言必须以真实窗口读数为准，见 test_site_pref_row_order.py）。"""
     from mdcx.consts import MAIN_PATH
     from mdcx.controllers.main_window import main_window as mw_mod
@@ -153,7 +155,7 @@ def win(app, monkeypatch, tmp_path):
 
     monkeypatch.setattr(mw_mod, "run_startup_health_checks", lambda: None)
     monkeypatch.setattr(mw_mod, "show_netstatus", lambda: None)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: None)
     monkeypatch.setattr(mw_mod, "save_remain_list", lambda: None)
     monkeypatch.setattr(
         style_mod.resources,

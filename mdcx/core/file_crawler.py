@@ -17,11 +17,11 @@ from ..models.enums import FileMode
 from ..models.flags import Flags
 from ..models.log_buffer import LogBuffer
 from ..models.model_types import CrawlerInput, CrawlerResponse, CrawlerResult, CrawlersResult, CrawlTask, FailureReason
+from ..models.mosaic import is_guochan_mosaic, is_plain_uncensored_mosaic, normalize_mosaic
 from ..number import is_uncensored
 from ..utils import parse_score_number
 from ..utils.dataclass import update
 from ..utils.xml import XML_TEXT_FIELDS, normalize_xml_text
-from .mosaic import is_guochan_mosaic, is_plain_uncensored_mosaic, normalize_mosaic
 
 if TYPE_CHECKING:
     from ..config.models import Config

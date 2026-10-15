@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pydantic.fields import FieldInfo
 
+from ..crawler_registry import registered_site_values
 from ..gen.field_enums import CrawlerResultFields
 from ..manual import ManualConfig
 from .enums import (
@@ -1230,12 +1231,8 @@ class Config(BaseModel):
     @lru_cache
     def json_schema(cls) -> dict[str, Any]:
         schema = cls.model_json_schema()
-        try:
-            from mdcx.crawlers import get_registered_crawler_site_values
-
-            registered_sites = get_registered_crawler_site_values()
-        except Exception:
-            registered_sites = []
+        # 站点清单由 crawlers 层注入到中立注册表，config 不反向依赖 crawlers。
+        registered_sites = registered_site_values()
         if registered_sites and (website_schema := schema.get("$defs", {}).get("Website")):
             website_schema["enum"] = registered_sites
             website_schema["showNames"] = registered_sites

@@ -45,13 +45,14 @@ def win(app, monkeypatch, tmp_path):
     from mdcx.consts import MAIN_PATH
     from mdcx.controllers.main_window import main_window as mw_mod
     from mdcx.controllers.main_window import style as style_mod
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
 
     monkeypatch.setattr(mw_mod, "run_startup_health_checks", lambda: None)
     monkeypatch.setattr(mw_mod, "show_netstatus", lambda: None)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: None)
     monkeypatch.setattr(mw_mod, "save_remain_list", lambda: None)
     monkeypatch.setattr(mw_mod.MyMAinWindow, "set_style", lambda self: None)
-    monkeypatch.setattr(mw_mod, "apply_site_priority_theme", lambda _window: None)
+    monkeypatch.setattr(window_ops_mod, "apply_site_priority_theme", lambda _window: None)
     monkeypatch.setattr(
         style_mod.resources,
         "qtr",
@@ -259,12 +260,12 @@ def test_context_menu_hide_action_uses_hide_to_tray(win, app):
 
 
 def test_tray_hidden_window_restores_via_tray_icon(win, app, monkeypatch):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """收进托盘后托盘图标点击仍能恢复（议题 #132 的恢复通道不被本次改动破坏）。"""
     from PyQt6.QtWidgets import QSystemTrayIcon
 
-    from mdcx.controllers.main_window import main_window as mw_mod
-
-    monkeypatch.setattr(mw_mod, "IS_WINDOWS", True)
+    monkeypatch.setattr(window_ops_mod, "IS_WINDOWS", True)
     _force_tray(win, app, visible=False)
     _show(win, app)
 

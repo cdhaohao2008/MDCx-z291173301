@@ -8,11 +8,11 @@ from ..config.enums import FieldRule, Language, NfoInclude, NoEscape, TagInclude
 from ..config.manager import manager
 from ..config.resources import resources
 from ..gen.field_enums import CrawlerResultFields
+from ..log_console import log_console
 from ..manual import ManualConfig
 from ..models.log_buffer import LogBuffer
 from ..models.model_types import BaseCrawlerResult, CrawlersResult, FileInfo
 from ..number import get_number_letters, strip_escape_strings
-from ..signals import signal
 from ..utils import get_used_time
 from ..utils.video import get_video_metadata
 
@@ -230,7 +230,7 @@ async def get_video_size(file_path: Path, file_number: str = ""):
         try:
             height, codec = await asyncio.to_thread(get_video_metadata, file_path)
         except Exception as e:
-            signal.show_log_text(f" 🔴 无法获取视频分辨率! 文件地址: {file_path}  错误信息: {e}")
+            log_console.log_text(f" 🔴 无法获取视频分辨率! 文件地址: {file_path}  错误信息: {e}")
     elif hd_get == "path":
         height = _detect_height_from_path(file_path, file_number)
 

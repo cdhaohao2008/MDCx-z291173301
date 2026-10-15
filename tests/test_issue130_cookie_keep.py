@@ -29,10 +29,11 @@ def app():
 @pytest.fixture()
 def win(app, monkeypatch, tmp_path):
     from mdcx.controllers.main_window import main_window as mw_mod
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
 
     monkeypatch.setattr(mw_mod, "run_startup_health_checks", lambda: None)
     monkeypatch.setattr(mw_mod, "show_netstatus", lambda: None)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: None)
     monkeypatch.setattr(mw_mod, "save_remain_list", lambda: None)
     monkeypatch.chdir(tmp_path)
 
@@ -54,6 +55,7 @@ def _set_saved_cookie(monkeypatch, cookie: str) -> None:
 def test_javdb_cookie_not_cleared_on_network_error(win, monkeypatch):
     """网络/站点不可达（response is None 且 error 含 Cookie）：保留 cookie。"""
     from mdcx.config.manager import manager
+    from mdcx.controllers.main_window import net_check
 
     window, mw_mod = win
     saved = "locale=zh; _jdb_session=KEEP_ME"
@@ -62,7 +64,8 @@ def test_javdb_cookie_not_cleared_on_network_error(win, monkeypatch):
     def fake_get_text_sync(url, headers=None, **kwargs):
         return None, "HTTP 403 Cookie Invalid"
 
-    monkeypatch.setattr(mw_mod, "get_text_sync", fake_get_text_sync)
+    # _check_javdb_cookie 已随「检测网络」集群切到 NetCheckMixin，补丁改指向其所在模块。
+    monkeypatch.setattr(net_check, "get_text_sync", fake_get_text_sync)
 
     window._check_javdb_cookie(saved)
 
@@ -72,6 +75,7 @@ def test_javdb_cookie_not_cleared_on_network_error(win, monkeypatch):
 def test_javdb_cookie_not_cleared_when_logout_missing(win, monkeypatch):
     """页面无 /logout（可能维护页/拦截页）：只告警，保留 cookie。"""
     from mdcx.config.manager import manager
+    from mdcx.controllers.main_window import net_check
 
     window, mw_mod = win
     saved = "locale=zh; _jdb_session=KEEP_ME"
@@ -80,7 +84,7 @@ def test_javdb_cookie_not_cleared_when_logout_missing(win, monkeypatch):
     def fake_get_text_sync(url, headers=None, **kwargs):
         return "<html>maintenance</html>", ""
 
-    monkeypatch.setattr(mw_mod, "get_text_sync", fake_get_text_sync)
+    monkeypatch.setattr(net_check, "get_text_sync", fake_get_text_sync)
 
     window._check_javdb_cookie(saved)
 
@@ -106,6 +110,7 @@ def test_startup_selfcheck_includes_fc2ppvdb():
     from pathlib import Path
 
     from mdcx.controllers.main_window import main_window as mw_mod
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
     from mdcx.controllers.main_window.main_window import MyMAinWindow
 
     # 实现：_on_version_check_done 调用了 fc2ppvdb 检测
@@ -113,7 +118,8 @@ def test_startup_selfcheck_includes_fc2ppvdb():
     assert "pushButton_check_fc2ppvdb_cookie_clicked" in names, "启动自检未调用 fc2ppvdb cookie 检测"
 
     # 声明：启动自检文案包含 FC2PPVDB
-    text = Path(mw_mod.__file__).read_text(encoding="utf-8")
+    # 启动自检文案与 _on_version_check_done 已随 WindowOpsMixin 移出 main_window.py
+    text = Path(mw_mod.__file__).read_text(encoding="utf-8") + Path(window_ops_mod.__file__).read_text(encoding="utf-8")
     assert "启动自检：数据库/ThePornDB/JavDb/JavBus/FC2PPVDB连通性" in text, "启动自检文案未含 FC2PPVDB"
 
 

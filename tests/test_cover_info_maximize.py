@@ -37,12 +37,13 @@ def app():
 @pytest.fixture()
 def win(app, monkeypatch, tmp_path):
     from mdcx.controllers.main_window import main_window as mw_mod
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
 
     monkeypatch.setattr(mw_mod, "run_startup_health_checks", lambda: None)
     monkeypatch.setattr(mw_mod, "show_netstatus", lambda: None)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: None)
     monkeypatch.setattr(mw_mod, "save_remain_list", lambda: None)
-    monkeypatch.setattr(mw_mod, "apply_site_priority_theme", lambda _window: None)
+    monkeypatch.setattr(window_ops_mod, "apply_site_priority_theme", lambda _window: None)
     # 本文件断言以几何公式驱动(pixmap scaled 尺寸/固定 40px 行高/下划线偏移)为主;
     # #154 的省略长度按字体度量计算, 因而只断言"宽度越大省略文本不更短"这类单调性,
     # 不写死具体字数。保留 set_style stub 与 window_state_matrix 家族一致; 若未来

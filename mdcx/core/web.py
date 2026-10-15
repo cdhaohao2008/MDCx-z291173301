@@ -31,11 +31,12 @@ from ..base.web import (
 from ..config.enums import DownloadableFile, FixedScrapingType, HDPicSource, KeepableFile
 from ..config.manager import manager
 from ..config.resource_policy import resource_policy
+from ..log_console import log_console
 from ..manual import ManualConfig
 from ..models.flags import FileDoneDict, Flags
 from ..models.log_buffer import LogBuffer
 from ..models.model_types import CrawlersResult, OtherInfo
-from ..signals import signal
+from ..models.mosaic import has_leak_mark, has_umr_mark
 from ..utils import get_used_time, split_path
 from ..utils.file import check_pic_async, copy_file_async, delete_file_async, move_file_async
 from .amazon import (
@@ -49,7 +50,6 @@ from .amazon import (
 from .asin_cid_index import asin_matches_number
 from .image import cut_thumb_to_poster
 from .media_resource import MediaResourceContext
-from .mosaic import has_leak_mark, has_umr_mark
 from .title_match import contains_compilation_keyword, title_series_match
 
 AMAZON_SEARCH_SCRAPING_TYPES = {FixedScrapingType.YOUMA}
@@ -776,7 +776,7 @@ async def trailer_download(
     if ".fc2.com/" in trailer_url and "mid=" in trailer_url and "/up/" in trailer_url:
         tips = "🟡 FC2 预告片链接为带 mid 参数的临时地址，建议仅用于当前任务立即下载，后续直接复用远程链接可能失效。"
         LogBuffer.web().write("\n " + tips)
-        signal.add_log(tips)
+        log_console.add_log(tips)
 
     # 下载预告片,检测链接有效性
     content_length = await check_url(trailer_url, length=True)
@@ -787,7 +787,7 @@ async def trailer_download(
 
         # 开始下载
         download_files = manager.config.download_files
-        signal.show_traceback_log(f"🍔 {result.number} download trailer... {trailer_url}")
+        log_console.show_traceback_log(f"🍔 {result.number} download trailer... {trailer_url}")
         trailer_file_path_temp = trailer_file_path
         if await aiofiles.os.path.exists(trailer_file_path):
             trailer_file_path_temp = trailer_file_path.with_suffix(".[DOWNLOAD].mp4")
@@ -797,7 +797,7 @@ async def trailer_download(
                 LogBuffer.log().write(
                     f"\n 🍀 Trailer done! ({result.trailer_from} {file_size}/{content_length})({get_used_time(start_time)}s) "
                 )
-                signal.show_traceback_log(f"✅ {result.number} trailer done!")
+                log_console.show_traceback_log(f"✅ {result.number} trailer done!")
                 if trailer_file_path_temp != trailer_file_path:
                     await move_file_async(trailer_file_path_temp, trailer_file_path, overwrite=True)
                     await delete_file_async(trailer_file_path_temp)

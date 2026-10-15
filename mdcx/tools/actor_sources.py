@@ -26,7 +26,7 @@ from lxml import etree
 from ..base.web import get_aio_domain
 from ..config.manager import manager
 from ..config.resources import resources
-from ..signals import signal
+from ..log_console import log_console
 from ..utils.domain_rotate import DomainRotator
 
 _LIBREDMM = "https://www.libredmm.com"
@@ -49,7 +49,7 @@ _HEADERS = {"Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,ja;q=0.6"}
 
 
 def _log(msg: str) -> None:
-    signal.show_log_text(msg)
+    log_console.log_text(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -276,9 +276,7 @@ async def _javdb_app_search_numbers(keyword: str, *, number_prefix: str | None =
         truncated = False
         while page <= _JAVDB_APP_MAX_PAGES:
             params = _build_api_params()
-            params.update(
-                {"q": keyword, "page": str(page), "type": "movie", "limit": str(_JAVDB_APP_LIMIT)}
-            )
+            params.update({"q": keyword, "page": str(page), "type": "movie", "limit": str(_JAVDB_APP_LIMIT)})
             try:
                 async with manager.acquire_computed() as computed:
                     data, error = await computed.async_client.get_json(

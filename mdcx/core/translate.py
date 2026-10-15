@@ -15,10 +15,10 @@ from ..config.resources import resources
 from ..gen.field_enums import CrawlerResultFields
 from ..models.log_buffer import LogBuffer
 from ..models.model_types import CrawlersResult
+from ..models.mosaic import normalize_mosaic
 from ..number import get_number_letters
 from ..utils import clean_list, get_used_time
 from ..utils.language import is_japanese, is_probably_english_for_translation
-from .mosaic import normalize_mosaic
 
 AVWIKI_SCRAPING_TYPES = {
     FixedScrapingType.YOUMA,

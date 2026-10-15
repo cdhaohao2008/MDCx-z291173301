@@ -6,8 +6,8 @@ from parsel import Selector
 
 from ..config.manager import manager
 from ..config.models import Website
+from ..log_console import log_console
 from ..number import get_file_number, is_uncensored, normalize_uncensored_digit_number
-from ..signals import signal
 from .base import BaseCrawler, CrawlerData, CrawlerException, DetailPageParser, extract_all_texts, extract_text
 
 
@@ -327,7 +327,7 @@ class MissAVCrawler(BaseCrawler):
 
     @staticmethod
     def _log(message: str) -> None:
-        signal.add_log(f"🌐 [MissAV] {message}")
+        log_console.add_log(f"🌐 [MissAV] {message}")
 
     @classmethod
     @override

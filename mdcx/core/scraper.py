@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import aiofiles.os
-from PyQt6.QtWidgets import QMessageBox
 
 from ..base.file import (
     _clean_empty_folders,
@@ -58,8 +57,6 @@ from ..models.flags import JSON_DATA_CACHE_MAX_ENTRIES, FileDoneDict, Flags
 from ..models.log_buffer import LogBuffer
 from ..models.model_types import CrawlersResult, FileInfo, OtherInfo, ScrapeResult, ShowData
 from ..signals import signal
-from ..tools.emby_actor_image import update_emby_actor_photo
-from ..tools.emby_actor_info import creat_kodi_actors
 from ..utils import executor, get_current_time, get_real_time, get_used_time, split_path
 from ..utils.dataclass import update
 from ..utils.file import copy_file_async, move_file_async
@@ -99,6 +96,33 @@ from .web import (
 
 if TYPE_CHECKING:
     from ..crawler import CrawlerProviderProtocol
+
+
+class _LazyQMessageBox:
+    """延迟解析的 `QMessageBox` 代理，使 `mdcx.core` 在导入期不依赖 Qt。
+
+    `QMessageBox` 只在 `get_remain_list()` 真正弹窗时才被引用，此时才导入 PyQt6。
+    这样 `import mdcx.core.scraper` 在无 Qt 环境（测试 / 纯脚本）下同样可用，
+    而核心业务层不再与界面层硬耦合。代理仍然以模块级名字 `QMessageBox` 暴露，
+    因此既有的 monkeypatch（替换整个 `QMessageBox`）行为完全不变。
+    """
+
+    __slots__ = ()
+
+    @staticmethod
+    def _resolve() -> type:
+        from PyQt6.QtWidgets import QMessageBox
+
+        return QMessageBox
+
+    def __call__(self, *args, **kwargs):
+        return self._resolve()(*args, **kwargs)
+
+    def __getattr__(self, name: str):
+        return getattr(self._resolve(), name)
+
+
+QMessageBox = _LazyQMessageBox()
 
 
 class StopScrape(Exception): ...
@@ -457,9 +481,15 @@ class Scraper:
                 signal.show_log_text(f" 🧹 已清理遗留临时文件: {removed}")
 
         # auto run after scrape
+        # 注意：emby 工具层会传递引入 PyQt6（tools/emby_actor_image -> mdcx/image.py），
+        # 因此这里必须延迟导入，让 core 层保持 Qt-free；core 不得反向依赖 tools。
         if EmbyAction.ACTOR_PHOTO_AUTO in manager.config.emby_on:
+            from ..tools.emby_actor_image import update_emby_actor_photo
+
             await update_emby_actor_photo(manage_button_state=False)
         if manager.config.actor_photo_kodi_auto:
+            from ..tools.emby_actor_info import creat_kodi_actors
+
             await creat_kodi_actors(True, manage_button_state=False)
 
         signal.reset_buttons_status.emit()

@@ -4,8 +4,8 @@ import contextlib
 import httpx
 
 from ..llm import LLMClient
+from ..log_console import log_console
 from ..manual import ManualConfig
-from ..signals import signal
 from ..utils import get_random_headers
 from ..web_async import AsyncWebClient
 from .enums import CleanAction
@@ -39,7 +39,7 @@ class Computed:
             verify_ssl=config.verify_ssl,
             proxy_sites=config.proxy_hosts_list(),
             direct_sites=[s.strip() for s in (config.direct_sites or "").split(",") if s.strip()],
-            log_fn=signal.add_log,
+            log_fn=log_console.add_log,
         )
 
         official_websites_dic = {}

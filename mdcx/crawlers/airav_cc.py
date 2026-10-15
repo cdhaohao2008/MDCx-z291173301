@@ -8,8 +8,8 @@ from lxml import etree
 
 from ..config.enums import Website
 from ..config.manager import manager
+from ..log_console import log_console
 from ..number import match_number
-from ..signals import signal
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException, get_year
 from .base.base_types import split_csv
 
@@ -196,7 +196,7 @@ class AiravCcCrawler(BaseCrawler):
         temp_str = title + outline + actor + tag + studio
         if "�" in temp_str:
             debug_info = f"{number} 请求 airav_cc 返回内容存在乱码 �"
-            signal.add_log(debug_info)
+            log_console.add_log(debug_info)
             ctx.debug(debug_info)
             raise CrawlerException(debug_info)
 

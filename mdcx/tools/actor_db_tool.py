@@ -257,9 +257,9 @@ class UpdateNfoTmdbIdResult:
 
 def _log_line(message: str) -> None:
     LogBuffer.log().write(message)
-    from mdcx.signals import signal_qt
+    from mdcx.log_console import log_console
 
-    signal_qt.show_log_text(message)
+    log_console.log_text(message)
 
 
 _male_actor_set: set[str] | None = None
@@ -1293,11 +1293,11 @@ async def run_actor_db_xlsx(
 
     import openpyxl as _xl
 
+    from ..log_console import log_console
     from ..models.flags import Flags
-    from ..signals import signal
 
     def _is_stop_requested() -> bool:
-        return signal.stop or Flags.stop_requested
+        return log_console.stop or Flags.stop_requested
 
     wb = _xl.load_workbook(db_path)
     ws = get_actor_db_sheet(wb)
@@ -2189,14 +2189,14 @@ async def clean_male_actors(*, limit: int = 5000, concurrency: int = 5) -> Clean
       的男优行也能删除。
     - 名单未命中的含 tmdbid 行再校验 TMDB gender；gender 1/0、请求失败、404 保留。
     - 删除前将男优行追加备份到独立「男优备份」sheet。
-    - 支持 limit 限量与手动停止（signal.stop / Flags.stop_requested）。
+    - 支持 limit 限量与手动停止（log_console.stop / Flags.stop_requested）。
     """
     from ..core.tmdb_actor import _ACTOR_DB_ROW_INDEX, _ACTOR_DB_ROW_INDEX_LOCK, _format_db_worksheet
+    from ..log_console import log_console
     from ..models.flags import Flags
-    from ..signals import signal
 
     def _is_stop_requested() -> bool:
-        return signal.stop or Flags.stop_requested
+        return log_console.stop or Flags.stop_requested
 
     import openpyxl as _xl
 
@@ -2388,7 +2388,7 @@ async def verify_tmdb_ids(*, limit: int = 5000, concurrency: int = 5) -> VerifyT
     - 404（person 已删除）-> 清除该行 tmdbid + tmdb url（回到无 id 状态，宁缺毋滥，
       刮削会按名字重新搜索）
     - 网络错误/限流/5xx -> 保守保留（不误清）
-    - 支持 limit 限量与手动停止（signal.stop / Flags.stop_requested）
+    - 支持 limit 限量与手动停止（log_console.stop / Flags.stop_requested）
     """
     from ..core.tmdb_actor import (
         _ACTOR_DB_ROW_INDEX,
@@ -2396,11 +2396,11 @@ async def verify_tmdb_ids(*, limit: int = 5000, concurrency: int = 5) -> VerifyT
         _format_db_worksheet,
         _tmdb_rate_limiter,
     )
+    from ..log_console import log_console
     from ..models.flags import Flags
-    from ..signals import signal
 
     def _is_stop_requested() -> bool:
-        return signal.stop or Flags.stop_requested
+        return log_console.stop or Flags.stop_requested
 
     import openpyxl as _xl
 
@@ -2650,14 +2650,14 @@ async def update_nfo_tmdb_ids(dir_path: Path, *, limit: int = 5000, concurrency:
     3. 文本级替换/补入 <tmdbid>（仅改该值，保留 nfo 其他内容）
     4. 有变更则写回
 
-    支持 limit 限量与手动停止（signal.stop / Flags.stop_requested）。
+    支持 limit 限量与手动停止（log_console.stop / Flags.stop_requested）。
     """
     from ..core.tmdb_actor import search_actor_db_reverse
+    from ..log_console import log_console
     from ..models.flags import Flags
-    from ..signals import signal
 
     def _is_stop_requested() -> bool:
-        return signal.stop or Flags.stop_requested
+        return log_console.stop or Flags.stop_requested
 
     result = UpdateNfoTmdbIdResult()
     if not await aiofiles.os.path.isdir(dir_path):

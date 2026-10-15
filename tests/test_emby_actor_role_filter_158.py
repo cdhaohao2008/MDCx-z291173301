@@ -220,7 +220,7 @@ async def test_persons_list_keeps_partial_result_when_later_page_fails(monkeypat
     _configure(monkeypatch, "emby")
     limit = eam._PERSONS_PAGE_LIMIT
     logs: list[str] = []
-    monkeypatch.setattr(eam.signal, "show_log_text", logs.append)
+    monkeypatch.setattr(eam.log_console, "log_text", logs.append)
 
     total = limit * 3
 
@@ -312,7 +312,7 @@ async def test_persons_list_skips_request_without_api_key(monkeypatch, reset_sta
 
     _configure(monkeypatch, "emby")
     monkeypatch.setattr(manager.config, "api_key", "")
-    monkeypatch.setattr(eam.signal, "show_log_text", lambda _m: None)
+    monkeypatch.setattr(eam.log_console, "log_text", lambda _m: None)
 
     async def handler(url):  # pragma: no cover - 不应被调用
         raise AssertionError("无密钥时不应发起请求")

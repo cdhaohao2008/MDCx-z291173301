@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QEvent, QEventLoop, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap
@@ -31,9 +30,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-if TYPE_CHECKING:
-    from mdcx.controllers.main_window.main_window import MyMAinWindow
-
+# 本窗口只依赖宿主的 QWidget 接口（installEventFilter / geometry / 最小化最大化状态），
+# 因此不再引用控制器层的 MyMAinWindow 类型——否则 views 与 controllers 会互相依赖。
 # 无图片时图片区域的提示文字
 _NO_IMAGE_TEXT = "无图片"
 
@@ -109,7 +107,7 @@ class NfoPreviewWindow(QDialog):
     # 当前番号下标变化（value = 切换后的番号下标），用于同步外部选中项
     nfo_index_changed = pyqtSignal(int)
 
-    def __init__(self, parent: MyMAinWindow | QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         # 独立顶层窗口（不挂 owner）：任务栏常驻自己的按钮与实时缩略图，
         # 点缩略图切换窗口全由系统原生支持。
         super().__init__(None)

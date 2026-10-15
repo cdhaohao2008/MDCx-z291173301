@@ -120,7 +120,7 @@ def _isolated_cache(monkeypatch: pytest.MonkeyPatch, tmp_path):
 @pytest.fixture(autouse=True)
 def _quiet_detail_log(monkeypatch: pytest.MonkeyPatch):
     logs: list[str] = []
-    monkeypatch.setattr(base_web.signal, "add_log", lambda *text: logs.append(" ".join(map(str, text))))
+    monkeypatch.setattr(base_web.log_console, "add_log", lambda *text: logs.append(" ".join(map(str, text))))
     return logs
 
 
@@ -342,6 +342,7 @@ def test_unwritable_cache_does_not_break_check(monkeypatch: pytest.MonkeyPatch):
 
 class _UnwritablePath:
     """任何读写都抛 OSError，模拟只读目录 / 权限不足。"""
+
     name = "version_check_cache.json"
 
     def with_suffix(self, suffix):

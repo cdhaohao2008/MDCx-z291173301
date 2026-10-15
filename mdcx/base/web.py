@@ -20,9 +20,9 @@ from PIL import Image
 
 from ..config.manager import manager
 from ..consts import GITHUB_RELEASES_API_LIST, GITHUB_RELEASES_ATOM
+from ..log_console import log_console
 from ..models.log_buffer import LogBuffer
 from ..network_fingerprint import build_amazon_headers, build_fingerprint_headers, select_fingerprint
-from ..signals import signal
 from ..utils import executor
 from ..utils.file import check_pic_async
 from ..utils.rate_limit import AdaptiveRequestThrottle
@@ -396,10 +396,10 @@ async def _validate_dmm_image_url(url: str, length: bool = False, real_url: bool
                 if response is None:
                     last_error = error
                     if retry_attempt < max_retries - 1 and _should_retry_link_error(error):
-                        signal.add_log(f"🟡 检测链接失败，正在重试 ({retry_attempt + 1}/{max_retries}): {error}")
+                        log_console.add_log(f"🟡 检测链接失败，正在重试 ({retry_attempt + 1}/{max_retries}): {error}")
                         await asyncio.sleep(0.6 * (retry_attempt + 1))
                         continue
-                    signal.add_log(f"🔴 检测链接失败: {error}")
+                    log_console.add_log(f"🔴 检测链接失败: {error}")
                     return None
 
                 try:
@@ -408,11 +408,11 @@ async def _validate_dmm_image_url(url: str, length: bool = False, real_url: bool
                         return true_url
 
                     if "login" in true_url:
-                        signal.add_log(f"🔴 检测链接失败: 需登录 {true_url}")
+                        log_console.add_log(f"🔴 检测链接失败: 需登录 {true_url}")
                         return None
 
                     if _is_invalid_image_redirect_url(true_url):
-                        signal.add_log(f"🔴 检测链接失败: 图片已被网站删除 {_host_tag(true_url)} {true_url}")
+                        log_console.add_log(f"🔴 检测链接失败: 图片已被网站删除 {_host_tag(true_url)} {true_url}")
                         return None
 
                     content_length = _parse_content_range_total(response.headers.get("Content-Range")) or (
@@ -421,9 +421,9 @@ async def _validate_dmm_image_url(url: str, length: bool = False, real_url: bool
                     if content_length:
                         if _is_dmm_placeholder_size(content_length):
                             last_error = f"疑似占位图({content_length}B) {true_url}"
-                            signal.add_log(f"🔴 检测链接失败: {last_error}")
+                            log_console.add_log(f"🔴 检测链接失败: {last_error}")
                             return None
-                        signal.add_log(f"✅ 检测链接通过: 返回大小({content_length}) {true_url}")
+                        log_console.add_log(f"✅ 检测链接通过: 返回大小({content_length}) {true_url}")
                         return content_length if length else true_url
                 finally:
                     await client._close_response(response)
@@ -439,31 +439,31 @@ async def _validate_dmm_image_url(url: str, length: bool = False, real_url: bool
                             if downloaded_size > 0:
                                 if _is_dmm_placeholder_size(downloaded_size):
                                     last_error = f"疑似占位图({downloaded_size}B) {fb_url}"
-                                    signal.add_log(f"🔴 检测链接失败: {last_error}")
+                                    log_console.add_log(f"🔴 检测链接失败: {last_error}")
                                     return None
-                                signal.add_log(f"✅ 检测链接通过: 预下载成功 {fb_url}")
+                                log_console.add_log(f"✅ 检测链接通过: 预下载成功 {fb_url}")
                                 return downloaded_size if length else fb_url
                     finally:
                         await client._close_response(fallback_resp)
 
                 last_error = f"未返回大小且预下载失败 {true_url}"
                 if retry_attempt < max_retries - 1:
-                    signal.add_log(f"🟡 检测链接失败，正在重试 ({retry_attempt + 1}/{max_retries}): {last_error}")
+                    log_console.add_log(f"🟡 检测链接失败，正在重试 ({retry_attempt + 1}/{max_retries}): {last_error}")
                     await asyncio.sleep(0.6 * (retry_attempt + 1))
                     continue
-                signal.add_log(f"🔴 检测链接失败: {last_error}")
+                log_console.add_log(f"🔴 检测链接失败: {last_error}")
                 return None
             except Exception as e:
                 last_error = str(e)
                 if retry_attempt < max_retries - 1:
-                    signal.add_log(f"🟡 检测链接异常，正在重试 ({retry_attempt + 1}/{max_retries}): {e}")
+                    log_console.add_log(f"🟡 检测链接异常，正在重试 ({retry_attempt + 1}/{max_retries}): {e}")
                     await asyncio.sleep(0.6 * (retry_attempt + 1))
                     continue
-                signal.add_log(f"🔴 检测链接失败: 未知异常 {e} {normalized}")
+                log_console.add_log(f"🔴 检测链接失败: 未知异常 {e} {normalized}")
                 return None
 
     if last_error:
-        signal.add_log(f"🔴 检测链接失败: {last_error}")
+        log_console.add_log(f"🔴 检测链接失败: {last_error}")
     return None
 
 
@@ -546,7 +546,7 @@ async def check_url(url: str, length: bool = False, real_url: bool = False):
         return None
 
     if "http" not in url:
-        signal.add_log(f"🔴 检测链接失败: 格式错误 {url}")
+        log_console.add_log(f"🔴 检测链接失败: 格式错误 {url}")
         return None
 
     normalized_url = normalize_media_url(url)
@@ -564,11 +564,11 @@ async def check_url(url: str, length: bool = False, real_url: bool = False):
                 # 处理请求失败的情况
                 if response is None:
                     if retry_attempt < max_retries - 1:
-                        signal.add_log(f"🟡 检测链接失败，正在重试 ({retry_attempt + 1}/{max_retries}): {error}")
+                        log_console.add_log(f"🟡 检测链接失败，正在重试 ({retry_attempt + 1}/{max_retries}): {error}")
                         await asyncio.sleep(1 + retry_attempt)  # 指数退避
                         continue
                     else:
-                        signal.add_log(f"🔴 检测链接失败: {error}")
+                        log_console.add_log(f"🔴 检测链接失败: {error}")
                         return None
 
                 # 不输出获取 dmm预览视频(trailer) 最高分辨率的测试结果到日志中
@@ -582,14 +582,14 @@ async def check_url(url: str, length: bool = False, real_url: bool = False):
 
                 # 检查是否需要登录
                 if "login" in true_url:
-                    signal.add_log(f"🔴 检测链接失败: 需登录 {true_url}")
+                    log_console.add_log(f"🔴 检测链接失败: 需登录 {true_url}")
                     return None
 
                 # 检查是否带有图片不存在的关键词
                 bad_url_keys = ["now_printing", "nowprinting", "noimage", "nopic", "media_violation"]
                 for each_key in bad_url_keys:
                     if each_key in true_url:
-                        signal.add_log(f"🔴 检测链接失败: 图片已被网站删除 {_host_tag(true_url)} {url}")
+                        log_console.add_log(f"🔴 检测链接失败: 图片已被网站删除 {_host_tag(true_url)} {url}")
                         return None
 
                 # 获取文件大小
@@ -599,30 +599,30 @@ async def check_url(url: str, length: bool = False, real_url: bool = False):
                     content, error = await client.get_content(true_url)
 
                     if content is not None and len(content) > 0:
-                        signal.add_log(f"✅ 检测链接通过: 预下载成功 {true_url}")
+                        log_console.add_log(f"✅ 检测链接通过: 预下载成功 {true_url}")
                         return 10240 if length else true_url
-                    signal.add_log(f"🔴 检测链接失败: 未返回大小且预下载失败 {true_url}")
+                    log_console.add_log(f"🔴 检测链接失败: 未返回大小且预下载失败 {true_url}")
                     return None
                 # 如果返回内容的文件大小 < 8k，视为不可用
                 try:
                     content_length_int = int(str(content_length).strip())
                 except (ValueError, TypeError):
-                    signal.add_log(f"🔴 检测链接失败: 返回大小不可解析({content_length}) {true_url}")
+                    log_console.add_log(f"🔴 检测链接失败: 返回大小不可解析({content_length}) {true_url}")
                     return None
                 if content_length_int < 8192:
-                    signal.add_log(f"🔴 检测链接失败: 返回大小({content_length}) < 8k {true_url}")
+                    log_console.add_log(f"🔴 检测链接失败: 返回大小({content_length}) < 8k {true_url}")
                     return None
 
-                signal.add_log(f"✅ 检测链接通过: 返回大小({content_length}) {true_url}")
+                log_console.add_log(f"✅ 检测链接通过: 返回大小({content_length}) {true_url}")
                 return content_length_int if length else true_url
 
             except Exception as e:
                 if retry_attempt < max_retries - 1:
-                    signal.add_log(f"🟡 检测链接异常，正在重试 ({retry_attempt + 1}/{max_retries}): {e}")
+                    log_console.add_log(f"🟡 检测链接异常，正在重试 ({retry_attempt + 1}/{max_retries}): {e}")
                     await asyncio.sleep(1 + retry_attempt)
                     continue
                 else:
-                    signal.add_log(f"🔴 检测链接失败: 未知异常 {e} {url}")
+                    log_console.add_log(f"🔴 检测链接失败: 未知异常 {e} {url}")
                     return None
 
 
@@ -836,11 +836,11 @@ async def get_amazon_data(req_url: str) -> tuple[bool, str]:
         cooldown, penalty_level, escalated = await _amazon_request_throttle.register_result(throttled=throttled)
         if throttled:
             if escalated:
-                signal.add_log(f"🟡 Amazon 命中限流，动态退避 {cooldown:.2f}s (level={penalty_level}) {req_url}")
+                log_console.add_log(f"🟡 Amazon 命中限流，动态退避 {cooldown:.2f}s (level={penalty_level}) {req_url}")
             elif cooldown >= 0.8:
-                signal.add_log(f"🟡 Amazon 限流冷却延续 {cooldown:.2f}s {req_url}")
+                log_console.add_log(f"🟡 Amazon 限流冷却延续 {cooldown:.2f}s {req_url}")
         elif waited >= 0.6:
-            signal.add_log(f"🟡 Amazon 请求自适应等待 {waited:.2f}s {req_url}")
+            log_console.add_log(f"🟡 Amazon 请求自适应等待 {waited:.2f}s {req_url}")
         return html_info, error
 
     async with manager.acquire_computed() as computed:
@@ -915,7 +915,7 @@ async def get_dmm_trailer(trailer_url: str) -> str:
     # 临时链接示例: https://cc3001.dmm.co.jp/pv/{temp_key}/n_707agvn001_dmb_w.mp4
     # 标准格式示例: https://cc3001.dmm.co.jp/litevideo/freepv/a/asf/asfb00192/asfb00192_mhb_w.mp4
     if "/pv/" in trailer_url:
-        signal.add_log("🔄 检测到临时预告片链接，开始转换...")
+        log_console.add_log("🔄 检测到临时预告片链接，开始转换...")
         filename_match = re.search(r"/pv/[^/]+/(.+?)(?:\.mp4)?$", trailer_url)
         if filename_match:
             filename_base = filename_match.group(1).replace(".mp4", "")
@@ -931,7 +931,7 @@ async def get_dmm_trailer(trailer_url: str) -> str:
                 converted_url = (
                     f"https://cc3001.dmm.co.jp/litevideo/freepv/{prefix}/{three_char}/{cid}/{filename_base}.mp4"
                 )
-                signal.add_log(f"📝 转换后的URL: {converted_url}")
+                log_console.add_log(f"📝 转换后的URL: {converted_url}")
                 # 尝试验证转换后的URL，最多重试3次（仅对非404错误重试）
                 async with manager.acquire_computed() as computed:
                     client = computed.async_client
@@ -944,11 +944,11 @@ async def get_dmm_trailer(trailer_url: str) -> str:
                                 # 请求成功
                                 if response.status_code == 404:
                                     # 404错误说明转换后的URL不存在，回退到原始URL
-                                    signal.add_log("⚠️ 转换后的URL返回404，回退到原始链接")
+                                    log_console.add_log("⚠️ 转换后的URL返回404，回退到原始链接")
                                     break
                                 elif 200 <= response.status_code < 300:
                                     # 2xx成功，使用转换后的URL
-                                    signal.add_log(f"✅ 转换后的URL验证成功 (HTTP {response.status_code})")
+                                    log_console.add_log(f"✅ 转换后的URL验证成功 (HTTP {response.status_code})")
                                     trailer_url = converted_url
                                     break
                                 else:
@@ -957,39 +957,41 @@ async def get_dmm_trailer(trailer_url: str) -> str:
                                         f"🟡 转换后的URL检测失败 (HTTP {response.status_code})，"
                                         f"准备重试 ({attempt + 1}/3)..."
                                     )
-                                    signal.add_log(retry_msg)
+                                    log_console.add_log(retry_msg)
                                     if attempt < 2:
                                         await asyncio.sleep(0.5 * (attempt + 1))
                                         continue
                                     else:
                                         # 重试3次仍失败，回退到原始URL
-                                        signal.add_log("⚠️ 重试3次后仍失败，回退到原始链接")
+                                        log_console.add_log("⚠️ 重试3次后仍失败，回退到原始链接")
                                         break
                             else:
                                 # 检查是否为 404 错误
                                 if "404" in str(error):
                                     # 404错误说明转换后的URL不存在，直接回退
-                                    signal.add_log("⚠️ 转换后的URL返回404，回退到原始链接")
+                                    log_console.add_log("⚠️ 转换后的URL返回404，回退到原始链接")
                                     break
                                 else:
                                     # 其他网络错误、超时等，重试
-                                    signal.add_log(f"🟡 转换后的URL网络错误: {error}，准备重试 ({attempt + 1}/3)...")
+                                    log_console.add_log(
+                                        f"🟡 转换后的URL网络错误: {error}，准备重试 ({attempt + 1}/3)..."
+                                    )
                                     if attempt < 2:
                                         await asyncio.sleep(0.5 * (attempt + 1))
                                         continue
                                     else:
                                         # 重试3次仍失败，回退到原始URL
-                                        signal.add_log("⚠️ 重试3次后仍失败，回退到原始链接")
+                                        log_console.add_log("⚠️ 重试3次后仍失败，回退到原始链接")
                                         break
                         except Exception as e:
                             # 异常处理，继续重试
-                            signal.add_log(f"🟡 转换后的URL异常: {e}，准备重试 ({attempt + 1}/3)...")
+                            log_console.add_log(f"🟡 转换后的URL异常: {e}，准备重试 ({attempt + 1}/3)...")
                             if attempt < 2:
                                 await asyncio.sleep(0.5 * (attempt + 1))
                                 continue
                             else:
                                 # 重试3次仍失败，回退到原始URL
-                                signal.add_log("⚠️ 重试3次后仍失败，回退到原始链接")
+                                log_console.add_log("⚠️ 重试3次后仍失败，回退到原始链接")
                                 break
 
     """
@@ -1034,13 +1036,13 @@ async def get_dmm_trailer(trailer_url: str) -> str:
                 for test_suffix_char in suffix_candidates:
                     test_url = base_url + f"_{higher_quality}_{test_suffix_char}.mp4"
                     if await check_url(test_url):
-                        signal.add_log(
+                        log_console.add_log(
                             f"🎬 DMM trailer 升级(旧格式): {quality_level}_{suffix_char} -> "
                             f"{higher_quality}_{test_suffix_char}"
                         )
-                        signal.add_log(f"🎬 DMM trailer URL: {trailer_url} -> {test_url}")
+                        log_console.add_log(f"🎬 DMM trailer URL: {trailer_url} -> {test_url}")
                         return test_url
-            signal.add_log(f"🎬 DMM trailer 保持原质量(旧格式): {quality_level}_{suffix_char} {trailer_url}")
+            log_console.add_log(f"🎬 DMM trailer 保持原质量(旧格式): {quality_level}_{suffix_char} {trailer_url}")
         return trailer_url
 
     # 新格式：...nima00070mhb.mp4 / ...nima00070hhb.mp4（无 _w/_s 后缀）
@@ -1055,10 +1057,10 @@ async def get_dmm_trailer(trailer_url: str) -> str:
                 higher_quality = quality_levels[i]
                 test_url = base_url + f"{higher_quality}.mp4"
                 if await check_url(test_url):
-                    signal.add_log(f"🎬 DMM trailer 升级(新格式): {quality_level} -> {higher_quality}")
-                    signal.add_log(f"🎬 DMM trailer URL: {trailer_url} -> {test_url}")
+                    log_console.add_log(f"🎬 DMM trailer 升级(新格式): {quality_level} -> {higher_quality}")
+                    log_console.add_log(f"🎬 DMM trailer URL: {trailer_url} -> {test_url}")
                     return test_url
-            signal.add_log(f"🎬 DMM trailer 保持原质量(新格式): {quality_level} {trailer_url}")
+            log_console.add_log(f"🎬 DMM trailer 保持原质量(新格式): {quality_level} {trailer_url}")
 
     return trailer_url
 
@@ -1136,7 +1138,9 @@ def check_version() -> RemoteVersion | None:
     cached = _read_version_cache(_VERSION_CACHE_TTL)
     if cached is not None:
         # 缓存新鲜：一个请求都不发。日志里留痕，用户反馈「检测不到」时可对照排查。
-        signal.add_log(f"ℹ️ 使用本地缓存的最新版本记录（{_format_checked_at(cached[1])} 检查）: {cached[0].display}")
+        log_console.add_log(
+            f"ℹ️ 使用本地缓存的最新版本记录（{_format_checked_at(cached[1])} 检查）: {cached[0].display}"
+        )
         return cached[0]
 
     try:
@@ -1155,11 +1159,11 @@ def check_version() -> RemoteVersion | None:
     # 两条网络路径都失败：宁可给一条可能稍旧的记录，也不要让「有没有新版本」随网络抖动。
     stale = _read_version_cache(float("inf"))
     if stale is not None:
-        signal.add_log(f"🔶 获取最新版本失败（{last_error}），改用上次成功记录: {stale[0].display}")
+        log_console.add_log(f"🔶 获取最新版本失败（{last_error}），改用上次成功记录: {stale[0].display}")
         return stale[0]
 
     if last_error:
-        signal.add_log(f"❌ 获取最新版本失败！{last_error}")
+        log_console.add_log(f"❌ 获取最新版本失败！{last_error}")
     return None
 
 
@@ -1178,7 +1182,7 @@ def _fetch_remote_version(timeout: float, proxies: list[str]) -> tuple[RemoteVer
         return remote, ""
     atom_remote, _atom_error = _fetch_remote_version_from_atom(timeout, proxies)
     if atom_remote is not None:
-        signal.add_log(
+        log_console.add_log(
             f"🔄 GitHub API 暂不可用（{api_error}），已改用 releases.atom 获取最新版本: {atom_remote.display}"
         )
         return atom_remote, ""
@@ -1364,11 +1368,11 @@ def check_theporndb_api_token() -> str:
                 response, err = executor.run(computed.async_client.request("GET", url, headers=headers))
         except CancelledError:
             tips = "❌ ThePornDB 连接检查已取消"
-            signal.show_log_text(tips)
+            log_console.log_text(tips)
             return tips
         if response is None:
             tips = f"❌ ThePornDB 连接失败: {err}"
-            signal.show_log_text(tips)
+            log_console.log_text(tips)
             return tips
         if response.status_code == 401 and "Unauthenticated" in str(response.text):
             tips = "❌ API Token 错误！影响欧美刮削！请到「软件设置」-「网络」中修改。"
@@ -1376,7 +1380,7 @@ def check_theporndb_api_token() -> str:
             tips = "✅ 连接正常！" if response.json().get("data") else "❌ 返回数据异常！"
         else:
             tips = f"❌ 连接失败！请检查网络或代理设置！ {response.status_code} {response.text}"
-    signal.show_log_text(tips.replace("❌", " ❌ ThePornDB").replace("✅", " ✅ ThePornDB"))
+    log_console.log_text(tips.replace("❌", " ❌ ThePornDB").replace("✅", " ✅ ThePornDB"))
     return tips
 
 
@@ -1398,8 +1402,12 @@ async def get_actorname(number: str) -> tuple[bool, str]:
         actor_name = [n.strip() for n in each.xpath('li[@class="actress-name"]/a/text()') if n and n.strip()]
         actor_number_raw = each.xpath('li[@class="actress-name"]/following-sibling::li[last()]/text()')
         actor_number_text = (actor_number_raw[0] if actor_number_raw else "").strip()
-        if actor_number_text and number and (
-            actor_number_text.upper().endswith(number.upper()) or number.upper().endswith(actor_number_text.upper())
+        if (
+            actor_number_text
+            and number
+            and (
+                actor_number_text.upper().endswith(number.upper()) or number.upper().endswith(actor_number_text.upper())
+            )
         ):
             return True, ",".join(actor_name)
     return False, "No Result!"
@@ -1497,9 +1505,9 @@ async def download_dmm_extrafanart_with_filepath(url: str, file_path: Path, fold
         return False
 
     # 议题 #21: 图床冷却期内直接跳过（download_extrafanart_task 的 pics.dmm 回退不受影响）
-    from ..core.image_host_cooldown import record_failure as _record_host_failure
-    from ..core.image_host_cooldown import record_success as _record_host_success
-    from ..core.image_host_cooldown import remaining_seconds as _host_cooldown_remaining
+    from .image_host_cooldown import record_failure as _record_host_failure
+    from .image_host_cooldown import record_success as _record_host_success
+    from .image_host_cooldown import remaining_seconds as _host_cooldown_remaining
 
     skip_remaining = _host_cooldown_remaining(normalized_url)
     if skip_remaining > 0:

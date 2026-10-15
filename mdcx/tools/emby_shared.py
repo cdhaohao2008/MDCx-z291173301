@@ -14,7 +14,7 @@ import aiofiles
 import httpx
 
 from ..config.manager import manager
-from ..signals import signal
+from ..log_console import log_console
 
 JELLYFIN_PERSON_FIELDS = (
     "Overview",
@@ -171,5 +171,5 @@ async def _upload_actor_photo(url: str, pic_path: Path) -> tuple[bool, str]:
         resp, err = await _emby_request("POST", url, headers=header, data=b64_content)
         return resp is not None, err
     except Exception as e:
-        signal.show_log_text(traceback.format_exc())
+        log_console.log_text(traceback.format_exc())
         return False, f"上传头像失败: {url} {pic_path} {e!s}"

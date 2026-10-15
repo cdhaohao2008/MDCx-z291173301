@@ -52,18 +52,21 @@ def win(app, tmp_path_factory):
     from mdcx.controllers.main_window import main_window as mw_mod
     from mdcx.controllers.main_window import style as style_mod
 
+    # check_version / apply_site_priority_theme 随 WindowOpsMixin 一起移出 main_window.py
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     orig_cwd = os.getcwd()
     os.chdir(str(tmp_path_factory.mktemp("coverrow")))
-    orig = {}
-    for name, fn in (
-        ("run_startup_health_checks", lambda: None),
-        ("show_netstatus", lambda: None),
-        ("check_version", lambda: None),
-        ("save_remain_list", lambda: None),
-        ("apply_site_priority_theme", lambda _w: None),
+    orig = []
+    for owner, name, fn in (
+        (mw_mod, "run_startup_health_checks", lambda: None),
+        (mw_mod, "show_netstatus", lambda: None),
+        (window_ops_mod, "check_version", lambda: None),
+        (mw_mod, "save_remain_list", lambda: None),
+        (window_ops_mod, "apply_site_priority_theme", lambda _w: None),
     ):
-        orig[name] = getattr(mw_mod, name)
-        setattr(mw_mod, name, fn)
+        orig.append((owner, name, getattr(owner, name)))
+        setattr(owner, name, fn)
     orig_style = mw_mod.MyMAinWindow.set_style
     mw_mod.MyMAinWindow.set_style = lambda self: None
     orig_qtr = style_mod.resources.qtr
@@ -75,8 +78,8 @@ def win(app, tmp_path_factory):
     window.close()
     window.deleteLater()
     app.processEvents()
-    for name, fn in orig.items():
-        setattr(mw_mod, name, fn)
+    for owner, name, value in orig:
+        setattr(owner, name, value)
     mw_mod.MyMAinWindow.set_style = orig_style
     style_mod.resources.qtr = orig_qtr
     os.chdir(orig_cwd)

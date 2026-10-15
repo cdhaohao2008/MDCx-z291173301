@@ -11,11 +11,11 @@ from urllib.parse import quote
 from ..config.enums import Language
 from ..config.manager import manager
 from ..config.models import Translator
-from ..signals import signal
+from ..log_console import log_console
 from ..utils.language import is_probably_english_for_translation
 
 if TYPE_CHECKING:
-    from ..core.llm_translate_cache import LLMTranslateCache
+    from ..utils.llm_translate_cache import LLMTranslateCache
 
 
 @dataclass(slots=True)
@@ -158,11 +158,11 @@ async def _deepl_translate(text: str, source_lang: Literal["JA", "EN"] = "JA") -
     async with manager.acquire_computed() as computed:
         res, error = await computed.async_client.post_json(url, json_data=data, headers=headers)
     if res is None:
-        signal.add_log(f"DeepL API 请求失败: {error}")
+        log_console.add_log(f"DeepL API 请求失败: {error}")
         return None
     text_result = _extract_deepl_text(res)
     if text_result is None:
-        signal.add_log(f"DeepL API 返回数据异常: {res}")
+        log_console.add_log(f"DeepL API 返回数据异常: {res}")
         return None
     return text_result
 
@@ -195,11 +195,11 @@ async def _deeplx_translate(text: str, source_lang: Literal["JA", "EN"] = "JA") 
     async with manager.acquire_computed() as computed:
         res, error = await computed.async_client.post_json(url, json_data=data, headers=headers)
     if res is None:
-        signal.add_log(f"DeepLX API 请求失败: {error}")
+        log_console.add_log(f"DeepLX API 请求失败: {error}")
         return None
     text_result = _extract_deeplx_text(res)
     if text_result is None:
-        signal.add_log(f"DeepLX API 返回数据异常: {res}")
+        log_console.add_log(f"DeepLX API 返回数据异常: {res}")
         return None
     return text_result
 
@@ -246,7 +246,7 @@ async def _llm_translate(text: str, prompt_template: str, target_language: str =
                 user_prompt=prompt_template.replace("{content}", text).replace("{lang}", target_language),
                 temperature=translate_config.llm_temperature,
                 max_try=translate_config.llm_max_try,
-                log_fn=signal.add_log,
+                log_fn=log_console.add_log,
                 extra_body=extra_body,
             )
         if translated is None:
@@ -277,7 +277,7 @@ def _get_llm_translate_cache() -> "LLMTranslateCache":
     避免命中旧配置产出的译文。
     """
     global _llm_translate_cache, _llm_translate_cache_fingerprint
-    from ..core.llm_translate_cache import LLMTranslateCache
+    from ..utils.llm_translate_cache import LLMTranslateCache
 
     config = manager.config.translate_config
     fingerprint = (str(config.llm_model), str(config.llm_url), bool(config.llm_disable_thinking))

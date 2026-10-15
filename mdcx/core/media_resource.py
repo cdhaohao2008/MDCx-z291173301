@@ -13,6 +13,7 @@ import aiofiles
 import aiofiles.os
 from PIL import Image
 
+from ..base import image_host_cooldown
 from ..base.web import (
     _IMAGE_DOWNLOAD_MAX_BYTES,
     _build_dmm_probe_url,
@@ -29,7 +30,6 @@ from ..base.web import (
 )
 from ..config.manager import manager
 from ..models.log_buffer import LogBuffer
-from . import image_host_cooldown
 
 
 @dataclass(slots=True)

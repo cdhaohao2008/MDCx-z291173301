@@ -25,20 +25,28 @@ def win(app, tmp_path_factory):
     from mdcx.consts import MAIN_PATH
     from mdcx.controllers.main_window import main_window as mw_mod
     from mdcx.controllers.main_window import style as style_mod
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
 
     orig_cwd = os.getcwd()
     tmp = str(tmp_path_factory.mktemp("probe"))
     os.chdir(tmp)
     orig = {}
-    for name, fn in (
-        ("run_startup_health_checks", lambda: None),
-        ("show_netstatus", lambda *_a, **_k: None),
-        ("check_version", lambda *_a, **_k: None),
-        ("save_remain_list", lambda *_a, **_k: None),
-        ("apply_site_priority_theme", lambda *_a, **_k: None),
-    ):
-        orig[name] = getattr(mw_mod, name)
-        setattr(mw_mod, name, fn)
+    # 主窗拆成 mixin 之后，这些模块级名字各自归所属模块持有，
+    # 因此打桩目标必须指向真正发起调用的那个模块。
+
+    stubs = (
+        ("run_startup_health_checks", mw_mod, lambda: None),
+        ("show_netstatus", mw_mod, lambda *_a, **_k: None),
+        ("check_version", window_ops_mod, lambda *_a, **_k: None),
+        ("save_remain_list", mw_mod, lambda *_a, **_k: None),
+        ("apply_site_priority_theme", window_ops_mod, lambda *_a, **_k: None),
+        ("check_theporndb_api_token", window_ops_mod, lambda *_a, **_k: None),
+    )
+    patched = []
+    for name, owner, fn in stubs:
+        orig[(owner.__name__, name)] = getattr(owner, name)
+        setattr(owner, name, fn)
+        patched.append((owner, name))
     orig_style = mw_mod.MyMAinWindow.set_style
     mw_mod.MyMAinWindow.set_style = lambda self: None
     orig_qtr = style_mod.resources.qtr
@@ -54,8 +62,8 @@ def win(app, tmp_path_factory):
     window.close()
     window.deleteLater()
     app.processEvents()
-    for name, fn in orig.items():
-        setattr(mw_mod, name, fn)
+    for owner, name in patched:
+        setattr(owner, name, orig[(owner.__name__, name)])
     mw_mod.MyMAinWindow.set_style = orig_style
     style_mod.resources.qtr = orig_qtr
     os.chdir(orig_cwd)

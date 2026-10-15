@@ -29,10 +29,11 @@ from ..config.manager import manager
 from ..config.models import CleanAction
 from ..config.resource_policy import resource_policy
 from ..config.resources import resources
+from ..log_console import log_console
 from ..models.enums import FileMode
 from ..models.flags import Flags
 from ..models.log_buffer import LogBuffer
-from ..signals import signal
+from ..ui_hooks import ui_hooks
 from ..utils import executor, get_current_time, get_used_time
 from ..utils.file import copy_file_async, copy_file_sync, delete_file_async, delete_file_sync, move_file_async
 
@@ -47,7 +48,7 @@ _remain_save_lock = threading.Lock()
 def _path_lines_for_write(paths: list[Path] | set[Path], list_name: str):
     if len(paths) > LARGE_LIST_SORT_THRESHOLD:
         if list_name not in _large_list_warned:
-            signal.show_log_text(f" ⚠ {list_name} 数量较大（{len(paths)}），保存时将跳过排序以降低内存占用。")
+            log_console.log_text(f" ⚠ {list_name} 数量较大（{len(paths)}），保存时将跳过排序以降低内存占用。")
             _large_list_warned.add(list_name)
         for path in paths:
             yield str(path) + "\n"
@@ -72,7 +73,7 @@ async def _replace_success_file_with_retry(success_tmp_path: Path, success_path:
     try:
         await asyncio.to_thread(_ensure_file_writable, success_path)
     except Exception:
-        signal.show_log_text(" ⚠ success.txt 文件属性检查失败，将继续尝试保存。")
+        log_console.log_text(" ⚠ success.txt 文件属性检查失败，将继续尝试保存。")
 
     for attempt in range(1, _SUCCESS_REPLACE_RETRY_MAX + 1):
         try:
@@ -80,7 +81,7 @@ async def _replace_success_file_with_retry(success_tmp_path: Path, success_path:
             return
         except PermissionError:
             if attempt == 1:
-                signal.show_log_text(" ⚠ success.txt 正在被占用，正在重试保存...")
+                log_console.log_text(" ⚠ success.txt 正在被占用，正在重试保存...")
             if attempt >= _SUCCESS_REPLACE_RETRY_MAX:
                 raise
             await asyncio.sleep(_SUCCESS_REPLACE_RETRY_BASE_SLEEP * attempt)
@@ -267,13 +268,13 @@ async def save_success_list(old_path: Path | None = None, new_path: Path | None 
                     await f.writelines(_path_lines_for_write(success_list_snapshot, "成功列表"))
                 await _replace_success_file_with_retry(success_tmp_path, success_path)
         except Exception as e:
-            signal.show_log_text(f"  Save success list Error {e!s}\n {traceback.format_exc()}")
+            log_console.log_text(f"  Save success list Error {e!s}\n {traceback.format_exc()}")
         finally:
             if success_tmp_path:
                 await _cleanup_success_tmp_file(success_tmp_path)
         with Flags.guarded():
             success_count = len(Flags.success_list)
-        signal.view_success_file_settext.emit(f"查看 ({success_count})")
+        ui_hooks.view_success_file_settext(f"查看 ({success_count})")
 
 
 def save_remain_list() -> None:
@@ -332,7 +333,7 @@ def _save_remain_list_sync(paths: list[Path]) -> None:
             if list(Flags.remain_list) == paths:
                 Flags.can_save_remain = False
     except Exception as e:
-        signal.show_log_text(f"save remain list error: {e!s}\n {traceback.format_exc()}")
+        log_console.log_text(f"save remain list error: {e!s}\n {traceback.format_exc()}")
         with contextlib.suppress(OSError):
             os.remove(tmp_path)
     finally:
@@ -345,8 +346,8 @@ async def _clean_empty_folders(path: Path, file_mode: FileMode, allow_empty: boo
         allow_empty = manager.config.del_empty_folder
     if not allow_empty or file_mode == FileMode.Again:
         return
-    signal.set_label_file_path.emit("🗑 正在清理空文件夹，请等待...")
-    signal.show_log_text(" ⏳ Cleaning empty folders...")
+    ui_hooks.set_label_file_path("🗑 正在清理空文件夹，请等待...")
+    log_console.log_text(" ⏳ Cleaning empty folders...")
 
     if NoEscape.FOLDER in manager.config.no_escape:
         ignore_dirs = []
@@ -354,8 +355,8 @@ async def _clean_empty_folders(path: Path, file_mode: FileMode, allow_empty: boo
         ignore_dirs = get_movie_path_setting(movie_path_override=path).ignore_dirs
 
     if not await aiofiles.os.path.exists(path):
-        signal.show_log_text(f" 🍀 Clean done!({get_used_time(start_time)}s)")
-        signal.show_log_text("=" * 80)
+        log_console.log_text(f" 🍀 Clean done!({get_used_time(start_time)}s)")
+        log_console.log_text("=" * 80)
         return
 
     def task():
@@ -380,23 +381,23 @@ async def _clean_empty_folders(path: Path, file_mode: FileMode, allow_empty: boo
             try:
                 if not os.listdir(folder):
                     os.rmdir(folder)
-                    signal.show_log_text(f" 🗑 Clean empty folder: {folder}")
+                    log_console.log_text(f" 🗑 Clean empty folder: {folder}")
             except Exception as e:
-                signal.show_traceback_log(traceback.format_exc())
-                signal.show_log_text(f" 🔴 Delete empty folder error: {e!s}")
+                log_console.show_traceback_log(traceback.format_exc())
+                log_console.log_text(f" 🔴 Delete empty folder error: {e!s}")
 
     await asyncio.to_thread(task)
-    signal.show_log_text(f" 🍀 Clean done!({get_used_time(start_time)}s)")
-    signal.show_log_text("=" * 80)
+    log_console.log_text(f" 🍀 Clean done!({get_used_time(start_time)}s)")
+    log_console.log_text("=" * 80)
 
 
 async def check_and_clean_files() -> None:
-    signal.change_buttons_status.emit()
+    ui_hooks.change_buttons_status()
     start_time = time.time()
     movie_paths = get_movie_path_setting().movie_paths
-    signal.show_log_text("🍯 🍯 🍯 NOTE: START CHECKING AND CLEAN FILE NOW!!!")
-    signal.show_log_text(f"\n ⏰ Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
-    signal.show_log_text(
+    log_console.log_text("🍯 🍯 🍯 NOTE: START CHECKING AND CLEAN FILE NOW!!!")
+    log_console.log_text(f"\n ⏰ Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+    log_console.log_text(
         f" 🖥 Movie path: {';'.join(str(path) for path in movie_paths)} \n ⏳ Checking all videos and cleaning, Please wait..."
     )
     total = 0
@@ -405,7 +406,7 @@ async def check_and_clean_files() -> None:
     # 只有主界面点击会运行此函数, 因此此 walk 无需后台执行
     for movie_path in movie_paths:
         if not Path(movie_path).exists():
-            signal.show_log_text(f" 🔴 Movie folder does not exist: {movie_path}")
+            log_console.log_text(f" 🔴 Movie folder does not exist: {movie_path}")
             continue
         for root, _dirs, files in Path(movie_path).walk(top_down=True):
             for f in files:
@@ -417,12 +418,12 @@ async def check_and_clean_files() -> None:
                     result, error_info = delete_file_sync(path)
                     if result:
                         succ += 1
-                        signal.show_log_text(f" 🗑 Clean: {path!s} ")
+                        log_console.log_text(f" 🗑 Clean: {path!s} ")
                     else:
                         fail += 1
-                        signal.show_log_text(f" 🗑 Clean error: {error_info} ")
-    signal.show_log_text(f" 🍀 Clean done!({get_used_time(start_time)}s)")
-    signal.show_log_text("================================================================================")
+                        log_console.log_text(f" 🗑 Clean error: {error_info} ")
+    log_console.log_text(f" 🍀 Clean done!({get_used_time(start_time)}s)")
+    log_console.log_text("================================================================================")
     for movie_path in movie_paths:
         # 视频刮削目录下的空目录：永远走左侧正常模式开关（两种模式都一样）
         await _clean_empty_folders(movie_path, FileMode.Default, allow_empty=manager.config.del_empty_folder)
@@ -433,12 +434,12 @@ async def check_and_clean_files() -> None:
             if meta_root is not None:
                 # 数据存放目录下的空目录：走右侧分离模式开关
                 await _clean_empty_folders(meta_root, FileMode.Default, allow_empty=eff_del_empty_folder())
-    signal.set_label_file_path.emit("🗑 清理完成！")
-    signal.show_log_text(
+    ui_hooks.set_label_file_path("🗑 清理完成！")
+    log_console.log_text(
         f" 🎉🎉🎉 All finished!!!({get_used_time(start_time)}s) Total {total} , Success {succ} , Failed {fail} "
     )
-    signal.show_log_text("================================================================================")
-    signal.reset_buttons_status.emit()
+    log_console.log_text("================================================================================")
+    ui_hooks.reset_buttons_status()
 
 
 def get_success_list() -> None:
@@ -453,7 +454,7 @@ def get_success_list() -> None:
         executor.run(save_success_list())
     with Flags.guarded():
         success_total = len(Flags.success_list)
-    signal.view_success_file_settext.emit(f"查看 ({success_total})")
+    ui_hooks.view_success_file_settext(f"查看 ({success_total})")
 
 
 async def movie_lists(ignore_dirs: list[Path], media_type: list[str], movie_path: Path) -> list[Path]:
@@ -462,7 +463,7 @@ async def movie_lists(ignore_dirs: list[Path], media_type: list[str], movie_path
     skip_list = ["skip", ".skip", ".ignore"]
     not_skip_success = NoEscape.SKIP_SUCCESS_FILE not in manager.config.no_escape
 
-    signal.show_traceback_log("🔎 遍历待刮削目录....")
+    log_console.show_traceback_log("🔎 遍历待刮削目录....")
 
     def task():
         i = 100
@@ -497,9 +498,9 @@ async def movie_lists(ignore_dirs: list[Path], media_type: list[str], movie_path
                     if CleanAction.AUTO_CLEAN in manager.config.clean_enable and need_clean(path, f, file_ext):
                         result, error_info = delete_file_sync(path)
                         if result:
-                            signal.show_log_text(f" 🗑 Clean: {path} ")
+                            log_console.log_text(f" 🗑 Clean: {path} ")
                         else:
-                            signal.show_log_text(f" 🗑 Clean error: {error_info} ")
+                            log_console.log_text(f" 🗑 Clean error: {error_info} ")
                         continue
 
                     # 添加文件
@@ -510,9 +511,9 @@ async def movie_lists(ignore_dirs: list[Path], media_type: list[str], movie_path
                             if NoEscape.CHECK_SYMLINK in manager.config.no_escape and not real_path.exists():
                                 result, error_info = delete_file_sync(path)
                                 if result:
-                                    signal.show_log_text(f" 🗑 Clean dead link: {path} ")
+                                    log_console.log_text(f" 🗑 Clean dead link: {path} ")
                                 else:
-                                    signal.show_log_text(f" 🗑 Clean dead link error: {error_info} ")
+                                    log_console.log_text(f" 🗑 Clean dead link error: {error_info} ")
                                 continue
                             if real_path in seen_link_targets:
                                 skip_repeat_softlink += 1
@@ -532,12 +533,12 @@ async def movie_lists(ignore_dirs: list[Path], media_type: list[str], movie_path
         found_count = len(total)
         if found_count >= i:
             i = found_count + 100
-            signal.show_traceback_log(
+            log_console.show_traceback_log(
                 f"✅ Found ({found_count})! "
                 f"Skip successfully scraped ({skip}) repeat softlink ({skip_repeat_softlink})! "
                 f"({get_used_time(start_time)}s)... Still searching, please wait... \u3000"
             )
-            signal.show_log_text(
+            log_console.log_text(
                 f"    {get_current_time()} Found ({found_count})! "
                 f"Skip successfully scraped ({skip}) repeat softlink ({skip_repeat_softlink})! "
                 f"({get_used_time(start_time)}s)... Still searching, please wait... \u3000"
@@ -547,12 +548,12 @@ async def movie_lists(ignore_dirs: list[Path], media_type: list[str], movie_path
     total, skip, skip_repeat_softlink = await asyncio.to_thread(task)
 
     total.sort()
-    signal.show_traceback_log(
+    log_console.show_traceback_log(
         f"🎉 Done!!! Found ({len(total)})! "
         f"Skip successfully scraped ({skip}) repeat softlink ({skip_repeat_softlink})! "
         f"({get_used_time(start_time)}s) \u3000"
     )
-    signal.show_log_text(
+    log_console.log_text(
         f"    Done!!! Found ({len(total)})! "
         f"Skip successfully scraped ({skip}) repeat softlink ({skip_repeat_softlink})! "
         f"({get_used_time(start_time)}s) \u3000"
@@ -564,11 +565,11 @@ async def get_movie_list(file_mode: FileMode, movie_path: Path, ignore_dirs: lis
     movie_list = []
     if file_mode == FileMode.Default:  # 刮削默认视频目录的文件
         if not await aiofiles.os.path.exists(movie_path):
-            signal.show_log_text("\n 🔴 Movie folder does not exist!")
+            log_console.log_text("\n 🔴 Movie folder does not exist!")
         else:
-            signal.show_log_text(f" 🖥 Movie path: {movie_path}")
-            signal.show_log_text(" 🔎 Searching all videos, Please wait...")
-            signal.set_label_file_path.emit(f"正在遍历待刮削视频目录中的所有视频，请等待...\n {movie_path}")
+            log_console.log_text(f" 🖥 Movie path: {movie_path}")
+            log_console.log_text(" 🔎 Searching all videos, Please wait...")
+            ui_hooks.set_label_file_path(f"正在遍历待刮削视频目录中的所有视频，请等待...\n {movie_path}")
             if (
                 NoEscape.FOLDER in manager.config.no_escape
                 or manager.config.main_mode == 4
@@ -579,20 +580,20 @@ async def get_movie_list(file_mode: FileMode, movie_path: Path, ignore_dirs: lis
                 # 获取所有需要刮削的影片列表
                 movie_list = await movie_lists(ignore_dirs, manager.config.media_type, movie_path)
             except Exception:
-                signal.show_traceback_log(traceback.format_exc())
-                signal.show_log_text(traceback.format_exc())
+                log_console.show_traceback_log(traceback.format_exc())
+                log_console.log_text(traceback.format_exc())
             count_all = len(movie_list)
-            signal.show_log_text(" 📺 Find " + str(count_all) + " movies")
+            log_console.log_text(" 📺 Find " + str(count_all) + " movies")
 
     elif file_mode == FileMode.Single:  # 刮削单文件（工具页面）
         file_path = Flags.single_file_path
         if not await aiofiles.os.path.exists(file_path):
-            signal.show_log_text(" 🔴 Movie file does not exist!")
+            log_console.log_text(" 🔴 Movie file does not exist!")
         else:
             movie_list.append(file_path)  # 把文件路径添加到movie_list
-            signal.show_log_text(f" 🖥 File path: {file_path}")
+            log_console.log_text(f" 🖥 File path: {file_path}")
             if Flags.appoint_url:
-                signal.show_log_text(" 🌐 File url: " + Flags.appoint_url)
+                log_console.log_text(" 🌐 File url: " + Flags.appoint_url)
 
     return movie_list
 
@@ -605,20 +606,20 @@ async def newtdisk_creat_symlink(
     from_tool = False
     if not netdisk_path:
         from_tool = True
-        signal.change_buttons_status.emit()
+        ui_hooks.change_buttons_status()
     start_time = time.time()
     if not netdisk_path:
         netdisk_path = Path(manager.config.netdisk_path)
     if not local_path:
         local_path = Path(manager.config.localdisk_path)
-    signal.show_log_text("🍯 🍯 🍯 开始创建符号链接")
-    signal.show_log_text(f" 📁 源路径: {netdisk_path} \n 📁 目标路径：{local_path} \n")
+    log_console.log_text("🍯 🍯 🍯 开始创建符号链接")
+    log_console.log_text(f" 📁 源路径: {netdisk_path} \n 📁 目标路径：{local_path} \n")
     try:
         if not netdisk_path or not local_path:
-            signal.show_log_text(f" 🔴 网盘目录和本地目录不能为空！请重新设置！({get_used_time(start_time)}s)")
-            signal.show_log_text("================================================================================")
+            log_console.log_text(f" 🔴 网盘目录和本地目录不能为空！请重新设置！({get_used_time(start_time)}s)")
+            log_console.log_text("================================================================================")
             if from_tool:
-                signal.reset_buttons_status.emit()
+                ui_hooks.reset_buttons_status()
             return
         copy_exts = [".nfo", ".jpg", ".png"] + manager.config.sub_type
         file_exts = "|".join(manager.config.media_type).lower().split("|") + copy_exts + manager.config.sub_type
@@ -653,23 +654,23 @@ async def newtdisk_creat_symlink(
                     net_file = root / f
                     local_file = local_dir / f
                     if local_file.is_file():
-                        signal.show_log_text(f" {total} 🟠 跳过: 已存在文件或有效的符号链接\n {net_file} ")
+                        log_console.log_text(f" {total} 🟠 跳过: 已存在文件或有效的符号链接\n {net_file} ")
                         skip_num += 1
                         continue
                     if local_file.is_symlink():
-                        signal.show_log_text(f" {total} 🔴 删除: 无效的符号链接\n {net_file} ")
+                        log_console.log_text(f" {total} 🔴 删除: 无效的符号链接\n {net_file} ")
                         local_file.unlink()
 
                     if ext in copy_exts:  # 直接复制的文件
                         if not copy_flag:
                             continue
                         copy_file_sync(net_file, local_file)
-                        signal.show_log_text(f" {total} 🍀 Copy done!\n {net_file} ")
+                        log_console.log_text(f" {total} 🍀 Copy done!\n {net_file} ")
                         copy_num += 1
                         continue
                     # 不对原文件进行有效性检查以减小可能的网络 IO 开销
                     if net_file in done:
-                        signal.show_log_text(
+                        log_console.log_text(
                             f" {total} 🟠 Link skip! Source file already linked, this file is duplicate!\n {net_file} "
                         )
                         skip_num += 1
@@ -678,28 +679,28 @@ async def newtdisk_creat_symlink(
 
                     try:
                         os.symlink(net_file, local_file)
-                        signal.show_log_text(f" {total} 🍀 Link done!\n {net_file} ")
+                        log_console.log_text(f" {total} 🍀 Link done!\n {net_file} ")
                         link_num += 1
                     except Exception as e:
                         error_info = ""
                         if "symbolic link privilege not held" in str(e):
                             error_info = "   \n没有创建权限，请尝试管理员权限！或按照教程开启用户权限： https://www.jianshu.com/p/0e307bfe8770"
-                        signal.show_log_text(f" {total} 🔴 Link failed!{error_info} \n {net_file} ")
-                        signal.show_log_text(traceback.format_exc())
+                        log_console.log_text(f" {total} 🔴 Link failed!{error_info} \n {net_file} ")
+                        log_console.log_text(traceback.format_exc())
                         fail_num += 1
             return total, copy_num, link_num, skip_num, fail_num
 
         total, copy_num, link_num, skip_num, fail_num = await asyncio.to_thread(task)
-        signal.show_log_text(
+        log_console.log_text(
             f"\n 🎉🎉🎉 All finished!!!({get_used_time(start_time)}s) Total {total} , "
             f"Linked {link_num} , Copied {copy_num} , Skiped {skip_num} , Failed {fail_num} "
         )
     except Exception:
-        signal.show_log_text(traceback.format_exc())
+        log_console.log_text(traceback.format_exc())
 
-    signal.show_log_text("================================================================================")
+    log_console.log_text("================================================================================")
     if from_tool:
-        signal.reset_buttons_status.emit()
+        ui_hooks.reset_buttons_status()
 
 
 async def move_file_to_failed_folder(failed_folder: Path, file_path: Path, folder_old_path: Path) -> Path:
@@ -715,8 +716,8 @@ async def move_file_to_failed_folder(failed_folder: Path, file_path: Path, folde
         try:
             await aiofiles.os.makedirs(failed_folder, exist_ok=True)
         except Exception:
-            signal.show_traceback_log(traceback.format_exc())
-            signal.show_log_text(traceback.format_exc())
+            log_console.show_traceback_log(traceback.format_exc())
+            log_console.log_text(traceback.format_exc())
 
     # 获取文件路径
     file_full_name = file_path.name

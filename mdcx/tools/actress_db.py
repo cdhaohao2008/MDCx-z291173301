@@ -6,8 +6,8 @@ import traceback
 from pathlib import Path
 
 from ..config.manager import manager
+from ..log_console import log_console
 from ..models.emby import EMbyActressInfo
-from ..signals import signal
 
 
 class ActressDB:
@@ -23,10 +23,10 @@ class ActressDB:
                 info_count = cls.DB.execute(
                     "select count(*) from Info"
                 ).fetchone()  # 必须实际执行查询才能判断是否连接成功
-                signal.show_log_text(f" ✅ 数据库连接成功, 共有 {info_count[0]} 条女优信息")
+                log_console.log_text(f" ✅ 数据库连接成功, 共有 {info_count[0]} 条女优信息")
             except Exception:
-                signal.show_traceback_log(traceback.format_exc())
-                signal.show_log_text(" ❌ 数据库连接失败, 请检查数据库设置")
+                log_console.show_traceback_log(traceback.format_exc())
+                log_console.log_text(" ❌ 数据库连接失败, 请检查数据库设置")
                 cls.DB = None
 
     @classmethod

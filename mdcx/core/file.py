@@ -14,12 +14,13 @@ from ..config.enums import CDChar, Switch
 from ..config.extend import eff_success_file_move, eff_success_file_rename
 from ..config.manager import manager
 from ..consts import IS_MAC, IS_WINDOWS
+from ..log_console import log_console
 from ..models.enums import FileMode
 from ..models.flags import FileDoneDict, Flags
 from ..models.log_buffer import LogBuffer
 from ..models.model_types import BaseCrawlerResult, CrawlersResult, FileInfo, OtherInfo
+from ..models.mosaic import normalize_mosaic
 from ..number import get_file_number, get_number_letters, is_uncensored
-from ..signals import signal
 from ..utils import split_path
 from ..utils.file import (
     build_file_name_index,
@@ -29,7 +30,6 @@ from ..utils.file import (
     move_file_async,
 )
 from ..utils.path import safe_rmtree, showFilePath
-from .mosaic import normalize_mosaic
 from .naming import FIELD_DESCRIPTIONS, NameRenderOptions, NamingTarget, render_name
 
 
@@ -177,8 +177,8 @@ async def move_movie(other: OtherInfo, file_info: FileInfo, file_path: Path, fil
                 )
             else:
                 LogBuffer.log().write(f"\n 🔴 创建软链接失败\n{e!s}\n 🙉 [Movie] {raw}")
-            signal.show_traceback_log(traceback.format_exc())
-            signal.show_log_text(traceback.format_exc())
+            log_console.show_traceback_log(traceback.format_exc())
+            log_console.log_text(traceback.format_exc())
             return False
 
     # 硬链接模式开时，创建硬链接
@@ -209,8 +209,8 @@ async def move_movie(other: OtherInfo, file_info: FileInfo, file_path: Path, fil
                     f"如要跨卷可以尝试软链接模式.\n{e!s} "
                 )
             LogBuffer.error().write("创建硬链接失败")
-            signal.show_traceback_log(traceback.format_exc())
-            signal.show_log_text(traceback.format_exc())
+            log_console.show_traceback_log(traceback.format_exc())
+            log_console.log_text(traceback.format_exc())
             return False
 
     # 其他情况，就移动文件
@@ -687,7 +687,7 @@ async def get_file_info_v2(file_path: Path, copy_sub: bool = True) -> FileInfo:
                     elif ">动漫</" in nfo_content or ">動漫</" in nfo_content:
                         mosaic = "动漫"
             except Exception:
-                signal.show_traceback_log(traceback.format_exc())
+                log_console.show_traceback_log(traceback.format_exc())
 
         if not has_sub and await aiofiles.os.path.exists(nfo_old_path):
             try:
@@ -697,7 +697,7 @@ async def get_file_info_v2(file_path: Path, copy_sub: bool = True) -> FileInfo:
                     c_word = cnword_style  # 中文字幕影片后缀
                     has_sub = True
             except Exception:
-                signal.show_traceback_log(traceback.format_exc())
+                log_console.show_traceback_log(traceback.format_exc())
 
         # 查找字幕包目录字幕文件
         subtitle_add = manager.config.subtitle_add
@@ -738,9 +738,9 @@ async def get_file_info_v2(file_path: Path, copy_sub: bool = True) -> FileInfo:
         file_show_name += cd_part
 
     except Exception as e:
-        signal.show_traceback_log(file_path)
-        signal.show_traceback_log(traceback.format_exc())
-        signal.show_log_text(traceback.format_exc())
+        log_console.show_traceback_log(file_path)
+        log_console.show_traceback_log(traceback.format_exc())
+        log_console.log_text(traceback.format_exc())
         LogBuffer.error().write(f"get_file_info_v2 error: {e}")
         LogBuffer.log().write("\n" + str(file_path))
         LogBuffer.log().write("\n" + traceback.format_exc())
@@ -828,7 +828,7 @@ async def _migrate_picture_resource(
         elif p := cast(Path | None, Flags.file_done_dic.get(number, cast(FileDoneDict, {})).get(local_key)):
             await copy_file_async(p, final_path)
     except Exception:
-        signal.show_log_text(traceback.format_exc())
+        log_console.log_text(traceback.format_exc())
     return exists, done_path_copy
 
 
@@ -1013,7 +1013,7 @@ async def deal_old_files(
         elif nfo_old_path != nfo_new_path and await aiofiles.os.path.exists(nfo_old_path):
             await move_file_async(nfo_old_path, nfo_new_path)
     except Exception:
-        signal.show_log_text(traceback.format_exc())
+        log_console.log_text(traceback.format_exc())
 
     # trailer
     if trailer_name:  # 预告片名字不含视频文件名
@@ -1101,7 +1101,7 @@ async def deal_old_files(
             elif await aiofiles.os.path.exists(extrafanart_old_path):
                 await move_file_async(extrafanart_old_path, extrafanart_new_path)
         except Exception:
-            signal.show_log_text(traceback.format_exc())
+            log_console.log_text(traceback.format_exc())
 
         # extrafanart副本
         try:
@@ -1113,7 +1113,7 @@ async def deal_old_files(
             elif await aiofiles.os.path.exists(extrafanart_copy_old_path):
                 await move_file_async(extrafanart_copy_old_path, extrafanart_copy_new_path)
         except Exception:
-            signal.show_log_text(traceback.format_exc())
+            log_console.log_text(traceback.format_exc())
 
         # 主题视频
         if await aiofiles.os.path.exists(theme_videos_new_path):

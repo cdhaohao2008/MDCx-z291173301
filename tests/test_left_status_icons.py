@@ -21,6 +21,10 @@ from mdcx.models.flags import Flags
 
 REPO = Path(__file__).resolve().parent.parent
 MAIN_WINDOW_PATH = REPO / "mdcx" / "controllers" / "main_window" / "main_window.py"
+# show_scrape_info 已随「成功列表/状态区」集群切到 SuccessListMixin，字面量随之搬走。
+SUCCESS_LIST_PATH = REPO / "mdcx" / "controllers" / "main_window" / "success_list.py"
+# 「🍉 有新版本了」随 show_version 切到 WindowOpsMixin。
+WINDOW_OPS_PATH = REPO / "mdcx" / "controllers" / "main_window" / "window_ops.py"
 CONSTS_PATH = REPO / "mdcx" / "consts.py"
 UI_PATH = REPO / "mdcx" / "views" / "MDCx.ui"
 PY_PATH = REPO / "mdcx" / "views" / "MDCx.py"
@@ -45,7 +49,12 @@ _REQUIRED_ICON_LITERALS = (
 
 
 def _main_window_text() -> str:
-    return MAIN_WINDOW_PATH.read_text(encoding="utf-8")
+    """主窗口实现源码全文（main_window.py + success_list.py + window_ops.py 三处 mixin 宿主）。"""
+    return (
+        MAIN_WINDOW_PATH.read_text(encoding="utf-8")
+        + SUCCESS_LIST_PATH.read_text(encoding="utf-8")
+        + WINDOW_OPS_PATH.read_text(encoding="utf-8")
+    )
 
 
 def test_status_icons_present_in_show_scrape_info():

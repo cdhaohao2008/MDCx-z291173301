@@ -342,7 +342,7 @@ async def test_ensure_binary_degrades_when_checksum_mismatch(tmp_path, monkeypat
 async def test_upscale_failure_reports_vulkan_unavailable(tmp_path, monkeypatch):
     """开关开着却没效果时，日志要给可读结论：无 Vulkan 设备是最常见原因。"""
     logs: list[str] = []
-    monkeypatch.setattr(sr.signal, "show_log_text", logs.append)
+    monkeypatch.setattr(sr.log_console, "log_text", logs.append)
     monkeypatch.setattr(sr, "ensure_binary", lambda tool: _pass())
     monkeypatch.setattr(sr, "_SR_SKIP_REPORTED", False, raising=False)
 

@@ -29,7 +29,7 @@ from PIL import Image
 
 from ..config.manager import manager
 from ..config.resources import resources
-from ..signals import signal
+from ..log_console import log_console
 
 _PRESET_REALESRGAN_MODEL = "realesrgan-x4plus"
 _PRESET_WAIFU_MODEL = "upconv_7_photo"
@@ -220,7 +220,7 @@ def _install_from_builtin(tool: str, dest_dir: Path) -> bool:
         _make_executable(binary_path_from_dir(tool, dest_dir))
         return True
     except Exception as e:
-        signal.show_traceback_log(f"🔶 超分：内置工具释放失败 {tool}: {e}")
+        log_console.show_traceback_log(f"🔶 超分：内置工具释放失败 {tool}: {e}")
         return False
 
 
@@ -265,8 +265,8 @@ def _sr_report_skip(tool: str, reasons: list[str]) -> None:
         return
     _SR_SKIP_REPORTED = True
     detail = " | ".join(reasons) or "未知原因"
-    signal.show_log_text(f"🔴 海报超分未生效：{detail}；后续刮削保持原图，不影响结果")
-    signal.show_log_text(f"ℹ️ 可手动下载后解压到: {binary_path(tool)}")
+    log_console.log_text(f"🔴 海报超分未生效：{detail}；后续刮削保持原图，不影响结果")
+    log_console.log_text(f"ℹ️ 可手动下载后解压到: {binary_path(tool)}")
 
 
 async def ensure_binary(tool: str) -> Path | None:
@@ -284,9 +284,9 @@ async def ensure_binary(tool: str) -> Path | None:
             _sr_report_skip(tool, [f"当前系统不支持自动下载（{sys.platform}）"])
             return None
         if _install_from_builtin(tool, path.parent):
-            signal.show_log_text(f"✅ 超分工具就绪（内置）: {path}")
+            log_console.log_text(f"✅ 超分工具就绪（内置）: {path}")
             return path
-        signal.show_log_text(f"📥 首次使用，下载超分工具 {tool}（约 30-60MB，仅一次）...")
+        log_console.log_text(f"📥 首次使用，下载超分工具 {tool}（约 30-60MB，仅一次）...")
         failures: list[str] = []
         for attempt in range(1, _SR_DOWNLOAD_ATTEMPTS + 1):
             try:
@@ -303,7 +303,7 @@ async def ensure_binary(tool: str) -> Path | None:
                 failures.append(f"第 {attempt} 次解压失败: {e}")
                 break
             if is_binary_ready(tool):
-                signal.show_log_text(f"✅ 超分工具就绪: {path}")
+                log_console.log_text(f"✅ 超分工具就绪: {path}")
                 return path
             failures.append(f"第 {attempt} 次解压产物不可执行")
         _sr_report_skip(tool, failures or [f"工具获取失败: {tool}/{platform}"])
@@ -420,13 +420,11 @@ async def upscale_image(src: Path, dst: Path, preset: SrPreset) -> bool:
                     stderr=asyncio.subprocess.PIPE,
                 )
                 try:
-                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                        proc.communicate(), timeout=_SR_TIMEOUT_SECONDS
-                    )
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=_SR_TIMEOUT_SECONDS)
                 except TimeoutError:
                     proc.kill()
                     await proc.wait()
-                    signal.show_traceback_log(f"🔶 超分超时（保持原图）: {src.name}")
+                    log_console.show_traceback_log(f"🔶 超分超时（保持原图）: {src.name}")
                     _sr_report_skip(tool, [f"超分执行超过 {int(_SR_TIMEOUT_SECONDS)} 秒"])
                     return False
                 exit_code = proc.returncode
@@ -434,17 +432,17 @@ async def upscale_image(src: Path, dst: Path, preset: SrPreset) -> bool:
                 stdout_text = stdout_bytes.decode(errors="replace") if stdout_bytes else ""
             if exit_code == _TIMEOUT_EXIT_CODE:
                 # Windows 分支超时：与 POSIX 分支同文案上报，避免误报"工具执行失败"
-                signal.show_traceback_log(f"🔶 超分超时（保持原图）: {src.name}")
+                log_console.show_traceback_log(f"🔶 超分超时（保持原图）: {src.name}")
                 _sr_report_skip(tool, [f"超分执行超过 {int(_SR_TIMEOUT_SECONDS)} 秒"])
                 return False
             if exit_code != 0 or not dst.is_file() or dst.stat().st_size == 0:
                 output = stderr_text or stdout_text
-                signal.show_traceback_log(f"🔶 超分失败（保持原图）: {src.name} {output[:120]}")
+                log_console.show_traceback_log(f"🔶 超分失败（保持原图）: {src.name} {output[:120]}")
                 _sr_report_skip(tool, [_classify_upscale_failure(output)])
                 return False
             return True
     except Exception as e:
-        signal.show_traceback_log(f"🔶 超分异常（保持原图）: {src.name}: {e}")
+        log_console.show_traceback_log(f"🔶 超分异常（保持原图）: {src.name}: {e}")
         return False
 
 
@@ -673,34 +671,34 @@ async def maybe_upscale_poster(poster_path: Path) -> bool:
             try:
                 os.replace(tmp, poster_path)
             except OSError as e:
-                signal.show_traceback_log(f"🔶 超分落盘失败（保持原图）: {poster_path.name}: {e}")
+                log_console.show_traceback_log(f"🔶 超分落盘失败（保持原图）: {poster_path.name}: {e}")
                 return False
-            signal.show_log_text(f"✨ 海报超分完成: {poster_path.name}")
+            log_console.log_text(f"✨ 海报超分完成: {poster_path.name}")
             return True
-        signal.show_traceback_log(f"🔶 超分产物异常（{reason}），删除并换工具重试一次: {poster_path.name}")
+        log_console.show_traceback_log(f"🔶 超分产物异常（{reason}），删除并换工具重试一次: {poster_path.name}")
         try:
             tmp.unlink(missing_ok=True)
         except OSError:
             pass
         # 换另一款工具重试（同工具黑图多为确定性驱动问题，重试无意义）
         if not await upscale_image(poster_path, retry_tmp, fallback):
-            signal.show_traceback_log(f"🔶 超分重试失败（保持原图）: {poster_path.name}")
+            log_console.show_traceback_log(f"🔶 超分重试失败（保持原图）: {poster_path.name}")
             return False
         hard_reason = _hard_failure_reason(poster_path, retry_tmp)
         if hard_reason is not None:
-            signal.show_traceback_log(f"🔶 超分重试仍异常（{hard_reason}），弃用并保持原图: {poster_path.name}")
+            log_console.show_traceback_log(f"🔶 超分重试仍异常（{hard_reason}），弃用并保持原图: {poster_path.name}")
             return False
         sim = _similarity(poster_path, retry_tmp)
         if sim is not None and sim < _SR_SIMILARITY_THRESHOLD:
-            signal.show_log_text(
+            log_console.log_text(
                 f"✨ 海报超分重试完成（相似度{sim:.2f}仍偏低，但非黑/纯色，按策略保留）: {poster_path.name}"
             )
         else:
-            signal.show_log_text(f"✨ 海报超分重试完成: {poster_path.name}")
+            log_console.log_text(f"✨ 海报超分重试完成: {poster_path.name}")
         try:
             os.replace(retry_tmp, poster_path)
         except OSError as e:
-            signal.show_traceback_log(f"🔶 超分落盘失败（保持原图）: {poster_path.name}: {e}")
+            log_console.show_traceback_log(f"🔶 超分落盘失败（保持原图）: {poster_path.name}: {e}")
             return False
         return True
     finally:

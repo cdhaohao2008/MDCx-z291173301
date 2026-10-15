@@ -13,7 +13,7 @@ from ..config.enums import DownloadableFile
 from ..config.manager import manager
 from ..config.models import MarkType
 from ..core.file import get_file_info_v2
-from ..core.mosaic import has_leak_mark, has_umr_mark, has_uncensored_mark, is_censored_mosaic
+from ..models.mosaic import has_leak_mark, has_umr_mark, has_uncensored_mark, is_censored_mosaic
 from ..utils import executor
 from ..utils.file import delete_file_sync
 from ..views.posterCutTool import Ui_Dialog_cut_poster

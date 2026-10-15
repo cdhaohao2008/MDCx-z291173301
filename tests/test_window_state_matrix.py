@@ -38,14 +38,15 @@ def win(app, monkeypatch, tmp_path):
     from mdcx.consts import MAIN_PATH
     from mdcx.controllers.main_window import main_window as mw_mod
     from mdcx.controllers.main_window import style as style_mod
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
 
     monkeypatch.setattr(mw_mod, "run_startup_health_checks", lambda: None)
     monkeypatch.setattr(mw_mod, "show_netstatus", lambda: None)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: None)
     monkeypatch.setattr(mw_mod, "save_remain_list", lambda: None)
     # Geometry tests do not need the full QSS/resource loading path.
     monkeypatch.setattr(mw_mod.MyMAinWindow, "set_style", lambda self: None)
-    monkeypatch.setattr(mw_mod, "apply_site_priority_theme", lambda _window: None)
+    monkeypatch.setattr(window_ops_mod, "apply_site_priority_theme", lambda _window: None)
     monkeypatch.setattr(
         style_mod.resources,
         "qtr",
@@ -405,6 +406,8 @@ def test_log_first_open_pins_to_top_then_reopen_keeps_position(win, app):
 
 
 def test_nav_gap_uniform_when_entries_hidden(win, app, monkeypatch):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """议题 #74：原生边框下开启隐藏入口后，剩余导航按钮间隙必须一致且等于 spacing。
 
     根因：导航 layout 的固定高度容器没有底部 Expanding spacer，隐藏入口后多余
@@ -412,11 +415,10 @@ def test_nav_gap_uniform_when_entries_hidden(win, app, monkeypatch):
     吸收多余空间。本测试锁定隐藏后的间隙与整体结构。
     """
     from mdcx.config.enums import Switch
-    from mdcx.controllers.main_window import main_window as mw_mod
 
-    old = list(mw_mod.manager.config.switch_on)
-    monkeypatch.setattr(mw_mod.manager.config, "window_title", "show")  # 原生边框
-    monkeypatch.setattr(mw_mod.manager.config, "switch_on", [*old, Switch.HIDE_ACTOR_NAV, Switch.HIDE_NFO_NAV])
+    old = list(window_ops_mod.manager.config.switch_on)
+    monkeypatch.setattr(window_ops_mod.manager.config, "window_title", "show")  # 原生边框
+    monkeypatch.setattr(window_ops_mod.manager.config, "switch_on", [*old, Switch.HIDE_ACTOR_NAV, Switch.HIDE_NFO_NAV])
     win.load_config()
     win._windows_auto_adjust()
     win.show()
@@ -562,10 +564,11 @@ def test_setting_tabs_scrollareas_follow_window(win, app):
 
 @pytest.mark.parametrize("border", ["show", "hide"])
 def test_layout_correct_under_both_border_modes(win, app, border):
-    """原生边框与隐藏边框两种外观下，日志页几何规则一致（报告人未开隐藏边框）。"""
-    from mdcx.controllers.main_window import main_window as mw_mod
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
 
-    mw_mod.manager.config.window_title = border
+    """原生边框与隐藏边框两种外观下，日志页几何规则一致（报告人未开隐藏边框）。"""
+
+    window_ops_mod.manager.config.window_title = border
     win._windows_auto_adjust()
     app.processEvents()
     win.resize(1032, 737)
@@ -575,7 +578,7 @@ def test_layout_correct_under_both_border_modes(win, app, border):
     assert upper.y() == 0
     assert upper.height() == pytest.approx(page.height() * 0.61, abs=2)
     assert win.Ui.pushButton_start_cap2.geometry().right() <= page.width()
-    mw_mod.manager.config.window_title = "show"
+    window_ops_mod.manager.config.window_title = "show"
     win._windows_auto_adjust()
     app.processEvents()
 
@@ -585,6 +588,8 @@ def _size(obj):
 
 
 def test_save_load_config_keeps_minimized_main_window(win, app, monkeypatch):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """议题 #82：主窗最小化时，后台触发的配置保存/加载不得还原主窗。
 
     根因：save_config/load_config 末尾无条件
@@ -592,10 +597,9 @@ def test_save_load_config_keeps_minimized_main_window(win, app, monkeypatch):
     边框下会强制还原最小化主窗。用户场景：主窗最小化跑刮削/操作演员管理工具期间，
     任意自动保存把主窗弹出。修复：仅在主窗可见且未最小化时才恢复激活。
     """
-    from mdcx.controllers.main_window import main_window as mw_mod
 
     # dummy manager 无 save 桩——本测试只验证窗口状态行为，配置落盘打桩跳过
-    monkeypatch.setattr(mw_mod.manager, "save", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(window_ops_mod.manager, "save", lambda *a, **k: None, raising=False)
 
     win.show()
     app.processEvents()
@@ -2365,6 +2369,8 @@ def test_hidden_non_minimized_main_not_shown_on_app_activate(win, app):
 
 
 def test_tray_hidden_main_stays_hidden_after_manager_operation(win, app, monkeypatch):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """议题 #132 主场景：托盘隐藏主窗后打开演员管理工具并触发应用激活，主窗保持隐藏。
 
     ApplicationActivate 由操作演员管理工具触发，等价于向主窗 eventFilter 投递该事件。
@@ -2372,13 +2378,12 @@ def test_tray_hidden_main_stays_hidden_after_manager_operation(win, app, monkeyp
     from PyQt6.QtCore import QEvent
     from PyQt6.QtWidgets import QSystemTrayIcon
 
-    from mdcx.controllers.main_window import main_window as mw_mod
     from mdcx.controllers.main_window.tool_handlers import (
         pushButton_emby_actor_manager_clicked,
     )
 
     # tray_icon_click 仅在 Windows 走隐藏分支（IS_WINDOWS 门控），测试环境显式开启
-    monkeypatch.setattr(mw_mod, "IS_WINDOWS", True)
+    monkeypatch.setattr(window_ops_mod, "IS_WINDOWS", True)
 
     win.show()
     app.processEvents()
@@ -2399,15 +2404,16 @@ def test_tray_hidden_main_stays_hidden_after_manager_operation(win, app, monkeyp
 
 
 def test_tray_icon_click_restores_main_window_after_hide(win, app, monkeypatch):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """议题 #132 配套：移除 ApplicationActivate 自动 show() 后，托盘图标点击仍能恢复主窗。
 
     防止修复过度——恢复显示必须继续由托盘交互负责。
     """
     from PyQt6.QtWidgets import QSystemTrayIcon
 
-    from mdcx.controllers.main_window import main_window as mw_mod
 
-    monkeypatch.setattr(mw_mod, "IS_WINDOWS", True)
+    monkeypatch.setattr(window_ops_mod, "IS_WINDOWS", True)
 
     win.show()
     app.processEvents()
@@ -3960,7 +3966,7 @@ def test_zimu_download_link_aligns_to_filename_when_narrow(win, app):
     # (窗口宽, 窗口高) -> 链接可见文字左缘 - 「视频文件名」左缘（px，0 即严格对齐）
     # 注意 1059 宽时 extra 已 > 0 转入宽态（宽态由 test_zimu_rows_align_to_filename_when_wide 覆盖）
     # 残差随字体度量浮动（提示词自然宽变了残差跟着变），以下为当前环境
-    #（Sans Serif 9pt / offscreen 96dpi，800 档提示词自然宽 187）实测值
+    # （Sans Serif 9pt / offscreen 96dpi，800 档提示词自然宽 187）实测值
     expected_residual = {
         (800, 640): 51,
         (900, 680): 42,
@@ -4356,7 +4362,9 @@ def test_site_pref_combo_right_aligns_to_fixed_type(win, app, width):
 
     combo_right, ref_right = _site_pref_rights(win)
     # 实际布局有差异（最新代码的布局变化），只检查两者接近且都合理
-    assert abs(combo_right - ref_right) <= 200, f"{width} 宽下指定网站右缘 {combo_right} 与锁定类型 {ref_right} 差距过大"
+    assert abs(combo_right - ref_right) <= 200, (
+        f"{width} 宽下指定网站右缘 {combo_right} 与锁定类型 {ref_right} 差距过大"
+    )
     # 宽度上限应恰为「参考右缘 - 本框左缘」；且只钉上限、不钉下限
     combo = ui.comboBox_website_all
     content = ui.scrollArea_8.widget()
@@ -4404,10 +4412,7 @@ def test_site_pref_combo_ignored_until_tab_opened(win, app):
     assert abs(combo_right - ref_right) <= 200, f"首次打开未对齐: 指定网站 {combo_right} vs 锁定类型 {ref_right}"
 
 
-
 # ---------- 命名页「视频命名规则」组无大片空白（_sync_naming_template_section）----------
-
-
 
 
 def _naming_gaps(win):

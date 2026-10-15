@@ -350,10 +350,10 @@ class TestIntersectionUsesNormalizedKey:
 class TestLogUsesDisplayName:
     @pytest.mark.asyncio
     async def test_重复明细打印原名而非归一化键(self, monkeypatch):
-        from mdcx.signals import signal
+        from mdcx.log_console import log_console
 
         seen: list[str] = []
-        monkeypatch.setattr(signal, "show_log_text", lambda t: seen.append(t))
+        monkeypatch.setattr(log_console, "log_text", lambda t: seen.append(t))
 
         persons = [_person("ChiChi", "1"), _person("ＣＨＩＣＨＩ", "2"), _person("ＣhichI", "3")]
         await _run(monkeypatch, persons)
@@ -367,10 +367,10 @@ class TestLogUsesDisplayName:
 
     @pytest.mark.asyncio
     async def test_跳过日志打印原名(self, monkeypatch):
-        from mdcx.signals import signal
+        from mdcx.log_console import log_console
 
         seen: list[str] = []
-        monkeypatch.setattr(signal, "show_log_text", lambda t: seen.append(t))
+        monkeypatch.setattr(log_console, "log_text", lambda t: seen.append(t))
 
         # 交集集合为空 -> 不触发跳过; 构造一个"库里没有"的人
         persons = [_person("游离人员", "1")]

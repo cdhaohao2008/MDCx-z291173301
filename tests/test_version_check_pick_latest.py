@@ -80,7 +80,7 @@ def _isolated_cache(monkeypatch: pytest.MonkeyPatch, tmp_path):
 def _quiet_detail_log(monkeypatch: pytest.MonkeyPatch):
     """失败分支写 signal.add_log（详情日志框），桩掉免得污染断言与真实日志。"""
     logs: list[str] = []
-    monkeypatch.setattr(base_web.signal, "add_log", lambda *text: logs.append(" ".join(map(str, text))))
+    monkeypatch.setattr(base_web.log_console, "add_log", lambda *text: logs.append(" ".join(map(str, text))))
     return logs
 
 

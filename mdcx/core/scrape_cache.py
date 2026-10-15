@@ -11,7 +11,7 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..signals import signal
+from ..log_console import log_console
 
 # 失败自动重试的最大次数（设计决策：默认 3 次，达到后不再自动重试，仅手动强制）
 MAX_RETRY_COUNT = 3
@@ -40,7 +40,7 @@ class ScrapeStateCache:
         self._conn: sqlite3.Connection | None = None
         self._lock = threading.Lock()  # 刮削为多协程并发写，SQLite 单写者需串行化
         self._pending_writes = 0
-        self._log = log_fn or (lambda msg: signal.add_log(f" [刮削缓存] {msg}"))
+        self._log = log_fn or (lambda msg: log_console.add_log(f" [刮削缓存] {msg}"))
 
     # ------------------------------------------------------------------
     # 连接生命周期

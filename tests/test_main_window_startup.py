@@ -29,13 +29,15 @@ def app():
 
 
 def test_main_window_startup_no_crash(app, monkeypatch, tmp_path):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """MyMAinWindow 完整初始化不抛异常（含 Init_Singal 全部信号/布局调用）。"""
     # 打桩启动链中与 GUI 无关的副作用：网络自检/版本检查/剩余任务保存
     from mdcx.controllers.main_window import main_window as mw_mod
 
     monkeypatch.setattr(mw_mod, "run_startup_health_checks", lambda: None)
     monkeypatch.setattr(mw_mod, "show_netstatus", lambda: None)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: None)
     monkeypatch.setattr(mw_mod, "save_remain_list", lambda: None)
 
     monkeypatch.chdir(tmp_path)  # load_config/get_success_list 会写当前目录

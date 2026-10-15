@@ -170,9 +170,9 @@ class JavdbAppCrawler(BaseCrawler):
 
     @staticmethod
     def _log(message: str) -> None:
-        from ..signals import signal
+        from ..log_console import log_console
 
-        signal.add_log(f"[JavdbAPI] {message}")
+        log_console.add_log(f"[JavdbAPI] {message}")
 
     @classmethod
     @override

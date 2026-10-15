@@ -1,4 +1,5 @@
 from ..config.models import Website
+from ..crawler_registry import register_site_values_provider
 from . import (
     avbase,
     avsox,
@@ -92,3 +93,8 @@ register_crawler(_7mmtv.MmtvCrawler)
 def get_registered_crawler_site_values(*, include_hidden: bool = False) -> list[str]:
     """返回已注册刮削器的网站值, 用于 UI 动态填充."""
     return [site.value for site in get_registered_crawler_sites(include_hidden=include_hidden)]
+
+
+# 把站点清单登记到中立层，使 config 层（Website 枚举 / Config.json_schema）无需反向
+# 依赖 crawlers 包即可取到已注册站点。
+register_site_values_provider(get_registered_crawler_site_values)

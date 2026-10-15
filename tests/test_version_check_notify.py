@@ -41,19 +41,20 @@ def win(app, monkeypatch, tmp_path):
     from mdcx.consts import MAIN_PATH
     from mdcx.controllers.main_window import main_window as mw_mod
     from mdcx.controllers.main_window import style as style_mod
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
 
     monkeypatch.setattr(mw_mod, "run_startup_health_checks", lambda: None)
     monkeypatch.setattr(mw_mod, "show_netstatus", lambda: None)
     # 本文件测的是 _show_version_thread 本体：启动期 show_version 起的后台线程
     # 会跟测试抢读 check_version 桩，直接禁掉，测试内同步直调目标方法（确定性）。
     monkeypatch.setattr(mw_mod.MyMAinWindow, "show_version", lambda self: None)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: None)
     monkeypatch.setattr(mw_mod, "save_remain_list", lambda: None)
     # 本测试不走真实网络：桩掉副作用线程与数据库初始化。
-    monkeypatch.setattr(mw_mod, "check_theporndb_api_token", lambda: None)
-    monkeypatch.setattr(mw_mod.ActressDB, "init_db", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_theporndb_api_token", lambda: None)
+    monkeypatch.setattr(window_ops_mod.ActressDB, "init_db", lambda: None)
     monkeypatch.setattr(mw_mod.MyMAinWindow, "set_style", lambda self: None)
-    monkeypatch.setattr(mw_mod, "apply_site_priority_theme", lambda _window: None)
+    monkeypatch.setattr(window_ops_mod, "apply_site_priority_theme", lambda _window: None)
     monkeypatch.setattr(
         style_mod.resources,
         "qtr",
@@ -80,8 +81,11 @@ def win(app, monkeypatch, tmp_path):
 def _stub_version_path(monkeypatch, win):
     """桩掉提示链的日志出口，返回调用记录器。"""
     from mdcx import signals as signals_mod
+    from mdcx.log_console import log_console
 
     log_calls: list[str] = []
+    # base/web.py 的版本提示已改走无 Qt 的 log_console，桩住它的出口。
+    monkeypatch.setattr(log_console, "log_text", lambda text: log_calls.append(text))
     monkeypatch.setattr(signals_mod.signal_qt, "show_log_text", lambda text: log_calls.append(text))
     monkeypatch.setattr(signals_mod.signal_qt, "show_scrape_info", lambda *a, **k: None)
     return log_calls
@@ -98,15 +102,16 @@ def _remote(tag: int, name: str = ""):
 
 
 def test_periodic_recheck_notifies_once_per_version(win, app, monkeypatch):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """同一版本重复检查只提示一次；出现更新的版本时再次提示；已是最新则绿色。"""
-    from mdcx.controllers.main_window import main_window as mw_mod
 
     log_calls = _stub_version_path(monkeypatch, win)
     local = int(win.localversion)
     assert win._notified_new_version is None
 
     # 第一次发现新版本：提示。
-    monkeypatch.setattr(mw_mod, "check_version", lambda: _remote(local + 100, "v9.9.9 (99999999)"))
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: _remote(local + 100, "v9.9.9 (99999999)"))
     win._show_version_thread()
     app.processEvents()
     assert win._notified_new_version == _remote(local + 100, "v9.9.9 (99999999)")
@@ -121,14 +126,14 @@ def test_periodic_recheck_notifies_once_per_version(win, app, monkeypatch):
     assert _red_count(log_calls) == 1
 
     # 出现更新的版本：再次提示。
-    monkeypatch.setattr(mw_mod, "check_version", lambda: _remote(local + 101, "v9.9.10 (99999999)"))
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: _remote(local + 101, "v9.9.10 (99999999)"))
     win._show_version_thread()
     app.processEvents()
     assert win._notified_new_version == _remote(local + 101, "v9.9.10 (99999999)")
     assert _red_count(log_calls) == 2
 
     # 已是最新：绿色日志，不登记。
-    monkeypatch.setattr(mw_mod, "check_version", lambda: _remote(local, "v0.0.1 (19700101)"))
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: _remote(local, "v0.0.1 (19700101)"))
     win._show_version_thread()
     app.processEvents()
     assert win._notified_new_version == _remote(local + 101, "v9.9.10 (99999999)")
@@ -136,11 +141,14 @@ def test_periodic_recheck_notifies_once_per_version(win, app, monkeypatch):
 
 
 def test_new_version_prompt_shows_release_display_name(win, app, monkeypatch):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """左下角只展示日期 tag 全角括号红字（🍉 图标保留），红字日志仍展示 release 标题。"""
-    from mdcx.controllers.main_window import main_window as mw_mod
 
     log_calls = _stub_version_path(monkeypatch, win)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: _remote(int(win.localversion) + 100, "v9.9.9 (99999999)"))
+    monkeypatch.setattr(
+        window_ops_mod, "check_version", lambda: _remote(int(win.localversion) + 100, "v9.9.9 (99999999)")
+    )
 
     win._show_version_thread()
     app.processEvents()
@@ -151,13 +159,14 @@ def test_new_version_prompt_shows_release_display_name(win, app, monkeypatch):
 
 
 def test_same_tag_higher_version_name_still_prompts(win, app, monkeypatch):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """同一天发两版（tag 相同、版本号更高）也必须提示——纯日期比较认不出来。"""
-    from mdcx.controllers.main_window import main_window as mw_mod
 
     log_calls = _stub_version_path(monkeypatch, win)
     local = int(win.localversion)
     # 远端 tag 与本地相同，但展示版本号更高（远端名比本地 v2.x.y 高即可）
-    monkeypatch.setattr(mw_mod, "check_version", lambda: _remote(local, f"v99.0.0 ({local})"))
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: _remote(local, f"v99.0.0 ({local})"))
 
     win._show_version_thread()
     app.processEvents()

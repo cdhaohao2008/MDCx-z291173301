@@ -18,6 +18,7 @@ from parsel import Selector
 from ..base.web import download_file_with_filepath
 from ..config.manager import manager
 from ..config.resources import resources
+from ..log_console import log_console
 from ..models.emby import (
     EMbyActressInfo,
     clean_overview_text,
@@ -25,7 +26,6 @@ from ..models.emby import (
     normalize_production_year,
 )
 from ..models.flags import Flags
-from ..signals import signal
 from ..utils import executor
 from ..utils.file import write_file_atomic_async
 from .actress_db import ActressDB
@@ -68,7 +68,7 @@ class ActorTaskStopped(Exception):
 
 
 def _is_stop_requested() -> bool:
-    return signal.stop or Flags.stop_requested
+    return log_console.stop or Flags.stop_requested
 
 
 def _raise_if_stop_requested() -> None:
@@ -238,9 +238,9 @@ async def get_emby_actor_list(filter_actor_only: bool = True) -> list[dict]:
             params["personTypes"] = "Actor"
         persons_path = "/Persons"
 
-    signal.show_log_text(f"⏳ 连接 {server_name} 服务器...")
+    log_console.log_text(f"⏳ 连接 {server_name} 服务器...")
     if not manager.config.api_key:
-        signal.show_log_text(f"🔴 {server_name} API 密钥未填写！")
+        log_console.log_text(f"🔴 {server_name} API 密钥未填写！")
         return []
 
     # 议题 #158: /Persons 走 StartIndex 分页(Emby/Jellyfin 均支持, 实测集合一致)。
@@ -258,9 +258,9 @@ async def get_emby_actor_list(filter_actor_only: bool = True) -> list[dict]:
             response, error = await computed.async_client.get_json(url, headers=headers, use_proxy=False)
         if not isinstance(response, dict):
             if not actor_list:
-                signal.show_log_text(f"🔴 {server_name} 连接失败！{error}")
+                log_console.log_text(f"🔴 {server_name} 连接失败！{error}")
                 return []
-            signal.show_log_text(f"🔴 {server_name} 人员分页中断(已取回 {len(actor_list)} 人)：{error}")
+            log_console.log_text(f"🔴 {server_name} 人员分页中断(已取回 {len(actor_list)} 人)：{error}")
             break
         items = response.get("Items", [])
         if not isinstance(items, list):
@@ -275,7 +275,7 @@ async def get_emby_actor_list(filter_actor_only: bool = True) -> list[dict]:
 
     if not filter_actor_only:
         _remember_all_staff_count(len(actor_list))
-    signal.show_log_text(f"✅ {server_name} 连接成功！共 {len(actor_list)} 个演员")
+    log_console.log_text(f"✅ {server_name} 连接成功！共 {len(actor_list)} 个演员")
     return actor_list
 
 
@@ -283,7 +283,7 @@ async def get_media_folders() -> list[dict]:
     # 议题 #133: 用轻量直连 httpx(无指纹/无池/无限流), 避免对内网 Emby 握手拖分钟
     response, error = await _emby_get_json(f"{_emby_api_prefix()}/Library/MediaFolders")
     if response is None:
-        signal.show_log_text(f"🔴 获取媒体库列表失败！{error}")
+        log_console.log_text(f"🔴 获取媒体库列表失败！{error}")
         return []
     return response.get("Items", [])
 
@@ -441,9 +441,7 @@ async def fetch_person_item_stats(
     if failed_libs:
         # 部分/全部媒体库统计失败时人名集合与影片数不完整: 调用方据此过滤会误删,
         # 此处先提示, fetch_all_actors 的防误删兜底与跳过日志再接力。
-        signal.show_log_text(
-            f"⚠️ {failed_libs} 个媒体库出演统计失败(网络/超时), 演员过滤与影片数可能不完整"
-        )
+        log_console.log_text(f"⚠️ {failed_libs} 个媒体库出演统计失败(网络/超时), 演员过滤与影片数可能不完整")
     return counts, titles, person_names
 
 
@@ -521,7 +519,7 @@ async def fetch_all_actors(
     # 但此时勾选的「仅演员」/媒体库子集实际未生效, 必须明示, 否则用户拿到
     # 含导演/库外人员的数据还以为过滤正常(勾选与否看似无区别)。
     if (parent_ids or filter_actor_only) and not lib_person_names:
-        signal.show_log_text(
+        log_console.log_text(
             "⚠️ 出演统计为空, 已跳过角色/媒体库交集过滤(防误删兜底): 本次列表未按「仅演员」与所选媒体库过滤"
         )
 
@@ -590,7 +588,7 @@ async def fetch_all_actors(
         removed_dup = sum(c - 1 for c in removed_counter.values() if c > 1)
         dup_note = f", 其中重复条目{removed_dup}条" if removed_dup else ""
         where = "所选媒体库" if parent_ids else "全库影片"
-        signal.show_log_text(
+        log_console.log_text(
             f"⚠️ 跳过 {len(skipped_not_in_lib)} 个不在{where}中出演(Actor)的人员{dup_note}: {preview}{more}"
         )
 
@@ -605,7 +603,7 @@ async def fetch_all_actors(
         preview = "、".join(f"{display_name.get(n, n)}(×{c})" for n, c in top)
         more = f"等, 共{len(dup_names)}个重名" if len(dup_names) > 10 else f", 共{len(dup_names)}个重名"
         dup_entries = sum(c - 1 for c in dup_names.values())
-        signal.show_log_text(f"ℹ️ 重复明细[{scope}]: {preview}{more}; 重复条目={dup_entries}")
+        log_console.log_text(f"ℹ️ 重复明细[{scope}]: {preview}{more}; 重复条目={dup_entries}")
 
     # 第二遍: 并发抓详情 (注意限流——Emby/Jellyfin 一般无速率压力, 8 并发保守)
     # 列表请求已带 fields 时可直接复用 Item 中的详情字段, 避免逐人二次请求
@@ -693,7 +691,7 @@ async def get_gfriends_index() -> dict[str, str] | None:
                     data = json.loads(await f.read())
                 return _expand(data)
             except Exception as e:
-                signal.show_log_text(f"🔴 本地仓库解析失败: {e}，回退到网络")
+                log_console.log_text(f"🔴 本地仓库解析失败: {e}，回退到网络")
 
     # 2) 版本检测
     update_data = False
@@ -703,12 +701,12 @@ async def get_gfriends_index() -> dict[str, str] | None:
     elif await aiofiles.os.path.getmtime(gfriends_json_path) < 1657285200:
         update_data = True
     else:
-        signal.show_log_text("⏳ 连接 Gfriends 网络头像库...")
+        log_console.log_text("⏳ 连接 Gfriends 网络头像库...")
         net_url = f"{gfriends_github}/commits/master/Filetree.json"
         async with manager.acquire_computed() as computed:
             response, _ = await computed.async_client.get_text(net_url)
         if response is None:
-            signal.show_log_text("🔴 Gfriends 查询最新数据更新时间失败！")
+            log_console.log_text("🔴 Gfriends 查询最新数据更新时间失败！")
             update_data = True
         else:
             net_time = ""
@@ -719,45 +717,45 @@ async def get_gfriends_index() -> dict[str, str] | None:
                 latest_time = datetime.strptime(date_time[0], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=UTC)
                 net_float = latest_time.timestamp()
                 net_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(net_float))
-                signal.show_log_text(f"✅ Gfriends 连接成功！最新数据更新时间: {net_time}")
+                log_console.log_text(f"✅ Gfriends 连接成功！最新数据更新时间: {net_time}")
             except Exception:
-                signal.show_log_text("🔶 Gfriends 历史页面解析失败，将强制重新下载数据表")
+                log_console.log_text("🔶 Gfriends 历史页面解析失败，将强制重新下载数据表")
                 update_data = True
 
             if not update_data:
                 local_float = await aiofiles.os.path.getmtime(gfriends_json_path)
                 local_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(local_float))
                 if not net_float or net_float > local_float:
-                    signal.show_log_text(f"🍉 本地缓存数据需要更新！本地数据更新时间: {local_time}")
+                    log_console.log_text(f"🍉 本地缓存数据需要更新！本地数据更新时间: {local_time}")
                     update_data = True
                 else:
-                    signal.show_log_text(f"✅ 本地缓存数据无需更新！本地数据更新时间: {local_time}")
+                    log_console.log_text(f"✅ 本地缓存数据无需更新！本地数据更新时间: {local_time}")
                     try:
                         async with aiofiles.open(gfriends_json_path, encoding="utf-8") as f:
                             data = json.loads(await f.read())
                         return _expand(data)
                     except Exception:
-                        signal.show_log_text("🔴 本地缓存数据读取失败！需重新缓存！")
+                        log_console.log_text("🔴 本地缓存数据读取失败！需重新缓存！")
                         update_data = True
 
     # 3) 下载并缓存
     if update_data:
-        signal.show_log_text("⏳ 开始缓存 Gfriends 最新数据表...")
+        log_console.log_text("⏳ 开始缓存 Gfriends 最新数据表...")
         filetree_url = f"{raw_url}/Filetree.json"
         async with manager.acquire_computed() as computed:
             filetree_response, _ = await computed.async_client.get_content(filetree_url)
         if filetree_response is None:
-            signal.show_log_text("🔴 Gfriends 数据表获取失败！尝试使用本地缓存...")
+            log_console.log_text("🔴 Gfriends 数据表获取失败！尝试使用本地缓存...")
             if await aiofiles.os.path.exists(gfriends_json_path):
                 try:
                     async with aiofiles.open(gfriends_json_path, encoding="utf-8") as f:
                         data = json.loads(await f.read())
                     stale = _expand(data)
                     if stale:
-                        signal.show_log_text("🔶 已使用本地缓存（可能已过期）")
+                        log_console.log_text("🔶 已使用本地缓存（可能已过期）")
                         return stale
                 except Exception:
-                    signal.show_log_text("🔴 本地缓存读取失败！")
+                    log_console.log_text("🔴 本地缓存读取失败！")
             return None
         try:
             data = json.loads(filetree_response.decode("utf-8"))
@@ -766,10 +764,10 @@ async def get_gfriends_index() -> dict[str, str] | None:
                 gfriends_json_path,
                 json.dumps(expanded, ensure_ascii=False, sort_keys=True, indent=4, separators=(",", ": ")),
             )
-            signal.show_log_text("✅ Gfriends 数据表已缓存！")
+            log_console.log_text("✅ Gfriends 数据表已缓存！")
             return expanded
         except Exception:
-            signal.show_log_text("🔴 Gfriends 数据表展开失败！")
+            log_console.log_text("🔴 Gfriends 数据表展开失败！")
             return _expand(data) if isinstance(data, dict) else None
 
     return None

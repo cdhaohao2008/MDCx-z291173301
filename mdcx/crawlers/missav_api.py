@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from ..config.manager import manager
 from ..config.models import Website
-from ..signals import signal
+from ..log_console import log_console
 from .base import BaseCrawler, CrawlerData, CrawlerException
 from .base.base_types import NOT_SUPPORT, Context
 
@@ -39,7 +39,7 @@ class MissavApiCrawler(BaseCrawler):
 
     @staticmethod
     def _log(message: str) -> None:
-        signal.add_log(f"\U0001f310 [MISSAV-API] {message}")
+        log_console.add_log(f"\U0001f310 [MISSAV-API] {message}")
 
     @classmethod
     @override

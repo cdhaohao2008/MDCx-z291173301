@@ -5,18 +5,18 @@ import pytest
 from openpyxl import load_workbook
 
 from mdcx.core import tmdb_actor
+from mdcx.log_console import log_console
 from mdcx.models.flags import Flags
-from mdcx.signals import signal
 from mdcx.tools import actor_db_tool
 
 
 @pytest.fixture
 def _reset_stop_flags():
     Flags.stop_requested = False
-    signal.stop = False
+    log_console.stop = False
     yield
     Flags.stop_requested = False
-    signal.stop = False
+    log_console.stop = False
 
 
 @pytest.fixture

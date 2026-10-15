@@ -148,9 +148,9 @@ _admin_mkdir_attempted = False
 def _separate_log(text: str) -> None:
     """分离模式日志：优先走 UI 日志通道，失败时退到标准 logging（无 Qt 的测试桩环境不炸）。"""
     try:
-        from ..signals import signal_qt
+        from ..log_console import log_console
 
-        signal_qt.show_log_text(text)
+        log_console.log_text(text)
     except Exception:
         import logging
 

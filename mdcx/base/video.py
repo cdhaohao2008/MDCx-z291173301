@@ -6,7 +6,7 @@ import aiofiles.os
 
 from ..config.extend import get_movie_path_setting
 from ..config.manager import manager
-from ..signals import signal
+from ..log_console import log_console
 from ..utils.file import copy_file_async, safe_copytree_async
 from .file import movie_lists
 
@@ -15,10 +15,10 @@ async def add_del_extras(mode: str) -> None:
     """
     添加/删除剧照
     """
-    signal.show_log_text(f"Start {mode} extrafanart extras! \n")
+    log_console.log_text(f"Start {mode} extrafanart extras! \n")
 
     movie_path = get_movie_path_setting().movie_path
-    signal.show_log_text(f" 🖥 Movie path: {movie_path} \n 🔎 Checking all videos, Please wait...")
+    log_console.log_text(f" 🖥 Movie path: {movie_path} \n 🔎 Checking all videos, Please wait...")
     media_type = manager.config.media_type
     movie_list = await movie_lists([], media_type, movie_path)  # 获取所有需要刮削的影片列表
 
@@ -46,25 +46,25 @@ async def add_del_extras(mode: str) -> None:
                     file_path = extrafanart_copy_folder_path / file
                     file_new_path = extrafanart_copy_folder_path / file_new_name
                     await copy_file_async(file_path, file_new_path)
-                signal.show_log_text(f" {count} new extras: \n  {extrafanart_copy_folder_path}")
+                log_console.log_text(f" {count} new extras: \n  {extrafanart_copy_folder_path}")
                 new_count += 1
             else:
-                signal.show_log_text(f" {count} old extras: \n  {extrafanart_copy_folder_path}")
+                log_console.log_text(f" {count} old extras: \n  {extrafanart_copy_folder_path}")
         else:
             if await aiofiles.os.path.exists(extrafanart_copy_folder_path):
                 await asyncio.to_thread(shutil.rmtree, extrafanart_copy_folder_path, ignore_errors=True)
-                signal.show_log_text(f" {count} del extras: \n  {extrafanart_copy_folder_path}")
+                log_console.log_text(f" {count} del extras: \n  {extrafanart_copy_folder_path}")
                 new_count += 1
 
-    signal.show_log_text(f"\nDone! \n Total: {total_count}  {mode} copy: {new_count} ")
-    signal.show_log_text("================================================================================")
+    log_console.log_text(f"\nDone! \n Total: {total_count}  {mode} copy: {new_count} ")
+    log_console.log_text("================================================================================")
 
 
 async def add_del_theme_videos(mode: str) -> None:
-    signal.show_log_text(f"Start {mode} theme videos! \n")
+    log_console.log_text(f"Start {mode} theme videos! \n")
 
     movie_path = get_movie_path_setting().movie_path
-    signal.show_log_text(f" 🖥 Movie path: {movie_path} \n 🔎 Checking all videos, Please wait...")
+    log_console.log_text(f" 🖥 Movie path: {movie_path} \n 🔎 Checking all videos, Please wait...")
     movie_type = manager.config.media_type
     movie_list = await movie_lists([], movie_type, movie_path)  # 获取所有需要刮削的影片列表
 
@@ -91,15 +91,15 @@ async def add_del_theme_videos(mode: str) -> None:
                 if not await aiofiles.os.path.exists(theme_video_dir):
                     await aiofiles.os.mkdir(theme_video_dir)
                 await copy_file_async(trailer_file_path, theme_video)
-                signal.show_log_text(f" {count} new theme video: \n  {theme_video}")
+                log_console.log_text(f" {count} new theme video: \n  {theme_video}")
                 new_count += 1
             else:
-                signal.show_log_text(f" {count} old theme video: \n  {theme_video}")
+                log_console.log_text(f" {count} old theme video: \n  {theme_video}")
         else:
             if await aiofiles.os.path.exists(theme_video_dir):
                 await asyncio.to_thread(shutil.rmtree, theme_video_dir, ignore_errors=True)
-                signal.show_log_text(f" {count} del theme video: \n  {theme_video_dir}")
+                log_console.log_text(f" {count} del theme video: \n  {theme_video_dir}")
                 new_count += 1
 
-    signal.show_log_text(f"\nDone! \n Total: {total_count}  {mode} copy: {new_count} ")
-    signal.show_log_text("================================================================================")
+    log_console.log_text(f"\nDone! \n Total: {total_count}  {mode} copy: {new_count} ")
+    log_console.log_text("================================================================================")

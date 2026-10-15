@@ -74,16 +74,12 @@ def _assert_centered(widget: QWidget, msg: str) -> None:
     avail = _avail()
     frame = widget.frameGeometry()
     if frame.width() > avail.width():
-        assert frame.x() == avail.x(), (
-            f"{msg}: 宽于可用区时未贴左边缘, frame={frame.getRect()} avail={avail.getRect()}"
-        )
+        assert frame.x() == avail.x(), f"{msg}: 宽于可用区时未贴左边缘, frame={frame.getRect()} avail={avail.getRect()}"
     else:
         dx = frame.center().x() - avail.center().x()
         assert abs(dx) <= _TOL, f"{msg}: 水平未居中, 偏差 {dx}px, frame={frame.getRect()}"
     if frame.height() > avail.height():
-        assert frame.y() == avail.y(), (
-            f"{msg}: 高于可用区时未贴上边缘, frame={frame.getRect()} avail={avail.getRect()}"
-        )
+        assert frame.y() == avail.y(), f"{msg}: 高于可用区时未贴上边缘, frame={frame.getRect()} avail={avail.getRect()}"
     else:
         dy = frame.center().y() - avail.center().y()
         assert abs(dy) <= _TOL, f"{msg}: 垂直未居中, 偏差 {dy}px, frame={frame.getRect()}"
@@ -446,16 +442,59 @@ def _top_level_window_classes() -> dict[str, str]:
     return found
 
 
+def _class_index() -> dict[str, str]:
+    """扫出 mdcx 下所有类 -> 所在文件（解耦后窗口类由多个 mixin 拼装）。"""
+    index: dict[str, str] = {}
+    for path in sorted(_MDCX_ROOT.rglob("*.py")):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        rel = str(path.relative_to(_MDCX_ROOT.parent)).replace("\\", "/")
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                index.setdefault(node.name, rel)
+    return index
+
+
+def _class_source_files(class_name: str, index: dict[str, str]) -> list[str]:
+    """收集该类本身与它全部 mixin 基类所在的源文件。"""
+    files: set[str] = set()
+    queue = [class_name]
+    while queue:
+        name = queue.pop()
+        rel = index.get(name)
+        if rel is None or rel in files:
+            continue
+        files.add(rel)
+        try:
+            tree = ast.parse((_MDCX_ROOT.parent / rel).read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == name:
+                for base in node.bases:
+                    base_name = base.id if isinstance(base, ast.Name) else getattr(base, "attr", "")
+                    if base_name:
+                        queue.append(base_name)
+                break
+    return sorted(files)
+
+
 def test_every_top_level_window_can_center_itself():
     """每个顶层窗口要么自带 _center_on_screen，要么混入 CenterOnFirstShowMixin。
 
     豁免必须写进 _ALLOWED_NOT_CENTERED 并附上理由。
     """
+    index = _class_index()
     missing: list[str] = []
     for class_name, rel in _top_level_window_classes().items():
         if class_name in _ALLOWED_NOT_CENTERED:
             continue
-        source = (_MDCX_ROOT.parent / rel).read_text(encoding="utf-8")
+        # 窗口类已拆成多个 mixin，逐个 mixin 宿主文件一起判定
+        source = "".join(
+            (_MDCX_ROOT.parent / item).read_text(encoding="utf-8") for item in _class_source_files(class_name, index)
+        )
         has_own = "_center_on_screen" in source
         has_mixin = "CenterOnFirstShowMixin" in source
         if not (has_own or has_mixin):

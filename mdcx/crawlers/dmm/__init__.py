@@ -15,8 +15,8 @@ from mdcx.base.web import check_url, get_url_content_length, normalize_media_url
 from mdcx.config.enums import DownloadableFile
 from mdcx.config.manager import manager
 from mdcx.config.models import Website
+from mdcx.log_console import log_console
 from mdcx.models.model_types import CrawlerInput
-from mdcx.signals import signal
 from mdcx.utils import collapse_inline_script_splits
 from mdcx.utils.dataclass import update_valid
 from mdcx.utils.gather_group import GatherGroup
@@ -77,7 +77,7 @@ class DmmCrawler(GenericBaseCrawler[DMMContext]):
 
     @staticmethod
     def _log(message: str) -> None:
-        signal.add_log(f"🎬 [DMM] {message}")
+        log_console.add_log(f"🎬 [DMM] {message}")
 
     @staticmethod
     def _clean_html_text(content: str) -> str:

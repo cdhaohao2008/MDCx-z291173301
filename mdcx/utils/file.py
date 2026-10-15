@@ -13,7 +13,7 @@ import aiofiles.os
 from PIL import Image
 
 from ..consts import IS_MAC, IS_WINDOWS
-from ..signals import signal
+from ..log_console import log_console
 
 
 def _build_file_name_index_sync(folder: Path) -> dict[str, Path]:
@@ -54,7 +54,7 @@ def delete_file_sync(p: str | Path):
         return True, ""
     except Exception as e:
         error_info = f" 删除文件: {p}\n 错误: {e}\n{traceback.format_exc()}"
-        signal.add_log(error_info)
+        log_console.add_log(error_info)
         print(error_info)
     return False, error_info
 
@@ -71,7 +71,7 @@ def move_file_sync(old: str | Path, new: str | Path):
         return True, ""
     except Exception as e:
         error_info = f" 移动文件: {old}\n 目标: {new} \n 错误: {e}\n{traceback.format_exc()}\n"
-        signal.add_log(error_info)
+        log_console.add_log(error_info)
         print(error_info)
     return False, error_info
 
@@ -105,7 +105,7 @@ def _copy_file_atomic_sync(old: Path, new: Path) -> None:
         try:
             tmp.unlink(missing_ok=True)
         except OSError as cleanup_err:
-            signal.add_log(f" 临时文件清理失败（稍后刮削结束时重试）: {tmp} 错误: {cleanup_err}")
+            log_console.add_log(f" 临时文件清理失败（稍后刮削结束时重试）: {tmp} 错误: {cleanup_err}")
         raise
 
 
@@ -143,7 +143,7 @@ def copy_file_sync(old: Path | str, new: Path | str):
         return True, ""
     except Exception as e:
         error_info = f" 复制文件: {old}\n 目标: {new} \n 错误: {e}\n{traceback.format_exc()}"
-        signal.add_log(error_info)
+        log_console.add_log(error_info)
         print(error_info)
         return False, error_info
 
@@ -178,7 +178,7 @@ def resolve_link_source_sync(p: str | Path):
         return False, p, f"不存在: {p}"
     except Exception as e:
         error_info = f" 解析链接源文件: {p}\n 错误: {e}\n{traceback.format_exc()}"
-        signal.add_log(error_info)
+        log_console.add_log(error_info)
         print(error_info)
         return False, p, error_info
 
@@ -195,7 +195,7 @@ def resolve_success_record_source_sync(p: str | Path):
         return True, p, ""
     except Exception as e:
         error_info = f" 解析成功列表源文件: {p}\n 错误: {e}\n{traceback.format_exc()}"
-        signal.add_log(error_info)
+        log_console.add_log(error_info)
         print(error_info)
         return False, p, error_info
 
@@ -213,7 +213,7 @@ def create_symlink_sync(source: str | Path, target: str | Path):
         return True, ""
     except Exception as e:
         error_info = f" 创建软链接: {target}\n 源文件: {source}\n 错误: {e}\n{traceback.format_exc()}"
-        signal.add_log(error_info)
+        log_console.add_log(error_info)
         print(error_info)
         return False, error_info
 
@@ -235,7 +235,7 @@ def create_hardlink_sync(source: str | Path, target: str | Path):
         return True, ""
     except Exception as e:
         error_info = f" 创建硬链接: {target}\n 源文件: {source}\n 错误: {e}\n{traceback.format_exc()}"
-        signal.add_log(error_info)
+        log_console.add_log(error_info)
         print(error_info)
         return False, error_info
 
@@ -247,13 +247,13 @@ def check_pic_sync(p: str):
                 img.load()  # 如果图片不完整，报错OSError: image file is truncated
                 return img.size
         except Exception as e:
-            signal.add_log(f"文件损坏: {p} \n Error: {e}")
+            log_console.add_log(f"文件损坏: {p} \n Error: {e}")
             try:
                 os.remove(p)
-                signal.add_log("删除成功！")
+                log_console.add_log("删除成功！")
             except Exception as remove_err:
                 # 常见原因：Windows 下文件被资源管理器/杀软占用（PermissionError/WinError 32），权限不足（WinError 5）
-                signal.add_log(f"删除失败: {remove_err}（若是 WinError 32 请关闭预览/播放器，或重启软件后重试）")
+                log_console.add_log(f"删除失败: {remove_err}（若是 WinError 32 请关闭预览/播放器，或重启软件后重试）")
     return False
 
 
@@ -285,7 +285,7 @@ def open_file_thread(p: Path, is_dir: bool) -> None:
                 subprocess.Popen(["xdg-open", p])
     except Exception as e:
         try:
-            signal.add_log(f" 打开文件失败: {p} 错误: {e}")
+            log_console.add_log(f" 打开文件失败: {p} 错误: {e}")
         except Exception:
             pass
 
@@ -317,7 +317,7 @@ async def write_file_atomic_async(p: str | Path, content: str, encoding: str = "
         await asyncio.to_thread(os.replace, str(tmp), str(p))
         if not await aiofiles.os.path.exists(p):
             # 云盘驱动静默吞写：退回直接写（牺牲原子性，换取"要么真落盘要么报错"）
-            signal.add_log(f" ⚠️ 原子写入疑似被目标盘静默丢弃，退回直写: {p}")
+            log_console.add_log(f" ⚠️ 原子写入疑似被目标盘静默丢弃，退回直写: {p}")
             async with aiofiles.open(p, "w", encoding=encoding) as f:
                 await f.write(content)
             if not await aiofiles.os.path.exists(p):
@@ -345,7 +345,7 @@ def write_file_atomic(p: str | Path, content: str, encoding: str = "UTF-8") -> N
             f.write(content)
         os.replace(tmp, p)
         if not p.exists():
-            signal.add_log(f" ⚠️ 原子写入疑似被目标盘静默丢弃，退回直写: {p}")
+            log_console.add_log(f" ⚠️ 原子写入疑似被目标盘静默丢弃，退回直写: {p}")
             with open(p, "w", encoding=encoding) as f:
                 f.write(content)
             if not p.exists():
@@ -368,7 +368,7 @@ async def delete_file_async(p: str | Path):
         return True, ""
     except Exception as e:
         error_info = f" 删除文件: {p}\n 错误: {e}\n{traceback.format_exc()}"
-        signal.add_log(error_info)
+        log_console.add_log(error_info)
         print(error_info)
         return False, error_info
 
@@ -398,12 +398,12 @@ async def move_file_async(old: str | Path, new: str | Path, *, overwrite: bool =
             if not same:
                 backup = new.with_name(f"{new.stem}_conflict_{int(time.time())}{new.suffix}")
                 await asyncio.to_thread(os.rename, str(new), str(backup))
-                signal.add_log(f"⚠️ 目标已存在同名文件，旧文件已重命名保留: {backup}")
+                log_console.add_log(f"⚠️ 目标已存在同名文件，旧文件已重命名保留: {backup}")
         await asyncio.to_thread(shutil.move, str(old), str(new))
         return True, ""
     except Exception as e:
         error_info = f" 移动文件: {old}\n 目标: {new} \n 错误: {e}\n{traceback.format_exc()}"
-        signal.add_log(error_info)
+        log_console.add_log(error_info)
         print(error_info)
         return False, error_info
 
@@ -421,7 +421,7 @@ async def copy_file_async(old: str | Path, new: str | Path):
         return True, ""
     except Exception as e:
         error_info = f" 复制文件: {old}\n 目标: {new} \n 错误: {e}\n{traceback.format_exc()}"
-        signal.add_log(error_info)
+        log_console.add_log(error_info)
         print(error_info)
         return False, error_info
 
@@ -481,11 +481,11 @@ async def check_pic_async(p: str | Path):
             result = await asyncio.to_thread(_check_pic_blocking, p)
             return result
         except Exception as e:
-            signal.add_log(f"文件损坏: {p} \n Error: {e}")
+            log_console.add_log(f"文件损坏: {p} \n Error: {e}")
             try:
                 await aiofiles.os.remove(p)
-                signal.add_log("删除成功！")
+                log_console.add_log("删除成功！")
             except Exception as remove_err:
                 # 同上同步版：常见 WinError 32（被占用）/ WinError 5（权限不足）
-                signal.add_log(f"删除失败: {remove_err}（若是 WinError 32 请关闭预览/播放器后重试）")
+                log_console.add_log(f"删除失败: {remove_err}（若是 WinError 32 请关闭预览/播放器后重试）")
     return False

@@ -26,6 +26,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_create_application_disables_quit_on_last_window_closed(monkeypatch, tmp_path):
+    from mdcx.controllers.main_window import window_ops as window_ops_mod
+
     """真实执行启动入口后，Qt 的"最后窗口自动退出"必须处于关闭状态。"""
     # 注意：QApplication 实例必须持有引用（局部变量 app 承担），否则会被 GC 回收
     app = QApplication.instance() or QApplication(sys.argv)
@@ -35,7 +37,7 @@ def test_create_application_disables_quit_on_last_window_closed(monkeypatch, tmp
 
     monkeypatch.setattr(mw_mod, "run_startup_health_checks", lambda: None)
     monkeypatch.setattr(mw_mod, "show_netstatus", lambda: None)
-    monkeypatch.setattr(mw_mod, "check_version", lambda: None)
+    monkeypatch.setattr(window_ops_mod, "check_version", lambda: None)
     monkeypatch.setattr(mw_mod, "save_remain_list", lambda: None)
     monkeypatch.chdir(tmp_path)
 

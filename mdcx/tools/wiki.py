@@ -16,9 +16,9 @@ from ..config.enums import EmbyAction, Language
 from ..config.manager import manager
 from ..config.models import Translator
 from ..config.resources import resources
+from ..log_console import log_console
 from ..manual import ManualConfig
 from ..models.emby import EMbyActressInfo
-from ..signals import signal
 from ..utils.language import is_english
 
 # 维基媒体要求请求方提供可识别的 User-Agent：缺失或纯浏览器 UA 会被划入
@@ -426,7 +426,7 @@ def _process_personal_profile(
     pairs = list(_iter_infobox_pairs(actor_profile))
     if not pairs:
         # 页面格式变化时降级：保留已提取内容，跳过表格解析（原 raise 导致整页失败、已提取内容也丢弃）
-        signal.show_log_text(f"⚠️ wiki 个人资料表格未解析到键值行，跳过表格解析: {url}")
+        log_console.log_text(f"⚠️ wiki 个人资料表格未解析到键值行，跳过表格解析: {url}")
         return overview
 
     bday_element = actor_output.find(class_="bday")
@@ -559,7 +559,7 @@ async def _translate_english_tag(tag_req: str, translate_by_list: list[Translato
     target_language = _get_actor_info_translate_language(manager.config.emby_on)
     for each in translate_by_list:
         if skip_reason := get_translator_skip_reason(each):
-            signal.add_log(f"🟡 Translation skipped!({each.capitalize()}) {skip_reason}")
+            log_console.add_log(f"🟡 Translation skipped!({each.capitalize()}) {skip_reason}")
             continue
 
         result = await translate_with_engine(
@@ -570,7 +570,7 @@ async def _translate_english_tag(tag_req: str, translate_by_list: list[Translato
             outline_language=target_language,
         )
         if result.error:
-            signal.add_log(f"🔴 Translation failed!({each.capitalize()}) Error: {result.error}")
+            log_console.add_log(f"🔴 Translation failed!({each.capitalize()}) Error: {result.error}")
             continue
         actor_info.taglines = [result.title]
         return ""  # 清空tag_req表示已翻译
@@ -584,7 +584,7 @@ async def _translate_content(
     target_language = _get_actor_info_translate_language(manager.config.emby_on)
     for each in translators:
         if skip_reason := get_translator_skip_reason(each):
-            signal.add_log(f"🟡 Translation skipped!({each.capitalize()}) {skip_reason}")
+            log_console.add_log(f"🟡 Translation skipped!({each.capitalize()}) {skip_reason}")
             continue
 
         result = await translate_with_engine(
@@ -595,7 +595,7 @@ async def _translate_content(
             outline_language=target_language,
         )
         if result.error:
-            signal.add_log(f"🔴 Translation failed!({each.capitalize()}) Error: {result.error}")
+            log_console.add_log(f"🔴 Translation failed!({each.capitalize()}) Error: {result.error}")
             continue
         translated = False
         if tag and result.translated_title:

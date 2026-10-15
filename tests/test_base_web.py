@@ -73,7 +73,7 @@ def test_check_theporndb_api_token_handles_cancelled_executor(monkeypatch: pytes
     monkeypatch.setattr(manager.config, "theporndb_api_token", "token")
     monkeypatch.setattr(base_web.manager, "acquire_computed", lambda: _FakeComputedLease())
     monkeypatch.setattr(base_web.executor, "run", fake_run)
-    monkeypatch.setattr(base_web.signal, "show_log_text", logs.append)
+    monkeypatch.setattr(base_web.log_console, "log_text", logs.append)
 
     result = base_web.check_theporndb_api_token()
 

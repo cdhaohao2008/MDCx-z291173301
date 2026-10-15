@@ -13,8 +13,9 @@ import pytest
 from mdcx.base import file as file_module
 from mdcx.config.enums import NoEscape
 from mdcx.config.manager import manager
+from mdcx.log_console import log_console
 from mdcx.models.flags import Flags
-from mdcx.signals import signal
+from mdcx.ui_hooks import ui_hooks
 
 
 class _FakeEmitSignal:
@@ -35,9 +36,9 @@ def _reset_flags():
 def _enable_success_record(monkeypatch: pytest.MonkeyPatch) -> _FakeEmitSignal:
     monkeypatch.setattr(manager.config, "no_escape", [NoEscape.RECORD_SUCCESS_FILE])
     monkeypatch.setattr(manager.config, "soft_link", 0)
-    monkeypatch.setattr(signal, "show_log_text", lambda *a, **k: None)
+    monkeypatch.setattr(log_console, "log_text", lambda *a, **k: None)
     fake_view = _FakeEmitSignal()
-    monkeypatch.setattr(signal, "view_success_file_settext", fake_view)
+    monkeypatch.setattr(ui_hooks, "view_success_file_settext", fake_view.emit)
     # 让 get_used_time(success_save_time) > 5 不成立，避免触发落盘（写文件副作用）
     Flags.success_save_time = time.time()
     return fake_view

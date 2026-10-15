@@ -125,7 +125,7 @@ async def test_empty_stats_with_library_subset_warns_and_skips_filter(monkeypatc
     import mdcx.tools.emby_actor_manager as mgr_mod
 
     logs: list[str] = []
-    monkeypatch.setattr(mgr_mod.signal, "show_log_text", logs.append)
+    monkeypatch.setattr(mgr_mod.log_console, "log_text", logs.append)
     persons = [_person("演员A"), _person("库外演员B")]
     actors, raw = await _run_fetch(
         monkeypatch, persons, set(), filter_actor_only=True, deduplicate=True, parent_ids=["lib1"]
@@ -141,7 +141,7 @@ async def test_duplicate_gap_between_filter_modes_is_explained_by_removed_dupes(
     import mdcx.tools.emby_actor_manager as mgr_mod
 
     logs: list[str] = []
-    monkeypatch.setattr(mgr_mod.signal, "show_log_text", logs.append)
+    monkeypatch.setattr(mgr_mod.log_console, "log_text", logs.append)
     # 演员A×3(出演) + 导演B×2(未出演, 且B自身重名): 勾选剔除B的2条(R=2,U=1), 重复数差1
     persons = [_person("演员A"), _person("演员A"), _person("演员A"), _person("导演B"), _person("导演B")]
     actors_on, raw_on = await _run_fetch(monkeypatch, persons, {"演员A"}, filter_actor_only=True, deduplicate=True)

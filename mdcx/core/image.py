@@ -14,12 +14,12 @@ from PIL import Image
 from ..base.image import add_mark_thread
 from ..config.enums import DownloadableFile, FixedScrapingType, MarkType
 from ..config.manager import manager
+from ..log_console import log_console
 from ..models.log_buffer import LogBuffer
 from ..models.model_types import CrawlersResult, FileInfo, OtherInfo
-from ..signals import signal
+from ..models.mosaic import has_leak_mark, has_umr_mark, has_uncensored_mark, is_censored_mosaic
 from ..utils import executor, get_used_time
 from ..utils.file import check_pic_async, copy_file_async, copy_file_sync, delete_file_sync
-from .mosaic import has_leak_mark, has_umr_mark, has_uncensored_mark, is_censored_mosaic
 
 YOUMA_RIGHT_CROP_TYPES = {FixedScrapingType.YOUMA}
 FACE_FALLBACK_CROP_TYPES = {
@@ -297,8 +297,8 @@ def cut_thumb_to_poster(
         log(f"\n 🥺 Poster cut failed! ({json_data.poster_from})({get_used_time(start_time)}s)")
     except Exception as e:
         log(f"\n 🥺 Poster failed! ({json_data.poster_from})({get_used_time(start_time)}s)\n    {e!s}")
-        signal.show_traceback_log(traceback.format_exc())
-        signal.show_log_text(f"{traceback.format_exc()}\n Pic: {thumb_path}")
+        log_console.show_traceback_log(traceback.format_exc())
+        log_console.log_text(f"{traceback.format_exc()}\n Pic: {thumb_path}")
         return False
     finally:
         if img_new_png:

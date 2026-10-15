@@ -10,7 +10,7 @@ mdcx/
 ├── cmd/               # 命令行工具（crawl 调试爬虫、gen_enums）
 ├── config/            # 配置管理（Pydantic 模型、枚举、管理器）
 ├── controllers/       # 控制器（主窗口、海报裁剪）
-│   └── main_window/   # 主窗口逻辑（按职责拆分 11 个模块，共 ~10000 行）
+│   └── main_window/   # 主窗口逻辑（main_window.py 只做类装配 + 717 行；其余按职责拆成 28 个 mixin 模块，共 ~10900 行）
 ├── core/              # 核心业务（刮削器、NFO、命名、图片、翻译等）
 ├── crawlers/          # 36 个网站爬虫 + 基类框架
 ├── gen/               # 自动生成的枚举
@@ -39,7 +39,9 @@ UI 层 (PyQt6)         → 界面展示、用户操作
 
 ## 主窗口 UI 布局与窗口缩放
 
-主窗口 `centralwidget` 没有布局管理器（上游遗留），全部控件绝对定位；窗口缩放时靠 `MyMainWindow.resizeEvent` → `_sync_page_layouts`（`mdcx/controllers/main_window/main_window.py`）按设计基准手动 `move` / `resize` 同步。
+主窗口 `centralwidget` 没有布局管理器（上游遗留），全部控件绝对定位；窗口缩放时靠 `MyMainWindow.resizeEvent`（`main_window.py`）→ `_sync_page_layouts`（`mdcx/controllers/main_window/layout_master.py`）按设计基准手动 `move` / `resize` 同步。
+
+主窗口类已按关注点拆成 28 个 mixin（`MyMAinWindow(ActorDbMixin, …, WindowOpsMixin, QMainWindow)`），`main_window.py` 只保留 49 个 `pyqtSignal`、`__init__`、命名模板预览、外部方法委托赋值，以及 3 个 `super()` 调用点（`__init__` / `eventFilter` / `showEvent` / `resizeEvent`）。定位某个方法请在 `mdcx/controllers/main_window/` 下按 mixin 名查找（`layout_*` = 布局、`result_*` = 结果树与动作、`window_ops` = 窗口/托盘/导航、`settings_actions` = 配置、`scrape_control` = 刮削启停、`net_check` = 网络检测、`logs` = 日志页、`actor_db` = 演员库）。完整清单与行为等价性证据见 `docs/Decoupling-Review.md` 第 3.4 节。
 
 **基准与公式**
 
@@ -224,7 +226,7 @@ UI 层 (PyQt6)         → 界面展示、用户操作
 位置与 `mdcx-diy-main` 完全对齐。修改任一图标前先通读本节，改完跑
 `tests/test_left_status_icons.py`。
 
-**图标对照表**（实现：`mdcx/controllers/main_window/main_window.py`）
+**图标对照表**（实现：`mdcx/controllers/main_window/layout_actor.py`）
 
 | 位置 | 图标 | 文本 | 源码锚点 |
 |---|---|---|---|
@@ -345,15 +347,15 @@ FileInfo → CrawlerInput → CrawlTask
 
 - **两个开关**：`separate_reuse_metadata`（复用数据存放目录中的元数据文件：目标已存在则跳过图片下载与 NFO 写入）与 `separate_overwrite_meta`（覆盖本地保存的视频元数据文件：存在也重下重写），默认 False，`save_config.py` / `load_config.py` 接线并写入 JSON。
 - **仅分离模式 + 数据存放目录有效时生效**：`extend.py: should_reuse_metadata(meta_root) / should_overwrite_meta(meta_root)` 均为 `meta_root is not None and is_separate_mode() and 配置值`——`meta_root` 无效（data_path 为空/不可创建、元数据退回视频目录）时没有「数据存放目录」可复用/可覆盖，若仍生效会让复用开关在回退路径上误跳图片下载与 NFO 写入；`scraper.py` 复用跳过条件额外含 `not overwrite_meta`，故手改 JSON 把两项都写成 true 时运行时仍以覆盖优先为准，不会出现既跳过又重写的不确定行为（`load_config` 读到双开时也以覆盖为准落盘显示）。
-- **界面互斥**：`checkBox_separate_reuse_meta_changed / checkBox_separate_overwrite_meta_changed`（`main_window.py`）在勾选时自动取消另一项，去勾选不动作（无回环）；`init.py` 接 `toggled` 信号。
-- **对齐**：覆盖框与「覆盖本地已存在的STRM链接文本」框上下严格对齐，由 `_sync_reuse_meta_gap_align()`（`main_window.py`，`_sync_page_layouts` 尾部调用）按两框实测 x 差闭环收敛钉死 gap 宽，窄宽往返冻结；行内子项顺序与文案由 `tests/test_ui_structure.py` 锁定。
+- **界面互斥**：`checkBox_separate_reuse_meta_changed / checkBox_separate_overwrite_meta_changed`（`settings_actions.py`）在勾选时自动取消另一项，去勾选不动作（无回环）；`init.py` 接 `toggled` 信号。
+- **对齐**：覆盖框与「覆盖本地已存在的STRM链接文本」框上下严格对齐，由 `_sync_reuse_meta_gap_align()`（`layout_settings.py`，`_sync_page_layouts` 尾部调用）按两框实测 x 差闭环收敛钉死 gap 宽，窄宽往返冻结；行内子项顺序与文案由 `tests/test_ui_structure.py` 锁定。
 
 ### 分离模式 STRM 生成/覆盖的前置依赖（改前必读）
 
 - **两个开关**：`separate_generate_strm`（为本地视频文件生成STRM链接文本）与 `separate_overwrite_strm`（覆盖本地已存在的STRM链接文本），默认 False。
 - **覆盖以生成为前提**：`extend.py: should_overwrite_strm()` = `is_separate_mode() and separate_generate_strm and separate_overwrite_strm`。不生成 STRM 自然不存在「覆盖」，故未勾选生成时勾选覆盖不生效（其他模式同理不生效，调用方不得直读 `manager.config.separate_overwrite_strm`）。
 - **生成条件**：`should_generate_strm(meta_root, skip_reorganize)` = 元数据根有效 + 非跳过整理 + 分离模式 + 已勾选生成。写入位置为元数据镜像目录 `meta_folder`（与 nfo/封面同目录），内容为视频最终绝对路径：开移动写 `file_new_path`，不开移动写 `file_path`（此时 `file_new_path` 指向未使用的目标目录）。
-- **界面联动**：`checkBox_separate_generate_strm_changed`（`main_window.py`）在生成框勾选状态变化时置灰/恢复 `checkBox_separate_overwrite_strm`（只改 enabled，保留其勾选值，故重新勾选生成即恢复）；`init.py` 接 `toggled`，`load_config.py` 回读后同步 enabled 状态；tooltip 写明前置条件。
+- **界面联动**：`checkBox_separate_generate_strm_changed`（`settings_actions.py`）在生成框勾选状态变化时置灰/恢复 `checkBox_separate_overwrite_strm`（只改 enabled，保留其勾选值，故重新勾选生成即恢复）；`init.py` 接 `toggled`，`load_config.py` 回读后同步 enabled 状态；tooltip 写明前置条件。
 - **.strm 属元数据**：`SEPARATE_META_EXTS` 含 `.strm`，`move_other_file` 因此把源目录已有 .strm 搬进数据目录而非跟随视频。
 
 ### 文件爬虫（mdcx/core/file_crawler.py）
@@ -586,7 +588,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 5. 断言要落在**不变量**上（底边贴底、间距恒定、边长恒定），不要写死具体 y 值——否则改一次设计就得改一次测试。
 
 - **格式化**：ruff（行宽 120，启用 isort/pyupgrade/flake8）
-- **类型检查**：mypy（全项目零 `disable_error_code`；`mdcx/controllers/main_window/init.py`、`load_config.py`、`views/`、`gen/` 等豁免，CI `ci.yaml` 强制执行）；pyright 仅在 `pyproject.toml` 中保留配置，未纳入 CI 门禁
+- **类型检查**：mypy（全项目零 `disable_error_code`；`mdcx/controllers/main_window/` 下的 28 个 `*Mixin` 模块、`init.py`、`load_config.py`、`views/`、`gen/` 等豁免——注意这 28 个用的是 `pyproject.toml` 的 `[[tool.mypy.overrides]] module=[...] ignore_errors=true`，**不是** `exclude`（mypy 对被 import 的模块不认 `exclude`），CI `ci.yaml` 强制执行）；pyright 仅在 `pyproject.toml` 中保留配置，未纳入 CI 门禁
 - **Git 钩子**：项目不要求安装 pre-commit；统一使用 `uv run quick-check` 和 `uv run check --skip-hook-install` 完成检查
 - **检查和修复**：
   ```bash
@@ -646,7 +648,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 
 ### 更新检查（客户端自动更新）
 
-代码在 `mdcx/base/web.py` 的 `check_version()`（拉取）与 `is_remote_version_newer()`（比较），主窗口侧是 `main_window.py` 的 `_show_version_thread()`。有六条不变量，改任一处都要连带另几处。
+代码在 `mdcx/base/web.py` 的 `check_version()`（拉取）与 `is_remote_version_newer()`（比较），主窗口侧是 `window_ops.py` 的 `_show_version_thread()`。有六条不变量，改任一处都要连带另几处。
 
 **① 取 tag 最大的 release，不是列表第一条。** `/releases?per_page=10` 按 `created_at` 倒序返回，**不按 tag 倒序**；而本工作流四个 `Create Release` 步骤用同一 tag + `overwrite: true`（`svenstaro/upload-release-action` 先删后建），任何一次补发/重跑都会把那条 release 的 `created_at` 刷成"当前时间"、顶到第一位。原实现取第一条，于是**手动补发一次旧 tag 就让所有用户从此看不到新版本提示且无任何报错**。修法是遍历全部条目收集所有 `tag_name.isdigit()` 的值取 `max`（`tests/test_version_check_pick_latest.py` 守卫）。tag 必须纯数字这条硬约束不变，非纯数字 tag 照旧跳过。
 
