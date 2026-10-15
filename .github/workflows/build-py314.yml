@@ -16,6 +16,16 @@ name: Build and Release Python3.14
 # 取全部 `tag_name.isdigit()` 的值中**最大**的一个，非纯数字 tag 会被跳过，客户端自动
 # 更新永久失效。`Resolve release metadata` 里会硬校验，填错直接 exit 1。
 #
+# 资产文件名（2026-10 起）：`MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，
+# 例如 `MDCx-2.4.7-20261020-windows-x86_64-<40位sha>.exe`。两个版本段刻意并存：
+#   - `asset_version` = `mdcx/consts.py` 的 `VERSION_NAME` 去 v 前缀（`v2.4.7` → `2.4.7`），
+#     只给人看，不参与任何版本比较；
+#   - `tag` = 纯数字 `LOCAL_VERSION`（`20261020`），Release 的 tag 与之相同，
+#     `check_version()` 的 `int(tag_name)` 比较走的是它。
+# 客户端 `check_version()` 只读 `tag_name`，不解析资产名，故插入展示版本号不影响自动更新；
+# 资产名同时出现在 `docs/Development.md`、`DADA/MEMORY.md` 与
+# `tests/test_py314_release_workflow.py::_EXPECTED_ASSETS`，改一处必须同步另两处。
+#
 # 附注：正因为本工作流四个平台用**同一 tag + `overwrite: true`**（先删后建）重建 release，
 # 任何一次补发/重跑都会把那条 release 的 `created_at` 刷成当前时间、顶到 `/releases`
 # 列表第一条（该接口按 created_at 而非 tag 倒序）。客户端因此不能取第一条，必须取
@@ -225,7 +235,19 @@ jobs:
           $arch = "${{ matrix.arch }}"
           $sha = "${{ github.sha }}"
           $artifactPath = "dist/MDCx.exe"
-          $expectedAssetName = "MDCx-${releaseTag}-${platform}-${arch}-${sha}.exe"
+
+          # 展示版本号（VERSION_NAME 去 v 前缀），与 publish-release 的 asset_version 同源同算法。
+          # 两处各算一遍而不是跨 job 传递：build-app 的 outputs 未定义，且这个值一旦算错
+          # 只会让日志里的「计划发布文件名」与真正上传的名字对不上，属于可读性问题。
+          $versionName = ""
+          if (Test-Path -LiteralPath "mdcx/consts.py") {
+            $m = Select-String -Path "mdcx/consts.py" -Pattern 'VERSION_NAME\s*=\s*"([^"]+)"' | Select-Object -First 1
+            if ($m) { $versionName = $m.Matches[0].Groups[1].Value }
+          }
+          $versionName = $versionName.TrimStart('v')
+          if ([string]::IsNullOrWhiteSpace($versionName)) { $versionName = $releaseTag }
+
+          $expectedAssetName = "MDCx-${versionName}-${releaseTag}-${platform}-${arch}-${sha}.exe"
 
           Write-Host "检查发布产物：$artifactPath"
           Write-Host "计划发布文件名：$expectedAssetName"
@@ -244,6 +266,10 @@ jobs:
 
           if ([string]::IsNullOrWhiteSpace($platform) -or [string]::IsNullOrWhiteSpace($arch)) {
             throw "发布平台/架构信息缺失，无法确认上传文件名规则"
+          }
+
+          if ([string]::IsNullOrWhiteSpace($expectedAssetName) -or $expectedAssetName -notlike 'MDCx-*-*') {
+            throw "无法拼出资产文件名：'$expectedAssetName'"
           }
 
           $artifactSizeBytes = (Get-Item -LiteralPath $artifactPath).Length
@@ -304,13 +330,23 @@ jobs:
           fi
 
           version_name=$(grep -oE 'VERSION_NAME[[:space:]]*=[[:space:]]*"[^"]+"' mdcx/consts.py | grep -oE '"[^"]+"' | tr -d '"')
+
+          # 资产文件名里的展示版本号：VERSION_NAME 去掉 v 前缀（v2.4.7 → 2.4.7）。
+          # 与 tag 是两回事——tag 必须纯数字（check_version 只认 tag_name.isdigit()），
+          # 展示版本号只进文件名，不参与任何版本比较，故不受纯数字约束。
+          asset_version=${version_name#v}
+
           version_name=${version_name:-MDCx}
+          # 读不到 VERSION_NAME 时退回 tag，保证文件名不会缺一段
+          asset_version=${asset_version:-$tag}
+
           prerelease=false
           if [ "${{ github.event_name }}" ] = "workflow_dispatch" ] && [ "$DISPATCH_PRERELEASE" = "true" ]; then
             prerelease=true
           fi
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "asset_version=$asset_version" >> "$GITHUB_OUTPUT"
           echo "name=${version_name} (${tag})" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
@@ -361,7 +397,7 @@ jobs:
         with:
           overwrite: true
           release_name: ${{ steps.metadata.outputs.name }}
-          asset_name: MDCx-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg
+          asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg
           file: dist/MDCx-aarch64.dmg
           prerelease: ${{ steps.metadata.outputs.prerelease }}
           body: ${{ steps.changelog.outputs.CHANGELOG }}
@@ -372,7 +408,7 @@ jobs:
         with:
           overwrite: true
           release_name: ${{ steps.metadata.outputs.name }}
-          asset_name: MDCx-${{ steps.metadata.outputs.tag }}-macos-x86_64-${{ github.sha }}.dmg
+          asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-x86_64-${{ github.sha }}.dmg
           file: dist/MDCx-x86_64.dmg
           prerelease: ${{ steps.metadata.outputs.prerelease }}
           body: ${{ steps.changelog.outputs.CHANGELOG }}
@@ -383,7 +419,7 @@ jobs:
         with:
           overwrite: true
           release_name: ${{ steps.metadata.outputs.name }}
-          asset_name: MDCx-${{ steps.metadata.outputs.tag }}-windows-x86_64-${{ github.sha }}.exe
+          asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-windows-x86_64-${{ github.sha }}.exe
           file: dist/MDCx.exe
           prerelease: ${{ steps.metadata.outputs.prerelease }}
           body: ${{ steps.changelog.outputs.CHANGELOG }}
@@ -394,7 +430,7 @@ jobs:
         with:
           overwrite: true
           release_name: ${{ steps.metadata.outputs.name }}
-          asset_name: MDCx-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}
+          asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}
           file: dist/MDCx
           prerelease: ${{ steps.metadata.outputs.prerelease }}
           body: ${{ steps.changelog.outputs.CHANGELOG }}

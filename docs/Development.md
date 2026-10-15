@@ -675,7 +675,7 @@ uv sync --locked --all-extras --dev
 uv run build --debug
 ```
 
-正式发版只有一条工作流：`.github/workflows/build-py314.yml`（**Build and Release (Python 3.14)**），四平台矩阵（macOS ARM64 / macOS Intel / Windows x86_64 / Linux x86_64）全量构建，创建 tag 为纯数字 `LOCAL_VERSION` 的 Release，资产名 `MDCx-<版本>-<平台>-<架构>-<sha>`。**客户端自动更新只看这个 Release，资产名与 tag 形态都是对外契约，别动它。**
+正式发版只有一条工作流：`.github/workflows/build-py314.yml`（**Build and Release (Python 3.14)**），四平台矩阵（macOS ARM64 / macOS Intel / Windows x86_64 / Linux x86_64）全量构建，创建 tag 为纯数字 `LOCAL_VERSION` 的 Release，资产名 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，例如 `MDCx-2.4.7-20261020-windows-x86_64-<40位sha>.exe`。两个版本段刻意并存：`<展示版本号>` 是 `VERSION_NAME` 去 `v` 前缀（`v2.4.7` → `2.4.7`，由工作流的 `steps.metadata.outputs.asset_version` 提供），只给人看、不参与任何版本比较；`<tag>` 仍是纯数字 `LOCAL_VERSION`，`check_version()` 的 `int(tag_name)` 比的就是它——**新增展示版本号段不影响自动更新，因为客户端只读 `tag_name`、不解析资产名**。**客户端自动更新只看这个 Release，tag 形态（纯数字）与资产名都是对外契约，别动它。**
 
 两种触发方式：
 

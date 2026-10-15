@@ -19,8 +19,11 @@
 4. **缺产物不发版**：`build-app` 带 `continue-on-error`，所以 `publish-release` 必须用
    `needs.build-app.result == 'success'` 把关（不能写 `success()`：`needs` 里任一失败腿
    都会让它整体跳过），并在上传前核对四个平台产物齐全——半成品 Release 比不发更糟。
-5. **资产命名是客户端契约**：`MDCx-<版本>-<平台>-<架构>-<sha>.<ext>`，同名资产靠
-   `overwrite: true` 覆盖更新，格式一改客户端下载链接就全断。
+5. **资产命名是客户端契约**：`MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，同名资产靠
+   `overwrite: true` 覆盖更新，格式一改客户端下载链接就全断。展示版本号取
+   `mdcx/consts.py` 的 `VERSION_NAME` 去 v 前缀（`v2.4.7` → `2.4.7`），只进文件名、
+   不参与版本比较；`tag` 仍是纯数字 `LOCAL_VERSION`，`check_version()` 比的就是它。
+   资产名同时写在 `docs/Development.md` 与 `DADA/MEMORY.md`，改一处要同步三处。
 
 按仓库惯例做文本断言（`tests/` 不引入 yaml 依赖），改工作流后请同步更新本文件。
 """
@@ -49,12 +52,16 @@ _MATRIX_ITEMS = (
     '{"build": "linux", "os": "ubuntu-latest", "arch": "x86_64"}',
 )
 
-# 客户端依赖的资产名，逐条写死（唯一发版流程，没有第二份可对照，改名即破坏下载链接）
+# 客户端依赖的资产名，逐条写死（唯一发版流程，没有第二份可对照，改名即破坏下载链接）。
+# 形如 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，例如
+# `MDCx-2.4.7-20261020-windows-x86_64-<40位sha>.exe`：两个版本段并存——`asset_version`
+# 是 `VERSION_NAME` 去 v 前缀（只给人看），`tag` 是纯数字 `LOCAL_VERSION`（`check_version()`
+# 的 `int(tag_name)` 比较走的是它）。
 _EXPECTED_ASSETS = (
-    "asset_name: MDCx-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg",
-    "asset_name: MDCx-${{ steps.metadata.outputs.tag }}-macos-x86_64-${{ github.sha }}.dmg",
-    "asset_name: MDCx-${{ steps.metadata.outputs.tag }}-windows-x86_64-${{ github.sha }}.exe",
-    "asset_name: MDCx-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}",
+    "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg",
+    "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-x86_64-${{ github.sha }}.dmg",
+    "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-windows-x86_64-${{ github.sha }}.exe",
+    "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}",
 )
 
 # 2026-09-28 删掉的三个工作流，守卫它们别被无意中加回来
@@ -75,7 +82,7 @@ def test_tag_is_plain_numeric_not_py314_prefixed():
     )
     # 只查真正的配置行：工作流名/并发组里的 build-py314- 是合法的
     assert re.search(r"(?m)^\s+asset_name:.*py314", text) is None, (
-        "资产名不得带 -py314- 段：客户端按 `MDCx-<版本>-<平台>-<架构>-<sha>` 找资产"
+        "资产名不得带 -py314- 段：客户端按 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>` 找资产"
     )
     assert 'echo "tag=$tag" >> "$GITHUB_OUTPUT"' in text, "metadata 步骤应回输出解析出的纯数字 tag"
     assert text.count("tag: ${{ steps.metadata.outputs.tag }}") == _RELEASE_STEP_COUNT, (
@@ -202,6 +209,32 @@ def test_asset_names_and_release_title():
     assert "release_name: ${{ steps.metadata.outputs.name }}" in text, "标题应沿用 metadata 的解析结果"
     assert 'echo "name=${version_name} (${tag})" >> "$GITHUB_OUTPUT"' in text, (
         "Release 标题应为 `VERSION_NAME (版本号)`"
+    )
+
+
+def test_asset_version_segment_comes_from_version_name_without_v_prefix():
+    """资产名里的展示版本号段必须是 `VERSION_NAME` 去 v 前缀，且四个发布步骤都引用它。"""
+    text = _workflow()
+
+    assert "asset_version=${version_name#v}" in text, (
+        "展示版本号应由 VERSION_NAME 去掉 v 前缀得到（v2.4.7 → 2.4.7），不能直接拼带 v 的原值"
+    )
+    assert 'echo "asset_version=$asset_version" >> "$GITHUB_OUTPUT"' in text, (
+        "metadata 步骤应回输出 asset_version，四个 Create Release 步骤都靠它拼文件名"
+    )
+    assert "asset_version=${asset_version:-$tag}" in text, (
+        "读不到 VERSION_NAME 时应退回 tag，保证资产文件名不会缺一段"
+    )
+    assert text.count("steps.metadata.outputs.asset_version") == _RELEASE_STEP_COUNT, (
+        f"四个 Create Release 步骤都应引用 asset_version（当前 {text.count('steps.metadata.outputs.asset_version')} 处）"
+    )
+    # asset_version 只进文件名，绝不能被写回 tag——tag 必须保持纯数字
+    assert 'echo "tag=$tag"' in text and "asset_version=$tag" not in text, (
+        "asset_version 不得覆盖 tag：tag 必须纯数字，否则 check_version 的 int(tag_name) 失效"
+    )
+    # build-app 的 Windows 预检步骤独立算了一遍展示版本号，日志里的文件名必须与真名一致
+    assert '$versionName.TrimStart(\'v\')' in text, (
+        "Windows 预检步骤应按同一算法（去 v 前缀）算出计划发布文件名，否则日志与实际上传名对不上"
     )
 
 
