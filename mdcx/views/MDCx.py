@@ -11110,6 +11110,16 @@ class Ui_MDCx(object):
         self.label_cf_bypass_trusted_hosts_desc.setWordWrap(True)
         self.label_cf_bypass_trusted_hosts_desc.setObjectName("label_cf_bypass_trusted_hosts_desc")
         self.gridLayout_9.addWidget(self.label_cf_bypass_trusted_hosts_desc, 12, 1, 1, 3)
+        self.label_cf_bypass_trusted_hosts_check = QtWidgets.QLabel(parent=self.gridLayoutWidget_9)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.label_cf_bypass_trusted_hosts_check.sizePolicy().hasHeightForWidth())
+        self.label_cf_bypass_trusted_hosts_check.setSizePolicy(sizePolicy)
+        self.label_cf_bypass_trusted_hosts_check.setStyleSheet("color: rgb(8, 128, 128);")
+        self.label_cf_bypass_trusted_hosts_check.setWordWrap(True)
+        self.label_cf_bypass_trusted_hosts_check.setObjectName("label_cf_bypass_trusted_hosts_check")
+        self.gridLayout_9.addWidget(self.label_cf_bypass_trusted_hosts_check, 13, 1, 1, 3)
         self.label_65 = QtWidgets.QLabel(parent=self.gridLayoutWidget_9)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -14436,22 +14446,23 @@ class Ui_MDCx(object):
         )
         self.comboBox_cf_bypass_backend.setItemText(0, _translate("MDCx", "TRAWL"))
         self.comboBox_cf_bypass_backend.setItemText(1, _translate("MDCx", "flaresolverr"))
-        self.label_cf_bypass_trusted_hosts.setText(_translate("MDCx", "Bypass 白名单："))
+        self.label_cf_bypass_trusted_hosts.setText(_translate("MDCx", "CF Bypass校验："))
         self.lineEdit_cf_bypass_trusted_hosts.setPlaceholderText(
-            _translate("MDCx", "逗号分隔，如javbus.com,*.javbus.com，留空不校验")
+            _translate("MDCx", "默认留空不校验，逗号分隔，如javbus.com,*.javbus.com")
         )
         self.lineEdit_cf_bypass_trusted_hosts.setToolTip(
             _translate(
                 "MDCx",
-                "只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；落地域名不在名单内则拒绝该响应。支持 *.example.com 子域通配（只匹配子域、不含裸域名本身，需同时写 example.com）；留空不校验（默认）",
+                "校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；落地域名不在名单内则拒绝该响应。支持 *.example.com 子域通配（只匹配子域、不含裸域名本身，需同时写 example.com）；留空不校验（默认）。输入框下方会实时提示写法问题",
             )
         )
         self.label_cf_bypass_trusted_hosts_desc.setText(
             _translate(
                 "MDCx",
-                "用途：只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass，防止第三方Bypass服务被劫持时把恶意页面当数据写入NFO。名单外的站点照常走Bypass，只是其落地域名必须命中名单；支持*.example.com子域通配（不含裸域名本身，需同时写example.com），逗号分隔，留空不校验，一般不需要配置",
+                "用途：只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass，防止第三方Bypass服务被劫持时把恶意页面当数据写入NFO。名单外的站点照常走Bypass，只是其落地域名必须命中名单；支持*.example.com子域通配（不含裸域名本身，需同时写example.com），逗号分隔，留空不校验，一般不需要配置。输入框下方会实时校验写法",
             )
         )
+        self.label_cf_bypass_trusted_hosts_check.setText(_translate("MDCx", "状态：留空不校验（默认）"))
         self.label_65.setText(_translate("MDCx", "重试次数："))
         self.label_64.setText(_translate("MDCx", "代理地址："))
         self.label_verify_ssl.setText(_translate("MDCx", "HTTPS证书校验："))
@@ -14626,7 +14637,7 @@ class Ui_MDCx(object):
                 "<ul>\n"
                 '<li><b>CloudFlare 绕过服务</b>：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址</li>\n'
                 "<li><b>Selenium CF Bypass</b>：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10、11+Edge浏览器，首次使用将自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却</li>\n"
-                "<li><b>CF Bypass落地白名单</b>：可填写可信落地域名白名单，逗号分隔，支持*.example.com子域通配（只匹配子域、不含裸域名本身），只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验</li>\n"
+                "<li><b>CF Bypass校验</b>：可填写可信落地域名，逗号分隔，支持*.example.com子域通配（只匹配子域、不含裸域名本身），只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验，输入框下方实时提示写法问题</li>\n"
                 "<li><b>CloudFlare 直连通道</b>：部分站点提供免CF的数据接口JavDB_API、JavDB_APP、MissAV_API、R18.dev、TheJavDB_API，默认已加入网站源，可直接选用获得更稳定的抓取</li>\n"
                 "</ul>\n"
                 "<h4>六、代理设置</h4>\n"

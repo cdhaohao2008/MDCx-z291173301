@@ -30,6 +30,12 @@ from mdcx.image import PreviewImageLoader
 from mdcx.models.flags import Flags
 from mdcx.models.model_types import CrawlersResult, FileInfo, OtherInfo, ShowData
 from mdcx.signals import signal_qt
+from mdcx.utils.cf_bypass_hosts import (
+    LEVEL_ERROR,
+    LEVEL_INFO,
+    LEVEL_WARN,
+    validate_cf_bypass_hosts,
+)
 from mdcx.views.CustomClass import CustomScrollArea
 from mdcx.views.MDCx import Ui_MDCx
 
@@ -457,6 +463,7 @@ class MyMAinWindow(
         self._init_donate_widgets()  # 侧栏「使用说明」下方加收款码 + [赞助作者] 链接
         self.load_config()  # 加载配置
         self._setup_name_template_preview()
+        self._setup_cf_bypass_hosts_check()
         get_success_list()  # 获取历史成功刮削列表
         # endregion
 
@@ -542,6 +549,36 @@ class MyMAinWindow(
             "示例：number=ABC-123, studio=Studio A, originaltitle=Original Title definition=4K"
         )
         self._sync_naming_template_section()
+
+    # region CF Bypass 校验名单（即时反馈）
+    #
+    # 为什么要有这层：cf_bypass_trusted_hosts 配错是**静默**的——平时不命中 CF 挑战
+    # 页就不校验、不报错，只有真走 Bypass 时才拒收，用户看到的是「昨天能刮的站今天
+    # 全 403」，得反查日志里那句「🧱 落地域名不在白名单」才知道是自己配错了一个安全
+    # 开关。把反馈提前到输入框，配置期就能看见。
+    _CF_BYPASS_HOSTS_LEVEL_COLORS = {
+        LEVEL_ERROR: "color: rgb(190, 0, 0);",
+        LEVEL_WARN: "color: rgb(190, 110, 0);",
+        LEVEL_INFO: "color: rgb(8, 128, 128);",
+    }
+
+    def _setup_cf_bypass_hosts_check(self) -> None:
+        self.Ui.lineEdit_cf_bypass_trusted_hosts.textChanged.connect(self._update_cf_bypass_hosts_check)
+        self._update_cf_bypass_hosts_check()
+
+    def _update_cf_bypass_hosts_check(self) -> None:
+        label = self.Ui.label_cf_bypass_trusted_hosts_check
+        try:
+            report = validate_cf_bypass_hosts(self.Ui.lineEdit_cf_bypass_trusted_hosts.text())
+        except Exception as exc:  # 校验只是提示，绝不能因为它把设置页搞挂
+            label.setStyleSheet(self._CF_BYPASS_HOSTS_LEVEL_COLORS[LEVEL_WARN])
+            label.setText(f"状态：校验未执行（{type(exc).__name__}），不影响保存")
+            return
+        label.setStyleSheet(self._CF_BYPASS_HOSTS_LEVEL_COLORS.get(report.level, ""))
+        label.setText(report.text)
+        label.setToolTip("\n".join(report.messages) if report.messages else "")
+
+    # endregion
 
     # region Init
     def Init_Ui(self): ...
