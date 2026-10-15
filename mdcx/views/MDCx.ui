@@ -23192,7 +23192,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <string notr="true">color: rgb(8, 128, 128);</string>
                             </property>
                             <property name="text">
-                              <string>用途：只校验走Bypass的请求最终落在哪个域名，防止第三方Bypass服务被劫持时把恶意页面当数据写入NFO。与「哪些站点走Bypass」无关，名单外的站点照常走Bypass，只是其落地域名必须命中名单（如通配只覆盖子域，裸域名要另写一条）。逗号分隔，留空不校验，一般不需要配置</string>
+                              <string>用途：只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass，防止第三方Bypass服务被劫持时把恶意页面当数据写入NFO。名单外的站点照常走Bypass，只是其落地域名必须命中名单；支持*.example.com子域通配（不含裸域名本身，需同时写example.com），逗号分隔，留空不校验，一般不需要配置</string>
                             </property>
                             <property name="wordWrap">
                               <bool>true</bool>

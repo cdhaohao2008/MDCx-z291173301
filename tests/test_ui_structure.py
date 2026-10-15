@@ -296,10 +296,7 @@ def test_mdcx_py_in_sync_with_ui():
             if ver is None:
                 pytest.skip("无可用 ruff（uv 与系统 ruff 均不可用），跳过同步检查")
             if locked is not None and ver != locked:
-                pytest.skip(
-                    f"系统 ruff {ver} 与 uv.lock 锁定版本 {locked} 不一致，"
-                    "跳过同步检查（错版本排版必误报）"
-                )
+                pytest.skip(f"系统 ruff {ver} 与 uv.lock 锁定版本 {locked} 不一致，跳过同步检查（错版本排版必误报）")
             try:
                 result = subprocess.run(
                     ["ruff", "format", str(tmp_path)],
@@ -997,7 +994,7 @@ def test_about_official_site_list_yellow_py_literal_single_line():
     assert py_text.count(_OFFICIAL_ABOUT_PARA) == 1, (
         f"MDCx.py 中 Official 段应恰好出现一次（单一字面量），实际 {py_text.count(_OFFICIAL_ABOUT_PARA)} 次"
     )
-    assert _OFFICIAL_ABOUT_PARA + "\\n\"" in py_text, "MDCx.py 的 Official 段字面量应以换行收尾"
+    assert _OFFICIAL_ABOUT_PARA + '\\n"' in py_text, "MDCx.py 的 Official 段字面量应以换行收尾"
 
 
 def test_about_official_site_list_red_stale_shape_gone():
@@ -1012,3 +1009,48 @@ def test_about_official_site_list_red_stale_shape_gone():
     assert '按番号前缀自动路由到各番号官网，全部走代理）："\n' not in py_text, (
         "MDCx.py 不应再把 Official 段拆成两个字符串字面量"
     )
+
+
+# 「Bypass 白名单」输入框 placeholder 里给出的示例域名。示例必须自身可用——
+# 用户是照着它抄的，示例写错等于教所有人配错。
+_BYPASS_TRUSTED_HOSTS_EXAMPLE = "javbus.com,*.javbus.com"
+
+
+def test_bypass_trusted_hosts_placeholder_example_works():
+    """绿：placeholder 里的示例域名必须能真正命中该站实际使用的地址。
+
+    历史回归：示例写作 `JavBus.com,*.JavDB.com`，与匹配规则（`*.example.com` 只匹配
+    子域、不匹配裸域名）正好相反——`JavBus.com` 精确项漏掉实际使用的 `www.javbus.com`
+    （mdcx/crawlers/javbus.py），`*.JavDB.com` 又匹配不到裸域 `javdb.com`
+    （mdcx/crawlers/javdb.py）。照抄的用户会把自己的站点全部拒收。
+    """
+    from mdcx.web_async import AsyncWebClient
+
+    root = _parse_ui()
+    line_edit = _find_widget_by_name(root, "lineEdit_cf_bypass_trusted_hosts")
+    assert line_edit is not None, "找不到 lineEdit_cf_bypass_trusted_hosts"
+    placeholder = _widget_string_prop(line_edit, "placeholderText") or ""
+    assert _BYPASS_TRUSTED_HOSTS_EXAMPLE in placeholder, (
+        f"placeholder 应包含可用示例 {_BYPASS_TRUSTED_HOSTS_EXAMPLE}，实为 {placeholder!r}"
+    )
+
+    client = AsyncWebClient(timeout=1, cf_bypass_trusted_hosts=_BYPASS_TRUSTED_HOSTS_EXAMPLE)
+    # 裸域与 www 子域都要命中：通配不含裸域，示例才必须两条都写。
+    for url in ("https://javbus.com/en/1", "https://www.javbus.com/en/1"):
+        assert client._is_trusted_bypass_landing(url) is True, f"示例配置未覆盖 {url}"
+
+
+def test_bypass_trusted_hosts_copy_states_it_is_not_a_bypass_exclusion():
+    """绿：tooltip/说明行须点明「不控制哪些站点走Bypass」，避免被误读成排除名单。
+
+    语义事实：白名单只在 `_call_bypass_mirror` / `_call_bypass_html` 内校验落地域名，
+    bypass 对全局自动触发（命中 CF 挑战页即用），与本名单无关。文案若没说清，用户
+    会以为填了 JavBus 就让它不走 Bypass，或以为填了 JavLibrary 会拦掉它的 bypass。
+    """
+    root = _parse_ui()
+    line_edit = _find_widget_by_name(root, "lineEdit_cf_bypass_trusted_hosts")
+    desc = _find_widget_by_name(root, "label_cf_bypass_trusted_hosts_desc")
+    for widget, prop in ((line_edit, "toolTip"), (desc, "text")):
+        text = _widget_string_prop(widget, prop) or ""
+        assert "不控制哪些站点走" in text, f"{prop} 未点明「不控制哪些站点走Bypass」：{text!r}"
+        assert "不含裸域名" in text, f"{prop} 未点明通配不含裸域名本身：{text!r}"
