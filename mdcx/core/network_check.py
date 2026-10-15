@@ -304,6 +304,60 @@ def _clean_error(error: str) -> str:
     return error
 
 
+# 失败串开头的「{方法} {url} 失败:」段（`web_async.request` 的返回格式），
+# 前置到行首后一眼就知道这条在查哪个站，行尾只留根因
+_REQUEST_PREFIX_RE = re.compile(r"^((?:GET|POST|HEAD|PUT|PATCH|DELETE|OPTIONS)\s+\S+\s+(?:失败|未知错误))\s*[:：]\s*")
+
+# curl 英文尾巴 → 中文。只收 TLS/SSL 家族，对不上的形态原样留着（仍是诊断线索）
+_CURL_TAIL_RE = re.compile(r"(?:Failed to perform,\s*)?curl:.*$", re.IGNORECASE)
+_CURL_TAIL_ZH = (
+    ("closed abruptly", "curl：连接被强制关闭"),
+    ("ssl_error_syscall", "curl：连接被强制关闭"),
+    ("error queue empty", "curl：连接被强制关闭"),
+    ("unexpected_eof", "curl：连接被意外中断"),
+    ("tls handshake", "curl：TLS握手失败"),
+    ("handshake failure", "curl：TLS握手失败"),
+    ("wrong version number", "curl：TLS版本不匹配"),
+)
+
+
+def _split_request_prefix(error: str) -> tuple[str, str]:
+    """拆出「{方法} {url} 失败」段与其后的细节；拆不出时整串当细节返回。"""
+    matched = _REQUEST_PREFIX_RE.match(error)
+    if not matched:
+        return "", error.strip()
+    return matched.group(1), error[matched.end() :].strip()
+
+
+def _translate_error_detail(detail: str) -> str:
+    """把 curl 的英文 SSL 尾巴译成中文，`Failed to perform,` 这类无信息量的引导词一并丢掉。"""
+
+    def _replace(matched: re.Match[str]) -> str:
+        tail = matched.group(0)
+        lowered = tail.lower()
+        for marker, zh in _CURL_TAIL_ZH:
+            if marker in lowered:
+                return zh
+        return tail
+
+    return _CURL_TAIL_RE.sub(_replace, detail)
+
+
+def _compose_failed_message(message: str, error: str) -> str:
+    """失败行文案：`{方法} {url} 失败：{友好提示}，{中文细节}`。
+
+    原先是 `{友好提示}: {错误串}`，目标地址压在行尾，得读到行末才知道这条在查哪个站。
+    """
+    if message == error:
+        return message
+    prefix, detail = _split_request_prefix(error)
+    if not prefix:
+        return f"{message}: {error}"
+    tail = _translate_error_detail(detail)
+    head = f"{prefix}：{message}"
+    return f"{head}，{tail}" if tail else head
+
+
 def _classify_http_result(spec: NetworkCheckSpec, status_code: int, text: str) -> tuple[NetworkCheckStatus, str]:
     if _is_cloudflare_challenge(text):
         return (
@@ -697,7 +751,7 @@ def format_result_line(result: NetworkCheckResult) -> str:
     message = result.message
     if result.error and result.status == NetworkCheckStatus.FAILED:
         if result.error not in message:
-            message = f"{message}: {result.error}"
+            message = _compose_failed_message(message, result.error)
     return f"  {_pad_right(icon, 4)}   {name}   {status_code}   {elapsed}        {proxy}     {message}"
 
 

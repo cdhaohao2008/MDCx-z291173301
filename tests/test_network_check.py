@@ -679,6 +679,85 @@ def test_format_result_line_does_not_duplicate_error():
     assert line.count("GET https://example.test 失败:HTTP 403") == 1
 
 
+def test_format_result_line_tls_error_puts_url_first():
+    """TLS 握手中断行：目标地址前置到行首，curl 英文尾巴译中文。"""
+    from mdcx.core.network_check import _clean_error, _message_for_error
+
+    spec = NetworkCheckSpec(name="AVSex", group="刮削站点", url="https://avsex.cc")
+    error = _clean_error(
+        "GET https://avsex.cc 失败: Failed to perform, curl: (35) BoringSSL SSL_connect: Connection closed abruptly"
+    )
+    result = NetworkCheckResult(
+        spec=spec,
+        status=NetworkCheckStatus.FAILED,
+        message=_message_for_error(error),
+        error=error,
+    )
+
+    line = format_result_line(result)
+
+    assert line.endswith(
+        "GET https://avsex.cc 失败：TLS握手中断，常为HTTP/2指纹/SNI策略与目标站不兼容，curl：连接被强制关闭"
+    )
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected_detail"),
+    [
+        (
+            "Failed to perform, curl: (35) BoringSSL SSL_connect: Connection closed abruptly",
+            "curl：连接被强制关闭",
+        ),
+        (
+            "Failed to perform, curl: (35) OpenSSL SSL_read: UNEXPECTED_EOF_WHILE_READING",
+            "curl：连接被意外中断",
+        ),
+        (
+            "Failed to perform, curl: (35) TLS connect error: SSL routines: tlsv1 alert handshake failure",
+            "curl：TLS握手失败",
+        ),
+        (
+            "Failed to perform, curl: (35) SSL routines: wrong version number",
+            "curl：TLS版本不匹配",
+        ),
+        # 非 TLS 家族对不上译表，原样留着仍是诊断线索
+        ("Failed to perform, curl: (7) Failed to connect to 127.0.0.1 port 1080", None),
+        # 多轮累积的其他原因不被译文吃掉
+        (
+            "HTTP 403、Failed to perform, curl: (35) BoringSSL SSL_connect: Connection closed abruptly",
+            "HTTP 403、curl：连接被强制关闭",
+        ),
+    ],
+)
+def test_translate_error_detail(raw: str, expected_detail: str | None):
+    from mdcx.core.network_check import _translate_error_detail
+
+    detail = _translate_error_detail(raw)
+
+    assert detail == (raw if expected_detail is None else expected_detail)
+
+
+def test_split_request_prefix():
+    from mdcx.core.network_check import _split_request_prefix
+
+    assert _split_request_prefix("GET https://avsex.cc 失败: curl: (35) TLS connect error") == (
+        "GET https://avsex.cc 失败",
+        "curl: (35) TLS connect error",
+    )
+    assert _split_request_prefix("POST https://x.cc 未知错误:  boom") == ("POST https://x.cc 未知错误", "boom")
+    # 拆不出地址前缀时整串当细节（调用方退回旧格式）
+    assert _split_request_prefix("Could not resolve host: x.cc") == ("", "Could not resolve host: x.cc")
+
+
+def test_compose_failed_message_falls_back_without_prefix():
+    """错误串没有「{方法} {url} 失败」段时维持旧的 `{提示}: {错误串}` 格式。"""
+    from mdcx.core.network_check import _compose_failed_message
+
+    assert _compose_failed_message("DNS 解析失败", "Could not resolve host: x.cc") == (
+        "DNS 解析失败: Could not resolve host: x.cc"
+    )
+
+
 @pytest.mark.anyio
 async def test_run_network_check_item_uses_default_retry_instead_of_single_attempt():
     spec = NetworkCheckSpec(name="avbase", group="刮削站点", url="https://www.avbase.net")
