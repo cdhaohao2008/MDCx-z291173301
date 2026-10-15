@@ -320,7 +320,7 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
         # 回环 https 降回 http：FlareSolverr/TRAWL 本地实例只 serving 纯 HTTP，
         # 保留 https 会导致适配层与检测全部 TLS 超时（normalize_trawl_url）。
         try:
-            from ..cf_bypass.trawl_adapter import normalize_trawl_url
+            from ..utils.cf_url import normalize_trawl_url
 
             r = normalize_trawl_url(r)
         except Exception:

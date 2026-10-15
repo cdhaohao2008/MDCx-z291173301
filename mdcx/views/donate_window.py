@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..config.resources import resources
-from ..controllers.main_window.style import get_theme_tokens
+from ..ui_theme import get_theme_tokens
 from ..utils.window_center import CenterOnFirstShowMixin
 
 # ------------------------------------------------------------------ 设计尺寸

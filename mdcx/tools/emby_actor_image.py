@@ -14,9 +14,9 @@ from ..config.enums import EmbyAction
 from ..config.manager import manager
 from ..config.resources import resources
 from ..image import cut_pic, fix_pic_async
-from ..models.flags import Flags
 from ..signals import signal
 from ..utils import get_used_time
+from ..utils.task_stop import stop_requested
 from .emby_actor_manager import _parse_graphis_html, get_gfriends_index
 from .emby_shared import (
     JELLYFIN_PERSON_FIELDS,
@@ -32,7 +32,7 @@ class ActorPhotoTaskStopped(Exception): ...
 
 
 def _is_stop_requested() -> bool:
-    return signal.stop or Flags.stop_requested
+    return stop_requested()
 
 
 def _raise_if_stop_requested() -> None:

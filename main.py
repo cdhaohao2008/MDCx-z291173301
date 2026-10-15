@@ -11,8 +11,8 @@ from PyQt6.QtWidgets import QApplication
 
 from mdcx.consts import IS_DOCKER, IS_MAC, IS_NFC, IS_PYINSTALLER, IS_WINDOWS, MAIN_PATH
 from mdcx.controllers.main_window.main_window import MyMAinWindow
-from mdcx.controllers.main_window.style import apply_application_palette
 from mdcx.core.tmdb_actor import flush_tmdb_query_cache
+from mdcx.ui_theme import apply_application_palette
 from mdcx.utils.video import get_video_backend
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True

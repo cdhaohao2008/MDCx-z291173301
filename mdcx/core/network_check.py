@@ -1086,7 +1086,7 @@ def _build_static_specs() -> list[NetworkCheckSpec]:
     trawl_url = manager.config.cf_bypass_trawl_url.strip()
     if trawl_url:
         try:
-            from ..cf_bypass.trawl_adapter import normalize_trawl_url
+            from ..utils.cf_url import normalize_trawl_url
 
             trawl_url = normalize_trawl_url(trawl_url)
         except Exception:

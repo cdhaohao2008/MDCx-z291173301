@@ -14,6 +14,11 @@ import httpx
 
 from mdcx.consts import IS_PYINSTALLER
 
+# 归一化纯函数已下沉到 mdcx/utils/cf_url.py：config 迁移与 core 网络检测都要用它，
+# 留在本模块会让 config 反向依赖 cf_bypass，并在只读配置时把 httpx 一起拖进来。
+# 这里同名再导出，既有 `from mdcx.cf_bypass.trawl_adapter import normalize_trawl_url` 不变。
+from ..utils.cf_url import _LOOPBACK_HOSTS, normalize_trawl_url  # noqa: F401
+
 if TYPE_CHECKING:
     import uvicorn
 
@@ -40,27 +45,6 @@ def _normalize_backend(backend: str | None) -> str:
     if backend not in VALID_BACKENDS:
         backend = BACKEND_TRAWL
     return backend
-
-
-_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
-
-
-def normalize_trawl_url(url: str | None) -> str:
-    """归一化外部CF服务地址：回环地址的 https 降回 http。
-
-    FlareSolverr / TRAWL 本地实例只 serving 纯 HTTP；配成 https://127.0.0.1:8191
-    会导致适配层 POST /v1 TLS 握手失败（_wait_ready 探活永不等到 200，60s 后
-    start() 失败并永久禁用），检测页 GET / 也超时红灯。非回环地址原样保留。
-    """
-    cleaned = (url or "").strip().rstrip("/")
-    if cleaned.lower().startswith("https://"):
-        try:
-            host = (urlparse(cleaned).hostname or "").lower()
-        except Exception:
-            host = ""
-        if host in _LOOPBACK_HOSTS:
-            cleaned = "http://" + cleaned[len("https://") :]
-    return cleaned
 
 
 def _find_free_port() -> int:

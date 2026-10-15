@@ -11,7 +11,8 @@
 ## 一、总体结论
 
 项目分层的**声明**（`docs/Development.md`：UI → 控制器 → 核心业务层 → 爬虫框架 → 基础设施层）
-与**实际**存在系统性偏差。偏差集中在 6 个根因上：
+与**实际**存在系统性偏差。第一轮偏差集中在 6 个根因上（均已修复，见「二」），
+**第二轮**复查又找出 4 个（同样已修复，见 3.6）：
 
 | # | 根因 | 表现 | 状态 |
 |---|---|---|---|
@@ -21,16 +22,25 @@
 | 4 | 视图层反向依赖控制器层 | `views/nfo_preview_window.py` 引用 `MyMAinWindow` | ✅ **已修复** |
 | 5 | 全局事件总线把 Qt 传染给整个业务层 | `mdcx/signals.py` 顶层 `class Signals(QObject)`；`base` / `core` / `crawlers` / `tools` 为了 `add_log` 一行日志而被迫加载 PyQt6 | ✅ **已修复** |
 | 6 | 主窗口单文件承载全部关注点 | `controllers/main_window/main_window.py` 12,596 行 / 387 方法 / 221 个类常量 / 49 个 `pyqtSignal`，布局、导航、刮削控制、结果树、设置、托盘、网络检测全部混在一起 | ✅ **已修复** |
+| 7 | **主题/调色板住在控制器包里**（第二轮） | `controllers/main_window/style.py` 里的 token / QSS 生成器被 `views/donate_window.py`、`controllers/cut_window.py`、`tools/emby_actor_manager_ui.py`、`main.py` 引用 | ✅ **已修复** |
+| 8 | **配置层反向依赖 CF 绕过层**（第二轮） | `config/migrations.py`、`core/network_check.py` 运行时 `from ..cf_bypass.trawl_adapter import normalize_trawl_url`，只读配置时把 `httpx` 一起拖进来 | ✅ **已修复** |
+| 9 | **停机判定散落 7 份**（第二轮） | `signal.stop or Flags.stop_requested` 在 `emby_actor_manager.py` / `emby_actor_info.py` / `emby_actor_image.py` / `actor_db_tool.py` 各写一遍 | ✅ **已修复** |
+| 10 | **演员管理窗口 UI / 数据 / 服务三层同文件 + 20 处重复**（第二轮） | `tools/emby_actor_manager_ui.py` 5,310 行；`_center_on_screen` 6 份、头像来源分派 3 份、config 持久化样板 8 份；`ActorDetailDialog._run_sync` 绕过整套线程框架 | ✅ **已修复**（见 3.6） |
 
 **结果：分层倒置从 5 处降到 0 处**（`core→tools`、`base→core`、`crawlers→core`、
-`config→crawlers`、`views↔controllers`）；
+`config→crawlers`、`views↔controllers`）；第二轮再消掉 `views/tools→controllers`
+与 `config→cf_bypass` 两条边；
 **Qt 传染源从 1 个全局总线收窄为 0 个（除 `core/scraper.py` 一处刻意保留外，见下）——
 实测 32 个被探测模块中 31 个已完全不含 PyQt6**；
 **主窗口从 12,596 行单体拆成 1 个 717 行的类装配器 + 28 个按职责命名的 mixin，
-公开表面（387 方法 / 221 类常量 / 49 信号 / 568 个 `self.xxx` 赋值）逐项比对完全一致。**
+公开表面（387 方法 / 221 类常量 / 49 信号 / 568 个 `self.xxx` 赋值）逐项比对完全一致；
+演员管理窗口从 5,310 行拆出 4 个无界面依赖的模块（`emby_actor_clean_rules` /
+`emby_actor_source_catalog` / `emby_actor_ui_kit` / `emby_avatar_fetch`），
+公开表面（12 模块函数 / 16 个类 / 200 方法 / 241 个 `self.xxx` 赋值）逐项比对完全一致。**
 
-尚未处理、但影响面最大的一项见文末「四、后续优先级」——
-它体量大、且被大量**结构性测试**钉死物理位置，必须分批推进而非一次性重写。
+⚠️ 两轮里**唯一改变了行为**的一项是 `ActorDetailDialog` 的线程框架补齐（3.6 的 D18）：
+原先关闭详情窗口时若同步协程卡住，进程会留下无法回收的孤儿线程；现在可取消、
+可等待、必要时按既有「孤儿线程」约定摘除。其余改动全部行为等价。
 
 ---
 
@@ -312,6 +322,96 @@ main_window.py      717 行   ← 只剩：导入、_NET_SEP_* 常量、类声�
 > 于是 1 个文件的指针错误会在全量跑里级联出 20 多个无关文件的失败。
 > 改完测试指针一定要跑**全量**。
 
+### 3.6 二次解耦（第二轮）
+
+第一轮结束后重新做了全量审计（`audit2b.py`：修正了相对导入层级的解析；
+第一版解析把 `config/` 里的 `..core.x` 算成了 `config.core.x`，矩阵是假的）。
+结论：`views/` + `controllers/` 之外的 **Qt 导入已经是 0 个**，`mdcx.signals` 的
+35 个引用方全部是真正贴着界面的模块。剩下的偏差集中在 4 处。
+
+#### 3.6.1 主题层归位 — 新增 `mdcx/ui_theme.py`（根因 7）
+
+`controllers/main_window/style.py` 前 231 行的 9 个符号（`_qss_resources`、
+`LIGHT_TOKENS` / `DARK_TOKENS` / `_tokens` / `get_theme_tokens`、
+`apply_application_palette`、`build_tree_widget_style`、`build_menu_style`、
+`build_scrollbar_style`）**逐字搬到根级中立模块**，消掉 3 条反向依赖边：
+
+| 引用方 | 原导入 | 现导入 |
+|---|---|---|
+| `views/donate_window.py` | `..controllers.main_window.style` | `..ui_theme` |
+| `controllers/cut_window.py` | `.main_window.style` | `..ui_theme` |
+| `tools/emby_actor_manager_ui.py` | `..controllers.main_window.style` | `..ui_theme` |
+| `main.py` | `mdcx.controllers.main_window.style` | `mdcx.ui_theme` |
+
+`style.py` 保留 `__all__` 再导出全部 9 个名字，只留下真正只服务主窗口的 4 个
+（`_apply_log_document_style` / `_nfo_lib_top_button_qss` /
+`apply_nfo_lib_top_button_style` / `set_style` / `set_dark_style`）。
+
+> ⚠️ 有约 35 个测试 `monkeypatch` `style_mod.resources.qtr`。
+> 之所以安全：`style.py` 与 `ui_theme.py` 拿到的是**同一个** `Resources` 单例实例，
+> 打补丁打在对象属性上，两边都看得到。
+
+#### 3.6.2 CF 地址归一化下沉 — 新增 `mdcx/utils/cf_url.py`（根因 8）
+
+`normalize_trawl_url` 与 `_LOOPBACK_HOSTS` 从 `cf_bypass/trawl_adapter.py` 逐字搬出。
+收益有两层：消掉 `config→cf_bypass` 反向依赖；**只读配置文件不再把 `httpx` 拖进来**
+（`config/migrations.py` 在迁移时会调它）。
+`trawl_adapter.py` 保留同名再导出（`# noqa: F401`），
+因为 `tests/test_cf_proxy_routing.py:18` 直接 `from mdcx.cf_bypass.trawl_adapter import normalize_trawl_url`。
+
+#### 3.6.3 停机判定归一 — 新增 `mdcx/utils/task_stop.py`（根因 9）
+
+`stop_requested() -> bool` 单一实现，收掉 7 份逐字重复的
+`signal.stop or Flags.stop_requested`。各模块仍保留自己的 `_is_stop_requested`
+薄壳——测试会 `monkeypatch` 那个模块级名字。
+⚠️ `signal.stop` 与 `log_console.stop` 是**同一个变量**
+（`Signals.stop` 是代理 `log_console.stop` 的 property），所以换写法行为不变。
+3 个异常类（`ActorTaskStopped` ×2 + `ActorPhotoTaskStopped`）**刻意不动**：
+合并会改变 `except` 的匹配语义。
+
+#### 3.6.4 演员管理窗口拆层（根因 10）— 5,310 行 → 4,709 行
+
+拆出 4 个模块，UI 文件只留界面装配：
+
+| 新模块 | 搬走什么 | 性质 |
+|---|---|---|
+| `emby_actor_clean_rules.py` | `DEFAULT_CLEAN_RULES`、`_ensure_default_clean_rules`、`_sanitize_clean_rules`、`load_clean_rules` / `save_clean_rules`、`format_detail_cell_text`、`scan_actor_data_noise` | 纯业务，零 Qt |
+| `emby_actor_source_catalog.py` | 6 张数据源标签表（`IMAGE_SOURCE_NAMES` / `INFO_SOURCE_NAMES` / `IMAGE_PROGRESS` / `INFO_PROGRESS` / `_IMAGE_RESULT_NAMES` / `_INFO_RESULT_NAMES`），**每个字面量逐字保留** | 纯数据 |
+| `emby_avatar_fetch.py` | `fetch_avatar_from_source` / `load_gfriends_index` / `is_known_source` —— 把**重复 3 遍**的头像来源分派阶梯收成一份 | 只依赖数据层，零 Qt |
+| `emby_actor_ui_kit.py` | `make_folder_row` / `browse_folder`，并让 4 份 `_center_on_screen` 改用 `mdcx.utils.window_center` 里项目自己的标准实现 | 界面小工具 |
+
+**D18 线程框架补齐（本轮唯一的行为变更）**：
+`ActorDetailDialog._run_sync` 原先直接 `threading.Thread(...).start()`，
+既无取消、也无 stale-session、也无孤儿线程保护——同步协程卡住时关窗口会留下回收不掉的线程。
+现在：新增 `class DetailSyncThread(_CancellableWorkerThread)`，
+`_CancellableWorkerThread` 拆出 `_await_future` / `_run_blocking`；
+`ActorDetailDialog` 新增 `closeEvent` 与 `_sync_thread_finished`。
+
+> ⚠️ `_run_blocking` 走的是**新加的** `_BLOCKING_EXECUTOR`（`ThreadPoolExecutor(max_workers=4)`），
+> 不是共享的 `AsyncBackgroundExecutor`——后者只收协程，把阻塞调用丢进去会冻住共享的后台事件循环。
+> 这个坑是被新写的回归测试 `tests/test_actor_detail_sync_thread.py` 当场抓出来的。
+
+**为什么没有合并剩下几处重复**（逐条判断，不是遗漏）：
+
+| 编号 | 内容 | 不合并的理由 |
+|---|---|---|
+| D11 | config 持久化样板 8 处 | 改回调式要动大量行，收益不抵 churn |
+| D14 / D16 | 全屏钳制 + QSS ×3、字段/值表格 ×2 | 每处要的控件集合都不同，强行统一只会变成参数汤 |
+| D4 / D5 | 结构化 bio 解析在 `emby_actor_manager` 与 `actor_db_tool` 各一份 | `actor_db_tool` 的名字被测试钉死，且两种格式并不相同，合并有行为风险 |
+| D19 | `emby_actor_manager.py` 里 curl_cffi 与 httpx 两套 HTTP 栈并存 | 是真实设计问题，但会改变 TLS 指纹与代理路径，超出「行为不变」的范围 |
+| D15（部分） | 本地头像目录行 3 处 | 只套用了**形状完全一致**的那 1 处；另外 2 处的固定宽度 / `objectName("btnPrimary")` / 测试钉死的 `self.folder_browse_btn` 都不能动，已在 kit 的 docstring 里写明 |
+
+**等价性证据**：`tools/emby_actor_manager_ui.py` 的公开表面比对器
+`funcs 12 / classes 16 / consts 7 / methods 200 / self_attrs 241` →
+**`RESULT: IDENTICAL`**；另有 `sentinel` 模式复刻了 7 个测试对这个文件的
+**全部** AST / 源码断言（`_shutdown_worker_threads` 的 5 个属性名 + `abort` +
+`_detach_running_thread`、5 个 worker 类、`_begin_session` / `_is_stale_session`
+守卫、`_update_statistics` 的「恰好一处 `if self._show_unique:`」、
+`_build_actor_list` 里 `lbl_duplicate` 紧跟 `lbl_total`、
+`cmb_count_mode.setCurrentIndex` 必须在 `connect` 之前、
+`lbl_backdrop` tooltip 那句文案在且「唯一名字数模式按名字去重计数」不在，
+以及 `ActorSourceTestThread.run` 必须走 `_run_coro`/`executor.*`）→ **`SENTINEL: OK`**。
+
 ---
 
 ## 四、后续优先级（尚未实施）
@@ -329,13 +429,12 @@ main_window.py      717 行   ← 只剩：导入、_NET_SEP_* 常量、类声�
   （`test_net_separator_width.py` 会 import）
 - `super()` 的 4 个调用点必须与 `QMainWindow` 同类
 
-### P2 — `tools/emby_actor_manager_ui.py`（5,310 行）
+### ~~P2 — `tools/emby_actor_manager_ui.py`（5,310 行）~~ ✅ **已完成**（见 3.6）
 
-UI / 数据 / 服务三层混在一个文件，且存在 20 处重复（D1–D20）。已测绘出：
-重复最多的 config 持久化样板（8 处逐字重复）、`_center_on_screen`（6 处）、
-头像来源分派阶梯（3 处）、结构化 bio 解析（core 与 tools 各一份）。
-另有线程隐患：`ActorDetailDialog._run_sync` 绕过整套线程框架（无取消 /
-无 stale-session / 无孤儿线程保护）。
+5,310 行 → 4,709 行。UI / 数据 / 服务三层分开，20 处重复里处理了收益最高、
+且能证明行为等价的那些（D1 停机判定、D2 头像分派、D3 标签表、D13 居中、
+D15 目录行、D18 线程框架），其余逐条记录了**为什么不合并**。
+公开表面比对 `RESULT: IDENTICAL`，7 个结构性测试的 AST 断言 `SENTINEL: OK`。
 
 ---
 
@@ -371,3 +470,17 @@ UI / 数据 / 服务三层混在一个文件，且存在 20 处重复（D1–D20
     新增 mixin 时请一并加进那个列表。
 14. **改测试指针后必须跑全量**：某个 fixture 中途抛异常会让模块属性在整个
     session 内保持被替换状态，1 个文件的指针错误会级联出 20 多个无关文件的失败。
+15. **`ruff.toml` 的 `exclude` 对显式传入的路径无效**，除非加 `force-exclude`。
+    所以 `ruff format mdcx/views/donate_window.py` 会真的改写它 ——
+    而 `**/views/*.py` 是被**故意**排除的。本轮踩到，已从 HEAD 还原并只保留导入改动。
+16. **HEAD 本身就有 19 个文件过不了 `ruff format --check`**（含用户自己刚提交的
+    `core/network_check.py` 里的 I001）。不要顺手格式化它们 ——
+    `ruff format` 会把无关的格式改动混进本次 diff。本轮已还原
+    `cut_window.py` / `network_check.py` / `donate_window.py` 的格式改动。
+17. **`mdcx/tools/emby_actor_manager_ui.py` 的模块级属性是被 monkeypatch 的**：
+    `QMessageBox` / `manager` / `search_actor_info` / `fetch_all_actors` /
+    `get_all_staff_count` / `QGuiApplication` / `EmbyActorManagerDialog`。
+    搬走任何被调用的东西之前，先确认这些名字仍留在本模块、且调用点走的是模块属性。
+18. **第二轮新增的中立模块**（`mdcx/ui_theme.py`、`mdcx/utils/cf_url.py`、
+    `mdcx/utils/task_stop.py`）均**保留了原路径的同名再导出**，
+    因为测试与历史调用方都从旧路径 import。改名 = 破坏兼容。

@@ -19,7 +19,6 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QFileDialog,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -44,24 +43,23 @@ from PyQt6.QtWidgets import (
 from ..config.enums import Switch
 from ..config.manager import manager
 from ..config.resources import resources
-from ..controllers.main_window.style import build_scrollbar_style
 from ..models.emby import (
-    apply_overview_clean_rules,
     normalize_premiere_date,
     normalize_production_year,
 )
+from ..ui_theme import build_scrollbar_style
 from ..utils import executor
 from ..utils.qt_text import left_anchor_text_edits
+from ..utils.window_center import center_on_screen
+from . import emby_actor_clean_rules as clean_rules
+from . import emby_actor_source_catalog as source_catalog
 from .emby_actor_manager import (
     ActorInfo,
     build_local_avatar_index,
     clean_actor_data_batch_async,
     fetch_actor_info_from_source,
     fetch_all_actors,
-    from_gfriends,
     from_graphis,
-    from_local_avatar,
-    from_minnano_image,
     get_all_staff_count,
     get_gfriends_index,
     get_media_folders,
@@ -69,6 +67,8 @@ from .emby_actor_manager import (
     search_actor_info,
     sync_batch_async,
 )
+from .emby_actor_ui_kit import browse_folder, make_folder_row
+from .emby_avatar_fetch import fetch_avatar_from_source, is_known_source, load_gfriends_index
 
 # 演员管理器（主窗 + 设置 / 数据源测试 / 演员详情 / 选择媒体库 等子窗口）整体字号放大一号。
 # 走 QSS 而非 setFont：Qt 里样式表的 font-size 会覆盖控件字体，且样式表沿 QObject 父子链
@@ -241,10 +241,7 @@ class _FlushLogTextEdit(QPlainTextEdit):
             pass  # C++ 对象已销毁等竞态：纯外观调整，静默放弃
 
 
-DEFAULT_CLEAN_RULES: list[tuple[str, str]] = [
-    ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
-    ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
-]
+DEFAULT_CLEAN_RULES = clean_rules.DEFAULT_CLEAN_RULES
 """数据清洗默认替换规则: 两条 minnano 占位文案(半角/全角逗号)替换为空, 始终保留。"""
 
 
@@ -255,13 +252,7 @@ def _ensure_default_clean_rules(
 
     保证「两条 minnano 占位规则始终保留」——用户误删后下次加载/保存自动补回。
     """
-    existing = {original for original, _ in cleaned}
-    result = list(cleaned)
-    for original, replacement in DEFAULT_CLEAN_RULES:
-        if original not in existing:
-            result.append((original, replacement))
-            existing.add(original)
-    return result
+    return clean_rules._ensure_default_clean_rules(cleaned)
 
 
 def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
@@ -270,24 +261,7 @@ def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
     原始数值为空或非字符串的行丢弃(空行视为未填完); 替换数值非字符串时按空串处理
     (即删除原始数值)。供对话框回读与扫描口径共用。
     """
-    cleaned: list[tuple[str, str]] = []
-    if not rules:
-        return cleaned
-    try:
-        items = list(rules)
-    except TypeError:
-        return cleaned
-    for item in items:
-        try:
-            original, replacement = item
-        except (TypeError, ValueError):
-            continue
-        if not isinstance(original, str) or not original.strip():
-            continue
-        if not isinstance(replacement, str):
-            replacement = ""
-        cleaned.append((original, replacement))
-    return cleaned
+    return clean_rules._sanitize_clean_rules(rules)
 
 
 def load_clean_rules() -> list[tuple[str, str]]:
@@ -295,10 +269,7 @@ def load_clean_rules() -> list[tuple[str, str]]:
 
     数据清洗窗口弹出时默认加载本函数返回值, 故首开即见两条 minnano 占位规则。
     """
-    try:
-        return _ensure_default_clean_rules(_sanitize_clean_rules(manager.config.actor_clean_rules))
-    except Exception:
-        return list(DEFAULT_CLEAN_RULES)
+    return clean_rules.load_clean_rules(manager.config)
 
 
 def save_clean_rules(rules: object) -> list[tuple[str, str]]:
@@ -306,15 +277,7 @@ def save_clean_rules(rules: object) -> list[tuple[str, str]]:
 
     保存时自动补齐缺失的默认规则, 保证两条 minnano 占位规则始终保留。
     """
-    cleaned = _ensure_default_clean_rules(_sanitize_clean_rules(rules))
-    try:
-        cfg = manager.config.model_copy(deep=True)
-        cfg.actor_clean_rules = [[o, r] for o, r in cleaned]
-        manager._replace_config(cfg)
-        manager.save()
-    except Exception:
-        pass
-    return cleaned
+    return clean_rules.save_clean_rules(rules, manager)
 
 
 def format_detail_cell_text(overview: object) -> str:
@@ -325,44 +288,20 @@ def format_detail_cell_text(overview: object) -> str:
     - 剥除“(无)”/“（无）”残留与“=”装饰线（“====== 个人资料 ======”只留文字）；
     - 空白坍缩后截断 80 字 + “...”，空结果返回空串。
     """
-    if not isinstance(overview, str):
-        return ""
-    t = overview.strip()
-    if not t or t in ("(无)", "（无）", "无"):
-        return ""
-    t = re.sub(r"(?i)<br\s*/?>", " ", t)
-    t = re.sub(r"<[^>]*>", "", t)
-    # 残留字面 <br>（标签被截断时尖括号不完整，上面剥不掉）与行尾截断标签（如截图末尾“<b...”）
-    t = re.sub(r"(?i)<br\s*/?", " ", t)
-    t = re.sub(r"<[^>]*$", "", t)
-    for token in ("(无)", "（无）"):
-        t = t.replace(token, "")
-    t = re.sub(r"={2,}", " ", t)
-    t = re.sub(r"\s+", " ", t).strip()
-    if not t or t in ("(无)", "（无）"):
-        return ""
-    return t[:80] + "..." if len(t) > 80 else t
+    return clean_rules.format_detail_cell_text(overview)
 
 
-def scan_actor_data_noise(
-    actors: list[ActorInfo], rules: object | None = None
-) -> list[tuple[ActorInfo, str, bool]]:
+def scan_actor_data_noise(actors: list[ActorInfo], rules: object | None = None) -> list[tuple[ActorInfo, str, bool]]:
     """议题 #149: 扫描需要清洗的演员——简介含历史噪声(清洗后有变化)或生日非法(0000-00-00 等)。
 
     返回 (actor, 清洗后简介, 是否重置生日) 三元组; 生日为 Emby 未设置零值 0001-01-01
     或可被 normalize_premiere_date 正常解析时不算噪声。rules 为用户自定义
     (原始数值, 替换数值) 序列, 为空时仅走内置清洗(旧口径, 保证测试与兼容)。
     """
-    dirty: list[tuple[ActorInfo, str, bool]] = []
-    for a in actors:
-        new_overview = apply_overview_clean_rules(a.existing_overview, rules)
-        raw_birth = (a.existing_premiere_date or "").strip()
-        fix_birth = (
-            bool(raw_birth) and not raw_birth.startswith("0001-01-01") and normalize_premiere_date(raw_birth) is None
-        )
-        if new_overview != (a.existing_overview or "") or fix_birth:
-            dirty.append((a, new_overview, fix_birth))
-    return dirty
+    return clean_rules.scan_actor_data_noise(actors, rules)
+
+
+"""数据清洗默认替换规则: 两条 minnano 占位文案(半角/全角逗号)替换为空, 始终保留。"""
 
 
 class LibrarySelectDialog(QDialog):
@@ -424,24 +363,8 @@ class LibrarySelectDialog(QDialog):
 
     def _center_on_screen(self, avail=None, *, allow_defer: bool = True) -> None:
         """打开默认居于屏幕正中央(与管理器主窗同款口径: 以外框 frameGeometry 为准)。"""
-        try:
-            if avail is None or not hasattr(avail, "isValid") or not avail.isValid():
-                screen = self.screen() or QGuiApplication.primaryScreen()
-                if screen is None:
-                    return
-                avail = screen.availableGeometry()
-            if allow_defer and self.windowHandle() is None:
-                # 原生窗口尚未创建, frameGeometry 退化为客户区: 下一拍再居中一次。
-                QTimer.singleShot(0, lambda: self._center_on_screen(avail, allow_defer=False))
-                return
-            frame = self.frameGeometry()
-            x = avail.x() + (avail.width() - frame.width()) // 2
-            y = avail.y() + (avail.height() - frame.height()) // 2
-            self.move(max(x, avail.x()), max(y, avail.y()))
-        except (RuntimeError, AttributeError):
-            pass
-        except Exception:
-            pass
+        # 统一走 mdcx.utils.window_center 的唯一实现（外框 frameGeometry 口径）。
+        center_on_screen(self, avail, allow_defer=allow_defer)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -508,6 +431,11 @@ class _WorkerCancelled(Exception):
 # 避免 WA_DeleteOnClose 拆掉 C++ 线程对象导致整个进程 abort。
 _ORPHAN_WORKER_THREADS: set[QThread] = set()
 
+# 同步（阻塞）业务函数的专用线程池：与 AsyncBackgroundExecutor 刻意分开，
+# 后者跑在共享后台事件循环上，塞阻塞调用会把整条循环卡死。此处只承载
+# _run_blocking 的任务，由 QThread 侧轮询 + abort 收尾。
+_BLOCKING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="mdcx-blocking")
+
 
 def _detach_running_thread(thread: QThread) -> None:
     thread.setParent(None)
@@ -545,10 +473,8 @@ class _CancellableWorkerThread(QThread):
         if future is not None and not future.done():
             future.cancel()
 
-    def _run_coro(self, coro):
-        future = executor.submit(coro)
-        with self._lock:
-            self._future = future
+    def _await_future(self, future):
+        """轮询等待已登记的 future，abort 后立即按取消返回（不无限堵住 run()）。"""
         try:
             while True:
                 try:
@@ -564,6 +490,27 @@ class _CancellableWorkerThread(QThread):
         finally:
             with self._lock:
                 self._future = None
+
+    def _run_coro(self, coro):
+        future = executor.submit(coro)
+        with self._lock:
+            self._future = future
+        return self._await_future(future)
+
+    def _run_blocking(self, fn, *args):
+        """_run_coro 的同步版：把阻塞函数也丢进线程池，从而同样可被 abort 打断。
+
+        同步业务函数（如 sync_actor）若直接在 run() 里裸调，卡在网络请求上时
+        abort() 无从下手，关窗只能干等超时；统一登记 future 后，_await_future
+        的轮询看到 abort 标记就立刻收尾，run() 返回 → finished 发射 → wait() 放行。
+
+        不能复用 ``executor``（AsyncBackgroundExecutor）：它只收协程，且在它
+        的后台事件循环里跑阻塞函数会卡住整条共享循环。故用独立的线程池。
+        """
+        future = _BLOCKING_EXECUTOR.submit(fn, *args)
+        with self._lock:
+            self._future = future
+        return self._await_future(future)
 
 
 class FetchActorsThread(_CancellableWorkerThread):
@@ -762,13 +709,14 @@ class PreparePreviewThread(_CancellableWorkerThread):
 
     async def _fetch_avatar_from(self, actor: ActorInfo, src: str) -> str | None:
         """从单个图源尝试获取头像路径；未命中返回 None。graphis 由 _try_fetch_image 特判处理。"""
-        if src == "gfriends" and self.gfriends_index:
-            return await from_gfriends(actor, self.gfriends_index, self.cache_dir)
-        if src == "minnano":
-            return await from_minnano_image(actor, self.cache_dir)
-        if src == "local":
-            return from_local_avatar(actor, self.local_avatar_dir, self._local_avatar_index)
-        return None
+        return await fetch_avatar_from_source(
+            actor,
+            src,
+            gfriends_index=self.gfriends_index,
+            cache_dir=self.cache_dir,
+            local_avatar_dir=self.local_avatar_dir,
+            local_avatar_index=self._local_avatar_index,
+        )
 
     async def _try_fetch_info(self, actor: ActorInfo, force: bool):
         # 议题 #127: 简介缺失判定已由 select_targets 前置（列表阶段已带回 existing_overview，
@@ -861,6 +809,37 @@ _OPEN_CLEAN_RULES_DIALOGS: dict = {}
 规则窗(离屏实测: 双双 `wrapper alive: False`)。注册表多持一份强引用,
 随 `destroyed` 按 id 摘除(清理闭包只捕获 int, 不形成引用环), 保证两窗
 关闭互不影响。"""
+
+
+class DetailSyncThread(_CancellableWorkerThread):
+    """演员详情窗口的「同步回写」任务线程。
+
+    原先 ActorDetailDialog._run_sync 直接拉一根裸 threading.Thread：它不继承
+    _CancellableWorkerThread，既没有 abort()/cancel() 可打断，也没有注册进
+    _shutdown_worker_threads 的统一收尾，于是关窗只能干等、同步任务既停不掉
+    也不会被回收。改为与其它工作线程同源后，abort() 能取消登记的 future，
+    关窗亦可 wait + 必要时 detach 兜底（议题 #175 同一套保命手段）。
+    """
+
+    sync_done = Signal(object)
+
+    def __init__(self, actor, sync_type: str, parent=None):
+        super().__init__(parent)
+        self._actor = actor
+        self._sync_type = sync_type
+
+    def run(self):
+        from .emby_actor_manager import sync_actor
+
+        try:
+            result = self._run_blocking(sync_actor, self._actor, self._sync_type)
+        except _WorkerCancelled:
+            return
+        except Exception:
+            import traceback
+
+            result = (False, f"同步异常: {traceback.format_exc()}")
+        self.sync_done.emit(result)
 
 
 class ActorCleanRulesDialog(QDialog):
@@ -1023,22 +1002,10 @@ class ActorCleanRulesDialog(QDialog):
         except Exception:
             self.status_label.setText("")
 
-    def _center_on_screen(self, avail=None) -> None:
+    def _center_on_screen(self, avail=None, *, allow_defer: bool = True) -> None:
         """把窗口外框放到所在屏幕可用区的正中央(与演员详情窗同款口径)。"""
-        try:
-            if avail is None or not avail.isValid():
-                screen = self.screen() or QGuiApplication.primaryScreen()
-                if screen is None:
-                    return
-                avail = screen.availableGeometry()
-            frame = self.frameGeometry()
-            x = avail.x() + (avail.width() - frame.width()) // 2
-            y = avail.y() + (avail.height() - frame.height()) // 2
-            self.move(max(x, avail.x()), max(y, avail.y()))
-        except (RuntimeError, AttributeError):
-            pass
-        except Exception:
-            pass
+        # 统一走 mdcx.utils.window_center 的唯一实现（外框 frameGeometry 口径）。
+        center_on_screen(self, avail, allow_defer=allow_defer)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -1166,24 +1133,8 @@ class EmbyActorManagerDialog(QDialog):
         move() 收的是边框左上角，无需再补偿边框厚度。窗口比可用区还大时
         钳到可用区左上角，保证标题栏留在屏内抓得到。
         """
-        try:
-            if avail is None or not avail.isValid():
-                screen = self.screen() or QGuiApplication.primaryScreen()
-                if screen is None:
-                    return
-                avail = screen.availableGeometry()
-            if allow_defer and self.windowHandle() is None:
-                # 原生窗口尚未创建，frameGeometry 退化为客户区：下一拍再居中一次。
-                QTimer.singleShot(0, lambda: self._center_on_screen(avail, allow_defer=False))
-                return
-            frame = self.frameGeometry()
-            x = avail.x() + (avail.width() - frame.width()) // 2
-            y = avail.y() + (avail.height() - frame.height()) // 2
-            self.move(max(x, avail.x()), max(y, avail.y()))
-        except (RuntimeError, AttributeError):
-            pass
-        except Exception:
-            pass
+        # 统一走 mdcx.utils.window_center 的唯一实现（外框 frameGeometry 口径）。
+        center_on_screen(self, avail, allow_defer=allow_defer)
 
     def _begin_session(self, thread) -> None:
         """任务线程发起时颁发代数；与对话框当前值一致才允许写回 UI/状态。"""
@@ -1424,7 +1375,7 @@ class EmbyActorManagerDialog(QDialog):
         parent_layout.setContentsMargins(0, 0, 0, 0)
         stats_layout = QHBoxLayout()
         # 收紧统计栏上下边距：腾出的纵向空间让演员表格正好显示整行数
-        #（最大化 20 行、普通窗 15 行）。
+        # （最大化 20 行、普通窗 15 行）。
         stats_layout.setSpacing(2)
         stats_layout.setContentsMargins(0, 0, 0, 0)
         self.lbl_all_staff = QLabel("总数: ")
@@ -1473,9 +1424,7 @@ class EmbyActorManagerDialog(QDialog):
             lbl.setStyleSheet("padding: 0px 6px;")
             stats_layout.addWidget(lbl)
         # 有背景图留出足够显示数字的空间：按 5 位数预留最小宽度，避免右侧筛选控件挤压导致数字被裁
-        self.lbl_backdrop.setMinimumWidth(
-            self.lbl_backdrop.fontMetrics().horizontalAdvance("有背景图: 99999") + 20
-        )
+        self.lbl_backdrop.setMinimumWidth(self.lbl_backdrop.fontMetrics().horizontalAdvance("有背景图: 99999") + 20)
         stats_layout.addSpacing(6)
         stats_layout.addWidget(QLabel("筛选:"))
         self.cmb_filter = QComboBox()
@@ -1673,7 +1622,10 @@ class EmbyActorManagerDialog(QDialog):
                     cmb.setFixedWidth(self._FETCH_W_NARROW)
                 if clean.minimumWidth() != self._CLEAN_W_NARROW or clean.maximumWidth() != self._CLEAN_W_NARROW:
                     clean.setFixedWidth(self._CLEAN_W_NARROW)
-                if settings.minimumWidth() != self._SETTINGS_W_NARROW or settings.maximumWidth() != self._SETTINGS_W_NARROW:
+                if (
+                    settings.minimumWidth() != self._SETTINGS_W_NARROW
+                    or settings.maximumWidth() != self._SETTINGS_W_NARROW
+                ):
                     settings.setFixedWidth(self._SETTINGS_W_NARROW)
         except (RuntimeError, AttributeError):
             pass
@@ -1801,10 +1753,7 @@ class EmbyActorManagerDialog(QDialog):
         if a1 is not None and a1.type() == QEvent.Type.Resize:
             if table is not None and a0 is table.viewport():
                 self._apply_column_widths()
-            if (
-                (table is not None and a0 is table.viewport())
-                or (log is not None and a0 is log.viewport())
-            ):
+            if (table is not None and a0 is table.viewport()) or (log is not None and a0 is log.viewport()):
                 self._queue_viewport_refit()
         return super().eventFilter(a0, a1)
 
@@ -2013,9 +1962,7 @@ class EmbyActorManagerDialog(QDialog):
             # 最大化永远落回自然布局（用户报障 21.5 行 / 11 行即此）。
             # 必须同时服从表头 minimumSectionSize：低于它时 setDefaultSectionSize/
             # setRowHeight 会被静默钳位，算出的整行数全部作废（实测 21→24 的坑）。
-            hard_min = max(
-                table.fontMetrics().height() + 2, int(vhead.minimumSectionSize())
-            )
+            hard_min = max(table.fontMetrics().height() + 2, int(vhead.minimumSectionSize()))
 
             header_h = table.horizontalHeader().height()
             try:
@@ -2033,12 +1980,12 @@ class EmbyActorManagerDialog(QDialog):
             log_target = None
             avail = 0
             for _ in range(4):
-                table_fixed = (list_widget.height() - table.height()) + header_h + (
-                    table.height() - header_h - table.viewport().height()
+                table_fixed = (
+                    (list_widget.height() - table.height())
+                    + header_h
+                    + (table.height() - header_h - table.viewport().height())
                 )
-                log_chrome = (log_widget.height() - log.height()) + (
-                    log.height() - log.viewport().height()
-                )
+                log_chrome = (log_widget.height() - log.height()) + (log.height() - log.viewport().height())
                 avail = splitter.height() - handle
                 if avail <= 0:
                     return
@@ -2080,8 +2027,7 @@ class EmbyActorManagerDialog(QDialog):
                     self._setting_splitter_sizes = False
                 # 横向滚动条出现时会吃掉日志视口高度（属正常 chrome，不追）。
                 if table.viewport().height() == want_vp and (
-                    log.horizontalScrollBar().isVisible()
-                    or log.viewport().height() == want_log_vp
+                    log.horizontalScrollBar().isVisible() or log.viewport().height() == want_log_vp
                 ):
                     break
             if want_vp is None or list_target is None or log_target is None:
@@ -2473,7 +2419,9 @@ class EmbyActorManagerDialog(QDialog):
         self._set_status("获取完成")
         unique_names = len({a.name for a in actors})
         dup = max(raw_count - unique_names, 0)
-        self.log(f"获取完成，共 {len(actors)} 个演员（原始条目 {raw_count}，唯一名字 {unique_names}，重复 {dup}，全服总数 {self._all_staff_count}）")
+        self.log(
+            f"获取完成，共 {len(actors)} 个演员（原始条目 {raw_count}，唯一名字 {unique_names}，重复 {dup}，全服总数 {self._all_staff_count}）"
+        )
         self._populate_table(actors)
         self._update_statistics(actors)
         self.btn_preview.setEnabled(True)
@@ -2659,6 +2607,7 @@ class EmbyActorManagerDialog(QDialog):
                     pass
 
             dialog.destroyed.connect(_forget)
+
             # finished 接到闭包而非管理器 bound method: 闭包只弱引管理器,
             # 管理器先被回收时规则窗仍能独立收尾(确定则保存规则), 且连接本身
             # 不再强留管理器, 两窗生命周期彻底解耦。
@@ -2915,7 +2864,9 @@ class EmbyActorManagerDialog(QDialog):
         self.btn_preview.setEnabled(True)
         self._set_status("自动刷新完成")
         unique_names = len({a.name for a in actors})
-        self.log(f"✅ 自动刷新完成，共 {len(actors)} 个演员（原始条目 {raw_count}，唯一名字 {unique_names}，全服总数 {self._all_staff_count}）")
+        self.log(
+            f"✅ 自动刷新完成，共 {len(actors)} 个演员（原始条目 {raw_count}，唯一名字 {unique_names}，全服总数 {self._all_staff_count}）"
+        )
         self._set_buttons_enabled(True)
 
     def _on_thread_error(self, msg: str):
@@ -3214,18 +3165,10 @@ class EmbyActorManagerDialog(QDialog):
         self.btn_sync.setText(f"开始全部更新同步({sync_count} 项)" if sync_count > 0 else "开始全部更新同步")
 
 
-IMAGE_SOURCE_NAMES = {
-    "gfriends": "Gfriends网络头像",
-    "graphis": "Graphis头像/背景",
-    "minnano": "Minnano-av.com",
-    "local": "本地头像保存目录",
-}
-INFO_SOURCE_NAMES = {
-    "local": "本地演员名数据表",
-    "wiki": "维基百科中文网站",
-    "minnano": "Minnano-av.com",
-    "database": "本地已保存数据库",
-}
+IMAGE_SOURCE_NAMES = source_catalog.IMAGE_SOURCE_NAMES
+"""数据源展示名目录，见 :mod:`mdcx.tools.emby_actor_source_catalog`。"""
+INFO_SOURCE_NAMES = source_catalog.INFO_SOURCE_NAMES
+"""数据源展示名目录，见 :mod:`mdcx.tools.emby_actor_source_catalog`。"""
 
 
 class _SourceQuickSettingsPanel(QGroupBox):
@@ -3311,8 +3254,7 @@ class EmbyActorSettingsDialog(QDialog):
         super().__init__(None)
         self.setWindowTitle("Emby/Jellyfin 演员设置")
         self.setWindowFlags(
-            (self.windowFlags()
-             | Qt.WindowType.Window)
+            (self.windowFlags() | Qt.WindowType.Window)
             & ~(Qt.WindowType.WindowMaximizeButtonHint | Qt.WindowType.WindowMinimizeButtonHint)
         )
         # 关闭时由 Qt 销毁 C++ 对象，管理器侧的 destroyed 信号随之清空引用。
@@ -3321,6 +3263,7 @@ class EmbyActorSettingsDialog(QDialog):
         self.setStyleSheet(f"QWidget {{ font-size: {_ui_font_pt()}; }}")
         self.setMinimumSize(480, 720)
         self.resize(480, 720)
+
         # 打开时默认在屏幕可用区居中（主界面同款：以 frameGeometry 外框为准，
         # 原生窗口未创建时延后一次；小屏时钳制，避免标题栏移出可视区）。
         def _center_dialog(avail_rect):
@@ -3374,14 +3317,10 @@ class EmbyActorSettingsDialog(QDialog):
             self.info_list.addItem(item)
         layout.addWidget(self.info_list)
 
-        dir_row = QHBoxLayout()
-        dir_row.addWidget(QLabel("本地头像目录:"))
         self.photo_folder_edit = QLineEdit(manager.config.actor_photo_folder)
-        browse_btn = QPushButton("浏览...")
-        browse_btn.clicked.connect(self._browse_photo_folder)
-        dir_row.addWidget(self.photo_folder_edit)
-        dir_row.addWidget(browse_btn)
-        layout.addLayout(dir_row)
+        layout.addLayout(
+            make_folder_row("本地头像目录:", self.photo_folder_edit, self._browse_photo_folder),
+        )
 
         gf_row = QHBoxLayout()
         gf_row.addWidget(QLabel("Gfriends地址:"))
@@ -3406,9 +3345,7 @@ class EmbyActorSettingsDialog(QDialog):
         left_anchor_text_edits(self)
 
     def _browse_photo_folder(self):
-        path = QFileDialog.getExistingDirectory(self, "选择本地头像目录", self.photo_folder_edit.text())
-        if path:
-            self.photo_folder_edit.setText(path)
+        browse_folder(self, "选择本地头像目录", self.photo_folder_edit, cursor_reset=False)
 
     def _save(self):
         image_sources = [self.image_list.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.image_list.count())]
@@ -3460,9 +3397,7 @@ class ActorSourceTestThread(_CancellableWorkerThread):
                     pass
 
             logs, avatar_path, info = self._run_coro(
-                _actor_source_test_execute(
-                    self._name, self._need_image, self._need_info, progress_callback=_report
-                )
+                _actor_source_test_execute(self._name, self._need_image, self._need_info, progress_callback=_report)
             )
             self.result.emit(logs, avatar_path, info)
         except _WorkerCancelled:
@@ -3489,32 +3424,10 @@ async def _actor_source_test_execute(
             except Exception:
                 pass
 
-    # 与右侧快速设置面板文案保持一致的状态提示（顶部红字实时状态用，不写入底部结果框）。
-    _IMAGE_PROGRESS = {
-        "local": "正在从本地头像保存目录获取头像",
-        "minnano": "正在从Minnano-av.com获取头像",
-        "gfriends": "正在从Gfriends仓库获取网络头像",
-        "graphis": "正在从Graphis网站获取头像/背景",
-    }
-    _INFO_PROGRESS = {
-        "minnano": "正在从Minnano-av.com获取信息",
-        "local": "正在从本地演员名数据表获取信息",
-        "wiki": "正在从维基百科中文网站获取信息",
-        "database": "正在从本地已保存数据库获取信息",
-    }
-    # 底部结果框展示名（用户指定文案）。
-    _IMAGE_RESULT_NAMES = {
-        "local": "本地头像目录缓存",
-        "minnano": "Minnano-av.com",
-        "gfriends": "Gfriends网络头像",
-        "graphis": "Graphis网站头像",
-    }
-    _INFO_RESULT_NAMES = {
-        "minnano": "Minnano-av.com",
-        "local": "本地演员名数据表",
-        "wiki": "维基百科中文网站",
-        "database": "本地已保存数据库",
-    }
+    _IMAGE_PROGRESS = source_catalog.IMAGE_PROGRESS
+    _INFO_PROGRESS = source_catalog.INFO_PROGRESS
+    _IMAGE_RESULT_NAMES = source_catalog.IMAGE_RESULT_NAMES
+    _INFO_RESULT_NAMES = source_catalog.INFO_RESULT_NAMES
 
     logs: list[str] = []
     avatar_path: str | None = None
@@ -3522,26 +3435,21 @@ async def _actor_source_test_execute(
     actor = ActorInfo(name=name, actor_id="", server_id="")
 
     if need_image:
-        gfriends_index = None
-        try:
-            gfriends_index = await get_gfriends_index()
-        except Exception:
-            pass
+        gfriends_index = await load_gfriends_index()
         for src in manager.config.actor_image_sources:
             _report(_IMAGE_PROGRESS.get(src, f"正在从{src}获取头像"))
             result: object = None
             try:
-                if src == "gfriends" and gfriends_index:
-                    result = await from_gfriends(actor, gfriends_index, resources.u("emby_actor_cache"))
-                elif src == "graphis":
-                    result = await from_graphis(actor, resources.u("emby_actor_cache"))
-                elif src == "minnano":
-                    result = await from_minnano_image(actor, resources.u("emby_actor_cache"))
-                elif src == "local":
-                    result = from_local_avatar(actor, manager.config.actor_photo_folder)
-                else:
+                if not is_known_source(src):
                     logs.append(f"{_IMAGE_RESULT_NAMES.get(src, src)}: 未知数据源")
                     continue
+                result = await fetch_avatar_from_source(
+                    actor,
+                    src,
+                    gfriends_index=gfriends_index,
+                    cache_dir=resources.u("emby_actor_cache"),
+                    local_avatar_dir=manager.config.actor_photo_folder,
+                )
             except Exception as e:
                 logs.append(f"{_IMAGE_RESULT_NAMES.get(src, src)}: ❌ 异常 {e}")
                 continue
@@ -3584,9 +3492,7 @@ async def _actor_source_test_execute(
                             data, "birthday", ""
                         ) not in ("", "0000-00-00"):
                             info.birthday = data.birthday
-                        if getattr(info, "year", "") in ("", "0000") and getattr(
-                            data, "year", ""
-                        ) not in ("", "0000"):
+                        if getattr(info, "year", "") in ("", "0000") and getattr(data, "year", "") not in ("", "0000"):
                             info.year = data.year
                         _old_ov = getattr(info, "overview", "") or ""
                         _new_ov = getattr(data, "overview", "") or ""
@@ -3642,11 +3548,13 @@ class ActorSourceTestDialog(QDialog):
         # 打开时默认在屏幕可用区居中；小屏时钳制，避免标题栏移出可视区。
         # 与主窗口一致：使用 frameGeometry 精确计算外框居中，原生窗口未创建时延后一次。
         _w, _h = 1080, 720
+
         def _center_dialog(avail_rect):
             frame = self.frameGeometry()
             x = avail_rect.x() + max(0, (avail_rect.width() - frame.width()) // 2)
             y = avail_rect.y() + max(0, (avail_rect.height() - frame.height()) // 2)
             self.move(max(x, avail_rect.x()), max(y, avail_rect.y()))
+
         try:
             screen = QGuiApplication.primaryScreen()
             avail = screen.availableGeometry() if screen is not None else None
@@ -3679,9 +3587,7 @@ class ActorSourceTestDialog(QDialog):
         # 右侧预留文本边距，演员名与状态不重叠。轮换显示“正在从XX获取头像/信息”避免无反馈。
         self.status_label = QLabel(self.name_edit)
         self.status_label.setStyleSheet("color: #c00000; background: transparent;")
-        self.status_label.setAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-        )
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.status_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.status_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.status_label.setText("")
@@ -3833,10 +3739,7 @@ class ActorSourceTestDialog(QDialog):
         left_anchor_text_edits(self)
 
     def _browse_folder(self):
-        path = QFileDialog.getExistingDirectory(self, "选择本地头像目录", self.folder_edit.text())
-        if path:
-            self.folder_edit.setText(path)
-            self.folder_edit.setCursorPosition(0)
+        browse_folder(self, "选择本地头像目录", self.folder_edit, cursor_reset=True)
 
     def _save_folder(self):
         cfg = manager.config.model_copy(deep=True)
@@ -4260,8 +4163,7 @@ class ActorSourceTestDialog(QDialog):
             _bio.setReadOnly(True)
             _bio.setPlainText(_overview)
             _bio.setTextInteractionFlags(
-                Qt.TextInteractionFlag.TextSelectableByMouse
-                | Qt.TextInteractionFlag.TextSelectableByKeyboard
+                Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard
             )
             _bio.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             _bio.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -4368,7 +4270,13 @@ class ActorSourceTestDialog(QDialog):
             gaps = (g1.x() - g0.right() - 1) + (g2.x() - g1.right() - 1)
             fair = (g2.right() - g0.x() + 1 - gaps) / 4.0
             avail_w = int(fair)
-            avail_h = g0.height() - self.btn_image.height() - col.spacing() * 3 - col.contentsMargins().top() - col.contentsMargins().bottom()
+            avail_h = (
+                g0.height()
+                - self.btn_image.height()
+                - col.spacing() * 3
+                - col.contentsMargins().top()
+                - col.contentsMargins().bottom()
+            )
             if avail_w < 10 or avail_h < 10:
                 return
             ratio = 310 / 190
@@ -4430,11 +4338,7 @@ class ActorSourceTestDialog(QDialog):
                             if _w is not None:
                                 try:
                                     _cur = _w.textCursor()
-                                    _texts.append(
-                                        _cur.selectedText()
-                                        if _cur.hasSelection()
-                                        else _w.toPlainText()
-                                    )
+                                    _texts.append(_cur.selectedText() if _cur.hasSelection() else _w.toPlainText())
                                     continue
                                 except Exception:
                                     pass
@@ -4445,9 +4349,7 @@ class ActorSourceTestDialog(QDialog):
                             _w04 = None
                         if _w04 is not None and isinstance(_w04, QLineEdit):
                             try:
-                                _texts.append(
-                                    _w04.selectedText() if _w04.hasSelectedText() else _w04.text()
-                                )
+                                _texts.append(_w04.selectedText() if _w04.hasSelectedText() else _w04.text())
                             except Exception:
                                 _texts.append(_w04.text() or "")
                         else:
@@ -4664,14 +4566,16 @@ class ActorDetailDialog(QDialog):
             | Qt.WindowType.WindowMinimizeButtonHint
             | Qt.WindowType.WindowMaximizeButtonHint
         )
-        # 独立窗口：无父级、非模态打开，关闭即销毁 C++ 对象（无 QThread 子对象，
-        # 后台回写全经信号 + _emit_done 守卫，关窗中途回写不炸）。
+        # 独立窗口：无父级、非模态打开，关闭即销毁 C++ 对象（同步任务走可取消的
+        # QThread 子对象并在 closeEvent 里 abort + wait + 必要时 detach；
+        # 其余后台回写全经信号 + _emit_done 守卫，关窗中途回写不炸）。
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         # 无父级独立顶层窗口收不到管理器的 QSS 级联，字号与蓝色主按钮样式自带一份
         # （与管理器同值）：窗内所有控件比应用默认字号大一号；窗口标题栏文字由系统
         # 窗口框绘制、不受 QSS 影响，即「除演员详情标题外全部加大一号」。
         self.setStyleSheet(_child_dialog_qss())
         self._log_lines: list[str] = []
+        self._sync_thread: DetailSyncThread | None = None
         # 默认宽高与数据源测试窗口一致（1080x720），小屏钳制。
         self.setMinimumSize(1080, 720)
         try:
@@ -4802,7 +4706,7 @@ class ActorDetailDialog(QDialog):
             _box.installEventFilter(self)
 
         # 右侧快速设置面板（改即保存）：不限定宽，与左右两栏按 1:2:1 分配
-        #（数据源测试窗口同款 fixed_width=None，定宽会卡死 stretch）。
+        # （数据源测试窗口同款 fixed_width=None，定宽会卡死 stretch）。
         panel = _SourceQuickSettingsPanel(self, fixed_width=None)
         panel.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         # 头像/信息两列表 1:1 占据面板高度：详情窗常开（数据源测试窗是最大化才开，
@@ -4818,7 +4722,7 @@ class ActorDetailDialog(QDialog):
         self.folder_edit.textChanged.connect(self._save_folder)
 
         # 记住六枚按钮的默认高度：最大化时按对话框高度比例等比拉升高度、宽度不动
-        #（见 _sync_button_stretch）。按控件直接存引用——六枚都是 btnPrimary，
+        # （见 _sync_button_stretch）。按控件直接存引用——六枚都是 btnPrimary，
         # 用 objectName / 文案当键会互相顶掉。
         self._stretch_base_h: list[tuple[QPushButton, int]] = []
         for b in (
@@ -4843,10 +4747,7 @@ class ActorDetailDialog(QDialog):
         left_anchor_text_edits(self)
 
     def _browse_folder(self):
-        path = QFileDialog.getExistingDirectory(self, "选择本地头像目录", self.folder_edit.text())
-        if path:
-            self.folder_edit.setText(path)
-            self.folder_edit.setCursorPosition(0)
+        browse_folder(self, "选择本地头像目录", self.folder_edit, cursor_reset=True)
 
     def _save_folder(self):
         cfg = manager.config.model_copy(deep=True)
@@ -4999,7 +4900,7 @@ class ActorDetailDialog(QDialog):
         finally:
             self._in_preview_sync = False
 
-    def _center_on_screen(self, avail=None) -> None:
+    def _center_on_screen(self, avail=None, *, allow_defer: bool = True) -> None:
         """把窗口外框放到所在屏幕可用区的正中央（严格居中）。
 
         与管理器 `_center_on_screen()` 同款口径：以 **frameGeometry**（含标题栏/边框）
@@ -5007,20 +4908,8 @@ class ActorDetailDialog(QDialog):
         标题栏的高度（本机实测 30px）。窗口比可用区还大时钳到可用区左上角，
         保证标题栏留在屏内抓得到。
         """
-        try:
-            if avail is None or not avail.isValid():
-                screen = self.screen() or QGuiApplication.primaryScreen()
-                if screen is None:
-                    return
-                avail = screen.availableGeometry()
-            frame = self.frameGeometry()
-            x = avail.x() + (avail.width() - frame.width()) // 2
-            y = avail.y() + (avail.height() - frame.height()) // 2
-            self.move(max(x, avail.x()), max(y, avail.y()))
-        except (RuntimeError, AttributeError):
-            pass
-        except Exception:
-            pass
+        # 统一走 mdcx.utils.window_center 的唯一实现（外框 frameGeometry 口径）。
+        center_on_screen(self, avail, allow_defer=allow_defer)
 
     @staticmethod
     def _rescale_preview_pixmap(label: QLabel) -> None:
@@ -5042,11 +4931,7 @@ class ActorDetailDialog(QDialog):
 
     def eventFilter(self, obj, event):
         try:
-            if (
-                event is not None
-                and event.type() == QEvent.Type.Resize
-                and obj in getattr(self, "_preview_boxes", ())
-            ):
+            if event is not None and event.type() == QEvent.Type.Resize and obj in getattr(self, "_preview_boxes", ()):
                 self._sync_column_heights()
         except Exception:
             pass
@@ -5168,29 +5053,20 @@ class ActorDetailDialog(QDialog):
         except Exception as e:
             self.log(f"🔶 获取头像失败: {e}")
             return
-        future.add_done_callback(
-            lambda fut: self._emit_done("fetch_image", _future_result_or(fut, (False, None)))
-        )
+        future.add_done_callback(lambda fut: self._emit_done("fetch_image", _future_result_or(fut, (False, None))))
 
     async def _fetch_image(self) -> tuple[bool, str | None]:
-        from .emby_actor_manager import from_gfriends, from_graphis, from_local_avatar, from_minnano_image
-
-        gfriends_index = None
-        try:
-            gfriends_index = await get_gfriends_index()
-        except Exception:
-            pass
+        gfriends_index = await load_gfriends_index()
         for src in manager.config.actor_image_sources:
             result: object = None
             try:
-                if src == "gfriends" and gfriends_index:
-                    result = await from_gfriends(self.actor, gfriends_index, resources.u("emby_actor_cache"))
-                elif src == "graphis":
-                    result = await from_graphis(self.actor, resources.u("emby_actor_cache"))
-                elif src == "minnano":
-                    result = await from_minnano_image(self.actor, resources.u("emby_actor_cache"))
-                elif src == "local":
-                    result = from_local_avatar(self.actor, manager.config.actor_photo_folder)
+                result = await fetch_avatar_from_source(
+                    self.actor,
+                    src,
+                    gfriends_index=gfriends_index,
+                    cache_dir=resources.u("emby_actor_cache"),
+                    local_avatar_dir=manager.config.actor_photo_folder,
+                )
             except Exception:
                 continue
             if result:
@@ -5235,23 +5111,36 @@ class ActorDetailDialog(QDialog):
                 self.on_synced(self.actor)
 
     def _run_sync(self, sync_type: str):
-        from .emby_actor_manager import sync_actor
-
         self._apply_edits()
         self.btn_sync_both.setEnabled(False)
         self.btn_sync_image.setEnabled(False)
         self.btn_sync_info.setEnabled(False)
 
-        def _worker():
-            try:
-                result = sync_actor(self.actor, sync_type)
-            except Exception:
-                import traceback
+        # 走可取消的 QThread（与 _fetch/_preview/_sync/_clean 同源）而不是裸
+        # threading.Thread：同步会真的写 Emby 服务器，关窗时必须能打断并回收，
+        # 否则窗口已销毁、任务还在后台跑，回写只能被 _emit_done 静默丢弃。
+        thread = DetailSyncThread(self.actor, sync_type, self)
+        thread.sync_done.connect(lambda result: self._emit_done("sync", result))
+        thread.finished.connect(lambda: self._sync_thread_finished(thread))
+        self._sync_thread = thread
+        thread.start()
 
-                result = (False, f"同步异常: {traceback.format_exc()}")
-            self._emit_done("sync", result)
+    def _sync_thread_finished(self, thread):
+        """线程收尾：只清理自己仍是当前线程的那一格，避免拆掉后续任务的引用。"""
+        if getattr(self, "_sync_thread", None) is thread:
+            self._sync_thread = None
 
-        threading.Thread(target=_worker, daemon=True).start()
+    def closeEvent(self, event):
+        # 与管理器 closeEvent 同源的收尾：先打断同步任务，再等它退出；
+        # 等不到（卡在不可取消的原生阻塞）就卸父级并保住引用，避免
+        # WA_DeleteOnClose 拆掉仍在运行的 QThread 导致进程 abort。
+        thread = getattr(self, "_sync_thread", None)
+        if thread is not None:
+            thread.abort()
+            if thread.isRunning() and not thread.wait(5000) and thread.isRunning():
+                _detach_running_thread(thread)
+            self._sync_thread = None
+        super().closeEvent(event)
 
     def _apply_edits(self):
         actor = self.actor

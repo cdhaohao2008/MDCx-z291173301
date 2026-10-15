@@ -1293,11 +1293,10 @@ async def run_actor_db_xlsx(
 
     import openpyxl as _xl
 
-    from ..log_console import log_console
-    from ..models.flags import Flags
+    from ..utils.task_stop import stop_requested
 
     def _is_stop_requested() -> bool:
-        return log_console.stop or Flags.stop_requested
+        return stop_requested()
 
     wb = _xl.load_workbook(db_path)
     ws = get_actor_db_sheet(wb)
@@ -2192,11 +2191,10 @@ async def clean_male_actors(*, limit: int = 5000, concurrency: int = 5) -> Clean
     - 支持 limit 限量与手动停止（log_console.stop / Flags.stop_requested）。
     """
     from ..core.tmdb_actor import _ACTOR_DB_ROW_INDEX, _ACTOR_DB_ROW_INDEX_LOCK, _format_db_worksheet
-    from ..log_console import log_console
-    from ..models.flags import Flags
+    from ..utils.task_stop import stop_requested
 
     def _is_stop_requested() -> bool:
-        return log_console.stop or Flags.stop_requested
+        return stop_requested()
 
     import openpyxl as _xl
 
@@ -2396,11 +2394,10 @@ async def verify_tmdb_ids(*, limit: int = 5000, concurrency: int = 5) -> VerifyT
         _format_db_worksheet,
         _tmdb_rate_limiter,
     )
-    from ..log_console import log_console
-    from ..models.flags import Flags
+    from ..utils.task_stop import stop_requested
 
     def _is_stop_requested() -> bool:
-        return log_console.stop or Flags.stop_requested
+        return stop_requested()
 
     import openpyxl as _xl
 
@@ -2653,11 +2650,10 @@ async def update_nfo_tmdb_ids(dir_path: Path, *, limit: int = 5000, concurrency:
     支持 limit 限量与手动停止（log_console.stop / Flags.stop_requested）。
     """
     from ..core.tmdb_actor import search_actor_db_reverse
-    from ..log_console import log_console
-    from ..models.flags import Flags
+    from ..utils.task_stop import stop_requested
 
     def _is_stop_requested() -> bool:
-        return log_console.stop or Flags.stop_requested
+        return stop_requested()
 
     result = UpdateNfoTmdbIdResult()
     if not await aiofiles.os.path.isdir(dir_path):

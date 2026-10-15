@@ -14,10 +14,10 @@ from ..config.manager import manager
 from ..config.models import MarkType
 from ..core.file import get_file_info_v2
 from ..models.mosaic import has_leak_mark, has_umr_mark, has_uncensored_mark, is_censored_mosaic
+from ..ui_theme import get_theme_tokens
 from ..utils import executor
 from ..utils.file import delete_file_sync
 from ..views.posterCutTool import Ui_Dialog_cut_poster
-from .main_window.style import get_theme_tokens
 
 if TYPE_CHECKING:
     from ..models.model_types import FileInfo

@@ -16,9 +16,15 @@ mdcx/
 ├── gen/               # 自动生成的枚举
 ├── models/            # 数据模型（FileInfo、CrawlerResult 等）
 ├── tools/             # 工具（演员数据库、Emby 同步、字幕等）
-├── utils/             # 工具函数（限流、日志、文件操作）
+├── ui_theme.py        # 中立主题层：token / 调色板 / QSS 生成器（views、controllers、tools、main.py 都从这里取，不要再从 controllers 拿）
+├── utils/             # 工具函数（限流、日志、文件操作、task_stop、cf_url）
 └── views/             # UI 视图（Qt Designer 生成的 .ui 和 .py）
 ```
+
+> `tools/emby_actor_manager_ui.py`（演员管理主窗口）已按 UI / 规则 / 标签 / 头像分派拆开：
+> `emby_actor_clean_rules.py`（清洗规则与展示文本）、`emby_actor_source_catalog.py`（数据源标签表）、
+> `emby_actor_ui_kit.py`（目录行 / 选目录小工具）、`emby_avatar_fetch.py`（头像来源分派）。
+> 拆分依据与「哪些重复刻意没合并」见 `docs/Decoupling-Review.md` 3.6。
 
 ## 架构
 
@@ -120,7 +126,7 @@ UI 层 (PyQt6)         → 界面展示、用户操作
 **设置页各页签滚动条厚度统一（80% 分数缩放下“未点开的页更窄”）**
 
 - 现象（用户实测四条，截图红框标出演员/网络/高级）：启动后先点开过的页正常、没点过的更窄；等 30~60 秒或最大化再还原后全部变齐；且每次异常页都不同。
-- 排查排除：滚动区 `.ui` 逐项一致（几何/frameShape/lineWidth/AlwaysOn/AlwaysOff/widgetResizable，演员仅多 Sunken 装饰）；12 个滚动区全是 `CustomScrollArea`（`findChild` 无遗漏）；全库无 `setStyle`/`QScrollBar` 实例化/`setVerticalScrollBar`，策略全 AlwaysOn；QSS 滚动条规则全库唯一（`controllers/main_window/style.py:build_scrollbar_style`，`QScrollBar:vertical{width:16px}` + 满宽滑块 + `min-height:44px`，随 centralwidget 整页下发）且渲染输出合法（大括号平衡）；离屏 12 页 + 0.8 缩放 + 首开→最大化→还原三轮探针全部逐值相等。
+- 排查排除：滚动区 `.ui` 逐项一致（几何/frameShape/lineWidth/AlwaysOn/AlwaysOff/widgetResizable，演员仅多 Sunken 装饰）；12 个滚动区全是 `CustomScrollArea`（`findChild` 无遗漏）；全库无 `setStyle`/`QScrollBar` 实例化/`setVerticalScrollBar`，策略全 AlwaysOn；QSS 滚动条规则全库唯一（`mdcx/ui_theme.py:build_scrollbar_style`，`QScrollBar:vertical{width:16px}` + 满宽滑块 + `min-height:44px`，随 centralwidget 整页下发）且渲染输出合法（大括号平衡）；离屏 12 页 + 0.8 缩放 + 首开→最大化→还原三轮探针全部逐值相等。
 - ~~生产取证（临时日志）~~ / ~~像素级取证~~：**这两批"12 页逐值相同、都是 16px"的证据已作废**，原因是探针根本没让设置页显示出来——`stackedWidget` 里 `page_setting` 的下标是 **4**（不是 2），按 2 进页时页面始终 `isVisibleTo=False`，滚动条从未被布局/抛光，量到的只有"恰好被布局过的那一条"是真的，其余 11 条的 `vis=False` 被当成"无需检查"跳过了。**教训：量设置页滚动条前必须先断言 `page_setting.isVisibleTo(win)`，否则整批数据作废。**
 - **已定案（滚动条忽宽忽窄）**：根因是控制器读 `width()` + 取 `min`，两处叠加把一次瞬时坏读数变成全局永久降级。QSS 的权威厚度是 `QScrollBar:vertical{width:16px}`，它落在 **`sizeHint()`** 上；而 `width()` 只是控件当前几何，未 polish / 未被布局的页签停在平台默认 `PM_ScrollBarExtent`（`QT_SCALE_FACTOR=0.8` + 125% 系统缩放下实测 **12**，比 QSS 少 4）。旧代码 `min(sane)` 先取到某个未抛光页的 12，再 `setFixedWidth(12)`（min=max=12，**覆盖 QSS**）把 12 页一齐钉死——这正是"首开某页是宽的、切走再回来变窄、再也回不到 16、且每次落在随机页签"的表现。**决定性复现**：`QT_SCALE_FACTOR=0.8`、窗口 1030×650、真正进入设置页后逐页切换并对每条**可见**滚动条 `grab()` 逐像素量——修前 11 页里 **10 页渲染宽度就是 12px**（恰好落在字幕/水印/演员/网络/高级五页，与用户报的一模一样），修后 **11 页全 16px**。
 - 保留兜底：`_sync_settings_scrollbar_widths()`（try/except 整体兜底，3.14t free-threading 下槽内抛异常会直接带崩进程，见 add_log 槽事故）遍历 12 页签 CustomScrollArea，`area/viewport/bar` 全部 `ensurePolished()`，厚度读数改取 **`sizeHint()`**（不受布局时序影响，12 页恒为 QSS 值），只采信 8~48px 区间读数**取最宽者** `max` 为准、sizeHint 全不可信时退回 `width()` 仍取 max、其余 `setFixedWidth(target)`，有改动则 `_sync_page_layouts()` 按新视口重排；连接用 `QTimer.singleShot(0, …)` 且排在 `_queue_nfo_post_cascade_sync` 之后（量级联终态厚度，直连会量到级联前几何，同款陷阱见字段说明那节）。已一致时零改动（幂等）。**读数来源与 max 缺一不可**：读 `width()` 会被未布局页污染，取 `min` 则一次坏读数拖着全组降级——两者任一错都会复现随机页签变窄。**判定"是否需要钉"必须看约束（`minimumWidth()/maximumWidth()`）而不是几何（`width()`）**：首开时唯一被布局过的那条 `width()` 恰好已等于 target，按几何判会放过它，它就永远只靠 QSS 撑着，后续任意一次 polish/布局都能把它打回平台默认厚度——这正是"随机页签"的残余，故逐条钉成 `min=max=target` 才是封死的终态。
@@ -415,7 +421,7 @@ Jinja2 模板引擎，支持条件渲染、智能截断。三类命名目标：�
 
 依赖方向：`emby_shared.py` ← `emby_actor_manager.py` ← `emby_actor_image.py` / `emby_actor_info.py`（单向，无循环）。
 
-- **数据源显示名大小写**：`emby_actor_manager_ui.py` 中 `minnano` 的 6 处用户可见文案保持 `Minnano-av.com` 首字母大写（`IMAGE_SOURCE_NAMES`/`INFO_SOURCE_NAMES`/`_IMAGE_RESULT_NAMES`/`_INFO_RESULT_NAMES` 的显示名、`_IMAGE_PROGRESS`/`_INFO_PROGRESS` 的"正在从Minnano-av.com获取…"进度提示）——这是数据源品牌显示名，不随代理域名全小写规则改动；代理域名（`proxy_sites` 默认值、使用说明页、网络层）一律全小写。
+- **数据源显示名大小写**：`emby_actor_manager_ui.py` 中 `minnano` 的 6 处用户可见文案保持 `Minnano-av.com` 首字母大写（`IMAGE_SOURCE_NAMES`/`INFO_SOURCE_NAMES`/`_IMAGE_RESULT_NAMES`/`_INFO_RESULT_NAMES`（已搬至 `mdcx/tools/emby_actor_source_catalog.py`，UI 侧同名再导出） 的显示名、`_IMAGE_PROGRESS`/`_INFO_PROGRESS` 的"正在从Minnano-av.com获取…"进度提示）——这是数据源品牌显示名，不随代理域名全小写规则改动；代理域名（`proxy_sites` 默认值、使用说明页、网络层）一律全小写。
 
 ## 爬虫框架
 

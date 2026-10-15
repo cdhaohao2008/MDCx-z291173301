@@ -247,6 +247,10 @@ class Resources:
 
         actor_db = self.actor_db
         if actor_db is not None:
+            # 延迟导入是为了断开真实循环：core.tmdb_actor 在模块顶层就 import 本模块的
+            # resources（见 core/tmdb_actor.py 的 `from ..config.resources import ...`），
+            # 提到顶层会变成 resources <-> core.tmdb_actor 互相导入。函数级导入是这类
+            # 循环的唯一无副作用解法，行为与顶层导入完全一致。
             from ..core.tmdb_actor import search_actor_db_reverse
 
             row = search_actor_db_reverse(actor)
@@ -321,6 +325,10 @@ class Resources:
             # 尝试从 XML 迁移
             loop = None
             try:
+                # 延迟导入是为了断开真实循环：core.tmdb_actor 在模块顶层就 import 本模块的
+                # resources（见 core/tmdb_actor.py 的 `from ..config.resources import ...`），
+                # 提到顶层会变成 resources <-> core.tmdb_actor 互相导入。函数级导入是这类
+                # 循环的唯一无副作用解法，行为与顶层导入完全一致。
                 from ..core.tmdb_actor import migrate_xml_to_xlsx
 
                 # 同步执行迁移（在事件循环外）
@@ -345,6 +353,10 @@ class Resources:
             # 尝试从 XML 迁移
             loop2 = None
             try:
+                # 延迟导入是为了断开真实循环：core.tmdb_actor 在模块顶层就 import 本模块的
+                # resources（见 core/tmdb_actor.py 的 `from ..config.resources import ...`），
+                # 提到顶层会变成 resources <-> core.tmdb_actor 互相导入。函数级导入是这类
+                # 循环的唯一无副作用解法，行为与顶层导入完全一致。
                 from ..core.tmdb_actor import migrate_info_xml_to_xlsx
 
                 loop2 = asyncio.new_event_loop()
@@ -371,6 +383,10 @@ class Resources:
         # 加载数据库 xlsx
         merge_actor_db_from_backup(self.actor_db_backup_path, self.u("actor_database.xlsx"))
         merge_info_db_from_backup(self.info_db_backup_path, self.u("info_database.xlsx"))
+        # 延迟导入是为了断开真实循环：core.amazon_database 在模块顶层就 import
+        # config.manager，与本模块同处 config 层，形成 config 内部互依；
+        # 提到顶层会变成 resources <-> core.tmdb_actor 互相导入。函数级导入是这类
+        # 循环的唯一无副作用解法，行为与顶层导入完全一致。
         from ..core.amazon_database import merge_asin_db_from_backup
 
         merge_asin_db_from_backup(asin_db_backup_path, asin_db_local_path)

@@ -20,10 +20,10 @@ from ..config.extend import get_movie_path_setting
 from ..config.manager import manager
 from ..config.resources import resources
 from ..models.emby import EMbyActressInfo
-from ..models.flags import Flags
 from ..signals import signal
 from ..utils import get_used_time
 from ..utils.file import copy_file_async
+from ..utils.task_stop import stop_requested
 from .emby_actor_image import (
     _get_actor_detail,
     _get_emby_actor_list,
@@ -39,7 +39,7 @@ class ActorTaskStopped(Exception): ...
 
 
 def _is_stop_requested() -> bool:
-    return signal.stop or Flags.stop_requested
+    return stop_requested()
 
 
 def _raise_if_stop_requested() -> None:
@@ -55,9 +55,7 @@ async def creat_kodi_actors(add: bool, *, manage_button_state: bool = True) -> N
         signal.show_log_text(f"📂 待刮削目录: {get_movie_path_setting().movie_path}")
         gfriends_actor_data: dict[str, str] | Literal[False] | None | bool
         if add:
-            signal.show_log_text(
-                "💡 将为等待刮削目录中的每个视频创建.actors文件夹，并补全演员图片到.actors文件夹中\n"
-            )
+            signal.show_log_text("💡 将为等待刮削目录中的每个视频创建.actors文件夹，并补全演员图片到.actors文件夹中\n")
             signal.show_log_text("👩🏻 开始补全 Kodi/Plex/Jvedio 演员头像...")
             gfriends_actor_data = await _get_gfriends_actor_data()
         else:

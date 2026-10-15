@@ -25,9 +25,9 @@ from ..models.emby import (
     normalize_premiere_date,
     normalize_production_year,
 )
-from ..models.flags import Flags
 from ..utils import executor
 from ..utils.file import write_file_atomic_async
+from ..utils.task_stop import stop_requested
 from .actress_db import ActressDB
 from .emby_shared import (  # noqa: F401
     _append_query,
@@ -68,7 +68,7 @@ class ActorTaskStopped(Exception):
 
 
 def _is_stop_requested() -> bool:
-    return log_console.stop or Flags.stop_requested
+    return stop_requested()
 
 
 def _raise_if_stop_requested() -> None:
