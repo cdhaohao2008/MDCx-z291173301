@@ -14413,7 +14413,7 @@ class Ui_MDCx(object):
         self.label_73.setText(_translate("MDCx", "超时时间："))
         self.label_no_proxy_sites.setText(_translate("MDCx", "使用代理："))
         self.comboBox_no_proxy_sites.setCurrentText(_translate("MDCx", "选择网站..."))
-        self.lineEdit_no_proxy_sites.setPlaceholderText(_translate("MDCx", "逗号分隔，如 api.tmdb.org,libredmm"))
+        self.lineEdit_no_proxy_sites.setPlaceholderText(_translate("MDCx", "逗号分隔，如api.tmdb.org,LibreDMM"))
         self.checkBox_proxy_route_all.setToolTip(
             _translate(
                 "MDCx",
@@ -14425,7 +14425,7 @@ class Ui_MDCx(object):
         self.lineEdit_direct_sites.setPlaceholderText(_translate("MDCx", "逗号分隔，如 google.com,github.com"))
         self.label_cf_bypass.setText(_translate("MDCx", "CF Bypass："))
         self.lineEdit_cf_bypass_url.setPlaceholderText(
-            _translate("MDCx", "留空则由CloudFlare 绕过服务自动启动（高级：手动指定 cf_bypasser 协议服务地址）")
+            _translate("MDCx", "留空则由CloudFlare Bypass服务自动启动，高级：手动指定cf_bypasser协议服务地址")
         )
         self.label_cf_bypass_proxy.setText(_translate("MDCx", "Bypass代理："))
         self.lineEdit_cf_bypass_proxy.setPlaceholderText(_translate("MDCx", "例如: http://127.0.0.1:7890（可选）"))
@@ -14438,7 +14438,7 @@ class Ui_MDCx(object):
         self.comboBox_cf_bypass_backend.setItemText(1, _translate("MDCx", "flaresolverr"))
         self.label_cf_bypass_trusted_hosts.setText(_translate("MDCx", "Bypass 白名单："))
         self.lineEdit_cf_bypass_trusted_hosts.setPlaceholderText(
-            _translate("MDCx", "逗号分隔，如 javbus.com,*.javdb.com（留空不校验）")
+            _translate("MDCx", "逗号分隔，如JavBus.com,*.JavDB.com，留空不校验")
         )
         self.lineEdit_cf_bypass_trusted_hosts.setToolTip(
             _translate(

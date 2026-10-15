@@ -22878,7 +22878,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
 </string>
                                 </property>
                                 <property name="placeholderText">
-                                  <string>逗号分隔，如 api.tmdb.org,libredmm</string>
+                                  <string>逗号分隔，如api.tmdb.org,LibreDMM</string>
                                 </property>
                               </widget>
                             </item>
@@ -22990,7 +22990,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
 </string>
                             </property>
                             <property name="placeholderText">
-                              <string>留空则由CloudFlare 绕过服务自动启动（高级：手动指定 cf_bypasser 协议服务地址）</string>
+                              <string>留空则由CloudFlare Bypass服务自动启动，高级：手动指定cf_bypasser协议服务地址</string>
                             </property>
                           </widget>
                         </item>
@@ -23173,7 +23173,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
 </string>
                             </property>
                             <property name="placeholderText">
-                              <string>逗号分隔，如 javbus.com,*.javdb.com（留空不校验）</string>
+                              <string>逗号分隔，如JavBus.com,*.JavDB.com，留空不校验</string>
                             </property>
                             <property name="toolTip">
                               <string>校验 Bypass 服务落地或重定向后的最终域名，防止第三方服务被劫持时把恶意页面当数据；支持 *.example.com 子域通配；留空表示不校验（默认）</string>
