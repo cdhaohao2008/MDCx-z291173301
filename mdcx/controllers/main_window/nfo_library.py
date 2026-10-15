@@ -797,7 +797,7 @@ def pushButton_nfo_lib_crop_clicked(self: MyMAinWindow) -> None:
     self.cutwindow.showimage(poster_path, None)
     # 标记来源：裁剪完成后留在信息管理页、只刷新预览图（见 cut_window.to_cut 末尾）
     self.cutwindow._nfo_lib_source = nfo_path
-    self.cutwindow.show()
+    self.cutwindow.present()
     self.cutwindow.raise_()
     self.cutwindow.activateWindow()
 

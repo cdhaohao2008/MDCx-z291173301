@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
-from PyQt6.QtCore import QPoint, QRect, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QCursor, QPixmap
-from PyQt6.QtWidgets import QDialog, QFileDialog, QPushButton
+from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog, QPushButton
 
 from ..base.image import add_mark_thread
 from ..config.enums import DownloadableFile
@@ -78,8 +78,23 @@ class CutWindow(QDialog):
     # 裁剪任务完成（后台线程发出，主线程收）：载荷 True/False/None 仅用于重启用按钮，结果本身无人消费
     cut_task_done = pyqtSignal(object)
 
+    # ==================== 布局常量（.ui 全是绝对几何，窗口尺寸变化只能靠这里重排）====================
+    # 设计尺寸 1000x600 = 左侧图片区 800 + 右侧面板 200，图片区下方是 60 高的底部滑块条
+    _SIDE_W = 200  # 右侧面板宽（固定，贴窗口右缘）
+    _BAR_H = 60  # 底部滑块条高
+    _BAR_DESIGN_W = 800  # 底部滑块条设计宽，富余宽度由左右两个滑块对半分
+    _BAR_MARGIN_R = 9  # 右组滑块距右缘（照搬 .ui 设计值）
+    _BAR_MIN_GAP = 40  # 左右两组滑块之间的最小间隙
+    _BAR_MIN_SLIDER_W = 120  # 滑块最小宽（窗口被压得很窄时）
+    _MIN_WIN_W = 640  # 窗口最小宽
+    _MIN_WIN_H = 500  # 窗口最小高（低于此值右侧面板的按钮会压到水印选项上）
+    _SIDE_BTN_BOTTOM = 10  # 右侧面板动作按钮距底
+    _SIDE_BTN_GAP = 10  # 右侧面板动作按钮彼此间距
+
     def __init__(self, parent: "MyMAinWindow"):
-        super().__init__(parent)
+        # 独立顶层窗口（不挂 owner）：主窗口最小化/隐藏/切到托盘都不牵连本窗口，
+        # 本窗口最小化/最大化也不动主窗口。parent 只作为 Python 引用留着取配置与发信号。
+        super().__init__()
         self.Ui = Ui_Dialog_cut_poster()  # 实例化 Ui
         self.Ui.setupUi(self)  # 初始化Ui
         self.main_window = parent
@@ -93,6 +108,8 @@ class CutWindow(QDialog):
         self.pic_new_h = self.show_h
         self.pic_w = self.show_w
         self.pic_h = self.show_h
+        self._source_pixmap: QPixmap | None = None  # 原图缓存：窗口缩放时直接复用，不再读盘
+        self._last_layout_size = QSize()  # 上次重排时的窗口尺寸，用来跳过无谓重排
         self.pushButton_select_cutrange = DraggableButton("拖动选择裁剪范围", self.Ui.label_backgroud_pic, self)
         self.pushButton_select_cutrange.setObjectName("pushButton_select_cutrange")
         self.pushButton_select_cutrange.setGeometry(QRect(420, 0, 379, 539))
@@ -101,6 +118,7 @@ class CutWindow(QDialog):
         self.Ui.horizontalSlider_left.setRange(1, 10000)
         self.Ui.horizontalSlider_right.setRange(1, 10000)
         self.set_style()
+        self._init_window_state()
         self.Ui.horizontalSlider_left.valueChanged.connect(self.change_postion_left)
         self.Ui.horizontalSlider_right.valueChanged.connect(self.change_postion_right)
         self.Ui.pushButton_open_pic.clicked.connect(self.open_image)
@@ -108,7 +126,141 @@ class CutWindow(QDialog):
         self.Ui.pushButton_cut.clicked.connect(self.do_cut)
         self.Ui.pushButton_close.clicked.connect(self.close)
         self.cut_task_done.connect(self._on_cut_task_done)
+        self._relayout(force=True)  # 建立基准布局（设计尺寸下与 .ui 逐像素一致）
         self.showimage()
+
+    def _init_window_state(self):
+        """窗口能力：最小化/最大化按钮、Esc 关闭、最小尺寸。"""
+        # 摘掉工具窗/无边框标记，补上最小化与最大化按钮（关闭按钮 QDialog 自带）。
+        # 窗口类型强制为 Window：不带 Dialog 位才不会成为主窗口的附属窗，
+        # 否则主窗口最小化/隐藏时 Windows 会连带把本窗口一起收走。
+        flags = self.windowFlags() & ~(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setWindowFlags(
+            flags | Qt.WindowType.Window | Qt.WindowType.WindowMinimizeButtonHint | Qt.WindowType.WindowMaximizeButtonHint
+        )
+        self.setModal(False)
+        # 独立窗口后本窗口就成了"最后一扇可见主窗口"，默认的 WA_QuitOnClose 会让
+        # 关掉裁剪窗直接退出整个应用（主窗口收进托盘时尤其明显），必须关掉。
+        self.setAttribute(Qt.WidgetAttribute.WA_QuitOnClose, False)
+        # 限死最小尺寸：窗口再小也不会把右侧面板按钮压到水印选项上、底栏标签裁掉
+        self.setMinimumSize(self._MIN_WIN_W, self._MIN_WIN_H)
+        # Esc 关闭要求窗口自己能拿到键盘焦点（焦点落在子控件上时按键事件也会冒泡上来）
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def _relayout(self, force: bool = False):
+        """按当前窗口尺寸重排三个区域，图片与裁剪框同步等比放大。
+
+        裁剪窗的 .ui 全是绝对几何、没有布局管理器，窗口放大后各控件不会自己跟位，
+        这里统一按窗口当前尺寸重排：右侧面板固定宽贴右缘并铺满高、底栏贴图片区下缘、
+        图片区吃掉剩余空间；图片按新的显示区重新等比缩放，裁剪框按相对位置还原，
+        用户已经选好的裁剪范围跟着图片一起放大。
+        """
+        if not force and self._last_layout_size == self.size():
+            return  # 尺寸没变（如最小化）不重排，避免白做一次图片缩放
+        win_w = max(int(self.width()), self._MIN_WIN_W)
+        win_h = max(int(self.height()), self._MIN_WIN_H)
+        side_w = self._SIDE_W
+        left_w = max(1, win_w - side_w)  # 左侧图片区宽（吃掉除右侧面板外的全部宽度）
+        img_h = max(1, win_h - self._BAR_H)  # 左侧图片区高（吃掉除底部滑块条外的全部高度）
+
+        self.Ui.widget.setGeometry(win_w - side_w, 0, side_w, win_h)  # 右侧面板：贴右上缘
+        self._layout_side_buttons(side_w, win_h)
+        self.Ui.widget_cutimage.setGeometry(0, 0, left_w, img_h)  # 左侧图片区
+        self.Ui.widget_2.setGeometry(0, img_h, left_w, self._BAR_H)  # 底部滑块条
+        self._layout_bottom_bar(left_w)
+
+        self.show_w = left_w  # 图片显示区域宽高，_fit_image 按它等比缩放
+        self.show_h = img_h
+        self._fit_image()
+        self._last_layout_size = QSize(win_w, win_h)
+
+    def _layout_side_buttons(self, side_w: int, win_h: int):
+        """右侧面板三个动作按钮贴底排布，间距照搬 .ui 设计值。
+
+        上半部分的尺寸/水印标签与选项固定在顶部不动，窗口拉高时多出来的高度
+        落在水印选项与动作按钮之间；动作按钮始终贴底，还原后与 .ui 逐像素一致。
+        """
+        btn_x, btn_w = 30, 141
+        if side_w < btn_x + btn_w:  # 面板被压窄（正常最小宽下不会发生）时水平居中
+            btn_w = max(60, side_w - btn_x * 2)
+            btn_x = (side_w - btn_w) // 2
+        close_h, cut_h, cut_close_h = 40, 40, 50  # 三个按钮的高度
+        y = win_h - self._SIDE_BTN_BOTTOM - close_h
+        self.Ui.pushButton_close.setGeometry(btn_x, y, btn_w, close_h)
+        y -= self._SIDE_BTN_GAP + cut_h
+        self.Ui.pushButton_cut.setGeometry(btn_x, y, btn_w, cut_h)
+        y -= self._SIDE_BTN_GAP + cut_close_h
+        self.Ui.pushButton_cut_close.setGeometry(btn_x, y, btn_w, cut_close_h)
+
+    def _layout_bottom_bar(self, bar_w: int):
+        """底部滑块条随窗口加长：宽态（最大化）两个滑块等分富余并同步右移。
+
+        窄态（用户手动缩小窗口）改为按可用宽度压窄滑块、右组贴右缘，
+        保证两组不重叠、标签不被裁掉。
+        """
+        left_x = 50  # 左滑块 x（设计值）
+        slider_w = 311  # 滑块设计宽
+        # 宽态：富余宽度对半分给左右两个滑块
+        extra = max(0, (bar_w - self._BAR_DESIGN_W) // 2)
+        avail = bar_w - self._BAR_MARGIN_R - left_x - self._BAR_MIN_GAP
+        if 2 * (slider_w + extra) > avail:  # 窄态：两个滑块同时等宽压窄
+            slider_w = max(self._BAR_MIN_SLIDER_W, avail // 2)
+            extra = 0
+        slider_w += extra
+        right_x = bar_w - self._BAR_MARGIN_R - slider_w
+        self.Ui.label_4.setGeometry(30, 10, 141, 16)
+        self.Ui.horizontalSlider_left.setGeometry(left_x, 31, slider_w, 20)
+        # 右组标签比滑块左移 40（照搬 .ui 设计关系），窗口变窄也不会被裁掉
+        self.Ui.label_6.setGeometry(right_x - 40, 10, 131, 16)
+        self.Ui.horizontalSlider_right.setGeometry(right_x, 30, slider_w, 21)
+
+    def _fit_image(self, keep_selection: bool = True):
+        """按当前显示区重新等比缩放图片，并按相对位置还原裁剪框。
+
+        keep_selection=True（窗口缩放/最大化）时先把裁剪框按当前显示区归一化，
+        缩放后再还原，保证选中范围跟着图片一起放大且指向原图同一块区域。
+        """
+        frac = None
+        old_w, old_h = int(self.pic_new_w), int(self.pic_new_h)
+        if keep_selection and old_w > 0 and old_h > 0:
+            px, py, pw, ph = self.pushButton_select_cutrange.geometry().getRect()
+            frac = (px / old_w, py / old_h, pw / old_w, ph / old_h)
+
+        area_w, area_h = max(1, int(self.show_w)), max(1, int(self.show_h))
+        source = self._source_pixmap
+        if source is not None and not source.isNull() and self.pic_w > 0 and self.pic_h > 0:
+            if self.pic_h_w_ratio <= area_h / area_w:  # 水平撑满（图片高/宽 <= 显示区高/宽）
+                new_w = area_w  # 图片显示的宽度=显示区域宽度
+                new_h = max(1, int(new_w * self.pic_h / self.pic_w))  # 计算出图片显示的高度
+            else:  # 垂直撑满
+                new_h = area_h  # 图片显示的高度=显示区域高度
+                new_w = max(1, int(new_h * self.pic_w / self.pic_h))  # 计算出图片显示的宽度
+            pixmap = QPixmap.scaled(
+                source, new_w, new_h, aspectRatioMode=Qt.AspectRatioMode.KeepAspectRatio
+            )  # 图片缩放
+        else:
+            # 还没打开图片：显示区即裁剪区（_constrain_crop_rect 依赖 pic_new_w/h），裁剪框照样能拖
+            new_w, new_h = area_w, area_h
+            pixmap = QPixmap()
+        self.pic_new_w, self.pic_new_h = new_w, new_h
+        # 横图（宽>高）在显示区内居中：等比缩放后四周必然留白，居中比贴左上角好看。
+        # 只改显示位置，裁剪框及 pic_new_w/h 换算出的裁剪坐标都以 label 为基准，不受影响。
+        offset_x = offset_y = 0
+        if self.pic_w > self.pic_h:  # 未载入图片时 pic_w/pic_h 均为 0，保持原来的左上角对齐
+            offset_x = max(0, (area_w - new_w) // 2)
+            offset_y = max(0, (area_h - new_h) // 2)
+        self.Ui.label_backgroud_pic.setGeometry(offset_x, offset_y, new_w, new_h)  # 背景区域大小位置设置
+        self.Ui.label_backgroud_pic.setPixmap(pixmap)  # 背景区域显示缩放后的图片
+
+        if frac is not None:
+            rect = QRect(
+                int(round(frac[0] * new_w)),
+                int(round(frac[1] * new_h)),
+                max(1, int(round(frac[2] * new_w))),
+                max(1, int(round(frac[3] * new_h))),
+            )
+            self._apply_crop_rect(rect, sync_sliders=True)  # 裁剪框跟着图片一起放大
+            self.getRealPos()  # 同步裁剪框在原图中的实际位置与两个滑块
 
     def set_style(self):
         # 控件美化 裁剪弹窗
@@ -316,6 +468,7 @@ class CutWindow(QDialog):
         self.pic_h_w_ratio = 1.5
         self.rect_h_w_ratio = 536.6 / 379  # 裁剪框默认高宽比
         self.show_image_path = img_path
+        self._source_pixmap = None  # 原图缓存：窗口缩放时直接复用，不再重复读盘
         self.cut_thumb_path = None  # 裁剪后的thumb路径
         self.cut_poster_path = None  # 裁剪后的poster路径
         self.cut_fanart_path = None  # 裁剪后的fanart路径
@@ -334,6 +487,7 @@ class CutWindow(QDialog):
             self.show_image_path = img_path
             # 显示背景
             pic = QPixmap(img_path.as_posix())
+            self._source_pixmap = pic  # 缓存原图，窗口最大化/缩放时按新尺寸重新缩放
             self.pic_w = max(pic.width(), 1)
             self.pic_h = max(pic.height(), 1)
             self.Ui.label_origin_size.setText(str(f"{self.pic_w!s}, {self.pic_h!s}"))  # 显示原图尺寸
@@ -342,19 +496,8 @@ class CutWindow(QDialog):
             # self.Ui.horizontalSlider_left.setValue(abc)  # 裁剪框左侧调整条的值（最大10000）
             # self.Ui.horizontalSlider_right.setValue(10000 - abc)  # 裁剪框右侧调整条的值（最大10000）和左侧的值反过来
 
-            # 背景图片等比缩放并显示
-            if self.pic_h_w_ratio <= self.show_h / self.show_w if self.show_w > 0 else False:  # 水平撑满（图片高/宽 <= 显示区域高/显示区域宽）
-                self.pic_new_w = self.show_w  # 图片显示的宽度=显示区域宽度
-                self.pic_new_h = int(self.pic_new_w * self.pic_h / self.pic_w) if self.pic_w > 0 else self.show_h  # 计算出图片显示的高度
-            else:  # 垂直撑满
-                self.pic_new_h = self.show_h  # 图片显示的高度=显示区域高度
-                self.pic_new_w = int(self.pic_new_h * self.pic_w / self.pic_h) if self.pic_h > 0 else self.show_w  # 计算出图片显示的宽度
-
-            pic = QPixmap.scaled(
-                pic, self.pic_new_w, self.pic_new_h, aspectRatioMode=Qt.AspectRatioMode.KeepAspectRatio
-            )  # 图片缩放
-            self.Ui.label_backgroud_pic.setGeometry(0, 0, self.pic_new_w, self.pic_new_h)  # 背景区域大小位置设置
-            self.Ui.label_backgroud_pic.setPixmap(pic)  # 背景区域显示缩放后的图片
+            # 背景图片等比缩放并显示（keep_selection=False：下面会按新图重设默认裁剪框）
+            self._fit_image(keep_selection=False)
 
             # 获取nfo文件名，用来设置裁剪后图片名称和裁剪时的水印状态
             img_folder = img_path.parent
@@ -611,6 +754,80 @@ class CutWindow(QDialog):
             self.main_window.change_to_mainpage.emit("")
             self.main_window.request_preview_images.emit(str(self.cut_poster_path), str(thumb_path))
         return True
+
+    def keyPressEvent(self, event):
+        """Esc 关闭裁剪窗。焦点落在子控件上时按键事件会冒泡到窗口，同样能关。"""
+        if event is not None and event.key() == Qt.Key.Key_Escape:
+            self.close()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def _center_on_screen(self):
+        """把整扇窗口放到所在屏幕可用区域的正中央（尺寸不变）。
+
+        以 frameGeometry 为准而不是 geometry：geometry 只是客户区，直接拿它居中会被
+        顶部的标题栏顶高半个标题栏高度，看上去并没有真正居中。
+        """
+        if self.isMaximized() or self.isFullScreen():
+            return  # 最大化/全屏时位置由系统接管
+        screen = QApplication.screenAt(self.frameGeometry().center()) or QApplication.primaryScreen()
+        if screen is None:
+            return
+        center = screen.availableGeometry().center()
+        # 移完回读确认一次正中就收手：个别平台的首个落点会差几个像素，补一次即可；
+        # 真机 Windows 一次到位，读到正中直接返回。
+        for _ in range(2):
+            frame = self.frameGeometry()
+            if frame.center() == center:
+                return
+            frame.moveCenter(center)
+            self.move(frame.topLeft())
+
+    def showEvent(self, event):
+        # Qt 不给隐藏窗口发 resize 事件，隐藏期间被改过的尺寸在这里补一次重排
+        super().showEvent(event)
+        # 每次打开都回到屏幕正中央，尺寸保持不变。
+        # 延后一拍再挪：showEvent 里原生窗口刚建好，frameGeometry 的边框/标题栏尺寸还没稳定，
+        # 此刻算出来的位置会差几个像素；等事件循环转一圈再定位才是精确居中。
+        QTimer.singleShot(0, self._center_on_screen)
+        self._relayout()
+
+    def present(self):
+        """打开/重新拉起裁剪窗。
+
+        窗口是最小化状态时它是「可见」的，show() 会直接跳过（showEvent 也不触发），
+        最小化按钮之外的入口再点一次就像没反应。这里统一先还原再显示。
+        """
+        if self.isMinimized():
+            self.showNormal()
+        else:
+            self.show()
+
+    def resizeEvent(self, event):
+        # 最大化/还原与手动拖拽改尺寸都走这里：重排控件并同步放大图片与裁剪框
+        super().resizeEvent(event)
+        self._relayout()
+
+    def changeEvent(self, event):
+        # 兜底某些平台上最大化不发 resize 的情况；尺寸没变时 _relayout 内部直接跳过
+        super().changeEvent(event)
+        if event is not None and event.type() == QEvent.Type.WindowStateChange:
+            state = self.windowState()
+            # Qt 最小化是 state |= WindowMinimized，不会清掉最大化位。窗口开着时最小化就会留下
+            # Minimized|Maximized 这种矛盾状态，Windows 无法还原，表现为最小化按钮点了没反应。
+            # 这里补一次纠正：最小化时把最大化位摘掉（纠正后条件不再成立，不会递归）。
+            if state & Qt.WindowState.WindowMinimized and state & Qt.WindowState.WindowMaximized:
+                self.setWindowState(
+                    (state & ~Qt.WindowState.WindowMaximized) | Qt.WindowState.WindowMinimized
+                )
+            self._relayout()
+
+    def closeEvent(self, event):
+        # 裁剪窗是常驻对象（main_window 启动时创建一次，之后只反复 show），
+        # 关闭时把窗口状态清回正常，否则用户最大化过一次，之后每次打开都是最大化。
+        self.setWindowState(Qt.WindowState.WindowNoState)
+        super().closeEvent(event)
 
     def mousePressEvent(self, a0):
         if a0 is None:

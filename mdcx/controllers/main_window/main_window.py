@@ -8531,10 +8531,14 @@ class MyMAinWindow(QMainWindow):
     def closeEvent(self, a0):
         if Switch.HIDE_CLOSE in manager.config.switch_on:
             self.hide()
-            # 主窗口收起时把预览窗口连带关闭，不留孤儿窗口在屏幕/任务栏上
+            # 主窗口收起时把预览/裁剪窗口连带关闭，不留孤儿窗口在屏幕/任务栏上
+            # （这两个是独立顶层窗口，不再随主窗口的 hide 自动收起）
             preview = getattr(self, "nfo_lib_preview_window", None)
             if preview is not None:
                 preview.close()
+            cut = getattr(self, "cutwindow", None)
+            if cut is not None:
+                cut.close()
         else:
             self.ready_to_exit()
         if a0:
@@ -10339,7 +10343,7 @@ class MyMAinWindow(QMainWindow):
         """
         file_info = None if self.show_data is None else self.show_data.file_info
         self.cutwindow.showimage(self.img_path, file_info)
-        self.cutwindow.show()
+        self.cutwindow.present()
 
     # 主界面-开关封面显示
     def checkBox_cover_clicked(self):
@@ -10868,7 +10872,7 @@ class MyMAinWindow(QMainWindow):
         )
         if file_path:
             self.cutwindow.showimage(Path(file_path))
-            self.cutwindow.show()
+            self.cutwindow.present()
 
     # 工具-视频移动
     def pushButton_move_mp4_clicked(self):
