@@ -41,6 +41,7 @@ from PyQt6.QtWidgets import (
 
 from ..config.resources import resources
 from ..controllers.main_window.style import get_theme_tokens
+from ..utils.window_center import CenterOnFirstShowMixin
 
 # ------------------------------------------------------------------ 设计尺寸
 # 客户区尺寸 = 参考图 657×677 整窗扣掉约 40px 原生标题栏（125% DPI）
@@ -148,7 +149,7 @@ _RANK_ROWS = 10
 _RANK_COLS = 3
 
 
-class DonateDialog(QDialog):
+class DonateDialog(CenterOnFirstShowMixin, QDialog):
     """赞助窗口：收款码 + 新人榜/土豪榜（版式严格复刻参考截图）。"""
 
     def __init__(self, parent=None, dark: bool = False) -> None:

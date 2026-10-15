@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QDialog, QLabel, QListWidget, QListWidgetItem, QVBoxLayout
 
 from ..core.similar import SimilarIndex
+from ..utils.window_center import CenterOnFirstShowMixin
 
 
 @dataclass
@@ -27,7 +28,7 @@ class _SummaryItem:
 
 
 
-class SimilarDialog(QDialog):
+class SimilarDialog(CenterOnFirstShowMixin, QDialog):
     """相似片推荐列表对话框。
 
     构造时传入语料（全部刮削结果）与当前选中影片，

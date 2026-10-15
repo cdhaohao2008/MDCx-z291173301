@@ -27,6 +27,7 @@ from mdcx.config.models import SCRAPING_TYPE_SITE_FIELDS, FieldPriorityConfig, s
 from mdcx.crawlers import get_registered_crawler_site_values
 from mdcx.gen.field_enums import CrawlerResultFields
 from mdcx.manual import ManualConfig
+from mdcx.utils.window_center import CenterOnFirstShowMixin
 
 from .style import build_scrollbar_style, get_theme_tokens
 
@@ -420,7 +421,7 @@ class PrioritySiteList(QListWidget):
         _setup_site_list(self, current[:row] + inserted + current[row:])
 
 
-class SiteListEditorDialog(QDialog):
+class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
     def __init__(
         self, title: str, selected_sites: list[Website], all_sites: list[Website], parent: QWidget | None = None
     ):
@@ -514,7 +515,7 @@ class SiteListEditorDialog(QDialog):
         self._refresh_lists()
 
 
-class FieldPriorityDialog(QDialog):
+class FieldPriorityDialog(CenterOnFirstShowMixin, QDialog):
     def __init__(
         self,
         title: str,
