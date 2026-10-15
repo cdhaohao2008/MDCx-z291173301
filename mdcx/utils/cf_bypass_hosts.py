@@ -83,7 +83,7 @@ class CFBypassHostsReport:
         if not self.entries:
             return "状态：留空不校验（默认）"
         if not self.issues:
-            return f"状态：{len(self.entries)} 条格式正确，均能对上已知站点域名"
+            return f"状态：{len(self.entries)}条格式正确，均能对上已知站点域名"
         return "\n".join(f"· {m}" for m in self.messages)
 
 
@@ -188,7 +188,7 @@ def _entry_problem(entry: str) -> str | None:
         return "只填域名，不要带协议、路径、端口或账号"
     labels = body.split(".")
     if len(labels) < 2:
-        return "至少要两级域名，例如 javbus.com"
+        return "至少需要两级域名，例如javbus.com"
     bad = [label for label in labels if not _HOST_LABEL.match(label)]
     if bad:
         return f"「{'.'.join(bad)}」不是合法域名字段"
@@ -265,7 +265,7 @@ def validate_cf_bypass_hosts(
         report.issues.append(
             CFBypassHostIssue(
                 entry=entry,
-                message=f"通配只匹配子域、不含 {base} 本身，若要一起覆盖请再补一条 {base}",
+                message=f"通配只匹配子域不含{base}本身，若要一起覆盖请再补一条{base}",
                 level=LEVEL_ERROR,
             )
         )
@@ -275,8 +275,8 @@ def validate_cf_bypass_hosts(
         report.issues.append(
             CFBypassHostIssue(
                 entry="",
-                message=f"这些条目对不上任何已知站点域名（{'、'.join(unknown)}）；"
-                "如果它们是镜像/CDN 域名可以忽略，否则该站走 Bypass 时会被拒收",
+                message=f"{'、'.join(unknown)}这些条目对不上任何已知站点域名；"
+                "如果它们是镜像/CDN域名可以忽略，否则该站走Bypass时会被拒收",
                 level=LEVEL_INFO,
             )
         )
