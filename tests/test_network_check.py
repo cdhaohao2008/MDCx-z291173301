@@ -295,8 +295,7 @@ def test_message_for_error_tls_handshake():
     from mdcx.core.network_check import _message_for_error
 
     msg = _message_for_error("SSL_ERROR_SYSCALL; error queue empty: Failed to perform")
-    assert "TLS" in msg or "SSL" in msg
-    assert "节点" in msg
+    assert msg == "TLS握手中断，常为HTTP/2指纹/SNI策略与目标站不兼容"
 
     msg2 = _message_for_error("UNEXPECTED_EOF_WHILE_READING")
     assert "TLS" in msg2 or "SSL" in msg2

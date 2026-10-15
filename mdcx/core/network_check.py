@@ -275,7 +275,7 @@ def _message_for_error(error: str) -> str:
     if _is_proxy_error(error):
         return "代理连接失败，请检查代理地址或代理软件"
     if _is_tls_handshake_error(error):
-        return "TLS 握手中断，常为代理节点与目标站不兼容，HTTP/2 指纹/SNI 策略，请更换节点"
+        return "TLS握手中断，常为HTTP/2指纹/SNI策略与目标站不兼容"
     if "超时" in error or "timeout" in error.lower():
         return "连接超时，请检查网络或代理节点"
     if "dns" in error.lower() or "resolve" in error.lower():
@@ -338,7 +338,7 @@ def _classify_http_result(spec: NetworkCheckSpec, status_code: int, text: str) -
 
     if spec.site == Website.DMM:
         if "このページはお住まいの地域からご利用になれません" in text:
-            return NetworkCheckStatus.FAILED, "DMM 地域限制，请使用日本节点"
+            return NetworkCheckStatus.FAILED, "DMM地域限制，请使用日本节点"
 
     if spec.site == Website.MGSTAGE and not text.strip():
         return NetworkCheckStatus.FAILED, "MGStage 返回空页面，通常是地域限制，请使用日本节点"

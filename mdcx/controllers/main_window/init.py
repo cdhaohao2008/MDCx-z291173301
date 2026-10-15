@@ -1250,10 +1250,11 @@ def Init_QSystemTrayIcon(self: "MyMAinWindow"):
     self.tray_icon.activated.connect(self.tray_icon_click)
     self.tray_icon.setToolTip(f"MDCx {self.localversion}（左键显示/隐藏 | 右键退出）")
     show_action = QAction("显示", self)
-    hide_action = QAction("隐藏\tQ", self)
+    # 与主窗内的隐藏入口保持一致：Q 键 / Esc 都收进托盘
+    hide_action = QAction("隐藏到托盘\tQ / Esc", self)
     quit_action = QAction("退出 MDCx", self)
     show_action.triggered.connect(self.tray_icon_show)
-    hide_action.triggered.connect(self.hide)
+    hide_action.triggered.connect(self.hide_to_tray)
     quit_action.triggered.connect(self.ready_to_exit)
     tray_menu = QMenu()
     tray_menu.setStyleSheet(build_menu_style(self.dark_mode))

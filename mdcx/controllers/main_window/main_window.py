@@ -611,7 +611,7 @@ class MyMAinWindow(QMainWindow):
         self.menu_folder = QAction(QIcon(resources.open_folder_icon), "  打开文件夹\tF", self)
         self.menu_nfo = QAction(QIcon(resources.open_nfo_icon), "  编辑 NFO\tE", self)
         self.menu_play = QAction(QIcon(resources.play_icon), "  播放\tP", self)
-        self.menu_hide = QAction(QIcon(resources.hide_boss_icon), "  隐藏\tQ", self)
+        self.menu_hide = QAction(QIcon(resources.hide_boss_icon), "  隐藏到托盘\tQ / Esc", self)
         self.menu_similar = QAction(QIcon(resources.open_folder_icon), "  查看相似片推荐", self)
 
         self.menu_start.triggered.connect(self.pushButton_start_scrape_clicked)
@@ -627,7 +627,7 @@ class MyMAinWindow(QMainWindow):
         self.menu_folder.triggered.connect(self.main_open_folder_click)
         self.menu_nfo.triggered.connect(self.main_open_nfo_click)
         self.menu_play.triggered.connect(self.main_play_click)
-        self.menu_hide.triggered.connect(self.hide)
+        self.menu_hide.triggered.connect(self.hide_to_tray)
         self.menu_similar.triggered.connect(self.main_show_similar_click)
 
         QShortcut(QKeySequence(self.tr("N")), self, self.search_by_number_clicked)
@@ -638,8 +638,10 @@ class MyMAinWindow(QMainWindow):
         QShortcut(QKeySequence(self.tr("E")), self, self.main_open_nfo_click)
         QShortcut(QKeySequence(self.tr("P")), self, self.main_play_click)
         QShortcut(QKeySequence(self.tr("S")), self, self.pushButton_start_scrape_clicked)
-        QShortcut(QKeySequence(self.tr("Q")), self, self.hide)
-        # QShortcut(QKeySequence(self.tr("Esc")), self, self.hide)
+        QShortcut(QKeySequence(self.tr("Q")), self, self.hide_to_tray)
+        # Esc 只有一个入口（见 hide_tips_widget_on_escape）：面板/弹窗优先处理，
+        # 都没有时收进托盘。此处不能再额外绑一条 Esc → hide_to_tray 的 shortcut，
+        # 否则同键序列被 Qt 判为 ambiguous shortcut，两条都不触发。
         QShortcut(QKeySequence(self.tr("Esc")), self, self.hide_tips_widget_on_escape)
         QShortcut(QKeySequence(self.tr("Ctrl+M")), self, self.pushButton_min_clicked2)
         QShortcut(QKeySequence(self.tr("Ctrl+W")), self, self.ready_to_exit)
@@ -728,6 +730,25 @@ class MyMAinWindow(QMainWindow):
         self.activateWindow()
         self.raise_()
         self.show()
+
+    # 收进托盘：ESC 键、Q 快捷键、右键菜单「隐藏」、托盘菜单「隐藏」的统一实现。
+    # 之所以不直接用 self.hide()：托盘图标默认可能处于隐藏状态（默认配置里
+    # Switch.HIDE_MENU / HIDE_DOCK 会置 hide_menu、hide_dock），此时再 hide 主窗，
+    # Windows 上任务栏按钮会一并消失，程序将彻底无法唤出，只能重启。因此隐藏前
+    # 必须保证托盘图标可见——没有就补建一个，有就直接点亮。
+    def hide_to_tray(self):
+        try:
+            if not hasattr(self, "tray_icon"):
+                self.Init_QSystemTrayIcon()
+            else:
+                self.tray_icon.show()
+        except Exception:  # 托盘不可用（无系统托盘等）时仍要隐藏窗口，否则用户按了没反应
+            signal_qt.show_traceback_log(traceback.format_exc())
+        # 主窗口收起时把预览窗口连带关闭，不留孤儿窗口在屏幕上
+        preview = getattr(self, "nfo_lib_preview_window", None)
+        if preview is not None:
+            preview.close()
+        self.hide()
 
     def change_mainpage(self, t):
         self.pushButton_main_clicked()
@@ -11457,15 +11478,18 @@ class MyMAinWindow(QMainWindow):
         self.Ui.widget_show_tips.show()
 
     # ESC 统一入口：编辑 NFO 面板可见时等同点「关闭」按钮（走 _close_nfo_editor，
-    # 脏数据照常弹保存确认）；否则才关说明弹窗。注意 ESC 全应用只许存在这一条路径——
-    # 关闭按钮自身不得再设 shortcut，否则与本全局 QShortcut 键序列相同会被 Qt 判为
-    # ambiguous shortcut，两条都不触发（此前 ESC 毫无反应的根因）。
+    # 脏数据照常弹保存确认）；否则才关说明弹窗；两者都没有时收进系统托盘
+    #（hide_to_tray），即「按 ESC 隐藏到任务栏托盘图标」。注意 ESC 全应用只许存在
+    # 这一条路径——关闭按钮自身不得再设 shortcut，否则与本全局 QShortcut 键序列
+    # 相同会被 Qt 判为 ambiguous shortcut，两条都不触发（此前 ESC 毫无反应的根因）。
     def hide_tips_widget_on_escape(self):
         if not self.Ui.widget_nfo.isHidden():
             self._close_nfo_editor()
             return
         if self.Ui.widget_show_tips.isVisible():
             self.Ui.widget_show_tips.hide()
+            return
+        self.hide_to_tray()
 
     # 设置-刮削网站和字段中的详细说明弹窗
     def pushButton_scrape_note_clicked(self):
