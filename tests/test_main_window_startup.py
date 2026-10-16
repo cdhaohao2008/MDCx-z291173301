@@ -254,67 +254,77 @@ def test_emby_actor_manager_columns_fit_after_vertical_scrollbar(app):
         app.processEvents()
 
 
-def test_emby_actor_manager_copyable_cells(app):
-    """新规格：姓名/出生日期/出生地/详情/标签可选中复制（整格 Ctrl+C + 双击只读编辑器子串复制）。"""
+def test_emby_actor_manager_inline_edit_and_copy(app):
+    """新行为：单击可编辑列行内编辑（回车/点别处提交即本地缓存+绿底🔄，仅改过行参与同步），
+    双击任意列都弹详情窗（先提交编辑器），右键/Ctrl+C 复制可编辑列文本。
+    简介列（状态图标）只读不可编辑。"""
     import math
 
     from PyQt6.QtCore import Qt
     from PyQt6.QtGui import QGuiApplication
-    from PyQt6.QtWidgets import QAbstractItemView, QStyleOptionViewItem, QTableWidget
+    from PyQt6.QtWidgets import QAbstractItemView, QTableWidget
 
     from mdcx.tools.emby_actor_manager import ActorInfo
     from mdcx.tools.emby_actor_manager_ui import (
-        _COPYABLE_COLUMNS,
+        _EDITABLE_COLUMNS,
         EmbyActorManagerDialog,
     )
 
-    assert sorted(_COPYABLE_COLUMNS) == [1, 4, 5, 6, 7]
+    assert sorted(_EDITABLE_COLUMNS) == [1, 4, 5, 6, 7]
     dlg = EmbyActorManagerDialog()
     try:
         table = dlg.table
         assert table.selectionBehavior() == QTableWidget.SelectionBehavior.SelectItems
-        assert table.editTriggers() == QAbstractItemView.EditTrigger.DoubleClicked
+        assert table.editTriggers() == QAbstractItemView.EditTrigger.NoEditTriggers
+        assert table.contextMenuPolicy() == Qt.ContextMenuPolicy.CustomContextMenu
         actor = ActorInfo(
-            name="复制演员",
-            actor_id="c1",
+            name="行内演员",
+            actor_id="e1",
             server_id="s",
             existing_premiere_date="2000-01-02T00:00:00",
             existing_production_locations=["日本"],
-            existing_overview="可复制简介",
+            existing_overview="行内简介",
             existing_taglines=["标1", "标2"],
         )
         dlg._actors = [actor]
         dlg._populate_table([actor])
         for col in range(table.columnCount()):
             editable = bool(table.item(0, col).flags() & Qt.ItemFlag.ItemIsEditable)
-            assert editable == (col in _COPYABLE_COLUMNS), f"列 {col} Editable 标记错误"
+            assert editable == (col in _EDITABLE_COLUMNS), f"列 {col} Editable 标记错误"
         assert dlg._measured_birthday_width() == int(
-            math.ceil(
-                max(
-                    table.fontMetrics().horizontalAdvance(s)
-                    for s in ("0000-00-00", "8888-88-88", "出生日期")
-                )
-            )
+            math.ceil(max(table.fontMetrics().horizontalAdvance(s) for s in ("0000-00-00", "8888-88-88", "出生日期")))
         ) + int(dlg._BIRTHDAY_CELL_PADDING)
-        dlg._on_table_double_clicked(0, 1)
-        assert dlg._detail_dialogs == {}
-        delegate = table.itemDelegate()
-        opt = QStyleOptionViewItem()
-        editor = delegate.createEditor(table, opt, table.model().index(0, 1))
-        assert editor is not None and editor.isReadOnly()
-        delegate.setEditorData(editor, table.model().index(0, 1))
-        assert editor.text() == "复制演员"
-        editor.setText("HACK")
-        delegate.setModelData(editor, table.model(), table.model().index(0, 1))
-        assert table.item(0, 1).text() == "复制演员"
-        assert delegate.createEditor(table, opt, table.model().index(0, 0)) is None
-        dlg._on_table_double_clicked(0, 0)
+        # 单击可编辑列开编辑器，改名后提交：本地缓存 + 绿底 🔄 + 只该行待同步。
+        dlg._on_table_clicked(table.model().index(0, 1))
+        assert dlg._cell_editor is not None
+        editor = dlg._cell_editor
+        editor.setText("改名演员")
+        dlg._commit_open_editor()
+        assert actor.name == "改名演员"
+        assert actor.need_update_info is True
+        assert table.item(0, 1).text() == "改名演员"
+        assert "🔄" in table.item(0, 3).text()
+        dlg._actors.append(ActorInfo(name="未改演员", actor_id="e2", server_id="s"))
+        to_sync = [a for a in dlg._actors if getattr(a, "need_update_info", False)]
+        assert [a.actor_id for a in to_sync] == ["e1"]
+        dlg._actors.pop()
+        # 右键可编辑格：直接复制展示文本。
+        dlg._on_table_right_clicked(table.visualItemRect(table.item(0, 1)).center())
+        assert QGuiApplication.clipboard().text() == "改名演员"
+        dlg._on_table_right_clicked(table.visualItemRect(table.item(0, 3)).center())
+        assert QGuiApplication.clipboard().text() != ""
+        # 双击可编辑列：提交编辑器后仍弹详情窗。
+        dlg._on_table_clicked(table.model().index(0, 4))
+        assert dlg._cell_editor is not None
+        dlg._on_table_double_clicked(0, 4)
         app.processEvents()
-        assert set(dlg._detail_dialogs) == {"c1"}
+        assert set(dlg._detail_dialogs) == {"e1"}
+        # 整格 Ctrl+C：只复制可编辑列。
+        dlg._populate_table([actor])
         table.clearSelection()
         table.selectAll()
         assert dlg._copy_selected_cells_to_clipboard() is True
-        assert QGuiApplication.clipboard().text() == "复制演员\t2000-01-02\t日本\t可复制简介\t标1, 标2"
+        assert QGuiApplication.clipboard().text() == "改名演员\t2000-01-02\t日本\t行内简介\t标1, 标2"
         for d in list(dlg._detail_dialogs.values()):
             d.close()
     finally:

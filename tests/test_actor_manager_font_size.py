@@ -8,7 +8,7 @@
 实现要点（改动任一条都会让本文件失败）:
 ① 字号由 QSS `QWidget { font-size: Npt }` 统一下发, 不用 setFont: 样式表沿 QObject
    父子链级联, 独立顶层子对话框一并生效; 而 setFont 只对子控件生效, 子窗口仍是应用默认字号。
-② 两处灰色提示文字（使用说明 / 双击行可编辑）不得再写死 font-size: 控件自身样式表优先级
+② 两处灰色提示文字（使用说明 / 单击编辑·双击查看详情·右键复制）不得再写死 font-size: 控件自身样式表优先级
    高于对话框样式表, 写死 12px 会把放大后的字号盖回去。
 ③ QWidget 规则只带 font-size, 不带 font-weight: 分组框标题的加粗必须保留。
 """
@@ -88,10 +88,8 @@ def test_manager_widgets_all_use_bumped_font(dlg, app):
 def test_hint_labels_follow_bumped_font(dlg):
     """灰色提示文字不得写死 font-size, 否则会盖回放大前的字号。"""
     expected = _expected_pt()
-    hints = [
-        lbl for lbl in dlg.findChildren(QLabel) if lbl.text().startswith("使用说明") or lbl.text() == "双击行可编辑"
-    ]
-    assert len(hints) == 2, "应找到「使用说明」与「双击行可编辑」两处提示"
+    hints = [lbl for lbl in dlg.findChildren(QLabel) if lbl.text().startswith("使用说明") or "单击编辑" in lbl.text()]
+    assert len(hints) == 2, "应找到「使用说明」与行内编辑提示两处提示"
     for lbl in hints:
         assert "font-size" not in lbl.styleSheet(), f"提示文字写死了字号: {lbl.styleSheet()!r}"
         assert lbl.font().pointSizeF() == pytest.approx(expected)

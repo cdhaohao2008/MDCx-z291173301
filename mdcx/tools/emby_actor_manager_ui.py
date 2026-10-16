@@ -13,6 +13,7 @@ from PyQt6.QtCore import QEvent, Qt, QThread, QTimer
 from PyQt6.QtCore import pyqtSignal as Signal
 from PyQt6.QtGui import QColor, QGuiApplication, QKeySequence
 from PyQt6.QtWidgets import (
+    QAbstractItemDelegate,
     QAbstractItemView,
     QApplication,
     QBoxLayout,
@@ -294,27 +295,95 @@ def format_detail_cell_text(overview: object) -> str:
     return clean_rules.format_detail_cell_text(overview)
 
 
-# 新列顺序（状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数）下允许复制的列。
-_COPYABLE_COLUMNS = frozenset((1, 4, 5, 6, 7))
-"""姓名(1)/出生日期(4)/出生地(5)/详情(6)/标签(7)的数据允许复制。"""
+# 新列顺序（状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数）下可编辑的列。
+_EDITABLE_COLUMNS = frozenset((1, 4, 5, 6, 7))
+"""姓名(1)/出生日期(4)/出生地(5)/详情(6)/标签(7)：单击进编辑器改值、
+右键/Ctrl+C 复制。简介(3)是 ✅/❌ 状态图标，保持只读。"""
+
+_EDITABLE_FIELD_NAMES = {1: "姓名", 4: "出生日期", 5: "出生地", 6: "详情", 7: "标签"}
+"""可编辑列号 → 字段中文名（日志/提示用）。"""
+
+_SPLIT_RE = re.compile(r"[,，、]")
 
 
-class _SelectableTextDelegate(QStyledItemDelegate):
-    """可复制列的只读文本代理：双击进入只读编辑器后可逐字选中文本复制。
+def _split_list_text(text: str) -> list[str]:
+    """出生地/标签编辑文本按半角逗号/全角逗号/顿号切分，去空去重保序。"""
+    parts = [p.strip() for p in _SPLIT_RE.split(text or "")]
+    seen: set[str] = set()
+    result = [p for p in parts if p and p not in seen and not seen.add(p)]
+    return result
 
-    表格用 SelectItems + DoubleClicked：单击只选中单元格（配合 Ctrl+C 整格复制），
-    双击可复制列时打开只读 QLineEdit，框内可拖选子串、Ctrl+C 走编辑器原生复制；
-    setModelData 空实现，编辑器内容永不回写 model，展示数据不会被改掉。
-    非可复制列返回 None（不进编辑器），双击走详情对话框。
+
+def _inline_edited_fields(actor) -> set:
+    """该演员被行内编辑改过的字段（挂在 actor 上的暂存标记，刷新后随对象更替自然消失）。"""
+    try:
+        fields = getattr(actor, "_inline_edited", None)
+        return fields if isinstance(fields, set) else set()
+    except (RuntimeError, AttributeError):
+        return set()
+    except Exception:
+        return set()
+
+
+def _mark_inline_edited(actor, field: str) -> None:
+    try:
+        fields = getattr(actor, "_inline_edited", None)
+        if not isinstance(fields, set):
+            fields = set()
+            actor._inline_edited = fields
+        fields.add(field)
+    except (RuntimeError, AttributeError):
+        pass
+    except Exception:
+        pass
+
+
+def _clear_inline_edited(actor) -> None:
+    try:
+        actor._inline_edited = set()
+    except (RuntimeError, AttributeError):
+        pass
+    except Exception:
+        pass
+
+
+def _effective_pending(actor, field: str, new_value, existing_value):
+    """展示/编辑器初值用的有效值：行内改过用 new_*（即使被清空成空），
+    否则取数带回了新值也用 new_*，都没动用服务器现有值。"""
+    if field in _inline_edited_fields(actor):
+        return new_value
+    try:
+        if actor.need_update_info and new_value:
+            return new_value
+    except (RuntimeError, AttributeError):
+        pass
+    except Exception:
+        pass
+    return existing_value
+
+
+class _InlineEditDelegate(QStyledItemDelegate):
+    """可编辑列的行内编辑代理：单击进可编辑 QLineEdit，回车/点别处提交。
+
+    编辑器初值取单元格 UserRole 存的完整值（详情列展示是截断清洗文本、
+    标签列展示只取前 2 个，绝不能拿展示文本当编辑初值，否则存盘即丢数据），
+    提交走默认 setModelData 写回 model，再由表格 itemChanged 统一换算进
+    ActorInfo（new_* + need_update_info），与详情窗口的同步口径一致。
+    非可编辑列返回 None（不进编辑器），双击直接走详情对话框。
     """
+
+    def __init__(self, parent=None, editor_changed=None):
+        super().__init__(parent)
+        self._editor_changed = editor_changed
 
     def createEditor(self, parent, option, index):  # noqa: N802
         try:
-            if index.column() not in _COPYABLE_COLUMNS:
+            if index.column() not in _EDITABLE_COLUMNS:
                 return None
             edit = QLineEdit(parent)
-            edit.setReadOnly(True)
-            # QLineEdit 只读仍可鼠标/键盘选中并 Ctrl+C，无需（也没有）setTextInteractionFlags。
+            edit.selectAll()
+            if self._editor_changed is not None:
+                self._editor_changed(edit)
             return edit
         except (RuntimeError, AttributeError):
             return None
@@ -323,19 +392,25 @@ class _SelectableTextDelegate(QStyledItemDelegate):
 
     def setEditorData(self, editor, index):  # noqa: N802
         try:
-            value = index.data(Qt.ItemDataRole.DisplayRole)
-            if value is None:
-                value = ""
-            editor.setText(str(value))
+            full = index.data(Qt.ItemDataRole.UserRole)
+            if full is None:
+                full = index.data(Qt.ItemDataRole.DisplayRole) or ""
+            editor.setText(str(full))
             editor.selectAll()
         except (RuntimeError, AttributeError):
             pass
         except Exception:
             pass
 
-    def setModelData(self, editor, model, index):  # noqa: N802
-        # 只读复制用：永不回写，关闭编辑器时展示文本保持不变。
-        return None
+    def destroyEditor(self, editor, index):  # noqa: N802
+        try:
+            if self._editor_changed is not None:
+                self._editor_changed(None)
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+        return super().destroyEditor(editor, index)
 
 
 def scan_actor_data_noise(actors: list[ActorInfo], rules: object | None = None) -> list[tuple[ActorInfo, str, bool]]:
@@ -1161,6 +1236,11 @@ class EmbyActorManagerDialog(QDialog):
         # 演员详情独立窗口（与管理器互不干扰）：按 actor_id 常驻，可多开、
         # 随各自关闭销毁；destroyed 信号负责从字典摘除。
         self._detail_dialogs: dict[str, ActorDetailDialog] = {}
+        # 行内编辑状态：当前打开的单元格编辑器（双击时先提交它再弹详情窗）；
+        # _in_table_update 为 True 时 _populate_table/行刷新正在批量写单元格，
+        # itemChanged 回调直接返回，避免把程序写表误判成用户编辑。
+        self._cell_editor = None
+        self._in_table_update = False
         # 议题 #25: 任务会话代数——取消/重启任务后旧线程的排队回调整体作废
         self._session_gen = 0
         self._failed_names: set[str] = set()
@@ -1384,14 +1464,14 @@ class EmbyActorManagerDialog(QDialog):
         self.btn_sync.setObjectName("btnSync")
         self.btn_sync.setEnabled(False)
         btn_layout.addWidget(self.btn_sync)
-        self._help_single = "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获取数据→④绿色行==待更新→⑤同步到服务器，双击行查看编辑详情"
+        self._help_single = "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获取数据→④绿色行==待更新→⑤同步，单击编辑、双击查看详情、右键复制"
         # 窄态（还原/常规/最小化）固定两行：在「③选择模式获取数据」处断行，
         # 两行等长，故窄态按钮行省下的就是「单行宽度 - 两行宽度」这一段，
         # 窗口最小宽度可据此下调（见 _narrow_min_width）。宽态仍用单行原文。
         # 断点按用户指定：第一行结尾「③选择模式获」，第二行以「取数据」开头。
         self._help_narrow = (
             "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获\n"
-            "取数据→④绿色行==待更新→⑤同步到服务器，双击行查看编辑详情"
+            "取数据→④绿色行==待更新→⑤同步，单击编辑、双击查看详情、右键复制"
         )
         help_label = QLabel(self._help_single)
         self.help_label = help_label
@@ -1501,7 +1581,7 @@ class EmbyActorManagerDialog(QDialog):
         self.txt_search.setMaximumWidth(200)
         self.txt_search.textChanged.connect(self._on_filter_changed)
         stats_layout.addWidget(self.txt_search)
-        hint = QLabel("双击行可编辑")
+        hint = QLabel("单击编辑 · 双击查看详情 · 右键复制")
         # 同上：不钉死字号，跟随统一放大的字号
         hint.setStyleSheet("color: #888888;")
         stats_layout.addWidget(hint)
@@ -1538,8 +1618,14 @@ class EmbyActorManagerDialog(QDialog):
         vertical_header = self.table.verticalHeader()
         assert vertical_header is not None
         vertical_header.setVisible(False)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
-        self.table.setItemDelegate(_SelectableTextDelegate(self.table))
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        # 编辑只走 _on_table_clicked 手动 editItem：单击可编辑列进编辑器，
+        # 双击统一弹详情窗（先提交编辑器），两者不叠加。
+        self.table.setItemDelegate(_InlineEditDelegate(self.table, self._track_cell_editor))
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._on_table_right_clicked)
+        self.table.clicked.connect(self._on_table_clicked)
+        self.table.itemChanged.connect(self._on_table_item_changed)
         self.table.setSortingEnabled(True)
         self.table.setColumnWidth(0, 50)
         self.table.setColumnWidth(1, 100)
@@ -1926,9 +2012,7 @@ class EmbyActorManagerDialog(QDialog):
             if table is None:
                 return int(self._BIRTHDAY_W) + int(self._BIRTHDAY_CELL_PADDING)
             fm = table.fontMetrics()
-            adv = max(
-                fm.horizontalAdvance(s) for s in ("0000-00-00", "8888-88-88", "出生日期")
-            )
+            adv = max(fm.horizontalAdvance(s) for s in ("0000-00-00", "8888-88-88", "出生日期"))
             if adv <= 0:
                 return int(self._BIRTHDAY_W) + int(self._BIRTHDAY_CELL_PADDING)
             return int(math.ceil(float(adv))) + int(self._BIRTHDAY_CELL_PADDING)
@@ -2059,7 +2143,9 @@ class EmbyActorManagerDialog(QDialog):
         表格/日志视口变化另补排一次行数对齐：日志条数增长冒出滚动条只改
         viewport 几何、不触发窗口 resize，整行数不能 silently 漂移。
         另支持表格 Ctrl+C：已选中单元格按行列制表符拼成文本进剪贴板，
-        与只读编辑器内的子串复制互补（编辑器打开时走其原生复制，不过滤）。
+        只取可编辑列（姓名/出生日期/出生地/详情/标签），
+        与编辑器内的子串复制互补（编辑器打开时走其原生复制，不过滤）。
+        右键复制走 _on_table_right_clicked，直接复制光标下可编辑格的展示文本。
         """
         table = getattr(self, "table", None)
         log = getattr(self, "log_text", None)
@@ -2088,7 +2174,7 @@ class EmbyActorManagerDialog(QDialog):
     def _copy_selected_cells_to_clipboard(self) -> bool:
         """把当前选中单元格的展示文本按“同行制表符、换行分行”拼串写入剪贴板。
 
-        只取可复制列（姓名/出生日期/出生地/详情/标签）的选中格，其余列选中
+        只取可编辑列（姓名/出生日期/出生地/详情/标签）的选中格，其余列选中
         不进剪贴板；无可复制选中时返回 False（不吞事件）；有则写剪贴板返回 True。
         行列按视觉行列排序，保证多选复制顺序稳定；空表/无选中返回 False。
         """
@@ -2096,7 +2182,7 @@ class EmbyActorManagerDialog(QDialog):
         if table is None:
             return False
         try:
-            indexes = [ix for ix in table.selectedIndexes() if ix.column() in _COPYABLE_COLUMNS]
+            indexes = [ix for ix in table.selectedIndexes() if ix.column() in _EDITABLE_COLUMNS]
             if not indexes:
                 return False
             rows: dict[int, dict[int, str]] = {}
@@ -3417,6 +3503,8 @@ class EmbyActorManagerDialog(QDialog):
             a.existing_premiere_date = a.new_premiere_date
             a.existing_production_locations = list(a.new_production_locations)
             a.need_update_info = False
+            # 行内编辑的暂存标记随成功落盘一起清掉，后续展示/编辑按服务器新值走。
+            _clear_inline_edited(a)
         if a.need_update_backdrop:
             a.has_backdrop = bool(a.new_backdrop_path)
             a.need_update_backdrop = False
@@ -3544,25 +3632,96 @@ class EmbyActorManagerDialog(QDialog):
     def _on_filter_changed(self):
         self._populate_table(self._actors)
 
-    def _on_table_double_clicked(self, row: int, col: int):
-        # 可复制列（姓名/出生日期/出生地/详情/标签）双击进只读编辑器逐字复制，
-        # 不弹详情窗（否则编辑器与详情叠加）；其余列双击照旧打开详情。
+    def _track_cell_editor(self, editor) -> None:
+        """行内编辑器开关跟踪：create/destroy 时由代理回调，供双击先提交再弹详情窗。"""
         try:
-            if int(col) in _COPYABLE_COLUMNS:
+            self._cell_editor = editor
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+
+    def _commit_open_editor(self) -> None:
+        """双击前把已打开的行内编辑器提交（回车同款：写 model → itemChanged 进本地缓存）。"""
+        editor = getattr(self, "_cell_editor", None)
+        table = getattr(self, "table", None)
+        if editor is None or table is None:
+            return
+        try:
+            table.commitData(editor)
+            table.closeEditor(editor, QAbstractItemDelegate.EndEditHint.SubmitModelCache)
+        except (RuntimeError, AttributeError, TypeError):
+            pass
+        except Exception:
+            pass
+        finally:
+            try:
+                self._cell_editor = None
+            except (RuntimeError, AttributeError):
+                pass
+            except Exception:
+                pass
+
+    def _actor_for_row(self, row: int):
+        """按视觉行取演员：0 列 UserRole 存 actor_id（排序/改名后仍不错位）。"""
+        try:
+            table = self.table
+            id_item = table.item(int(row), 0)
+            key = id_item.data(Qt.ItemDataRole.UserRole) if id_item is not None else None
+            if key:
+                actor = next((a for a in self._actors if a.actor_id == key), None)
+                if actor is not None:
+                    return actor
+            name_item = table.item(int(row), 1)
+            name = name_item.text() if name_item is not None else ""
+            return next((a for a in self._actors if a.name == name), None)
+        except (RuntimeError, AttributeError, ValueError, TypeError):
+            return None
+        except Exception:
+            return None
+
+    def _on_table_clicked(self, index) -> None:
+        """左键单击：可编辑列进编辑器（回车或点别处即提交进本地缓存），其余列只选中。"""
+        try:
+            if index is None or int(index.column()) not in _EDITABLE_COLUMNS:
                 return
+            table = self.table
+            item = table.itemFromIndex(index)
+            if item is None:
+                return
+            table.editItem(item)
         except (RuntimeError, AttributeError, ValueError, TypeError):
             pass
         except Exception:
             pass
-        # 表格启用排序后视觉行序 != _get_filtered_actors() 索引，用演员名反查，避免打开错误演员
-        item = self.table.item(row, 1)
-        if item is None:
-            return
-        name = item.text()
-        actor = next((a for a in self._actors if a.name == name), None)
-        if actor is None:
-            return
-        self._open_detail_dialog(actor)
+
+    def _on_table_right_clicked(self, pos) -> None:
+        """右键默认复制：光标下是可编辑格就把展示文本写剪贴板，无菜单。"""
+        try:
+            table = self.table
+            item = table.itemAt(pos)
+            if item is None or int(item.column()) not in _EDITABLE_COLUMNS:
+                return
+            QGuiApplication.clipboard().setText(item.text())
+            self.log(f"📋 已复制: {item.text()[:60]}")
+        except (RuntimeError, AttributeError, ValueError, TypeError):
+            pass
+        except Exception:
+            pass
+
+    def _on_table_double_clicked(self, row: int, col: int):
+        # 双击任何列都弹详情窗：先把行内编辑器提交（值已进本地缓存），
+        # 再按 actor_id 反查（表格启用排序后视觉行序 != 数据索引，且姓名可能刚被改过）。
+        self._commit_open_editor()
+        try:
+            actor = self._actor_for_row(row)
+            if actor is None:
+                return
+            self._open_detail_dialog(actor)
+        except (RuntimeError, AttributeError, ValueError, TypeError):
+            pass
+        except Exception:
+            pass
 
     def _open_detail_dialog(self, actor: ActorInfo):
         """演员详情独立窗口：无父级、非模态，与管理器互不干扰、可并存操作。
@@ -3663,15 +3822,38 @@ class EmbyActorManagerDialog(QDialog):
         return filtered
 
     def _populate_table(self, actors: list[ActorInfo]):
+        self._in_table_update = True
+        try:
+            self._fill_table_rows(actors)
+        finally:
+            self._in_table_update = False
+        self._update_sync_button()
+        # 取数后行高/视口落定，按当前窗口状态重对一次行数（纯内部，不碰窗口几何）。
+        QTimer.singleShot(0, self._fit_visible_rows)
+
+    def _fill_table_rows(self, actors: list[ActorInfo]):
         self.table.setSortingEnabled(False)
         filtered = self._get_filtered_actors() if actors else []
         self.table.setRowCount(len(filtered))
         for row, actor in enumerate(filtered):
             icon_item = QTableWidgetItem(actor.status_icon)
             icon_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            # 0 列 UserRole 存 actor_id：排序/改名后按行反查不错位。
+            try:
+                icon_item.setData(Qt.ItemDataRole.UserRole, actor.actor_id)
+            except (RuntimeError, AttributeError):
+                pass
+            except Exception:
+                pass
             self.table.setItem(row, 0, icon_item)
             name_item = QTableWidgetItem(actor.name)
             name_item.setToolTip(f"ID: {actor.actor_id}")
+            try:
+                name_item.setData(Qt.ItemDataRole.UserRole, actor.name)
+            except (RuntimeError, AttributeError):
+                pass
+            except Exception:
+                pass
             self.table.setItem(row, 1, name_item)
             img_item = QTableWidgetItem("✅" if actor.has_image else "❌")
             img_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -3689,44 +3871,79 @@ class EmbyActorManagerDialog(QDialog):
             # 新列顺序：状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数。
             # 详情仅展示清洗文本：缺简介/占位/空一律置空，不显示“（无）”；
             # <br>/残留标签/“=”装饰线只在展示层剥除，数据与同步不受影响。
-            raw_birthday = (actor.existing_premiere_date or "")[:10]
+            # 可编辑列的展示是派生值（详情截断 80 字、标签只取前 2 个），
+            # 编辑器初值必须用 UserRole 存的完整值，绝不能拿展示文本回写。
+            eff_overview = _effective_pending(actor, "overview", actor.new_overview, actor.existing_overview)
+            eff_birthday = _effective_pending(
+                actor, "premiere_date", actor.new_premiere_date, actor.existing_premiere_date
+            )
+            eff_locations = _effective_pending(
+                actor, "locations", actor.new_production_locations, actor.existing_production_locations
+            )
+            eff_taglines = _effective_pending(actor, "taglines", actor.new_taglines, actor.existing_taglines)
+            raw_birthday = (eff_birthday or "")[:10]
             # Emby 未设置生日时返回 0001-01-01，按空值展示，避免列表出现占位日期
             birthday_text = "" if raw_birthday.startswith("0001-01-01") else raw_birthday
             birthday_item = QTableWidgetItem(birthday_text)
             # 议题 #153：出生日期为定宽列, 居中显示与 状态/头像/影片数 列观感一致
             birthday_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            try:
+                birthday_item.setData(Qt.ItemDataRole.UserRole, birthday_text)
+            except (RuntimeError, AttributeError):
+                pass
+            except Exception:
+                pass
             self.table.setItem(row, 4, birthday_item)
-            location_text = (
-                ", ".join(actor.existing_production_locations) if actor.existing_production_locations else ""
-            )
-            self.table.setItem(row, 5, QTableWidgetItem(location_text))
+            location_text = ", ".join(eff_locations) if eff_locations else ""
+            location_item = QTableWidgetItem(location_text)
+            try:
+                location_item.setData(Qt.ItemDataRole.UserRole, location_text)
+            except (RuntimeError, AttributeError):
+                pass
+            except Exception:
+                pass
+            self.table.setItem(row, 5, location_item)
             if is_missing_overview(actor):
                 try:
                     from ..models.emby import clean_overview_text as _clean_ov
 
-                    _rest = _clean_ov(actor.existing_overview)
+                    _rest = _clean_ov(eff_overview)
                 except Exception:
                     _rest = ""
                 overview_text = format_detail_cell_text(_rest)
             else:
-                overview_text = format_detail_cell_text(actor.existing_overview)
-            self.table.setItem(row, 6, QTableWidgetItem(overview_text))
-            tags = ", ".join(actor.existing_taglines[:2]) if actor.existing_taglines else ""
-            self.table.setItem(row, 7, QTableWidgetItem(tags))
+                overview_text = format_detail_cell_text(eff_overview)
+            detail_item = QTableWidgetItem(overview_text)
+            try:
+                detail_item.setData(Qt.ItemDataRole.UserRole, eff_overview or "")
+            except (RuntimeError, AttributeError):
+                pass
+            except Exception:
+                pass
+            self.table.setItem(row, 6, detail_item)
+            tags_text = ", ".join(eff_taglines[:2]) if eff_taglines else ""
+            tags_item = QTableWidgetItem(tags_text)
+            try:
+                tags_item.setData(Qt.ItemDataRole.UserRole, ", ".join(eff_taglines) if eff_taglines else "")
+            except (RuntimeError, AttributeError):
+                pass
+            except Exception:
+                pass
+            self.table.setItem(row, 7, tags_item)
             mc_item = QTableWidgetItem(str(actor.movie_count) if actor.movie_count > 0 else "0")
             mc_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             if actor.movie_titles:
                 mc_item.setToolTip("\n".join(actor.movie_titles[:20]))
             self.table.setItem(row, 8, mc_item)
-            # 可复制列（姓名/出生日期/出生地/详情/标签）保留 Editable，双击进只读编辑器逐字复制；
-            # 其余列去掉 Editable，双击不进编辑器（代理同样拦截），只走详情对话框。
+            # 可编辑列（姓名/出生日期/出生地/详情/标签）保留 Editable，单击进编辑器改值；
+            # 其余列去掉 Editable，只选中不进编辑器，双击走详情对话框。
             for col in range(self.table.columnCount()):
                 _it = self.table.item(row, col)
                 if _it is None:
                     continue
                 try:
                     _fl = _it.flags()
-                    if col in _COPYABLE_COLUMNS:
+                    if col in _EDITABLE_COLUMNS:
                         _it.setFlags(_fl | Qt.ItemFlag.ItemIsEditable)
                     else:
                         _it.setFlags(_fl & ~Qt.ItemFlag.ItemIsEditable)
@@ -3740,9 +3957,191 @@ class EmbyActorManagerDialog(QDialog):
                     if item:
                         item.setBackground(QColor("#c8e6c9"))
         self.table.setSortingEnabled(True)
+
+    def _on_table_item_changed(self, item) -> None:
+        """行内编辑提交：回车/点别处/双击前提交都走这里，把格子值换算进 ActorInfo 本地缓存。
+
+        只改 new_* + need_update_info，不碰服务器；点「开始全部更新同步」时
+        to_sync 本来就只收 need 标记的行，没改过的行默认不更新。
+        _populate_table/行刷新批量写表时 _in_table_update 为 True，直接返回。
+        """
+        if getattr(self, "_in_table_update", False):
+            return
+        try:
+            if item is None:
+                return
+            col = int(item.column())
+            if col not in _EDITABLE_COLUMNS:
+                return
+            actor = self._actor_for_row(int(item.row()))
+            if actor is None:
+                return
+            text = item.text()
+            if col == 1:
+                self._commit_name_edit(item, actor, text)
+            elif col == 4:
+                self._commit_birthday_edit(item, actor, text)
+            elif col == 5:
+                self._commit_locations_edit(item, actor, text)
+            elif col == 6:
+                self._commit_overview_edit(item, actor, text)
+            elif col == 7:
+                self._commit_taglines_edit(item, actor, text)
+        except (RuntimeError, AttributeError, ValueError, TypeError):
+            pass
+        except Exception:
+            pass
+
+    def _commit_name_edit(self, item, actor, text: str) -> None:
+        new = (text or "").strip()
+        if not new:
+            self._revert_cell(item, actor.name, actor.name)
+            self.log("⚠️ 姓名不能为空，已恢复原值")
+            return
+        if new == actor.name:
+            self._revert_cell(item, actor.name, actor.name)
+            return
+        old = actor.name
+        actor.name = new
+        actor.need_update_info = True
+        _mark_inline_edited(actor, "name")
+        self._after_inline_edit(item, actor, "姓名", f"{old} → {new}")
+
+    def _commit_birthday_edit(self, item, actor, text: str) -> None:
+        new = (text or "").strip()
+        if new:
+            normalized = normalize_premiere_date(new)
+            if not normalized:
+                current = _effective_pending(
+                    actor, "premiere_date", actor.new_premiere_date, actor.existing_premiere_date
+                )
+                self._revert_cell(item, (current or "")[:10], (current or "")[:10])
+                self.log(f"⚠️ 出生日期格式不对（要 YYYY-MM-DD，如 2000-01-02），已恢复原值: {text[:20]}")
+                return
+        else:
+            normalized = ""
+        current = _effective_pending(actor, "premiere_date", actor.new_premiere_date, actor.existing_premiere_date)
+        if (normalized or "")[:10] == (current or "")[:10]:
+            self._revert_cell(item, (current or "")[:10], (current or "")[:10])
+            return
+        actor.new_premiere_date = normalized
+        actor.need_update_info = True
+        _mark_inline_edited(actor, "premiere_date")
+        shown = normalized[:10] if normalized else "（清空）"
+        self._after_inline_edit(item, actor, "出生日期", shown)
+
+    def _commit_locations_edit(self, item, actor, text: str) -> None:
+        new = _split_list_text(text)
+        current = _effective_pending(
+            actor, "locations", actor.new_production_locations, actor.existing_production_locations
+        )
+        if list(new) == list(current or []):
+            joined = ", ".join(current or [])
+            self._revert_cell(item, joined, joined)
+            return
+        actor.new_production_locations = list(new)
+        actor.need_update_info = True
+        _mark_inline_edited(actor, "locations")
+        self._after_inline_edit(item, actor, "出生地", ", ".join(new) if new else "（清空）")
+
+    def _commit_overview_edit(self, item, actor, text: str) -> None:
+        # 编辑器初值是 UserRole 里的完整简介（不是截断展示文本），此处 text 即全文。
+        new = text or ""
+        current = _effective_pending(actor, "overview", actor.new_overview, actor.existing_overview)
+        if new == (current or ""):
+            self._revert_cell(item, format_detail_cell_text(current or ""), current or "")
+            return
+        actor.new_overview = new
+        actor.need_update_info = True
+        _mark_inline_edited(actor, "overview")
+        self._after_inline_edit(item, actor, "详情", (new[:30] + "…") if len(new) > 30 else new)
+
+    def _commit_taglines_edit(self, item, actor, text: str) -> None:
+        new = _split_list_text(text)
+        current = _effective_pending(actor, "taglines", actor.new_taglines, actor.existing_taglines)
+        if list(new) == list(current or []):
+            self._revert_cell(item, ", ".join(current or []), ", ".join(current or []))
+            return
+        actor.new_taglines = list(new)
+        actor.need_update_info = True
+        _mark_inline_edited(actor, "taglines")
+        self._after_inline_edit(item, actor, "标签", ", ".join(new) if new else "（清空）")
+
+    def _revert_cell(self, item, display_text: str, full_value: str) -> None:
+        """值没变/非法时把格子恢复成规范展示（顺手补 UserRole 完整值），不标脏。"""
+        self._in_table_update = True
+        try:
+            item.setText(display_text)
+            try:
+                item.setData(Qt.ItemDataRole.UserRole, full_value)
+            except (RuntimeError, AttributeError):
+                pass
+            except Exception:
+                pass
+        finally:
+            self._in_table_update = False
+
+    def _after_inline_edit(self, item, actor, field_name: str, shown: str) -> None:
+        """编辑生效后：刷新该行展示（状态图标/绿底/规范文本）+ 同步按钮计数 + 日志。"""
+        try:
+            row = int(item.row())
+        except (RuntimeError, AttributeError, ValueError, TypeError):
+            return
+        except Exception:
+            return
+        self._refresh_row_after_edit(row, actor)
         self._update_sync_button()
-        # 取数后行高/视口落定，按当前窗口状态重对一次行数（纯内部，不碰窗口几何）。
-        QTimer.singleShot(0, self._fit_visible_rows)
+        self.log(f"📝 已本地缓存：{actor.name}·{field_name} → {shown}，点「开始全部更新同步」后写入服务器")
+
+    def _refresh_row_after_edit(self, row: int, actor) -> None:
+        """按 actor 当前值重刷一行的派生展示（与 _fill_table_rows 同口径，不重建行）。"""
+        self._in_table_update = True
+        try:
+            table = self.table
+
+            def _set(col: int, display: str, full: str):
+                it = table.item(row, col)
+                if it is None:
+                    return
+                it.setText(display)
+                try:
+                    it.setData(Qt.ItemDataRole.UserRole, full)
+                except (RuntimeError, AttributeError):
+                    pass
+                except Exception:
+                    pass
+
+            _set(1, actor.name, actor.name)
+            info_item = table.item(row, 3)
+            if info_item is not None:
+                info_item.setText(
+                    "🔄" if actor.need_update_info else ("✅" if not is_missing_overview(actor) else "❌")
+                )
+            eff_birthday = _effective_pending(
+                actor, "premiere_date", actor.new_premiere_date, actor.existing_premiere_date
+            )
+            birthday_text = (eff_birthday or "")[:10]
+            if birthday_text.startswith("0001-01-01"):
+                birthday_text = ""
+            _set(4, birthday_text, birthday_text)
+            eff_locations = _effective_pending(
+                actor, "locations", actor.new_production_locations, actor.existing_production_locations
+            )
+            location_text = ", ".join(eff_locations) if eff_locations else ""
+            _set(5, location_text, location_text)
+            eff_overview = _effective_pending(actor, "overview", actor.new_overview, actor.existing_overview)
+            _set(6, format_detail_cell_text(eff_overview or ""), eff_overview or "")
+            eff_taglines = _effective_pending(actor, "taglines", actor.new_taglines, actor.existing_taglines)
+            _set(
+                7, ", ".join(eff_taglines[:2]) if eff_taglines else "", ", ".join(eff_taglines) if eff_taglines else ""
+            )
+            if actor.need_update_info or actor.need_update_image or actor.need_update_backdrop:
+                for col in range(table.columnCount()):
+                    it = table.item(row, col)
+                    if it is not None:
+                        it.setBackground(QColor("#c8e6c9"))
+        finally:
+            self._in_table_update = False
 
     def _on_count_mode_changed(self, index: int):
         self._show_unique = index == 1

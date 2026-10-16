@@ -577,7 +577,7 @@ def test_title_and_label_align_with_button_text(app):
 
 def test_narrow_default_width_shrinks_to_content(app):
     """窄态默认宽度缩进：窗口收到按钮行内容宽，设置按钮右侧空白归零；
-    统计栏「双击行可编辑」右侧与详情列是同一段富余宽度，跟着一起缩；最大化不动。"""
+    统计栏行内编辑提示右侧与详情列是同一段富余宽度，跟着一起缩；最大化不动。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     dlg = EmbyActorManagerDialog()
