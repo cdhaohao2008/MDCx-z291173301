@@ -14708,13 +14708,13 @@ class Ui_MDCx(object):
         self.listWidget_nfo_lib.setSortingEnabled(False)
         self.groupBox_nfo_lib_batch.setTitle(_translate("MDCx", "批量操作（选中多条后使用）"))
         self.pushButton_nfo_lib_batch_actor.setText(_translate("MDCx", "替换演员名"))
-        self.lineEdit_nfo_lib_batch_actor.setPlaceholderText(_translate("MDCx", "新演员名（逗号分隔）"))
+        self.lineEdit_nfo_lib_batch_actor.setPlaceholderText(_translate("MDCx", "新演员名(逗号分隔)"))
         self.pushButton_nfo_lib_batch_add_tag.setText(_translate("MDCx", "增加新标签"))
-        self.lineEdit_nfo_lib_batch_add_tag.setPlaceholderText(_translate("MDCx", "标签内容（逗号分隔）"))
+        self.lineEdit_nfo_lib_batch_add_tag.setPlaceholderText(_translate("MDCx", "标签内容(逗号分隔)"))
         self.pushButton_nfo_lib_batch_del_tag.setText(_translate("MDCx", "删除旧标签"))
-        self.lineEdit_nfo_lib_batch_del_tag.setPlaceholderText(_translate("MDCx", "标签内容（逗号分隔）"))
+        self.lineEdit_nfo_lib_batch_del_tag.setPlaceholderText(_translate("MDCx", "标签内容(逗号分隔)"))
         self.pushButton_nfo_lib_batch_series.setText(_translate("MDCx", "统一系列名"))
-        self.lineEdit_nfo_lib_batch_series.setPlaceholderText(_translate("MDCx", "新系列名"))
+        self.lineEdit_nfo_lib_batch_series.setPlaceholderText(_translate("MDCx", "新系列名(统一名称)"))
         self.label_nfo_lib_batch_hint.setText(
             _translate(
                 "MDCx",
