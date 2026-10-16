@@ -331,3 +331,45 @@ def test_emby_actor_manager_inline_edit_and_copy(app):
         dlg.close()
         dlg.deleteLater()
         app.processEvents()
+
+
+def test_emby_actor_manager_editor_double_click_opens_detail(app):
+    """编辑器打开时双击编辑器本身也要弹详情窗：单击开编辑器后第二次点击
+    落在 QLineEdit 上，表格 cellDoubleClicked 收不到，必须靠编辑器上的
+    eventFilter 把双击转调详情窗。先红后绿的回归测试。"""
+    from PyQt6.QtCore import QEvent, QPointF, Qt
+    from PyQt6.QtGui import QMouseEvent
+    from PyQt6.QtWidgets import QApplication
+
+    from mdcx.tools.emby_actor_manager import ActorInfo
+    from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
+
+    dlg = EmbyActorManagerDialog()
+    try:
+        actor = ActorInfo(name="双击演员", actor_id="e9", server_id="s")
+        dlg._actors = [actor]
+        dlg._populate_table([actor])
+        table = dlg.table
+        # 单击开编辑器（此时第二次点击只会落到编辑器上，不会到表格）。
+        dlg._on_table_clicked(table.model().index(0, 1))
+        editor = dlg._cell_editor
+        assert editor is not None
+        editor.setText("双击改名")
+        dbl = QMouseEvent(
+            QEvent.Type.MouseButtonDblClick,
+            QPointF(5.0, 5.0),
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        QApplication.sendEvent(editor, dbl)
+        app.processEvents()
+        # 编辑器先提交（改名进本地缓存），再弹出该演员的详情窗。
+        assert actor.name == "双击改名"
+        assert set(dlg._detail_dialogs) == {"e9"}
+        for d in list(dlg._detail_dialogs.values()):
+            d.close()
+    finally:
+        dlg.close()
+        dlg.deleteLater()
+        app.processEvents()

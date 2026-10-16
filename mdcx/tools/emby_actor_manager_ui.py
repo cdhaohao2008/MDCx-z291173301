@@ -372,15 +372,21 @@ class _InlineEditDelegate(QStyledItemDelegate):
     非可编辑列返回 None（不进编辑器），双击直接走详情对话框。
     """
 
-    def __init__(self, parent=None, editor_changed=None):
+    def __init__(self, parent=None, editor_changed=None, editor_double_clicked=None):
         super().__init__(parent)
         self._editor_changed = editor_changed
+        self._editor_double_clicked = editor_double_clicked
 
     def createEditor(self, parent, option, index):  # noqa: N802
         try:
             if index.column() not in _EDITABLE_COLUMNS:
                 return None
             edit = QLineEdit(parent)
+            # 记下格子位置并给编辑器装过滤器：单击开编辑器后，第二次点击落在
+            # 编辑器上、表格 cellDoubleClicked 收不到，双击必须在这里转调详情窗。
+            edit.setProperty("cellRow", int(index.row()))
+            edit.setProperty("cellCol", int(index.column()))
+            edit.installEventFilter(self)
             edit.selectAll()
             if self._editor_changed is not None:
                 self._editor_changed(edit)
@@ -389,6 +395,26 @@ class _InlineEditDelegate(QStyledItemDelegate):
             return None
         except Exception:
             return None
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        try:
+            if (
+                event is not None
+                and event.type() == QEvent.Type.MouseButtonDblClick
+                and event.button() == Qt.MouseButton.LeftButton
+            ):
+                callback = self._editor_double_clicked
+                if callback is not None:
+                    row = obj.property("cellRow") if obj is not None else None
+                    col = obj.property("cellCol") if obj is not None else None
+                    if row is not None and col is not None:
+                        callback(int(row), int(col))
+                        return True
+        except (RuntimeError, AttributeError, ValueError, TypeError):
+            pass
+        except Exception:
+            pass
+        return super().eventFilter(obj, event)
 
     def setEditorData(self, editor, index):  # noqa: N802
         try:
@@ -1621,7 +1647,13 @@ class EmbyActorManagerDialog(QDialog):
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         # 编辑只走 _on_table_clicked 手动 editItem：单击可编辑列进编辑器，
         # 双击统一弹详情窗（先提交编辑器），两者不叠加。
-        self.table.setItemDelegate(_InlineEditDelegate(self.table, self._track_cell_editor))
+        self.table.setItemDelegate(
+            _InlineEditDelegate(
+                self.table,
+                self._track_cell_editor,
+                editor_double_clicked=self._on_editor_double_clicked,
+            )
+        )
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_table_right_clicked)
         self.table.clicked.connect(self._on_table_clicked)
@@ -3704,6 +3736,16 @@ class EmbyActorManagerDialog(QDialog):
                 return
             QGuiApplication.clipboard().setText(item.text())
             self.log(f"📋 已复制: {item.text()[:60]}")
+        except (RuntimeError, AttributeError, ValueError, TypeError):
+            pass
+        except Exception:
+            pass
+
+    def _on_editor_double_clicked(self, row: int, col: int) -> None:
+        """编辑器上的左键双击：单击已开编辑器后第二次点击落不到表格，
+        在这里转调同一套双击逻辑（先提交编辑器，再按 actor_id 弹详情窗）。"""
+        try:
+            self._on_table_double_clicked(int(row), int(col))
         except (RuntimeError, AttributeError, ValueError, TypeError):
             pass
         except Exception:

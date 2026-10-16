@@ -235,8 +235,9 @@ def test_text_col_width_for_screen_width():
         )
 
     assert ex.text_col_width_for_screen_width(1920) == pytest.approx(_expect(1920) / 2)
-    # 1920@125%（逻辑宽 1536）是本机标定点：详情/标签正好 54.00，55 则会超出。
-    assert ex.text_col_width_for_screen_width(1536) == pytest.approx(54.0)
+    # 1920@125%（逻辑宽 1536）是本机标定点：详情/标签约 54.63
+    # （右框线剩余约 11px 已加回，55 则会超出）。
+    assert ex.text_col_width_for_screen_width(1536) == pytest.approx(54.63, abs=0.01)
     # 屏幕越宽，分到的列越宽（头像/简介/状态三列无需横向滚动即默认可见）。
     assert ex.text_col_width_for_screen_width(2560) > ex.text_col_width_for_screen_width(1366)
     assert ex.text_col_width_for_screen_width("非法") == ex.EXPORT_MIN_TEXT_COL_WIDTH
