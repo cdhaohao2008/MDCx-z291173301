@@ -3978,7 +3978,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>QFrame::NoFrame</enum>
                             </property>
                             <property name="text">
-                              <string>检查软链接：</string>
+                              <string>检查软链接状态：</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -4274,7 +4274,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>QFrame::NoFrame</enum>
                             </property>
                             <property name="text">
-                              <string>过滤文件名多余字符：</string>
+                              <string>过滤文件名字符：</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -4302,7 +4302,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>QFrame::NoFrame</enum>
                             </property>
                             <property name="text">
-                              <string>跳过小文件(MB) &lt;：</string>
+                              <string>跳过小文件&lt=MB：</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -4547,7 +4547,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>QFrame::NoFrame</enum>
                             </property>
                             <property name="text">
-                              <string>⚠️ 清理文件规则</string>
+                              <string>⚠️ 需清理文件规则</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignCenter</set>
@@ -4786,7 +4786,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>QFrame::NoFrame</enum>
                             </property>
                             <property name="text">
-                              <string>文件大小(KB)&lt;=：</string>
+                              <string>文件大小&lt;=：</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>

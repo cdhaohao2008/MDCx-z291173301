@@ -13298,7 +13298,7 @@ class Ui_MDCx(object):
         self.pushButton_select_data_dir.setText(_translate("MDCx", "选择目录"))
         self.label_data_dir_tip.setText(_translate("MDCx", "选择或填写一个目录，该目录专门用来存放刮削元数据"))
         self.groupBox_32.setTitle(_translate("MDCx", "文件扫描设置"))
-        self.label_336.setText(_translate("MDCx", "检查软链接："))
+        self.label_336.setText(_translate("MDCx", "检查软链接状态："))
         self.label_337.setText(
             _translate("MDCx", "在勾选后将检查软链接文件指向的目标文件是否存在，如果不存在则会删除该软链接")
         )
@@ -13318,15 +13318,15 @@ class Ui_MDCx(object):
         self.label_94.setText(
             _translate("MDCx", "用于过滤掉本地的一些广告视频，此处填写文件大小，小于该大小的视频将跳过刮削")
         )
-        self.label_83.setText(_translate("MDCx", "过滤文件名多余字符："))
-        self.label_93.setText(_translate("MDCx", "跳过小文件(MB) <："))
+        self.label_83.setText(_translate("MDCx", "过滤文件名字符："))
+        self.label_93.setText(_translate("MDCx", "跳过小文件<=MB："))
         self.groupBox_61.setTitle(_translate("MDCx", "文件清理设置"))
         self.checkBox_clean_file_ext.setText(_translate("MDCx", "启用"))
         self.label_177.setText(_translate("MDCx", "扩展名等于："))
         self.label_184.setText(_translate("MDCx", "文件名包含："))
         self.checkBox_clean_excluded_file_ext.setText(_translate("MDCx", "启用"))
         self.label_178.setText(_translate("MDCx", "文件名等于："))
-        self.label_262.setText(_translate("MDCx", "⚠️ 清理文件规则"))
+        self.label_262.setText(_translate("MDCx", "⚠️ 需清理文件规则"))
         self.checkBox_clean_file_contains.setText(_translate("MDCx", "启用"))
         self.label_199.setText(
             _translate("MDCx", "以下已启用的规则中有任一命中时，文件将被清理，多个内容以｜分割，区分大小写")
@@ -13335,7 +13335,7 @@ class Ui_MDCx(object):
         self.label_270.setText(_translate("MDCx", "⚠️ 不清理文件规则"))
         self.checkBox_clean_excluded_file_contains.setText(_translate("MDCx", "启用"))
         self.label_202.setText(_translate("MDCx", "扩展名等于："))
-        self.label_263.setText(_translate("MDCx", "文件大小(KB)<=："))
+        self.label_263.setText(_translate("MDCx", "文件大小<=："))
         self.label_162.setText(
             _translate("MDCx", "以下已经启用的规则中有任一命中时，文件将不被清理，会优先处理不清理文件规则")
         )
