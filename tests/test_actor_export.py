@@ -395,15 +395,13 @@ def test_button_row_compact_narrow_and_wide(app):
         ]
         assert set(row_gaps) == {0}, "窄态按钮之间不得有任何空隙"
         assert items[0].x() == 1, "窄态首个按钮应贴组左边框"
-        # 窄态：组标题比服务器地址再多右移 1px（标题 padding 6 / 标签 padding-left 5），
-        # 两者首笔与「连接Emby/Jellyfin」按钮**内文字**同列（真机 Windows 实测同为
-        # 按钮左缘 + 设备像素 11），按钮本身仍贴组左边框。
-        assert dlg._CONN_TITLE_PAD_NARROW == 6
-        assert dlg._CONN_LABEL_PAD_NARROW == 5
-        assert dlg._lbl_server.styleSheet() == dlg._CONN_LABEL_QSS == "padding-left: 5px;"
-        assert dlg._conn_group.styleSheet() == dlg._CONN_TITLE_QSS
-        assert dlg._CONN_TITLE_QSS == "QGroupBox::title { left: 0px; padding: 0 6px; }"
-        assert dlg._conn_group.title() == "Emby/Jellyfin连接设置"
+        # 窄态：组标题与服务器地址标签一起左移，与首按钮「连接Emby/Jellyfin」内文字
+        # 严格上下对齐（目标竖线 x = 按钮 x=1 + 文字内偏移 7 = 8）；按钮仍贴组边框。
+        assert dlg._lbl_server.styleSheet() == dlg._NARROW_LBL_PADDING
+        assert group.styleSheet() == dlg._NARROW_TITLE_QSS
+        assert f"QGroupBox#{dlg._CONN_GROUP_OBJ}::title" in dlg._NARROW_TITLE_QSS
+        # 组标题文案按用户要求去掉空格。
+        assert group.title() == "Emby/Jellyfin连接设置"
         # 窄态：帮助标签恒两行、按文字实宽定宽，不再吸收富余宽度（曾致 23~37px 大缝）。
         assert dlg.help_label.text() == dlg._help_narrow
         assert dlg.help_label.maximumWidth() == dlg._narrow_help_width()
@@ -417,13 +415,9 @@ def test_button_row_compact_narrow_and_wide(app):
         dlg._apply_button_widths()
         assert dlg._btn_layout.spacing() == 4
         assert dlg.help_label.maximumWidth() == dlg._HELP_MAX_W
-        # 宽态：标题/标签同样与按钮内文字对齐（标题 left 18 + padding 4 / 标签 5），
-        # 按钮位置不动，其余布局控件逐像素不变。
-        assert dlg._CONN_TITLE_LEFT_WIDE == 18
-        assert dlg._CONN_TITLE_PAD_WIDE == 4
-        assert dlg._CONN_LABEL_PAD_WIDE == 5
-        assert dlg._lbl_server.styleSheet() == dlg._CONN_LABEL_QSS_WIDE == "padding-left: 5px;"
-        assert dlg._conn_group.styleSheet() == dlg._CONN_TITLE_QSS_WIDE
+        assert dlg._lbl_server.styleSheet() == ""
+        # 宽态：组标题局部 QSS 清空、回到全局 QSS 原位（相对窄态向右 12px）。
+        assert group.styleSheet() == ""
         # 宽态按钮行恢复填满整行（最大化逐像素不变）。
         assert dlg._btn_layout.alignment() == Qt.AlignmentFlag(0)
         margins = dlg._conn_grid.contentsMargins()
@@ -436,8 +430,8 @@ def test_button_row_compact_narrow_and_wide(app):
         assert dlg._btn_layout.spacing() == 0
         margins = dlg._conn_grid.contentsMargins()
         assert margins.left() == 0 and margins.right() == 0
-        assert dlg._lbl_server.styleSheet() == dlg._CONN_LABEL_QSS
-        assert dlg._conn_group.styleSheet() == dlg._CONN_TITLE_QSS
+        assert dlg._lbl_server.styleSheet() == dlg._NARROW_LBL_PADDING
+        assert group.styleSheet() == dlg._NARROW_TITLE_QSS
         assert dlg._btn_layout.alignment() == Qt.AlignmentFlag.AlignLeft
     finally:
         dlg.isMaximized = real
@@ -445,85 +439,59 @@ def test_button_row_compact_narrow_and_wide(app):
         app.processEvents()
 
 
-def _first_ink_x(image, row0, row1, *, bright: bool):
-    """在图像 [row0, row1) 行区间内扫描，返回第一列「文字像素」的 x。
-
-    dark 模式找深色字（黑字/白底，组标题与服务器地址标签用）。用于比对两处文字的
-    **首笔**是否同列。
-    """
-    for x in range(image.width()):
-        for y in range(row0, row1):
-            px = image.pixel(x, y)
-            r, g, b = (px >> 16) & 0xFF, (px >> 8) & 0xFF, px & 0xFF
-            if bright:
-                if r > 170 and g > 170 and b > 170:
-                    return x
-            elif r < 120:
-                return x
-    return -1
-
-
-def test_narrow_title_server_connect_button_align(app):
-    """窄态与宽态下，组标题与服务器地址两处黑字首笔逐像素同列，且都落在标定列上。
-
-    对齐基准是「连接Emby/Jellyfin」按钮**内文字**（不是按钮左边框）：蓝色背景只贴到
-    组边框，其内文字另有边框内边距 2px + 文字居中余量 (121-108)//2 = 6px，真机实测
-    白字首笔恒在「按钮左缘 + 设备像素 11」。
-
-    真机 Windows（DPR 1.25）实测映射表：组标题 QSS 的 (left, padding) 与标签
-    `padding-left` 对首笔墨迹的映射完全一致（left:0 时 padding 0→设备 5、1→6、2→7、
-    3→8、4→10、5→11、6→12、7→13、8→15；宽态 left 每 +1px 约 +1.25 设备像素），
-    故窄态取标题 `left:0 + padding:0 6` / 标签 `padding-left:5`（标题比标签多右移
-    1px），宽态取标题 `left:18 + padding:0 4` / 标签 `padding-left:5`——真机实测
-    窄态三处（标题/服务器地址/按钮内文字）首笔同落设备像素 27（按钮左缘 16 + 11），
-    宽态同落 47（按钮左缘 36 + 11）。
-
-    本测试只对**标题与服务器地址**（同为黑字、同字体、同扫描口径）做逐像素断言：按钮内
-    是白字/蓝底，首笔受抗锯齿与「按钮所在设备像素相位」（窗口位置 × dpr）影响，实测
-    在 pytest 环境里会在 9~16 列间漂，无法稳定断言，故改由上面的 QSS 常量断言
-    （`_CONN_TITLE_QSS` / `_CONN_LABEL_QSS` / `_CONN_TITLE_QSS_WIDE` /
-    `_CONN_LABEL_QSS_WIDE` 与四个标定数值）钉死，真实观感以真机标定数据为准。
-    """
+def test_narrow_title_and_label_align_with_button_text(app):
+    """窄态组标题与服务器地址文本逐像素落在首按钮「连接Emby/Jellyfin」内文字的竖线上；
+    宽态两者清空局部样式回到全局 QSS 原位（相对窄态向右）。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
+
+    def _dark_cols(img, y0, y1, x1=340):
+        xs = [
+            x
+            for y in range(y0, y1)
+            for x in range(x1)
+            if (lambda c: c.red() < 120 and c.green() < 120 and c.blue() < 120)(img.pixelColor(x, y))
+        ]
+        return (min(xs), max(xs)) if xs else None
+
+    def _white_cols(img):
+        xs = [
+            x
+            for y in range(img.height())
+            for x in range(img.width())
+            if (lambda c: c.red() > 200 and c.green() > 200 and c.blue() > 200)(img.pixelColor(x, y))
+        ]
+        return (min(xs), max(xs)) if xs else None
 
     dlg = EmbyActorManagerDialog()
     real = dlg.isMaximized
-    dpr = dlg.devicePixelRatioF()
-
-    def dev_x(widget, row0, row1, *, bright):
-        """控件内首笔墨迹折算成「连接组左缘起算的设备像素列」。
-
-        `grab()` 返回的是设备像素图（宽 = 逻辑宽 × dpr），控件 `x()` 是逻辑 px，
-        两者混用会错位，故这里先 `round(x() * dpr)` 再加图内首笔列，两处同一口径。
-        """
-        ink = _first_ink_x(widget.grab().toImage(), row0, row1, bright=bright)
-        return -1 if ink < 0 else round(widget.x() * dpr) + ink
-
-    def two_inks():
-        group = dlg._conn_group
-        label = dlg._lbl_server
-        return (
-            _first_ink_x(group.grab().toImage(), 0, 15, bright=False),
-            dev_x(label, 0, label.height(), bright=False),
-        )
-
     try:
+        dlg.resize(1400, 800)
         dlg.show()
         for _ in range(3):
             app.processEvents()
-        title_x, server_x = two_inks()
-        assert title_x >= 0 and server_x >= 0, "窄态两处文字均未扫描到首笔"
-        assert title_x == server_x, f"窄态组标题与服务器地址未同列：{title_x} {server_x}"
-        # 宽态：标题/标签换用宽态标定值后，两处仍与按钮内文字同列。
+        group = dlg._conn_grid.parentWidget()
+        # 首按钮内文字起点（相对按钮左边缘）：窄态贴组边框 x=1，故竖线 x = 1 + 该偏移。
+        btn_text = _white_cols(dlg.btn_connect.grab().toImage())
+        assert btn_text is not None, "首按钮应有可见文字"
+        want_x = dlg.btn_connect.x() + btn_text[0]
+        # 组标题文本起点。
+        title_text = _dark_cols(group.grab().toImage(), 0, 9)
+        assert title_text is not None, "组标题应有可见文字"
+        assert title_text[0] == want_x, f"组标题 x={title_text[0]} 应等于按钮文字 x={want_x}"
+        # 服务器地址标签：x=边距0+边框1，窄态垫左后文本起点同样落在该竖线。
+        lbl_x = dlg._lbl_server.mapTo(group, dlg._lbl_server.rect().topLeft()).x()
+        assert lbl_x == 1, "窄态组左内边距应为 0，标签紧贴边框"
+        assert "padding-left: 7px" in dlg._NARROW_LBL_PADDING, "标签垫左后文本 x=1+7=8=按钮文字竖线"
+        # 宽态：两者清空局部样式，各自向右（标题回 20、标签回 17）。
         dlg.isMaximized = lambda: True
-        dlg._apply_button_row_compact()
+        dlg._apply_button_widths()
         for _ in range(3):
             app.processEvents()
-        assert dlg._conn_group.styleSheet() == dlg._CONN_TITLE_QSS_WIDE
-        assert dlg._lbl_server.styleSheet() == dlg._CONN_LABEL_QSS_WIDE
-        title_x, server_x = two_inks()
-        assert title_x >= 0 and server_x >= 0, "宽态两处文字均未扫描到首笔"
-        assert title_x == server_x, f"宽态组标题与服务器地址未同列：{title_x} {server_x}"
+        assert group.styleSheet() == "" and dlg._lbl_server.styleSheet() == ""
+        wide_title = _dark_cols(group.grab().toImage(), 0, 9)
+        assert wide_title[0] > title_text[0], "最大化时组标题应向右"
+        wide_lbl = dlg._lbl_server.mapTo(group, dlg._lbl_server.rect().topLeft()).x()
+        assert wide_lbl > lbl_x, "最大化时服务器地址应向右"
     finally:
         dlg.isMaximized = real
         dlg.close()
