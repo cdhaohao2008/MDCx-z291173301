@@ -1,5 +1,13 @@
 
 # Changelog
+## v2.5.1 (2026-10-20)
+### 改进
+- **版本号**：`2.5.0` 升 `2.5.1`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx`；`LOCAL_VERSION` 保持 `20261020` 与前几个版本同批，时间标签不倒退）。仍是当前最新版本。
+- **演员管理器组标题与「服务器地址:」改按**真字体**实测标定对齐首按钮内文字，各右移 4px（`mdcx/tools/emby_actor_manager_ui.py` 的 `_NARROW_TITLE_QSS` / `_WIDE_TITLE_QSS` / `_LBL_ALIGN_PADDING`）**：上一版的标定是在 `QT_QPA_PLATFORM=offscreen` 下做的，而离屏平台 `QFontDatabase.families()` 为 0 个字体、字形退化，按钮文字居中余量被量成 7px（真机是 9px），于是整条标定公式连带偏移 4px。真机复测三条常数：按钮按文字实宽定宽后文字居中的余量**恒 9px**（`grab()` 扫白色像素，`btn_connect` 209/字宽 191、`btn_fetch` 92/字宽 74 均为 9）→ 文字竖线 = 按钮 x + 9，窄态按钮 x=1 → 目标 **10**、宽态按钮 x=17 → 目标 **26**；标题 `rel_group = 4 + left + padding_left`（`subcontrol-origin: margin` 的生效原点是 x=**4**，不是上版记的 6；实测 left=0/P2→6 / 4/P2→10 / 14/P4→22 / 18/P4→26）；标签 `rel_lbl = padding_left + 5`（不是上版的 6）。据此取值：**窄态**标题 `left:0 → 4`（`4+4+2 = 10`，**右移 4px**）、**宽态**标题 `left:14 → 18`（`4+18+4 = 26`，**右移 4px**）、标签 `padding-left:1px → 5px`（边距0/16+边框1+5+5 = 10/26，两态通用、各**右移 4px**）——一个标签值两态通用仍是因为它同时命中两态各自的按钮文字竖线。实测（用户环境：系统缩放 125% × 配置 `ui_scale_factor=0.8` → dpr=1.0）窄态 `标题 10 = 按钮文字 10 = 标签 10`、宽态 `26 = 26 = 26`，两态严格同竖线；dpr=1.25（不设 `QT_SCALE_FACTOR`）残差仅 −0.2 设备px。按钮行本身、页面布局、控件、组件、提示词一律不动。
+### 修复
+- **演员管理器组标题与「服务器地址:」看着贴着蓝色按钮边框，没与按钮内文字左对齐（用户实测两态均偏左 4px）**：上版的「对齐」只在离屏无字体环境成立，真机上标题/标签都比按钮内文字左 4px（窄态 `6 / 10 / 6`、宽态 `22 / 26 / 22`）。现按上条的真字体标定各右移 4px 修正；顺带把 `_apply_button_row_compact` 的 docstring 与两处分支注释里的旧数字（余量 7px / 目标 8 / 24 / 原点 6 / 标题位移 0）一并改成实测值，避免下次再被旧公式带偏。
+### 验证
+- 回归：`tests/test_actor_export.py`、`tests/test_actor_manager_font_size.py`、`tests/test_actor_manager_row_count.py`、`tests/test_window_centering.py`、`tests/test_version_consistency.py` 共 **74 项，73 通过 + 1 跳过（离屏像素那项，见下）/ EXIT=0**；`test_title_and_label_align_with_button_text` 改为**先判字体再测像素**——`QFontDatabase.families()` 为空（离屏无字体，字形退化、像素对齐不可信）就 `pytest.skip` 并在 docstring 写明原因，有真字体时按 `devicePixelRatioF()` 把 `widget.x()` 逻辑坐标 ×dpr 换算成设备像素再比（**坑**：`grab().toImage()` 是设备像素图、`widget.x()` 是逻辑像素，两者直接相加在 dpr≠1 时必错），dpr=1.0 要求三者**严格同线**、其它 dpr 放宽 1 个设备px。实测 `QT_QPA_PLATFORM=windows` + `QT_SCALE_FACTOR=0.8`（dpr=1.0）与不设 `QT_SCALE_FACTOR`（dpr=1.25）两种真实字体环境下该用例**均实跑通过**（不是跳过），离屏下如实跳过。`test_button_row_compact_narrow_and_wide` 的硬编码断言同步为 `left: 4px` / `left: 18px` / `padding-left: 5px`。`scripts/bump.py --check` 报「五处版本点一致」，`ruff check mdcx/tools/emby_actor_manager_ui.py tests/test_actor_export.py` 零告警。
 ## v2.5.0 (2026-10-20)
 ### 改进
 - **版本号**：`2.4.9` 升 `2.5.0`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx`；`LOCAL_VERSION` 保持 `20261020` 与前几个版本同批，时间标签不倒退）。仍是当前最新版本。

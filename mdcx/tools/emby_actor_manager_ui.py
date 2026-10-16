@@ -1041,23 +1041,29 @@ class EmbyActorManagerDialog(QDialog):
     # 连接组 QGroupBox 的 objectName：用局部 QSS 精确命中本组标题（其余 QGroupBox 不受影响）。
     _CONN_GROUP_OBJ = "connGroup"
 
-    # 「组标题 / 服务器地址」对齐到按钮行首按钮内文字的竖线——两态都要对齐，但偏移量不同。
-    # 基准：按钮按文字实宽定宽后，文字居中的余量恒为 7px（实测 btn_connect 209/字宽 195、
-    # btn_fetch 92/字宽 78 均为 7），故按钮文字竖线 = 按钮 x + 7：
-    #   窄态 按钮 x=1 → 目标 8；宽态 按钮 x=17 → 目标 24。
-    # 标题实测标定为 1:1 线性：`rel_group = 6 + left + padding_left`（Qt 的
-    # `subcontrol-origin: margin` 使 left 生效原点在 x=6，实测 left=0→10 / 4→14 /
-    # 10→20 / 14→24 / 16→26）：
-    #   窄态 `left:0; padding:0 2px` → 6+0+2 = 8（与按钮文字同竖线，故窄态标题不动）；
-    #   宽态 `left:14; padding:0 4px` → 6+14+4 = 24（右移 4px 到与宽态按钮文字同竖线，
-    #   不再用全局 QSS 的 `left:10` 落在 20）。
-    # 标签实测标定：`rel_lbl = padding_left + 6`（padding ≥1 时），而 `padding-left:0`
-    # 被 Qt 当「无 padding」处理、位移 0（实测 0→0 / 2→8 / 4→10 / 7→13 / 10→16 / 14→20）。
-    #   取 `padding-left:1px` 时窄态 1+1+6 = 8、宽态 17+1+6 = 24，两态同时命中各自
-    #   的按钮文字竖线，故这一个值两态通用（窄态右移 6px 回正、宽态右移 7px）。
-    _NARROW_TITLE_QSS = f"QGroupBox#{_CONN_GROUP_OBJ}::title {{ subcontrol-origin: margin; left: 0px; padding: 0 2px; }}"
-    _WIDE_TITLE_QSS = f"QGroupBox#{_CONN_GROUP_OBJ}::title {{ subcontrol-origin: margin; left: 14px; padding: 0 4px; }}"
-    _LBL_ALIGN_PADDING = "padding-left: 1px;"
+    # 「组标题 / 服务器地址」对齐到按钮行首按钮「连接Emby/Jellyfin」**内文字**的竖线
+    # （不是按钮左边框/蓝色边框）——两态都对齐，偏移量不同。
+    # ⚠ 标定必须在真字体下测（QT_QPA_PLATFORM=windows）：离屏(offscreen)平台
+    # `QFontDatabase.families()` 为 0 个字体、字形退化，下面三条常数会整体偏左 4px，
+    # 在离屏环境里"测出来对齐"是假象（详见 docs/Development.md 与下方实测记录）。
+    # 真字体（Microsoft YaHei UI，逻辑px）实测标定，dpr=1 时：
+    #   按钮：按文字实宽定宽后，文字居中的余量恒为 9px（实测 btn_connect 209/字宽 191、
+    #         btn_fetch 92/字宽 74 均为 9）→ 文字竖线 = 按钮 x + 9；
+    #   标题：`rel_group = 4 + left + padding_left`（`subcontrol-origin: margin` 的
+    #         生效原点为 x=4，实测 left=0/P2→6 / 2/P2→8 / 4/P2→10 / 14/P4→22 / 18/P4→26）；
+    #   标签：`rel_lbl = padding_left + 5`（padding ≥1 时；`padding-left:0` 被 Qt 当
+    #         「无 padding」处理、位移 0）。
+    # 目标竖线：窄态 按钮 x=1 → 10；宽态 按钮 x=17 → 26。故取值：
+    #   窄态 `left:4; padding:0 2px` → 4+4+2 = 10（较旧的 0/2 右移 4px 命中按钮文字）；
+    #   宽态 `left:18; padding:0 4px` → 4+18+4 = 26（右移 4px 命中宽态按钮文字）；
+    #   标签 `padding-left:5px` → 边距0/16+边框1+5+5 = 10/26（两态通用，各右移 4px）。
+    # 两个 dpr 都验过：dpr=1.0 三者严格同竖线（10/10/10、26/26/26）；
+    # dpr=1.25（未设 QT_SCALE_FACTOR）残差仅 −0.2 设备px。
+    _NARROW_TITLE_QSS = (
+        f"QGroupBox#{_CONN_GROUP_OBJ}::title {{ subcontrol-origin: margin; left: 4px; padding: 0 2px; }}"
+    )
+    _WIDE_TITLE_QSS = f"QGroupBox#{_CONN_GROUP_OBJ}::title {{ subcontrol-origin: margin; left: 18px; padding: 0 4px; }}"
+    _LBL_ALIGN_PADDING = "padding-left: 5px;"
 
     def __init__(self, parent=None):
         # 不传 parent：始终保持独立顶层窗口。议题 #61——以主窗口为 parent 时，
@@ -1788,13 +1794,13 @@ class EmbyActorManagerDialog(QDialog):
         富余宽度不再被这一行平摊成 1-10 号空白，而是整条给上一行的服务器地址/
         API 密钥输入框（它们本就是 Expanding，变宽是输入框正常表现，不是空白）。
         组标题「Emby/Jellyfin连接设置」与服务器地址标签**两态各自**对齐到首按钮
-        「连接Emby/Jellyfin」内文字的竖线，且两态偏移量不同（标定见 `_NARROW_TITLE_QSS`
-        注释）：按钮贴组边框时文字起点恒为左边缘+7px，故窄态按钮 x=1 → 目标竖线
-        x=8（标题 `left:0; padding:0 2px` → 8 正好命中，位移 0；标签 `padding-left:1px`
-        → 边距0+边框1+1+6 = 8）；宽态按钮 x=17 → 目标竖线 x=24（标题改 `left:14;
-        padding:0 4px` → 6+14+4 = 24，右移 4px；标签同一 `padding-left:1px` →
-        边距16+边框1+1+6 = 24，右移 7px）。上下边距与垂直间距一律不动，故两态高度不变。
-        宽态（最大化/全屏）的按钮行仍恢复填满整行（左 16/右 6/间距 4、对齐 0），
+        「连接Emby/Jellyfin」**内文字**的竖线（对齐按钮内文字，不对齐蓝色边框），
+        且两态偏移量不同（真字体标定见 `_NARROW_TITLE_QSS` 注释：按钮按文字实宽定宽后
+        文字居中余量恒为 9px）：窄态按钮 x=1 → 目标竖线 x=10（标题 `left:4; padding:0 2px`
+        → 4+4+2 = 10，右移 4px；标签 `padding-left:5px` → 边距0+边框1+5+5 = 10）；
+        宽态按钮 x=17 → 目标竖线 x=26（标题 `left:18; padding:0 4px` → 4+18+4 = 26；
+        标签同一 `padding-left:5px` → 边距16+边框1+5+5 = 26）。上下边距与垂直间距一律不动，
+        故两态高度不变。宽态（最大化/全屏）的按钮行仍恢复填满整行（左 16/右 6/间距 4、对齐 0），
         页面布局、控件、提示词除上述标题/标签定位外逐像素不变。重复调用幂等。
         """
         try:
@@ -1817,8 +1823,9 @@ class EmbyActorManagerDialog(QDialog):
                 base = self.CONN_BASE_MARGINS
                 if (margins.left(), margins.top(), margins.right(), margins.bottom()) != base:
                     grid.setContentsMargins(*base)
-                # 宽态：组标题与服务器地址标签各自右移到宽态按钮文字竖线 x=24
-                # （标题右移 4px、标签右移 7px），见 _WIDE_TITLE_QSS 注释。
+                # 宽态：组标题与服务器地址标签各自右移到宽态按钮内文字竖线 x=26
+                # （标题 `left:18`、标签 `padding-left:5px`，较旧值各右移 4px），
+                # 见 _WIDE_TITLE_QSS 注释。
                 group = grid.parentWidget()
                 if group is not None and group.styleSheet() != self._WIDE_TITLE_QSS:
                     group.setStyleSheet(self._WIDE_TITLE_QSS)
@@ -1844,9 +1851,9 @@ class EmbyActorManagerDialog(QDialog):
                 margins = grid.contentsMargins()
                 if margins.left() != 0 or margins.right() != 0:
                     grid.setContentsMargins(0, margins.top(), 0, margins.bottom())
-                # 窄态：组标题与服务器地址标签各自对齐到首按钮「连接Emby/Jellyfin」内文字
-                # 的竖线 x = 按钮 x=1 + 文字内偏移 7 = 8（标题位移 0、标签右移 6px 回正）；
-                # 按钮仍贴组边框不动。
+                # 窄态：组标题与服务器地址标签各自对齐到首按钮「连接Emby/Jellyfin」
+                # **内文字**的竖线 x = 按钮 x=1 + 文字内偏移 9 = 10（标题与标签各
+                # 右移 4px，不再与按钮左边框/蓝色边框对齐）；按钮仍贴组边框不动。
                 group = grid.parentWidget()
                 if group is not None and group.styleSheet() != self._NARROW_TITLE_QSS:
                     group.setStyleSheet(self._NARROW_TITLE_QSS)
