@@ -395,8 +395,10 @@ def test_button_row_compact_narrow_and_wide(app):
         ]
         assert set(row_gaps) == {0}, "窄态按钮之间不得有任何空隙"
         assert items[0].x() == 1, "窄态首个按钮应贴组左边框"
-        # 窄态：服务器地址文本与组标题严格左对齐（垫左 13px），按钮仍贴组边框。
-        assert dlg._lbl_server.styleSheet() == "padding-left: 13px;"
+        # 窄态：服务器地址文本与组标题、连接按钮三处文字首笔同列（标签垫左 1px +
+        # 局部标题 QSS），按钮仍贴组边框。
+        assert dlg._lbl_server.styleSheet() == "padding-left: 1px;"
+        assert dlg._conn_group.styleSheet() == dlg._CONN_TITLE_QSS
         # 窄态：帮助标签恒两行、按文字实宽定宽，不再吸收富余宽度（曾致 23~37px 大缝）。
         assert dlg.help_label.text() == dlg._help_narrow
         assert dlg.help_label.maximumWidth() == dlg._narrow_help_width()
@@ -423,8 +425,65 @@ def test_button_row_compact_narrow_and_wide(app):
         assert dlg._btn_layout.spacing() == 0
         margins = dlg._conn_grid.contentsMargins()
         assert margins.left() == 0 and margins.right() == 0
-        assert dlg._lbl_server.styleSheet() == "padding-left: 13px;"
+        assert dlg._lbl_server.styleSheet() == "padding-left: 1px;"
+        assert dlg._conn_group.styleSheet() == dlg._CONN_TITLE_QSS
         assert dlg._btn_layout.alignment() == Qt.AlignmentFlag.AlignLeft
+    finally:
+        dlg.isMaximized = real
+        dlg.close()
+        app.processEvents()
+
+
+def _first_ink_x(image, row0, row1, *, bright: bool):
+    """在图像 [row0, row1) 行区间内扫描，返回第一列「文字像素」的 x。
+
+    dark 模式找深色字（黑字/白底，标题与服务器地址标签用），bright 模式找亮色字
+    （白字/蓝底，按钮内文字用）。用于比对三处文字的**首笔**是否同列。
+    """
+    for x in range(image.width()):
+        for y in range(row0, row1):
+            px = image.pixel(x, y)
+            r, g, b = (px >> 16) & 0xFF, (px >> 8) & 0xFF, px & 0xFF
+            if bright:
+                if r > 170 and g > 170 and b > 170:
+                    return x
+            elif r < 120:
+                return x
+    return -1
+
+
+def test_narrow_title_server_connect_button_align(app):
+    """窄态组标题、服务器地址、连接按钮三处文字首笔严格同列（组客户区 x=8）。
+
+    标题以「E」开头无字形左边距，服务器地址以「服」、按钮内以「连」开头各有约
+    6px 字形左边距，故标签内容起点要退到 x=2 才能让三处首笔同列；组标题则由
+    本控件级 QSS 把全局 `left:10 + padding:0 4px` 覆盖成 `left:0 + padding:0 2px`。
+    """
+    from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
+
+    dlg = EmbyActorManagerDialog()
+    real = dlg.isMaximized
+    try:
+        dlg.show()
+        for _ in range(3):
+            app.processEvents()
+        group = dlg._conn_grid.parentWidget()
+        group_img = group.grab().toImage()
+        rows = [y for y in range(2, 24) if _first_ink_x(group_img, y, y + 1, bright=False) >= 0]
+        assert rows, "未找到组标题文字行"
+        title_x = _first_ink_x(group_img, rows[0], rows[-1] + 1, bright=False)
+        label = dlg._lbl_server
+        server_x = label.x() + _first_ink_x(label.grab().toImage(), 0, label.height(), bright=False)
+        button = dlg.btn_connect
+        btn_x = button.x() + _first_ink_x(button.grab().toImage(), 0, button.height(), bright=True)
+        assert title_x == server_x == btn_x, f"三处文字未同列：标题 {title_x} 服务器 {server_x} 按钮 {btn_x}"
+        # 宽态：三处都恢复全局原样（标题 17 / 服务器 17 / 按钮 24），互不覆盖。
+        dlg.isMaximized = lambda: True
+        dlg._apply_button_row_compact()
+        for _ in range(3):
+            app.processEvents()
+        assert dlg._conn_group.styleSheet() == ""
+        assert label.styleSheet() == ""
     finally:
         dlg.isMaximized = real
         dlg.close()
