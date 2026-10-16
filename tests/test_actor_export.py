@@ -469,6 +469,37 @@ def test_narrow_default_width_shrinks_to_content(app):
         app.processEvents()
 
 
+def test_narrow_shrink_recenters_on_screen(app, monkeypatch):
+    """窄态缩宽后重新居中：resize() 不动左上角，不重定位就会整体偏左半个差值。
+
+    `__init__` 的 `_center_on_screen()` 是按缩宽前的宽度（屏幕 80%）算的，
+    缩到 `_narrow_min_width()` 后右边界内收，几何中心左移 `(1800-1392)//2`，
+    所以缩宽后必须再居中一次，回到屏幕可用区正中央。
+    """
+    from PyQt6.QtCore import QRect
+
+    from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
+    from mdcx.utils import window_center
+
+    avail = QRect(0, 0, 3000, 2000)  # 放宽虚拟屏，使窗口小于可用区才谈得上居中
+    monkeypatch.setattr(window_center, "available_geometry", lambda widget: avail)
+    dlg = EmbyActorManagerDialog()
+    try:
+        dlg.resize(1800, dlg.height())
+        dlg.show()
+        for _ in range(3):
+            app.processEvents()
+        assert dlg.width() == dlg._narrow_min_width(), "窄态应缩到内容宽"
+        frame = dlg.frameGeometry()
+        want_x = avail.x() + (avail.width() - frame.width()) // 2
+        want_y = avail.y() + (avail.height() - frame.height()) // 2
+        assert abs(frame.x() - want_x) <= 1, f"缩宽后应重新居中，实际 x={frame.x()} 期望 {want_x}"
+        assert abs(frame.y() - want_y) <= 1, f"纵向同样应居中，实际 y={frame.y()} 期望 {want_y}"
+    finally:
+        dlg.close()
+        app.processEvents()
+
+
 def test_narrow_help_two_lines_and_min_width(app):
     """窄态帮助恒两行（断在「③选择模式获取数据」），最小宽随之下调；宽态复原。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog

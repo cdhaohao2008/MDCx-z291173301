@@ -2086,7 +2086,7 @@ class EmbyActorManagerDialog(QDialog):
         QTimer.singleShot(0, self._shrink_narrow_width)
 
     def _shrink_narrow_width(self) -> None:
-        """窄态默认宽度缩进：把窗口收到按钮行内容宽，删掉三处同源空白。
+        """窄态默认宽度缩进：把窗口收到按钮行内容宽，删掉三处同源空白，并保持屏幕居中。
 
         设置按钮右侧空白、统计栏「双击行可编辑」右侧空白、表格详情列富余，
         三者都来自「窗口宽 − 内容宽」的同一段富余宽度，故只需在窄态把窗口宽
@@ -2094,6 +2094,13 @@ class EmbyActorManagerDialog(QDialog):
         只在首次显示与「最大化→还原」时各收一次，用户之后手动拉宽不受限制
         （不逐次强拉，窗口仍可自由拖动）。最大化/全屏一律不动，几何与布局不变。
         重复调用幂等：宽度已贴合则无操作。
+
+        **缩宽后必须重新居中**：`resize()` 只改尺寸、**左上角 (x, y) 原地不动**，
+        而 `__init__` 里的 `_center_on_screen()` 是按缩宽前的宽度（屏幕 80%）算的，
+        缩窄后右边界内收、几何中心会整体左移半个差值（1536→1392 即左移 72px），
+        表现为「打开后偏左」。故这里 resize 之后紧跟一次 `_center_on_screen()`，
+        走 `mdcx.utils.window_center` 的 frameGeometry 口径（与主界面同款），
+        把缩完的窗口重新放回屏幕可用区正中央。
         """
         try:
             if self._is_wide_state():
@@ -2101,6 +2108,8 @@ class EmbyActorManagerDialog(QDialog):
             want = self._narrow_min_width()
             if want > 0 and self.width() > want:
                 self.resize(want, self.height())
+                # 缩宽改变了 frame 宽度，居中结果随之改变 → 重定位回屏幕正中央。
+                self._center_on_screen()
         except (RuntimeError, AttributeError):
             pass
         except Exception:
