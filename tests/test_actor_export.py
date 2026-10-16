@@ -395,9 +395,9 @@ def test_button_row_compact_narrow_and_wide(app):
         ]
         assert set(row_gaps) == {0}, "窄态按钮之间不得有任何空隙"
         assert items[0].x() == 1, "窄态首个按钮应贴组左边框"
-        # 窄态：组标题与服务器地址标签一起左移，与首按钮「连接Emby/Jellyfin」内文字
-        # 严格上下对齐（目标竖线 x = 按钮 x=1 + 文字内偏移 7 = 8）；按钮仍贴组边框。
-        assert dlg._lbl_server.styleSheet() == dlg._NARROW_LBL_PADDING
+        # 窄态：组标题与服务器地址标签各自对齐到首按钮「连接Emby/Jellyfin」内文字的竖线
+        # x = 按钮 x=1 + 文字内偏移 7 = 8（标题位移 0、标签右移 6px 回正）；按钮仍贴组边框。
+        assert dlg._lbl_server.styleSheet() == dlg._LBL_ALIGN_PADDING
         assert group.styleSheet() == dlg._NARROW_TITLE_QSS
         assert f"QGroupBox#{dlg._CONN_GROUP_OBJ}::title" in dlg._NARROW_TITLE_QSS
         # 组标题文案按用户要求去掉空格。
@@ -415,9 +415,10 @@ def test_button_row_compact_narrow_and_wide(app):
         dlg._apply_button_widths()
         assert dlg._btn_layout.spacing() == 4
         assert dlg.help_label.maximumWidth() == dlg._HELP_MAX_W
-        assert dlg._lbl_server.styleSheet() == ""
-        # 宽态：组标题局部 QSS 清空、回到全局 QSS 原位（相对窄态向右 12px）。
-        assert group.styleSheet() == ""
+        # 宽态：组标题与标签各自右移到宽态按钮文字竖线 x=24（标题右移 4px、标签右移 7px）。
+        assert dlg._lbl_server.styleSheet() == dlg._LBL_ALIGN_PADDING
+        assert group.styleSheet() == dlg._WIDE_TITLE_QSS
+        assert "left: 14px" in dlg._WIDE_TITLE_QSS
         # 宽态按钮行恢复填满整行（最大化逐像素不变）。
         assert dlg._btn_layout.alignment() == Qt.AlignmentFlag(0)
         margins = dlg._conn_grid.contentsMargins()
@@ -430,7 +431,7 @@ def test_button_row_compact_narrow_and_wide(app):
         assert dlg._btn_layout.spacing() == 0
         margins = dlg._conn_grid.contentsMargins()
         assert margins.left() == 0 and margins.right() == 0
-        assert dlg._lbl_server.styleSheet() == dlg._NARROW_LBL_PADDING
+        assert dlg._lbl_server.styleSheet() == dlg._LBL_ALIGN_PADDING
         assert group.styleSheet() == dlg._NARROW_TITLE_QSS
         assert dlg._btn_layout.alignment() == Qt.AlignmentFlag.AlignLeft
     finally:
@@ -439,16 +440,16 @@ def test_button_row_compact_narrow_and_wide(app):
         app.processEvents()
 
 
-def test_narrow_title_and_label_align_with_button_text(app):
-    """窄态组标题与服务器地址文本逐像素落在首按钮「连接Emby/Jellyfin」内文字的竖线上；
-    宽态两者清空局部样式回到全局 QSS 原位（相对窄态向右）。"""
+def test_title_and_label_align_with_button_text(app):
+    """窄态与宽态下，组标题 / 服务器地址文本都逐像素落在首按钮「连接Emby/Jellyfin」
+    内文字的同一条竖线上；两态偏移量不同（窄态标题位移 0、宽态标题右移 4px）。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     def _dark_cols(img, y0, y1, x1=340):
         xs = [
             x
-            for y in range(y0, y1)
-            for x in range(x1)
+            for y in range(y0, min(y1, img.height()))
+            for x in range(min(x1, img.width()))
             if (lambda c: c.red() < 120 and c.green() < 120 and c.blue() < 120)(img.pixelColor(x, y))
         ]
         return (min(xs), max(xs)) if xs else None
@@ -458,9 +459,27 @@ def test_narrow_title_and_label_align_with_button_text(app):
             x
             for y in range(img.height())
             for x in range(img.width())
-            if (lambda c: c.red() > 200 and c.green() > 200 and c.blue() > 200)(img.pixelColor(x, y))
+            if (lambda c: c.red() > 180 and c.green() > 180 and c.blue() > 180)(img.pixelColor(x, y))
         ]
         return (min(xs), max(xs)) if xs else None
+
+    def _measure(dlg, app):
+        """返回 (标题, 按钮文字, 标签) 三者文本起点的相对组左边框坐标。"""
+        group = dlg._conn_grid.parentWidget()
+        btn = _white_cols(dlg.btn_connect.grab().toImage())
+        assert btn is not None, "首按钮应有可见文字"
+        title = _dark_cols(group.grab().toImage(), 0, 12, x1=group.width())
+        assert title is not None, "组标题应有可见文字"
+        lbl_img = dlg._lbl_server.grab().toImage()
+        lbl_px = _dark_cols(lbl_img, 0, lbl_img.height())
+        assert lbl_px is not None, "服务器地址标签应有可见文字"
+        # 三张图都以各自 widget 左上角为原点，故各自减去 widget 相对组的 x 后才可比。
+        lbl_widget_x = dlg._lbl_server.mapTo(group, dlg._lbl_server.rect().topLeft()).x()
+        return (
+            title[0],
+            dlg.btn_connect.x() + btn[0],
+            lbl_widget_x + lbl_px[0],
+        )
 
     dlg = EmbyActorManagerDialog()
     real = dlg.isMaximized
@@ -470,28 +489,26 @@ def test_narrow_title_and_label_align_with_button_text(app):
         for _ in range(3):
             app.processEvents()
         group = dlg._conn_grid.parentWidget()
-        # 首按钮内文字起点（相对按钮左边缘）：窄态贴组边框 x=1，故竖线 x = 1 + 该偏移。
-        btn_text = _white_cols(dlg.btn_connect.grab().toImage())
-        assert btn_text is not None, "首按钮应有可见文字"
-        want_x = dlg.btn_connect.x() + btn_text[0]
-        # 组标题文本起点。
-        title_text = _dark_cols(group.grab().toImage(), 0, 9)
-        assert title_text is not None, "组标题应有可见文字"
-        assert title_text[0] == want_x, f"组标题 x={title_text[0]} 应等于按钮文字 x={want_x}"
-        # 服务器地址标签：x=边距0+边框1，窄态垫左后文本起点同样落在该竖线。
-        lbl_x = dlg._lbl_server.mapTo(group, dlg._lbl_server.rect().topLeft()).x()
-        assert lbl_x == 1, "窄态组左内边距应为 0，标签紧贴边框"
-        assert "padding-left: 7px" in dlg._NARROW_LBL_PADDING, "标签垫左后文本 x=1+7=8=按钮文字竖线"
-        # 宽态：两者清空局部样式，各自向右（标题回 20、标签回 17）。
+        narrow_title, narrow_btn, narrow_lbl = _measure(dlg, app)
+        assert narrow_title == narrow_btn, (
+            f"窄态组标题 x={narrow_title} 应等于按钮文字 x={narrow_btn}"
+        )
+        assert narrow_lbl == narrow_btn, (
+            f"窄态服务器地址 x={narrow_lbl} 应等于按钮文字 x={narrow_btn}"
+        )
+        assert dlg.btn_connect.x() == 1, "窄态组左内边距应为 0，首按钮紧贴边框"
+        assert "padding-left: 1px" in dlg._LBL_ALIGN_PADDING
+        # 宽态：三者各自右移到宽态按钮文字竖线（x = 17 + 7 = 24），仍严格同线。
         dlg.isMaximized = lambda: True
         dlg._apply_button_widths()
         for _ in range(3):
             app.processEvents()
-        assert group.styleSheet() == "" and dlg._lbl_server.styleSheet() == ""
-        wide_title = _dark_cols(group.grab().toImage(), 0, 9)
-        assert wide_title[0] > title_text[0], "最大化时组标题应向右"
-        wide_lbl = dlg._lbl_server.mapTo(group, dlg._lbl_server.rect().topLeft()).x()
-        assert wide_lbl > lbl_x, "最大化时服务器地址应向右"
+        wide_title, wide_btn, wide_lbl = _measure(dlg, app)
+        assert wide_title == wide_btn == wide_lbl, (
+            f"宽态三者应同竖线，实测 标题={wide_title} 按钮={wide_btn} 标签={wide_lbl}"
+        )
+        assert wide_btn > narrow_btn, "最大化时按钮文字竖线整体右移"
+        assert group.styleSheet() == dlg._WIDE_TITLE_QSS
     finally:
         dlg.isMaximized = real
         dlg.close()
