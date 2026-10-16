@@ -99,41 +99,39 @@ def test_emby_actor_manager_table_has_birthday_and_location_columns(app):
     try:
         table = dlg.table
         headers = [table.horizontalHeaderItem(i).text() for i in range(table.columnCount())]
-        assert headers == ["状态", "姓名", "头像", "简介", "详情", "出生日期", "出生地", "标签", "影片数"]
+        assert headers == ["状态", "姓名", "头像", "简介", "出生日期", "出生地", "详情", "标签", "影片数"]
 
-        # 常规态：出生日期恒 100，出生地等宽 100，标签 2 倍 200，总宽铺满视口
-        dlg.resize(1600, 900)
-        dlg.show()
-        app.processEvents()
-        dlg._is_wide_state = lambda: False
-        dlg._apply_column_widths()
-        app.processEvents()
-        assert table.columnWidth(5) == 100
-        assert table.columnWidth(6) == 100
-        assert table.columnWidth(7) == 200
-        total = sum(table.columnWidth(i) for i in range(table.columnCount()))
-        assert total == pytest.approx(table.viewport().width(), abs=4), "各列总宽未铺满视口"
-        # 固定列宽度保持不变（状态/头像/简介均为出生日期一半 50，影片数恒 60；姓名列与出生地同宽，随状态切换）
-        assert table.columnWidth(0) == 50
-        assert table.columnWidth(1) == 100
-        assert table.columnWidth(2) == 50
-        assert table.columnWidth(3) == 50
-        assert table.columnWidth(8) == 60
+        # 常规态与宽态列宽公式一致（宽/窄靠视口自然区分）：实测生日/2 倍出生地/平分。
+        import math as _math
 
-        # 宽态（最大化）：姓名与出生地同为 2 倍 200，标签 3 倍 300，出生日期不变，总宽仍铺满
-        dlg._is_wide_state = lambda: True
-        dlg._apply_column_widths()
-        app.processEvents()
-        assert table.columnWidth(1) == 200
-        assert table.columnWidth(5) == 100
-        assert table.columnWidth(0) == 50
-        assert table.columnWidth(2) == 50
-        assert table.columnWidth(3) == 50
-        assert table.columnWidth(8) == 60
-        assert table.columnWidth(6) == 200
-        assert table.columnWidth(7) == 300
-        total = sum(table.columnWidth(i) for i in range(table.columnCount()))
-        assert total == pytest.approx(table.viewport().width(), abs=4), "宽态各列总宽未铺满视口"
+        for _wide in (False, True):
+            dlg.resize(1600, 900)
+            dlg.show()
+            app.processEvents()
+            dlg._is_wide_state = lambda w=_wide: w
+            dlg._apply_column_widths()
+            app.processEvents()
+            _birthday_w = dlg._measured_birthday_width()
+            assert _birthday_w == int(
+                _math.ceil(
+                    max(
+                        table.fontMetrics().horizontalAdvance(s)
+                        for s in ("0000-00-00", "8888-88-88", "出生日期")
+                    )
+                )
+            ) + int(dlg._BIRTHDAY_CELL_PADDING)
+            assert table.columnWidth(4) == _birthday_w
+            assert table.columnWidth(5) == _birthday_w * 2
+            assert table.columnWidth(1) == _birthday_w * 2
+            _half_w = int(_math.ceil(_birthday_w / 2.0))
+            assert table.columnWidth(0) == _half_w
+            assert table.columnWidth(2) == _half_w
+            assert table.columnWidth(3) == _half_w
+            assert table.columnWidth(8) == 60
+            # 详情与标签平分剩余（余 1px 归详情），两者差至多 1。
+            assert abs(table.columnWidth(6) - table.columnWidth(7)) <= 1
+            total = sum(table.columnWidth(i) for i in range(table.columnCount()))
+            assert total == pytest.approx(table.viewport().width(), abs=4), "各列总宽未铺满视口"
     finally:
         dlg.close()
         dlg.deleteLater()
@@ -156,8 +154,8 @@ def test_emby_actor_manager_populates_birthday_and_location(app):
         )
         dlg._actors = [actor]
         dlg._populate_table(dlg._actors)
-        assert dlg.table.item(0, 5).text() == "1994-08-26"
-        assert dlg.table.item(0, 6).text() == "日本, 东京都"
+        assert dlg.table.item(0, 4).text() == "1994-08-26"
+        assert dlg.table.item(0, 5).text() == "日本, 东京都"
     finally:
         dlg.close()
         dlg.deleteLater()
@@ -187,8 +185,8 @@ def test_emby_actor_manager_detail_hides_br_and_none(app):
         )
         dlg._actors = [empty_actor, br_actor]
         dlg._populate_table(dlg._actors)
-        assert dlg.table.item(0, 4).text() == ""
-        detail = dlg.table.item(1, 4).text()
+        assert dlg.table.item(0, 6).text() == ""
+        detail = dlg.table.item(1, 6).text()
         assert "<br" not in detail.lower()
         assert "（无）" not in detail and "(无)" not in detail
         assert "<" not in detail and ">" not in detail
@@ -215,8 +213,8 @@ def test_emby_actor_manager_blank_birthday_placeholder(app):
         )
         dlg._actors = [actor]
         dlg._populate_table(dlg._actors)
+        assert dlg.table.item(0, 4).text() == ""
         assert dlg.table.item(0, 5).text() == ""
-        assert dlg.table.item(0, 6).text() == ""
     finally:
         dlg.close()
         dlg.deleteLater()
@@ -250,6 +248,75 @@ def test_emby_actor_manager_columns_fit_after_vertical_scrollbar(app):
         total_off = sum(table.columnWidth(i) for i in range(table.columnCount()))
         assert total_off == pytest.approx(table.viewport().width(), abs=4), "纵滚动条隐藏后列宽未铺满视口"
         assert hbar.maximum() == 0, f"纵滚动条隐藏后出现横向滚动条: {hbar.maximum()}"
+    finally:
+        dlg.close()
+        dlg.deleteLater()
+        app.processEvents()
+
+
+def test_emby_actor_manager_copyable_cells(app):
+    """新规格：姓名/出生日期/出生地/详情/标签可选中复制（整格 Ctrl+C + 双击只读编辑器子串复制）。"""
+    import math
+
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QGuiApplication
+    from PyQt6.QtWidgets import QAbstractItemView, QStyleOptionViewItem, QTableWidget
+
+    from mdcx.tools.emby_actor_manager import ActorInfo
+    from mdcx.tools.emby_actor_manager_ui import (
+        _COPYABLE_COLUMNS,
+        EmbyActorManagerDialog,
+    )
+
+    assert sorted(_COPYABLE_COLUMNS) == [1, 4, 5, 6, 7]
+    dlg = EmbyActorManagerDialog()
+    try:
+        table = dlg.table
+        assert table.selectionBehavior() == QTableWidget.SelectionBehavior.SelectItems
+        assert table.editTriggers() == QAbstractItemView.EditTrigger.DoubleClicked
+        actor = ActorInfo(
+            name="复制演员",
+            actor_id="c1",
+            server_id="s",
+            existing_premiere_date="2000-01-02T00:00:00",
+            existing_production_locations=["日本"],
+            existing_overview="可复制简介",
+            existing_taglines=["标1", "标2"],
+        )
+        dlg._actors = [actor]
+        dlg._populate_table([actor])
+        for col in range(table.columnCount()):
+            editable = bool(table.item(0, col).flags() & Qt.ItemFlag.ItemIsEditable)
+            assert editable == (col in _COPYABLE_COLUMNS), f"列 {col} Editable 标记错误"
+        assert dlg._measured_birthday_width() == int(
+            math.ceil(
+                max(
+                    table.fontMetrics().horizontalAdvance(s)
+                    for s in ("0000-00-00", "8888-88-88", "出生日期")
+                )
+            )
+        ) + int(dlg._BIRTHDAY_CELL_PADDING)
+        dlg._on_table_double_clicked(0, 1)
+        assert dlg._detail_dialogs == {}
+        delegate = table.itemDelegate()
+        opt = QStyleOptionViewItem()
+        editor = delegate.createEditor(table, opt, table.model().index(0, 1))
+        assert editor is not None and editor.isReadOnly()
+        delegate.setEditorData(editor, table.model().index(0, 1))
+        assert editor.text() == "复制演员"
+        editor.setText("HACK")
+        delegate.setModelData(editor, table.model(), table.model().index(0, 1))
+        assert table.item(0, 1).text() == "复制演员"
+        assert delegate.createEditor(table, opt, table.model().index(0, 0)) is None
+        dlg._on_table_double_clicked(0, 0)
+        app.processEvents()
+        assert set(dlg._detail_dialogs) == {"c1"}
+        table.clearSelection()
+        table.selectAll()
+        assert dlg._copy_selected_cells_to_clipboard() is True
+        assert QGuiApplication.clipboard().text() == "复制演员\t2000-01-02\t日本\t可复制简介\t标1, 标2"
+        for d in list(dlg._detail_dialogs.values()):
+            d.close()
     finally:
         dlg.close()
         dlg.deleteLater()

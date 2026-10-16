@@ -1,9 +1,8 @@
 """演员数据导出为 xlsx（不依赖 Qt，可单测）。
 
-列顺序与表头以用户给定的样例文件为准
-（``演员数据表2026-10-12 13-52-01.xlsx``）::
+列顺序与管理器表格一致（状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数）::
 
-    姓名 | 详情 | 出生日期 | 出生地 | 标签 | 头像 | 简介 | 状态
+    状态 | 姓名 | 头像 | 简介 | 出生日期 | 出生地 | 详情 | 标签 | 影片数
 
 - 状态：``actor.status_icon`` 原值（✅/❌/⚠️），与管理器表格第一列一致；
   其中 ⚠️ 左侧补一个空格（见 ``EXPORT_WARN_STATUS_PAD``），使其与 ✅/❌ 上下对齐；
@@ -13,15 +12,18 @@
   但**不做 80 字截断**——导出是数据落盘，截断会丢信息；
 - 出生日期：``YYYY-MM-DD`` 写成 Excel 日期类型（样例中为日期型单元格），
   ``0001-01-01``（Emby 未设置零值）与非法值按空值导出；
-- 出生地/标签：全量现有值，以全角 ``，`` 连接（与样例一致；注意表格里标签只展示前两条）；
-- 样式：全表宋体 11pt，对齐方式与样例一致
-  （姓名/出生日期/头像/简介/状态居中，详情/出生地/标签居左，纵向全部居中）。
-- 列宽：头像/简介/状态三列保持默认列宽（8.43）；出生日期列宽 12，
+- 出生地/标签：全量现有值，以全角 ``，`` 连接（注意表格里标签只展示前两条）；
+- 影片数：``actor.movie_count`` 原值（整数），与管理器表格第九列一致；
+- 样式：全表宋体 11pt，对齐方式
+  （状态/姓名/头像/简介/出生日期/影片数居中，出生地/详情/标签居左，纵向全部居中）。
+- 列宽：状态/头像/简介三列 5.44；姓名 18；出生日期 12，
   完整展示 ``1958-04-29`` 这类日期（不出现 ``###``）的前提下尽量收窄；
-  姓名/详情/出生地/标签四列按 1:1:1:1 均分剩余列宽：调用方按用户屏幕实际宽度
+  出生地 36；影片数 8（标签右侧）；
+  详情/标签两列平分扣除上述固定列宽后的剩余列宽：调用方按用户屏幕实际宽度
   算出可分配宽度后传入（见 :func:`text_col_width_for_screen_width`），
-  缺省时按总表宽 260 均分；H 列之后的列（I:XFD）全部隐藏。
-- 首行表头冻结（``A2``），向下滚动时姓名/详情/出生日期/出生地/标签/头像/简介/状态
+  缺省时按总表宽 260 均分；I 列之后的列（J:XFD）全部隐藏，表总宽不变、
+  默认占满整个可用列宽。
+- 首行表头冻结（``A2``），向下滚动时状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数
   始终置顶显示。
 """
 
@@ -34,8 +36,8 @@ from pathlib import Path
 from ..models.emby import clean_overview_text
 from .emby_actor_manager import is_missing_overview
 
-EXPORT_HEADERS: tuple[str, ...] = ("姓名", "详情", "出生日期", "出生地", "标签", "头像", "简介", "状态")
-"""导出表头，从左到右的列顺序。"""
+EXPORT_HEADERS: tuple[str, ...] = ("状态", "姓名", "头像", "简介", "出生日期", "出生地", "详情", "标签", "影片数")
+"""导出表头，从左到右的列顺序，与管理器表格九列一致。"""
 
 EXPORT_FILENAME_PREFIX = "演员数据表"
 """导出文件名固定前缀，形如 ``演员数据表2026-10-12 13-52-01.xlsx``。"""
@@ -57,18 +59,35 @@ EXPORT_WARN_STATUS_PAD = " "
 现按要求减为一个，若 WPS 仍警告只能去掉（对齐与警告不可兼得）。
 """
 
-EXPORT_ICON_COL_WIDTH = 8.43
-"""头像/简介/状态三列列宽：保持 Excel 默认列宽不变。"""
+EXPORT_ICON_COL_WIDTH = 5.44
+"""状态/头像/简介三列列宽。"""
+
+EXPORT_NAME_COL_WIDTH = 18
+"""姓名列（B）固定列宽。"""
+
+EXPORT_BIRTHPLACE_COL_WIDTH = 36
+"""出生地列（F）固定列宽。"""
+
+EXPORT_MOVIE_COL_WIDTH = 8
+"""影片数列（I，标签右侧）固定列宽。"""
 
 EXPORT_BIRTHDAY_COL_WIDTH = 12
 """出生日期列宽：完整展示 ``1958-04-29`` 这类日期（不出现 ``###``）的前提下尽量收窄。"""
 
 EXPORT_TABLE_WIDTH = 260
-"""导出表总宽（列宽单位）。姓名/详情/出生地/标签四列按 1:1:1:1 均分扣除
-出生日期列与头像/简介/状态三列后的剩余宽度，把表右侧的大片空白默认摊进这四列。"""
+"""导出表总宽（列宽单位）。详情/标签两列按 1:1 平分扣除出生日期列、
+状态/头像/简介三列、姓名列、出生地列与影片数列后的剩余宽度，
+把表右侧的大片空白默认摊进这两列，表总宽不变、默认占满整个可用列宽。"""
 
-EXPORT_TEXT_COL_WIDTH = (EXPORT_TABLE_WIDTH - EXPORT_BIRTHDAY_COL_WIDTH - 3 * EXPORT_ICON_COL_WIDTH) / 4
-"""姓名/详情/出生地/标签四列的均分列宽（无屏幕信息时的缺省值）。"""
+EXPORT_TEXT_COL_WIDTH = (
+    EXPORT_TABLE_WIDTH
+    - EXPORT_BIRTHDAY_COL_WIDTH
+    - 3 * EXPORT_ICON_COL_WIDTH
+    - EXPORT_NAME_COL_WIDTH
+    - EXPORT_BIRTHPLACE_COL_WIDTH
+    - EXPORT_MOVIE_COL_WIDTH
+) / 2
+"""详情/标签两列的均分列宽（无屏幕信息时的缺省值）。"""
 
 SCREEN_ROW_HEADER_PX = 41
 """表格左侧序号列宽（像素，Excel/WPS 默认行号列宽）。"""
@@ -84,11 +103,11 @@ EXCEL_TABLE_PADDING_PX = 5
 
 EXPORT_TABLE_MARGIN_PX = 48
 """表右侧安全边距（像素）。表总宽与视口严丝合缝时，Office/WPS 自身的边框差异
-（网格线、皮肤滚动条、窗口边框等）会把 H 列挤出视口；留出该边距保证八列默认
+（网格线、皮肤滚动条、窗口边框等）会把 I 列挤出视口；留出该边距保证九列默认
 一屏放下，无需横向滚动。"""
 
 EXPORT_MIN_TEXT_COL_WIDTH = 10.0
-"""姓名/详情/出生地/标签四列的最小列宽，小屏兜底不压成 0。"""
+"""详情/标签两列的最小列宽，小屏兜底不压成 0。"""
 
 EXPORT_FALLBACK_SCREEN_PX = 1536.0
 """取不到屏幕信息时的兜底逻辑宽度（1920 物理像素 @125% 缩放）。"""
@@ -161,11 +180,11 @@ def effective_screen_width_px(screen: object) -> float:
 
 
 def text_col_width_for_screen_width(screen_px: object) -> float:
-    """按用户屏幕实际宽度算出姓名/详情/出生地/标签四列的均分列宽。
+    """按用户屏幕实际宽度算出详情/标签两列的均分列宽。
 
     公式：先扣除左侧序号列、右侧滚动条（Office/WPS 都会占用这部分宽度）与
-    表右侧安全边距，剩下按列宽单位换算后，再扣除出生日期列与头像/简介/状态
-    三列固定列宽，剩余均分给四列。非法输入/小屏时兜底为最小列宽。
+    表右侧安全边距，剩下按列宽单位换算后，再扣除出生日期列、状态/头像/简介
+    三列、姓名列、出生地列与影片数列固定列宽，剩余均分给两列。非法输入/小屏时兜底为最小列宽。
     """
     try:
         width_px = float(screen_px)
@@ -173,11 +192,18 @@ def text_col_width_for_screen_width(screen_px: object) -> float:
         return EXPORT_MIN_TEXT_COL_WIDTH
     content_px = width_px - SCREEN_ROW_HEADER_PX - SCREEN_VSCROLL_PX - EXPORT_TABLE_MARGIN_PX
     total_units = (content_px - EXCEL_TABLE_PADDING_PX) / EXCEL_UNIT_PX
-    text_width = (total_units - EXPORT_BIRTHDAY_COL_WIDTH - 3 * EXPORT_ICON_COL_WIDTH) / 4
+    text_width = (
+        total_units
+        - EXPORT_BIRTHDAY_COL_WIDTH
+        - 3 * EXPORT_ICON_COL_WIDTH
+        - EXPORT_NAME_COL_WIDTH
+        - EXPORT_BIRTHPLACE_COL_WIDTH
+        - EXPORT_MOVIE_COL_WIDTH
+    ) / 2
     return max(EXPORT_MIN_TEXT_COL_WIDTH, text_width)
 
-# 样例文件实测：姓名/出生日期/头像/简介/状态列居中，详情/出生地/标签列居左。
-_EXPORT_CENTER_COLS = frozenset((0, 2, 5, 6, 7))
+# 新列顺序下居中：状态/姓名/头像/简介/出生日期/影片数居中，出生地/详情/标签居左。
+_EXPORT_CENTER_COLS = frozenset((0, 1, 2, 3, 4, 8))
 
 _UNSET_BIRTHDAY = "0001-01-01"
 """Emby 未设置生日时的零值，展示与导出时都按空值处理。"""
@@ -262,7 +288,7 @@ def actor_birthday_cell(actor: object) -> _datetime.datetime | str:
 
 
 def actor_export_row(actor: object) -> tuple:
-    """单个演员的导出数据行，顺序与 EXPORT_HEADERS 对应。"""
+    """单个演员的导出数据行，顺序与 EXPORT_HEADERS 对应（状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数）。"""
     name = getattr(actor, "name", "") or ""
     detail = actor_detail_text(actor)
     birthday = actor_birthday_cell(actor)
@@ -275,7 +301,11 @@ def actor_export_row(actor: object) -> tuple:
     status = actor_status_icon(actor)
     if status == "⚠️":
         status = f"{EXPORT_WARN_STATUS_PAD}{status}"
-    return (name, detail, birthday, birthplace, tags, image_icon, info_icon, status)
+    try:
+        movie_count = int(getattr(actor, "movie_count", 0) or 0)
+    except (TypeError, ValueError):
+        movie_count = 0
+    return (status, name, image_icon, info_icon, birthday, birthplace, detail, tags, movie_count)
 
 
 def build_export_rows(actors: list) -> list[tuple]:
@@ -291,7 +321,7 @@ def write_actor_export_xlsx(
     Args:
         file_path: 落盘路径（无 .xlsx 后缀时自动补）。
         actors: 演员列表。
-        text_col_width: 姓名/详情/出生地/标签四列列宽，为 None 时用缺省均分值。
+        text_col_width: 详情/标签两列列宽，为 None 时用缺省均分值。
     """
     import openpyxl
     from openpyxl.styles import Alignment, Font
@@ -308,21 +338,23 @@ def write_actor_export_xlsx(
     ws.title = "Sheet1"
     # 首行冻结：向下滚动时表头始终置顶显示。
     ws.freeze_panes = "A2"
-    # 列宽：头像/简介/状态（F/G/H）保持默认列宽，出生日期（C）加宽，
-    # 姓名/详情/出生地/标签（A/B/D/E）1:1:1:1 均分剩余列宽。
+    # 列宽：状态/头像/简介（A/C/D）5.44，姓名（B）18，出生日期（E）12，
+    # 出生地（F）36，影片数（I，标签右侧）8，详情/标签（G/H）平分剩余列宽，
+    # 表总宽不变、默认占满整个可用列宽。
     for col_letter, width in (
-        ("A", text_width),
-        ("B", text_width),
-        ("C", EXPORT_BIRTHDAY_COL_WIDTH),
-        ("D", text_width),
-        ("E", text_width),
-        ("F", EXPORT_ICON_COL_WIDTH),
-        ("G", EXPORT_ICON_COL_WIDTH),
-        ("H", EXPORT_ICON_COL_WIDTH),
+        ("A", EXPORT_ICON_COL_WIDTH),
+        ("B", EXPORT_NAME_COL_WIDTH),
+        ("C", EXPORT_ICON_COL_WIDTH),
+        ("D", EXPORT_ICON_COL_WIDTH),
+        ("E", EXPORT_BIRTHDAY_COL_WIDTH),
+        ("F", EXPORT_BIRTHPLACE_COL_WIDTH),
+        ("G", text_width),
+        ("H", text_width),
+        ("I", EXPORT_MOVIE_COL_WIDTH),
     ):
         ws.column_dimensions[col_letter].width = width
-    # H 列之后的列（I:XFD）全部隐藏，表右侧不再出现空白列。
-    ws.column_dimensions.group("I", "XFD", hidden=True)
+    # I 列之后的列（J:XFD）全部隐藏，表右侧不再出现空白列。
+    ws.column_dimensions.group("J", "XFD", hidden=True)
     font = Font(name=EXPORT_FONT_NAME, size=EXPORT_FONT_SIZE)
     for col, header in enumerate(EXPORT_HEADERS, start=1):
         cell = ws.cell(row=1, column=col, value=header)
@@ -334,7 +366,7 @@ def write_actor_export_xlsx(
             cell.font = font
             horizontal = "center" if (col_idx - 1) in _EXPORT_CENTER_COLS else "left"
             cell.alignment = Alignment(horizontal=horizontal, vertical="center")
-            if col_idx == 3 and isinstance(value, _datetime.datetime):
+            if col_idx == 5 and isinstance(value, _datetime.datetime):
                 cell.number_format = EXPORT_DATE_NUMBER_FORMAT
     wb.save(path)
     return path

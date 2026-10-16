@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import math
 import re
 import threading
 import weakref
@@ -34,6 +35,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QSplitter,
     QStatusBar,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -290,6 +292,50 @@ def format_detail_cell_text(overview: object) -> str:
     - 空白坍缩后截断 80 字 + “...”，空结果返回空串。
     """
     return clean_rules.format_detail_cell_text(overview)
+
+
+# 新列顺序（状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数）下允许复制的列。
+_COPYABLE_COLUMNS = frozenset((1, 4, 5, 6, 7))
+"""姓名(1)/出生日期(4)/出生地(5)/详情(6)/标签(7)的数据允许复制。"""
+
+
+class _SelectableTextDelegate(QStyledItemDelegate):
+    """可复制列的只读文本代理：双击进入只读编辑器后可逐字选中文本复制。
+
+    表格用 SelectItems + DoubleClicked：单击只选中单元格（配合 Ctrl+C 整格复制），
+    双击可复制列时打开只读 QLineEdit，框内可拖选子串、Ctrl+C 走编辑器原生复制；
+    setModelData 空实现，编辑器内容永不回写 model，展示数据不会被改掉。
+    非可复制列返回 None（不进编辑器），双击走详情对话框。
+    """
+
+    def createEditor(self, parent, option, index):  # noqa: N802
+        try:
+            if index.column() not in _COPYABLE_COLUMNS:
+                return None
+            edit = QLineEdit(parent)
+            edit.setReadOnly(True)
+            # QLineEdit 只读仍可鼠标/键盘选中并 Ctrl+C，无需（也没有）setTextInteractionFlags。
+            return edit
+        except (RuntimeError, AttributeError):
+            return None
+        except Exception:
+            return None
+
+    def setEditorData(self, editor, index):  # noqa: N802
+        try:
+            value = index.data(Qt.ItemDataRole.DisplayRole)
+            if value is None:
+                value = ""
+            editor.setText(str(value))
+            editor.selectAll()
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+
+    def setModelData(self, editor, model, index):  # noqa: N802
+        # 只读复制用：永不回写，关闭编辑器时展示文本保持不变。
+        return None
 
 
 def scan_actor_data_noise(actors: list[ActorInfo], rules: object | None = None) -> list[tuple[ActorInfo, str, bool]]:
@@ -1475,31 +1521,32 @@ class EmbyActorManagerDialog(QDialog):
         self.table = QTableWidget()
         self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels(
-            ["状态", "姓名", "头像", "简介", "详情", "出生日期", "出生地", "标签", "影片数"]
+            ["状态", "姓名", "头像", "简介", "出生日期", "出生地", "详情", "标签", "影片数"]
         )
         horizontal_header = self.table.horizontalHeader()
         assert horizontal_header is not None
         horizontal_header.setStretchLastSection(False)
         horizontal_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
-        # 议题 #136：详情/标签改为按 3:1 分配剩余宽度（标签过宽、详情过窄），
+        # 详情/标签平分剩余视口（出生地恒为出生日期 2 倍），
         # 具体宽度由 _apply_column_widths 在 resize 时按视口计算，总宽保持铺满。
-        horizontal_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
+        horizontal_header.setSectionResizeMode(6, QHeaderView.ResizeMode.Interactive)
         horizontal_header.setSectionResizeMode(7, QHeaderView.ResizeMode.Interactive)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
         self.table.setAlternatingRowColors(True)
         self.table.setVerticalScrollMode(QTableWidget.ScrollMode.ScrollPerPixel)
         vertical_header = self.table.verticalHeader()
         assert vertical_header is not None
         vertical_header.setVisible(False)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
+        self.table.setItemDelegate(_SelectableTextDelegate(self.table))
         self.table.setSortingEnabled(True)
         self.table.setColumnWidth(0, 50)
         self.table.setColumnWidth(1, 100)
         self.table.setColumnWidth(2, 50)
         self.table.setColumnWidth(3, 50)
+        self.table.setColumnWidth(4, 100)
         self.table.setColumnWidth(5, 100)
-        self.table.setColumnWidth(6, 100)
         self.table.setColumnWidth(7, 200)
         self.table.setColumnWidth(8, 60)
         self.table.cellDoubleClicked.connect(self._on_table_double_clicked)
@@ -1509,23 +1556,23 @@ class EmbyActorManagerDialog(QDialog):
         table_viewport = self.table.viewport()
         assert table_viewport is not None
         table_viewport.installEventFilter(self)
+        self.table.installEventFilter(self)
 
-    # 出生日期宽恒定 100；状态/头像/简介取其一半 50，影片数恒定 60；
-    # 姓名与出生地同宽，按窗口状态取相对宽度：
-    # 还原/常规/最小化：出生地=出生日期等宽 100，标签=出生日期×2=200；
-    # 最大化/全屏：出生地=出生日期×2=200，标签=出生日期×3=300；详情吃掉剩余视口。
-    _BIRTHDAY_W = 100
-    _HALF_BIRTHDAY_W = _BIRTHDAY_W // 2  # 状态/头像/简介取出生日期一半
+    # 出生日期宽按表格字体实测 10 位日期完整显示、取整数（含 12px 单元格边距）；
+    # 状态/头像/简介取其一半，影片数恒定 60；
+    # 出生地恒为出生日期 2 倍，姓名与出生地同宽；详情与标签平分剩余视口。
+    # 宽/窄依然区分：最大化/全屏视口更宽，详情与标签平分后自然更宽；
+    # 窗口最小宽（_BASE_MIN_W/_narrow_min_width）与按钮行仍按宽窄态切换。
+    _BIRTHDAY_W = 100  # 实测失败时的回退值（内容宽，不含边距）
+    _BIRTHDAY_CELL_PADDING = 12  # 单元格边距：delegate 内容边距+网格线+焦点框，裸文本宽必须加上它才能完整显示
     _VIDEO_COUNT_W = 60  # 影片数恒定
     _FIXED_COLUMN_WIDTHS = {
-        0: _HALF_BIRTHDAY_W,
-        2: _HALF_BIRTHDAY_W,
-        3: _HALF_BIRTHDAY_W,
-        5: _BIRTHDAY_W,
-        6: _BIRTHDAY_W,
+        0: 50,
+        2: 50,
+        3: 50,
         8: _VIDEO_COUNT_W,
-    }  # 姓名(1)不再定宽，跟随出生地
-    _DETAIL_WIDTH_RATIO = 0.75  # 历史比例（议题 #136），现仅保留兼容，实际按出生日期倍率定宽
+    }  # 姓名(1)/出生日期(4)/出生地(5)/详情(6)/标签(7)由 _apply_column_widths 按视口计算
+    _DETAIL_WIDTH_RATIO = 0.75  # 历史比例（议题 #136），现仅保留兼容，实际详情与标签平分剩余
 
     # 最小宽 1080 预算：获取模式下拉 220→210 沿用既有定值；数据工具下拉按自身 sizeHint
     # 定宽（恰容下最长项+箭头，随字体自适应）；其余六个按钮（连接/获取演员列表/
@@ -1865,37 +1912,77 @@ class EmbyActorManagerDialog(QDialog):
         except Exception:
             return False
 
+    def _measured_birthday_width(self) -> int:
+        """出生日期列宽：按表格当前字体实测 10 位日期完整显示，取整数。
+
+        用表字体量 “0000-00-00”/“8888-88-88”（比例字体下 8 未必比 0 窄，
+        取最宽者）与表头 “出生日期” 的最大值，horizontalAdvance 取整（ceil）
+        后再加单元格边距（delegate 内容边距+网格线+焦点框约 12px）：裸文本宽
+        与列宽相等时文字会顶边/出省略号，之前用户反馈“显示不全”即此原因；
+        量不到/异常时回退 _BIRTHDAY_W（含边距），保证任何字体下 10 位日期完整显示。
+        """
+        try:
+            table = getattr(self, "table", None)
+            if table is None:
+                return int(self._BIRTHDAY_W) + int(self._BIRTHDAY_CELL_PADDING)
+            fm = table.fontMetrics()
+            adv = max(
+                fm.horizontalAdvance(s) for s in ("0000-00-00", "8888-88-88", "出生日期")
+            )
+            if adv <= 0:
+                return int(self._BIRTHDAY_W) + int(self._BIRTHDAY_CELL_PADDING)
+            return int(math.ceil(float(adv))) + int(self._BIRTHDAY_CELL_PADDING)
+        except (RuntimeError, AttributeError):
+            try:
+                return int(self._BIRTHDAY_W) + int(self._BIRTHDAY_CELL_PADDING)
+            except Exception:
+                return 112
+        except Exception:
+            try:
+                return int(self._BIRTHDAY_W) + int(self._BIRTHDAY_CELL_PADDING)
+            except Exception:
+                return 112
+
     def _apply_column_widths(self) -> None:
-        """按视口宽度重排各列，保证总宽铺满且比例按窗口状态切换。"""
+        """按视口宽度重排各列，保证总宽铺满：出生日期实测，出生地=2倍，姓名同出生地，详情与标签平分剩余。"""
         table = getattr(self, "table", None)
         if table is None:
             return
         viewport_w = table.viewport().width()
         if viewport_w <= 0:
             return
-        birthday_w = self._BIRTHDAY_W
-        wide = self._is_wide_state()
-        birthplace_w = birthday_w * 2 if wide else birthday_w
+        birthday_w = self._measured_birthday_width()
+        birthplace_w = birthday_w * 2
         name_w = birthplace_w  # 姓名列与出生地同宽
-        tags_w = birthday_w * 3 if wide else birthday_w * 2
+        half_w = max(int(math.ceil(birthday_w / 2.0)), 1)
         base_fixed = (
-            self._FIXED_COLUMN_WIDTHS.get(0, 50)
-            + name_w
-            + self._FIXED_COLUMN_WIDTHS.get(2, 50)
-            + self._FIXED_COLUMN_WIDTHS.get(3, 50)
-            + self._FIXED_COLUMN_WIDTHS.get(8, 60)
+            half_w  # 状态(0)
+            + name_w  # 姓名(1)
+            + half_w  # 头像(2)
+            + half_w  # 简介(3)
+            + birthday_w  # 出生日期(4)
+            + birthplace_w  # 出生地(5)
+            + self._FIXED_COLUMN_WIDTHS.get(8, 60)  # 影片数(8)恒定
         )
-        fixed_sum = base_fixed + birthday_w + birthplace_w + tags_w
-        detail_w = max(viewport_w - fixed_sum, 120)
+        # 详情(6)与标签(7)平分剩余视口；余 1px 时归详情，保证总宽恰好铺满。
+        rest = viewport_w - base_fixed
+        if rest < 240:
+            rest = 240
+        half_rest = rest // 2
+        detail_w = half_rest + (rest % 2)
+        tags_w = half_rest
         # 防御性重入保护: setColumnWidth 实测不改 viewport 宽(不会自激), 嵌套调用为同值空操作
         if getattr(self, "_applying_widths", False):
             return
         self._applying_widths = True
         try:
+            table.setColumnWidth(0, half_w)
             table.setColumnWidth(1, name_w)
-            table.setColumnWidth(5, birthday_w)
-            table.setColumnWidth(6, birthplace_w)
-            table.setColumnWidth(4, detail_w)
+            table.setColumnWidth(2, half_w)
+            table.setColumnWidth(3, half_w)
+            table.setColumnWidth(4, birthday_w)
+            table.setColumnWidth(5, birthplace_w)
+            table.setColumnWidth(6, detail_w)
             table.setColumnWidth(7, tags_w)
         finally:
             self._applying_widths = False
@@ -1971,15 +2058,73 @@ class EmbyActorManagerDialog(QDialog):
         从不碰窗口自身几何（最大化/最小化/还原全走系统原生行为）。
         表格/日志视口变化另补排一次行数对齐：日志条数增长冒出滚动条只改
         viewport 几何、不触发窗口 resize，整行数不能 silently 漂移。
+        另支持表格 Ctrl+C：已选中单元格按行列制表符拼成文本进剪贴板，
+        与只读编辑器内的子串复制互补（编辑器打开时走其原生复制，不过滤）。
         """
         table = getattr(self, "table", None)
         log = getattr(self, "log_text", None)
-        if a1 is not None and a1.type() == QEvent.Type.Resize:
-            if table is not None and a0 is table.viewport():
-                self._apply_column_widths()
-            if (table is not None and a0 is table.viewport()) or (log is not None and a0 is log.viewport()):
-                self._queue_viewport_refit()
+        try:
+            if table is not None and a1 is not None:
+                if a1.type() == QEvent.Type.KeyPress and (a0 is table or a0 is table.viewport()):
+                    try:
+                        if a1.matches(QKeySequence.StandardKey.Copy):
+                            if self._copy_selected_cells_to_clipboard():
+                                return True
+                    except (RuntimeError, AttributeError):
+                        pass
+                    except Exception:
+                        pass
+                if a1.type() == QEvent.Type.Resize:
+                    if a0 is table.viewport():
+                        self._apply_column_widths()
+                    if (a0 is table.viewport()) or (log is not None and a0 is log.viewport()):
+                        self._queue_viewport_refit()
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
         return super().eventFilter(a0, a1)
+
+    def _copy_selected_cells_to_clipboard(self) -> bool:
+        """把当前选中单元格的展示文本按“同行制表符、换行分行”拼串写入剪贴板。
+
+        只取可复制列（姓名/出生日期/出生地/详情/标签）的选中格，其余列选中
+        不进剪贴板；无可复制选中时返回 False（不吞事件）；有则写剪贴板返回 True。
+        行列按视觉行列排序，保证多选复制顺序稳定；空表/无选中返回 False。
+        """
+        table = getattr(self, "table", None)
+        if table is None:
+            return False
+        try:
+            indexes = [ix for ix in table.selectedIndexes() if ix.column() in _COPYABLE_COLUMNS]
+            if not indexes:
+                return False
+            rows: dict[int, dict[int, str]] = {}
+            for ix in indexes:
+                try:
+                    r, c = int(ix.row()), int(ix.column())
+                except (RuntimeError, AttributeError, ValueError, TypeError):
+                    continue
+                try:
+                    item = table.item(r, c)
+                    txt = item.text() if item is not None else (ix.data(Qt.ItemDataRole.DisplayRole) or "")
+                except (RuntimeError, AttributeError):
+                    continue
+                except Exception:
+                    continue
+                rows.setdefault(r, {})[c] = str(txt)
+            if not rows:
+                return False
+            lines = []
+            for r in sorted(rows):
+                cols = rows[r]
+                lines.append("\t".join(cols[c] for c in sorted(cols)))
+            QGuiApplication.clipboard().setText("\n".join(lines))
+            return True
+        except (RuntimeError, AttributeError):
+            return False
+        except Exception:
+            return False
 
     def _queue_viewport_refit(self) -> None:
         """视口几何变化后的补对：合并同拍多次事件，只排一次，守卫与 fit 同款。"""
@@ -3399,6 +3544,15 @@ class EmbyActorManagerDialog(QDialog):
         self._populate_table(self._actors)
 
     def _on_table_double_clicked(self, row: int, col: int):
+        # 可复制列（姓名/出生日期/出生地/详情/标签）双击进只读编辑器逐字复制，
+        # 不弹详情窗（否则编辑器与详情叠加）；其余列双击照旧打开详情。
+        try:
+            if int(col) in _COPYABLE_COLUMNS:
+                return
+        except (RuntimeError, AttributeError, ValueError, TypeError):
+            pass
+        except Exception:
+            pass
         # 表格启用排序后视觉行序 != _get_filtered_actors() 索引，用演员名反查，避免打开错误演员
         item = self.table.item(row, 1)
         if item is None:
@@ -3531,8 +3685,20 @@ class EmbyActorManagerDialog(QDialog):
             if actor.need_update_info:
                 info_item.setText("🔄")
             self.table.setItem(row, 3, info_item)
-            # 详情列仅展示清洗文本：缺简介/占位/空一律置空，不显示“（无）”；
+            # 新列顺序：状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数。
+            # 详情仅展示清洗文本：缺简介/占位/空一律置空，不显示“（无）”；
             # <br>/残留标签/“=”装饰线只在展示层剥除，数据与同步不受影响。
+            raw_birthday = (actor.existing_premiere_date or "")[:10]
+            # Emby 未设置生日时返回 0001-01-01，按空值展示，避免列表出现占位日期
+            birthday_text = "" if raw_birthday.startswith("0001-01-01") else raw_birthday
+            birthday_item = QTableWidgetItem(birthday_text)
+            # 议题 #153：出生日期为定宽列, 居中显示与 状态/头像/影片数 列观感一致
+            birthday_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 4, birthday_item)
+            location_text = (
+                ", ".join(actor.existing_production_locations) if actor.existing_production_locations else ""
+            )
+            self.table.setItem(row, 5, QTableWidgetItem(location_text))
             if is_missing_overview(actor):
                 try:
                     from ..models.emby import clean_overview_text as _clean_ov
@@ -3543,19 +3709,7 @@ class EmbyActorManagerDialog(QDialog):
                 overview_text = format_detail_cell_text(_rest)
             else:
                 overview_text = format_detail_cell_text(actor.existing_overview)
-            self.table.setItem(row, 4, QTableWidgetItem(overview_text))
-            # 议题 #134：详情与标签之间展示出生日期、出生地，均为 Emby 服务器现有值
-            raw_birthday = (actor.existing_premiere_date or "")[:10]
-            # Emby 未设置生日时返回 0001-01-01，按空值展示，避免列表出现占位日期
-            birthday_text = "" if raw_birthday.startswith("0001-01-01") else raw_birthday
-            birthday_item = QTableWidgetItem(birthday_text)
-            # 议题 #153：出生日期为定宽列, 居中显示与 状态/头像/影片数 列观感一致
-            birthday_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(row, 5, birthday_item)
-            location_text = (
-                ", ".join(actor.existing_production_locations) if actor.existing_production_locations else ""
-            )
-            self.table.setItem(row, 6, QTableWidgetItem(location_text))
+            self.table.setItem(row, 6, QTableWidgetItem(overview_text))
             tags = ", ".join(actor.existing_taglines[:2]) if actor.existing_taglines else ""
             self.table.setItem(row, 7, QTableWidgetItem(tags))
             mc_item = QTableWidgetItem(str(actor.movie_count) if actor.movie_count > 0 else "0")
@@ -3563,6 +3717,22 @@ class EmbyActorManagerDialog(QDialog):
             if actor.movie_titles:
                 mc_item.setToolTip("\n".join(actor.movie_titles[:20]))
             self.table.setItem(row, 8, mc_item)
+            # 可复制列（姓名/出生日期/出生地/详情/标签）保留 Editable，双击进只读编辑器逐字复制；
+            # 其余列去掉 Editable，双击不进编辑器（代理同样拦截），只走详情对话框。
+            for col in range(self.table.columnCount()):
+                _it = self.table.item(row, col)
+                if _it is None:
+                    continue
+                try:
+                    _fl = _it.flags()
+                    if col in _COPYABLE_COLUMNS:
+                        _it.setFlags(_fl | Qt.ItemFlag.ItemIsEditable)
+                    else:
+                        _it.setFlags(_fl & ~Qt.ItemFlag.ItemIsEditable)
+                except (RuntimeError, AttributeError):
+                    pass
+                except Exception:
+                    pass
             if actor.need_update_info or actor.need_update_image or actor.need_update_backdrop:
                 for col in range(self.table.columnCount()):
                     item = self.table.item(row, col)

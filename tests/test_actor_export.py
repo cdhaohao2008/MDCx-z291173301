@@ -1,7 +1,7 @@
-"""演员数据导出 xlsx：列顺序/取值口径/样式与样例文件一致，UI 接线不断言业务细节。
+"""演员数据导出 xlsx：列顺序/取值口径/样式与管理器表格九列一致，UI 接线不断言业务细节。
 
-样例文件（用户给定）：表头 姓名|详情|出生日期|出生地|标签|头像|简介|状态，
-对齐为姓名/出生日期/头像/简介/状态居中、详情/出生地/标签居左，全表宋体 11pt，
+导出表头 状态|姓名|头像|简介|出生日期|出生地|详情|标签|影片数，
+对齐为状态/姓名/头像/简介/出生日期/影片数居中、出生地/详情/标签居左，全表宋体 11pt，
 出生日期为 Excel 日期型（`[$-409]yyyy\\-mm\\-dd;@`）。
 """
 
@@ -47,7 +47,7 @@ def _actor(**kwargs):
 def test_export_headers_order():
     from mdcx.tools.emby_actor_export import EXPORT_HEADERS
 
-    assert EXPORT_HEADERS == ("姓名", "详情", "出生日期", "出生地", "标签", "头像", "简介", "状态")
+    assert EXPORT_HEADERS == ("状态", "姓名", "头像", "简介", "出生日期", "出生地", "详情", "标签", "影片数")
 
 
 def test_export_row_complete_actor():
@@ -61,14 +61,15 @@ def test_export_row_complete_actor():
         existing_taglines=["AA", "BB", "CC"],
     )
     assert ex.actor_export_row(a) == (
+        "✅",
         "AAA",
-        "详情正文",
+        "✅",
+        "✅",
         datetime.datetime(1990, 2, 3),
         "日本，仙台",
+        "详情正文",
         "AA，BB，CC",
-        "✅",
-        "✅",
-        "✅",
+        0,
     )
 
 
@@ -77,10 +78,10 @@ def test_export_row_missing_actor():
 
     a = _actor(name="缺员", has_image=False, has_overview=False, existing_overview="")
     row = ex.actor_export_row(a)
-    assert row[0] == "缺员"
-    assert row[1] == ""
-    assert row[2] == ""
-    assert row[5] == "❌" and row[6] == "❌" and row[7] == "❌"
+    assert row[1] == "缺员"
+    assert row[6] == ""
+    assert row[4] == ""
+    assert row[2] == "❌" and row[3] == "❌" and row[0] == "❌"
 
 
 def test_export_row_half_missing_status_warn():
@@ -89,7 +90,7 @@ def test_export_row_half_missing_status_warn():
     a = _actor(has_image=True, has_overview=False, existing_overview="")
     row = ex.actor_export_row(a)
     # ⚠️ 左侧补一个空格再导出，使其与 ✅/❌ 上下对齐。
-    assert (row[5], row[6], row[7]) == ("✅", "❌", " ⚠️")
+    assert (row[2], row[3], row[0]) == ("✅", "❌", " ⚠️")
 
 
 def test_export_row_placeholder_overview_counts_missing():
@@ -101,15 +102,15 @@ def test_export_row_placeholder_overview_counts_missing():
         existing_overview="无维基百科信息，从 minnano-av 数据库补全女优信息",
     )
     row = ex.actor_export_row(a)
-    assert row[6] == "❌" and row[7] == "❌"
-    assert row[1] == ""
+    assert row[3] == "❌" and row[0] == "❌"
+    assert row[6] == ""
 
 
 def test_export_row_unset_birthday_empty():
     from mdcx.tools import emby_actor_export as ex
 
     a = _actor(existing_premiere_date="0001-01-01T00:00:00")
-    assert ex.actor_export_row(a)[2] == ""
+    assert ex.actor_export_row(a)[4] == ""
 
 
 def test_export_row_detail_full_text_not_truncated():
@@ -117,14 +118,14 @@ def test_export_row_detail_full_text_not_truncated():
 
     long_text = "详" * 200
     a = _actor(existing_overview=long_text)
-    assert ex.actor_export_row(a)[1] == long_text
+    assert ex.actor_export_row(a)[6] == long_text
 
 
 def test_export_row_detail_strips_html():
     from mdcx.tools import emby_actor_export as ex
 
     a = _actor(existing_overview="第一行<br>第二行 <b>加粗</b>")
-    assert ex.actor_export_row(a)[1] == "第一行 第二行 加粗"
+    assert ex.actor_export_row(a)[6] == "第一行 第二行 加粗"
 
 
 def test_export_filename_format():
@@ -168,15 +169,17 @@ def test_write_xlsx_roundtrip(tmp_path):
 
     wb = openpyxl.load_workbook(path)
     ws = wb.active
-    assert [c.value for c in ws[1]] == ["姓名", "详情", "出生日期", "出生地", "标签", "头像", "简介", "状态"]
+    assert [c.value for c in ws[1]] == ["状态", "姓名", "头像", "简介", "出生日期", "出生地", "详情", "标签", "影片数"]
     assert ws.max_row == 3  # 表头 + 2 行数据，无尾部空行
     row2 = [c.value for c in ws[2]]
-    assert row2[0] == "AAA" and row2[3] == "日本，仙台" and row2[4] == "AA，BB，CC"
-    assert row2[5] == row2[6] == row2[7] == "✅"
-    assert row2[2] == datetime.datetime(1990, 2, 3)
-    assert ws.cell(row=2, column=3).number_format == ex.EXPORT_DATE_NUMBER_FORMAT
-    # 样式：全表宋体 11pt；表头全部居中，数据行姓名/日期/头像/简介/状态居中、
-    # 详情/出生地/标签居左；纵向全部居中。
+    assert row2[1] == "AAA" and row2[5] == "日本，仙台" and row2[7] == "AA，BB，CC"
+    assert row2[6] == "详情正文"
+    assert row2[0] == row2[2] == row2[3] == "✅"
+    assert row2[4] == datetime.datetime(1990, 2, 3)
+    assert row2[8] == 0
+    assert ws.cell(row=2, column=5).number_format == ex.EXPORT_DATE_NUMBER_FORMAT
+    # 样式：全表宋体 11pt；表头全部居中，数据行状态/姓名/头像/简介/出生日期/影片数居中、
+    # 出生地/详情/标签居左；纵向全部居中。
     for row in ws.iter_rows(min_row=1, max_row=3):
         for idx, cell in enumerate(row):
             assert cell.font.name == "宋体" and cell.font.size == 11
@@ -184,25 +187,37 @@ def test_write_xlsx_roundtrip(tmp_path):
             if row[0].row == 1:
                 assert cell.alignment.horizontal == "center"
             else:
-                assert cell.alignment.horizontal == ("center" if idx in (0, 2, 5, 6, 7) else "left")
-    # 列宽：头像/简介/状态（F/G/H）保持默认列宽，出生日期（C）收窄到刚好放下日期，
-    # 姓名/详情/出生地/标签（A/B/D/E）1:1:1:1 均分剩余列宽（右侧空白默认摊进这四列）。
-    assert ws.column_dimensions["C"].width == ex.EXPORT_BIRTHDAY_COL_WIDTH
-    for col in ("F", "G", "H"):
-        assert ws.column_dimensions[col].width == ex.EXPORT_ICON_COL_WIDTH == 8.43
-    text_widths = {ws.column_dimensions[c].width for c in ("A", "B", "D", "E")}
+                assert cell.alignment.horizontal == ("center" if idx in (0, 1, 2, 3, 4, 8) else "left")
+    # 列宽：状态/头像/简介（A/C/D）5.44，姓名（B）18，出生日期（E）12，
+    # 出生地（F）36，影片数（I，标签右侧）8，详情/标签（G/H）平分剩余列宽，
+    # 表总宽不变、默认占满整个可用列宽。
+    assert ws.column_dimensions["E"].width == ex.EXPORT_BIRTHDAY_COL_WIDTH == 12
+    for col in ("A", "C", "D"):
+        assert ws.column_dimensions[col].width == ex.EXPORT_ICON_COL_WIDTH == 5.44
+    assert ws.column_dimensions["B"].width == ex.EXPORT_NAME_COL_WIDTH == 18
+    assert ws.column_dimensions["F"].width == ex.EXPORT_BIRTHPLACE_COL_WIDTH == 36
+    assert ws.column_dimensions["I"].width == ex.EXPORT_MOVIE_COL_WIDTH == 8
+    text_widths = {ws.column_dimensions[c].width for c in ("G", "H")}
     assert len(text_widths) == 1
     assert text_widths.pop() == ex.EXPORT_TEXT_COL_WIDTH == pytest.approx(
-        (ex.EXPORT_TABLE_WIDTH - ex.EXPORT_BIRTHDAY_COL_WIDTH - 3 * ex.EXPORT_ICON_COL_WIDTH) / 4
+        (
+            ex.EXPORT_TABLE_WIDTH
+            - ex.EXPORT_BIRTHDAY_COL_WIDTH
+            - 3 * ex.EXPORT_ICON_COL_WIDTH
+            - ex.EXPORT_NAME_COL_WIDTH
+            - ex.EXPORT_BIRTHPLACE_COL_WIDTH
+            - ex.EXPORT_MOVIE_COL_WIDTH
+        )
+        / 2
     )
-    # H 列之后的列（I:XFD）全部隐藏，表右侧无空白列。
-    assert ws.column_dimensions["I"].hidden is True
-    assert ws.column_dimensions["H"].hidden is not True
+    # I 列之后的列（J:XFD）全部隐藏，表右侧无空白列。
+    assert ws.column_dimensions["J"].hidden is True
+    assert ws.column_dimensions["I"].hidden is not True
     # 首行冻结：表头始终置顶显示。
     assert ws.freeze_panes == "A2"
     # 状态列：✅/❌ 无前后空格；⚠️ 仅左侧补一个对齐空格（多一个少一个都不行）。
     for r in range(2, ws.max_row + 1):
-        value = ws.cell(row=r, column=8).value
+        value = ws.cell(row=r, column=1).value
         assert isinstance(value, str) and value in ("✅", "❌", " ⚠️")
 
 
@@ -214,9 +229,9 @@ def test_text_col_width_for_screen_width():
         return (
             (px - ex.SCREEN_ROW_HEADER_PX - ex.SCREEN_VSCROLL_PX - ex.EXPORT_TABLE_MARGIN_PX)
             - ex.EXCEL_TABLE_PADDING_PX
-        ) / ex.EXCEL_UNIT_PX - ex.EXPORT_BIRTHDAY_COL_WIDTH - 3 * ex.EXPORT_ICON_COL_WIDTH
+        ) / ex.EXCEL_UNIT_PX - ex.EXPORT_BIRTHDAY_COL_WIDTH - 3 * ex.EXPORT_ICON_COL_WIDTH - ex.EXPORT_NAME_COL_WIDTH - ex.EXPORT_BIRTHPLACE_COL_WIDTH - ex.EXPORT_MOVIE_COL_WIDTH
 
-    assert ex.text_col_width_for_screen_width(1920) == pytest.approx(_expect(1920) / 4)
+    assert ex.text_col_width_for_screen_width(1920) == pytest.approx(_expect(1920) / 2)
     # 屏幕越宽，分到的列越宽（头像/简介/状态三列无需横向滚动即默认可见）。
     assert ex.text_col_width_for_screen_width(2560) > ex.text_col_width_for_screen_width(1366)
     assert ex.text_col_width_for_screen_width("非法") == ex.EXPORT_MIN_TEXT_COL_WIDTH
@@ -225,12 +240,19 @@ def test_text_col_width_for_screen_width():
 
 
 def test_export_table_fits_viewport():
-    """表总宽恒比视口可视区窄一个安全边距：八列默认一屏放下，无需横向滚动。"""
+    """表总宽恒比视口可视区窄一个安全边距：九列默认一屏放下，无需横向滚动。"""
     from mdcx.tools import emby_actor_export as ex
 
     for px in (1366, 1536, 1920, 2560):
         text_w = ex.text_col_width_for_screen_width(px)
-        total_units = 4 * text_w + ex.EXPORT_BIRTHDAY_COL_WIDTH + 3 * ex.EXPORT_ICON_COL_WIDTH
+        total_units = (
+            2 * text_w
+            + ex.EXPORT_BIRTHDAY_COL_WIDTH
+            + 3 * ex.EXPORT_ICON_COL_WIDTH
+            + ex.EXPORT_NAME_COL_WIDTH
+            + ex.EXPORT_BIRTHPLACE_COL_WIDTH
+            + ex.EXPORT_MOVIE_COL_WIDTH
+        )
         table_px = total_units * ex.EXCEL_UNIT_PX + ex.EXCEL_TABLE_PADDING_PX
         content_px = px - ex.SCREEN_ROW_HEADER_PX - ex.SCREEN_VSCROLL_PX
         assert table_px == pytest.approx(content_px - ex.EXPORT_TABLE_MARGIN_PX)
@@ -288,7 +310,9 @@ def test_write_xlsx_custom_text_width(tmp_path):
 
     path = ex.write_actor_export_xlsx(tmp_path / "t.xlsx", [_actor(name="甲")], text_col_width=30)
     ws = openpyxl.load_workbook(path).active
-    assert {ws.column_dimensions[c].width for c in ("A", "B", "D", "E")} == {30}
+    assert {ws.column_dimensions[c].width for c in ("G", "H")} == {30}
+    assert ws.column_dimensions["B"].width == ex.EXPORT_NAME_COL_WIDTH == 18
+    assert ws.column_dimensions["F"].width == ex.EXPORT_BIRTHPLACE_COL_WIDTH == 36
     assert ws.freeze_panes == "A2"
 
 
@@ -791,16 +815,17 @@ def test_do_export_uses_filtered_actors_and_dir(app, monkeypatch, tmp_path):
         import openpyxl
 
         ws = openpyxl.load_workbook(target).active
-        assert ws.max_row == 2 and ws.cell(row=2, column=1).value == "可见"
+        assert ws.max_row == 2 and ws.cell(row=2, column=2).value == "可见"
         # 列宽确系按本机屏幕逻辑宽度（物理宽/缩放比）换算，与纯函数同值。
         screen = dlg.screen()
         if screen is None:
             screen_px = ex.EXPORT_FALLBACK_SCREEN_PX
         else:
             screen_px = ex.effective_screen_width_px(screen)
-        assert ws.column_dimensions["A"].width == pytest.approx(
+        assert ws.column_dimensions["G"].width == pytest.approx(
             ex.text_col_width_for_screen_width(screen_px)
         )
+        assert ws.column_dimensions["B"].width == ex.EXPORT_NAME_COL_WIDTH == 18
         assert "共导出 1 个演员" in infos[-1]
     finally:
         dlg.close()
