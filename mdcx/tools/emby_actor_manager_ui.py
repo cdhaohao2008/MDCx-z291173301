@@ -572,7 +572,7 @@ class PreparePreviewThread(_CancellableWorkerThread):
         """议题 #127: 按获取模式筛出需要处理的演员子集, 避免无效人次的遍历与服务器的复核。
 
         - missing_image: 仅缺头像的演员
-        - missing_info : 仅缺简介的演员（含简介只剩占位文案的情况）
+        - missing_info : 仅缺简介的演员，含简介只剩占位文案的情况
         - missing_all  : 缺头像或缺简介的并集
         - missing_both : 缺头像且缺简介的交集（议题 #155，对应统计栏「全缺」）
         - force_*      : 用户显式选择「重新获取」, 不做筛选
