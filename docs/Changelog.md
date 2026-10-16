@@ -1,5 +1,16 @@
 
 # Changelog
+## v2.5.0 (2026-10-20)
+### 改进
+- **版本号**：`2.4.9` 升 `2.5.0`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx`；`LOCAL_VERSION` 保持 `20261020` 与前几个版本同批，时间标签不倒退）。仍是当前最新版本。
+- **演员管理器最小化（窄态）按钮行 1-10 号空白彻底删净、按钮之间紧贴（`mdcx/tools/emby_actor_manager_ui.py` 的 `_apply_button_row_compact` + `_narrow_help_width`）**：窄态三处一起收——① 连接组 `_conn_grid` 内边距 `(16,4,6,4)` → `(0,4,0,4)`（删 1 号行左、10 号行右空白）；② 按钮项 `spacing 4 → 0`（删 2-9 号按钮缝）；③ 使用说明标签按文字**实宽**定宽而非富余宽（原多留 4px → 改 `max(horizontalAdvance(两行))`，去掉 `+4`）；④ 窄态按钮行 `setAlignment(Qt.AlignmentFlag.AlignLeft)` 按内容宽左对齐，富余宽度整条让给同一组里本就 `Expanding` 的服务器地址/API 密钥输入框，不再被平摊成 1-10 号缝。实测 `QT_QPA_PLATFORM=offscreen` 下窄态 `gaps=[0]*8`、首按钮 `x=1` 贴组边框、末按钮右侧余 1px。**坑**：PyQt6 只有 `Qt.AlignmentFlag`、**没有 `Qt.Alignment`**，误用会抛 `AttributeError` 被外层 `except` 吞掉导致宽态恢复中断，宽态复原必须写 `Qt.AlignmentFlag(0)`。间距与内边距只作用于窄态，宽态（最大化/全屏）原样 `spacing 4` / 边距 `16,4,6,4` / 不设 alignment。
+- **演员管理器窄态默认宽度缩进，三处同源空白一起删掉（`_shrink_narrow_width` + 新增 `changeEvent` + `showEvent` 收尾）**：设置按钮右侧大片空白、统计栏「双击行可编辑」右侧空白、表格详情列富余，三者都来自同一段「窗口宽 − 内容宽」的富余宽度，故只在窄态把窗口宽收到 `_narrow_min_width()`（= 按钮行实宽和 1366 + 外层 26 = 1392），三处一起缩掉。实测 1520 → 1392：设置按钮右侧空白 → 1px（仅余边框）、统计栏 `addStretch` 宽度 335 → 0、详情列 767 → 656。`_shrink_narrow_width` 挂在 `showEvent` 末尾 `QTimer.singleShot(0, ...)`（排在本拍之后，确保按钮已按文字实宽定窄、`_narrow_min_width()` 才算得准），并新增 `changeEvent` 覆盖「最大化 → 还原」那一拍（`QEvent.Type.WindowStateChange` 且非宽态时才排）；最大化/全屏一律直接 return，且**只在这两个时刻各收一次**，不逐次强拉，用户之后仍可自由拖动窗口，重复调用幂等（已贴合则无操作）。
+- **服务器地址标签在窄态与组标题严格左右对齐（`self._lbl_server`）**：窄态连接组内边距左归 0 后，标签文本 x 会从 14 掉到 1，与组标题「Emby/Jellyfin 连接设置」脱开，故窄态给该标签单独加 `padding-left: 13px`（`1 + 13 = 14` = 标题 `QSS left:10 + padding 4`），服务器地址行与组标题严格上下左右对齐；宽态清空该样式，行水平衡逐像素不变。
+### 修复
+- **演员管理器窄态按钮行空白被富余宽度重新摊开（实测行左 8px、行右 10px、8 个按钮缝各 8px）**：`spacing` 与内边距设 0 并不能消除富余宽度——帮助标签 `addWidget(help_label, 1)`（stretch=1）与其余控件一起按比例瓜分多出来的宽度，重新在 2-9 号位置撑出缝来。现由「标签按实宽定宽 + 按钮行左对齐」两道同时收口，富余宽度全部改由同组的输入框吸收。
+- **演员管理器窄态窗口初始宽度按屏幕 80% 取值（1920 屏 → 1536），远宽于按钮行内容宽 1366，导致设置按钮右侧、统计栏右侧、详情列三处大片空白**：见上「窄态默认宽度缩进」条。
+### 验证
+- 回归：`tests/test_actor_export.py`、`tests/test_actor_manager_font_size.py`、`tests/test_actor_manager_row_count.py` 共 **45 项全通过 / EXIT=0**（含新增 `test_narrow_default_width_shrinks_to_content`：窄态 1520 收至 `_narrow_min_width()`、设置按钮右侧余 1px、`_shrink_narrow_width` 幂等、最大化下 `minimumWidth() == _BASE_MIN_W` 且宽度不被改动；`test_button_row_compact_narrow_and_wide` 补断言窄态 `alignment() == AlignLeft`、按钮缝 `set(gaps) == {0}`、首按钮 `x == 1`、宽态 `alignment() == Qt.AlignmentFlag(0)`），`tests/test_version_consistency.py` 校验 `VERSION_NAME`/`pyproject.toml`/`uv.lock` 三处版本号一致且与本条目日期对齐，`scripts/bump.py --check` 无告警，`ruff check mdcx/tools/emby_actor_manager_ui.py tests/test_actor_export.py` 零告警。
 ## v2.4.9 (2026-10-20)
 ### 调整
 - **版本号**：`2.4.8` → `2.4.9`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`，故本段日期仍为 `2026-10-20`，与前五个版本段一致）。改完以 `scripts/bump.py --check` 与 `tests/test_version_consistency.py` 复核五处同步点。

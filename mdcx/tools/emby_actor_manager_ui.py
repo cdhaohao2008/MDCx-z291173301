@@ -1759,11 +1759,14 @@ class EmbyActorManagerDialog(QDialog):
 
         窄态按钮之间紧贴着没空白没间距：项间距 4→0，连接组左 16→0（删掉 1 号
         左空白，按钮贴组边框）、右 6→0（删掉 10 号右空白），2-9 号项缝同步归零；
+        再把按钮行按内容宽左对齐（setAlignment(AlignLeft)）——窗口比按钮行宽出的
+        富余宽度不再被这一行平摊成 1-10 号空白，而是整条给上一行的服务器地址/
+        API 密钥输入框（它们本就是 Expanding，变宽是输入框正常表现，不是空白）。
         服务器地址标签垫左 13px，文本与组标题「Emby/Jellyfin 连接设置」严格上下
-        左对齐（标题 left:10+padding 4=14，标签 x=边距 0+边框 1+垫左 13=14），
-        按钮自身仍贴边（x=1）。上下边距与垂直间距一律不动，故窄态高度不变。
+        左对齐（标题 left:10+padding 4=14，标签 x=边距 0+边框 1+垫左 13=14）。
+        上下边距与垂直间距一律不动，故窄态高度不变。
         宽态（最大化/全屏）布局、控件、提示词逐像素不变（左 16/右 6/间距 4、
-        服务器标签无垫左原样）。重复调用幂等。
+        对齐恢复 0=填满、服务器标签无垫左原样）。重复调用幂等。
         """
         try:
             wide = self._is_wide_state()
@@ -1778,6 +1781,9 @@ class EmbyActorManagerDialog(QDialog):
             if wide:
                 if btn_layout.spacing() != 4:
                     btn_layout.setSpacing(4)
+                # 宽态：按钮行恢复填满整行（最大化逐像素不变，空白照旧由帮助标签吸收）。
+                if btn_layout.alignment() != Qt.AlignmentFlag(0):
+                    btn_layout.setAlignment(Qt.AlignmentFlag(0))
                 margins = grid.contentsMargins()
                 base = self.CONN_BASE_MARGINS
                 if (margins.left(), margins.top(), margins.right(), margins.bottom()) != base:
@@ -1798,6 +1804,10 @@ class EmbyActorManagerDialog(QDialog):
             else:
                 if btn_layout.spacing() != 0:
                     btn_layout.setSpacing(0)
+                # 窄态：按钮行按内容宽左对齐，富余宽度整条让给上一行输入框，
+                # 彻底删掉 1-10 号空白（行左、行右、按钮之间都不再被平摊空白）。
+                if btn_layout.alignment() != Qt.AlignmentFlag.AlignLeft:
+                    btn_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
                 margins = grid.contentsMargins()
                 if margins.left() != 0 or margins.right() != 0:
                     grid.setContentsMargins(0, margins.top(), 0, margins.bottom())
@@ -2072,6 +2082,44 @@ class EmbyActorManagerDialog(QDialog):
         self._apply_column_widths()
         QTimer.singleShot(0, self._update_help_line_break)
         QTimer.singleShot(0, self._deferred_after_resize)
+        # 窄态默认宽度缩进：排在本拍之后（按钮已按文字实宽定窄，_narrow_min_width 才准）。
+        QTimer.singleShot(0, self._shrink_narrow_width)
+
+    def _shrink_narrow_width(self) -> None:
+        """窄态默认宽度缩进：把窗口收到按钮行内容宽，删掉三处同源空白。
+
+        设置按钮右侧空白、统计栏「双击行可编辑」右侧空白、表格详情列富余，
+        三者都来自「窗口宽 − 内容宽」的同一段富余宽度，故只需在窄态把窗口宽
+        收到 `_narrow_min_width()`（= 按钮行实宽和 + 外层 26），三处一起缩掉。
+        只在首次显示与「最大化→还原」时各收一次，用户之后手动拉宽不受限制
+        （不逐次强拉，窗口仍可自由拖动）。最大化/全屏一律不动，几何与布局不变。
+        重复调用幂等：宽度已贴合则无操作。
+        """
+        try:
+            if self._is_wide_state():
+                return
+            want = self._narrow_min_width()
+            if want > 0 and self.width() > want:
+                self.resize(want, self.height())
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+
+    def changeEvent(self, event):
+        """窗口状态变化：从最大化/全屏还原回窄态时，按内容宽再缩一次贴合。
+
+        最大化/全屏期间布局、控件、提示词一律不动；这里只在「还原成窄态」这一拍
+        排一次缩宽，其余事件照旧交给父类。
+        """
+        super().changeEvent(event)
+        try:
+            if event.type() == QEvent.Type.WindowStateChange and not self._is_wide_state():
+                QTimer.singleShot(0, self._shrink_narrow_width)
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
 
     # Qt 默认最大宽：清除限宽用（与 16777215 字面值同义，写常量免魔法数）。
     _HELP_MAX_W = 16777215

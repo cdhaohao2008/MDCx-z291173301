@@ -16,6 +16,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import sys  # noqa: E402
 
 import pytest  # noqa: E402
+from PyQt6.QtCore import Qt  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QComboBox  # noqa: E402
 
 
@@ -381,6 +382,19 @@ def test_button_row_compact_narrow_and_wide(app):
         assert dlg._btn_layout.spacing() == 0
         margins = dlg._conn_grid.contentsMargins()
         assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (0, 4, 0, 4)
+        # 窄态：按钮行按内容宽左对齐——窗口富余宽度整条让给上一行输入框，
+        # 不再被这一行平摊成 1-10 号空白（这是「空白没删掉」的真正原因）。
+        assert dlg._btn_layout.alignment() == Qt.AlignmentFlag.AlignLeft
+        items = [
+            dlg._btn_layout.itemAt(i).widget()
+            for i in range(dlg._btn_layout.count())
+            if dlg._btn_layout.itemAt(i).widget() is not None
+        ]
+        row_gaps = [
+            items[i + 1].x() - (items[i].x() + items[i].width()) for i in range(len(items) - 1)
+        ]
+        assert set(row_gaps) == {0}, "窄态按钮之间不得有任何空隙"
+        assert items[0].x() == 1, "窄态首个按钮应贴组左边框"
         # 窄态：服务器地址文本与组标题严格左对齐（垫左 13px），按钮仍贴组边框。
         assert dlg._lbl_server.styleSheet() == "padding-left: 13px;"
         # 窄态：帮助标签恒两行、按文字实宽定宽，不再吸收富余宽度（曾致 23~37px 大缝）。
@@ -397,6 +411,8 @@ def test_button_row_compact_narrow_and_wide(app):
         assert dlg._btn_layout.spacing() == 4
         assert dlg.help_label.maximumWidth() == dlg._HELP_MAX_W
         assert dlg._lbl_server.styleSheet() == ""
+        # 宽态按钮行恢复填满整行（最大化逐像素不变）。
+        assert dlg._btn_layout.alignment() == Qt.AlignmentFlag(0)
         margins = dlg._conn_grid.contentsMargins()
         assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == tuple(
             dlg.CONN_BASE_MARGINS
@@ -408,6 +424,45 @@ def test_button_row_compact_narrow_and_wide(app):
         margins = dlg._conn_grid.contentsMargins()
         assert margins.left() == 0 and margins.right() == 0
         assert dlg._lbl_server.styleSheet() == "padding-left: 13px;"
+        assert dlg._btn_layout.alignment() == Qt.AlignmentFlag.AlignLeft
+    finally:
+        dlg.isMaximized = real
+        dlg.close()
+        app.processEvents()
+
+
+def test_narrow_default_width_shrinks_to_content(app):
+    """窄态默认宽度缩进：窗口收到按钮行内容宽，设置按钮右侧空白归零；
+    统计栏「双击行可编辑」右侧与详情列是同一段富余宽度，跟着一起缩；最大化不动。"""
+    from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
+
+    dlg = EmbyActorManagerDialog()
+    real = dlg.isMaximized
+    try:
+        dlg.resize(1520, dlg.height())
+        dlg.show()
+        app.processEvents()
+        app.processEvents()
+        assert dlg.width() == dlg._narrow_min_width(), "窄态默认宽度应缩到内容宽"
+        group = dlg._conn_grid.parentWidget()
+        items = [
+            dlg._btn_layout.itemAt(i).widget()
+            for i in range(dlg._btn_layout.count())
+            if dlg._btn_layout.itemAt(i).widget() is not None
+        ]
+        last = items[-1]
+        assert group.width() - (last.x() + last.width()) == 1, "设置按钮右侧应只剩边框"
+        # 幂等：再调一次宽度不动。
+        width_before = dlg.width()
+        dlg._shrink_narrow_width()
+        app.processEvents()
+        assert dlg.width() == width_before
+        # 最大化：不参与缩窄，最小宽与几何保持系统值。
+        dlg.isMaximized = lambda: True
+        dlg._apply_button_widths()
+        app.processEvents()
+        assert dlg.minimumWidth() == dlg._BASE_MIN_W
+        assert dlg.width() == width_before, "最大化不应被窄态缩宽逻辑改动"
     finally:
         dlg.isMaximized = real
         dlg.close()
