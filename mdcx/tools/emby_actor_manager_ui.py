@@ -1039,11 +1039,18 @@ class EmbyActorManagerDialog(QDialog):
 
     # 窄态专用的组标题覆盖样式（只挂到连接组这一个控件上，宽态清空即回全局值）：
     # 全局 QSS 是 `QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }`
-    # （实测标题文字起点 ink x=20），这里局部覆盖为 left:0 + padding:0 2px，
-    # 实测 ink x=8，与「连接Emby/Jellyfin」按钮内字体起点（按钮 x=1 + 边框/内边距 7）
-    # 严格对齐；服务器地址标签同步 padding-left:1px（内容起点 x=2，叠加「服」字
-    # 约 6px 字形左边距后首笔同为 x=8）。
-    _CONN_TITLE_QSS = "QGroupBox::title { left: 0px; padding: 0 2px; }"
+    # （实测标题文字起点 ink x=20），这里局部覆盖为 `left:0 + padding:0 _CONN_ALIGN_PAD`。
+    _CONN_ALIGN_PAD = 5
+
+    # `_CONN_ALIGN_PAD = 5` 是在**真机 Windows 平台**（DPR 1.25、Microsoft YaHei UI 10pt）
+    # 逐像素扫描标定出来的：标题 QSS padding 与服务器地址标签 padding-left 对首笔墨迹
+    # 的映射表**完全一致**（0→设备像素 5、1→6、2→7、3→8、4→10、5→11、6→12、7→13、8→15），
+    # 而「连接Emby/Jellyfin」按钮内白字首笔恒在设备像素 11（按钮贴左 x=1 + 边框内边距 2 +
+    # 文字居中余量 (121-108)//2 = 6 + 白字 0 左边距），故两者同取 5 即三处首笔严格同列。
+    # 顺带把组标题文案里的空格去掉（`Emby/Jellyfin 连接设置` → `Emby/Jellyfin连接设置`），
+    # 空格里侧的空白正是「标题比按钮文字看着还右一点」的另一半来源。
+    _CONN_TITLE_QSS = f"QGroupBox::title {{ left: 0px; padding: 0 {_CONN_ALIGN_PAD}px; }}"
+    _CONN_LABEL_QSS = f"padding-left: {_CONN_ALIGN_PAD}px;"
 
     def __init__(self, parent=None):
         # 不传 parent：始终保持独立顶层窗口。议题 #61——以主窗口为 parent 时，
@@ -1253,7 +1260,7 @@ class EmbyActorManagerDialog(QDialog):
             pass
 
     def _build_connection_section(self, parent_layout: QVBoxLayout):
-        group = QGroupBox("Emby/Jellyfin 连接设置")
+        group = QGroupBox("Emby/Jellyfin连接设置")
         self._conn_group = group
         grid = QGridLayout(group)
         # 收紧连接组内边距/行距：整体上移，纵向少占约一行高度。
@@ -1828,21 +1835,21 @@ class EmbyActorManagerDialog(QDialog):
                 margins = grid.contentsMargins()
                 if margins.left() != 0 or margins.right() != 0:
                     grid.setContentsMargins(0, margins.top(), 0, margins.bottom())
-                # 窄态：组标题与服务器地址文本左移到「连接Emby/Jellyfin」按钮内文字起点
-                # 严格对齐（组客户区内 x=8：按钮贴左 x=1 + 按钮左边框/内边距 7）。
-                # 标题偏移原本由全局 QSS `QGroupBox::title { left:10; padding:0 4px }`
+                # 窄态：组标题与服务器地址文本右移到「连接Emby/Jellyfin」按钮内文字起点
+                # 严格对齐。按钮蓝色背景只贴到组客户区 x=1，其内文字另有边框内边距 2px
+                # 加上文字居中余量，实测白字首笔在设备像素 11（用户口述的「再向右 2-3px」
+                # 即这段）。标题偏移原本由全局 QSS `QGroupBox::title { left:10; padding:0 4px }`
                 # 决定（实测 ink x=20），故用**本控件级**样式表局部覆盖为
-                # `left:0 + padding:0 2px`（实测 ink x=8），不影响「运行日志」
+                # `left:0 + padding:0 _CONN_ALIGN_PAD`，不影响「运行日志」
                 # 等其它 QGroupBox；宽态清空本控件样式表即回到全局值。
                 group_box = getattr(self, "_conn_group", None)
                 if group_box is not None and group_box.styleSheet() != self._CONN_TITLE_QSS:
                     group_box.setStyleSheet(self._CONN_TITLE_QSS)
-                # 服务器地址标签同理：标签 x=1，padding-left 1 → 内容起点 2，
-                # 再加上「服」字约 6px 的字形左边距，墨迹起点正好 x=8，
-                # 与标题的「E」、按钮内「连」三者的首笔严格同列。
+                # 服务器地址标签同理：标签贴左 x=1，`padding-left: _CONN_ALIGN_PAD`
+                # 与标题同值，实测两者的首笔墨迹映射表一致，故与标题、按钮内白字三者同列。
                 lbl_server = getattr(self, "_lbl_server", None)
-                if lbl_server is not None and lbl_server.styleSheet() != "padding-left: 1px;":
-                    lbl_server.setStyleSheet("padding-left: 1px;")
+                if lbl_server is not None and lbl_server.styleSheet() != self._CONN_LABEL_QSS:
+                    lbl_server.setStyleSheet(self._CONN_LABEL_QSS)
                 # 窄态：帮助标签按自身文字宽度定宽，不再吸收富余宽度。
                 want_help = self._narrow_help_width()
                 if want_help > 0 and help_label.maximumWidth() != want_help:
