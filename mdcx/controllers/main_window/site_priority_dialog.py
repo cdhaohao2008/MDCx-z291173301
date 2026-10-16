@@ -23,7 +23,12 @@ from PyQt6.QtWidgets import (
 )
 
 from mdcx.config.enums import FixedScrapingType, Website
-from mdcx.config.models import SCRAPING_TYPE_SITE_FIELDS, FieldPriorityConfig, str_to_list
+from mdcx.config.models import (
+    SCRAPING_TYPE_SITE_FIELDS,
+    FieldPriorityConfig,
+    filter_poster_default_sites,
+    str_to_list,
+)
 from mdcx.crawlers import get_registered_crawler_site_values
 from mdcx.gen.field_enums import CrawlerResultFields
 from mdcx.manual import ManualConfig
@@ -634,11 +639,17 @@ class FieldPriorityDialog(CenterOnFirstShowMixin, QDialog):
         _setup_site_list(list_widget, [site for site in _list_sites(list_widget) if site not in selected])
 
     def _reset_field(self, field: CrawlerResultFields) -> None:
+        if field == CrawlerResultFields.POSTER:
+            _setup_site_list(self._field_lists[field], filter_poster_default_sites(self._type_sites))
+            return
         _setup_site_list(self._field_lists[field], self._type_sites)
 
     def _reset_all(self) -> None:
         for field, list_widget in self._field_lists.items():
-            _setup_site_list(list_widget, self._type_sites)
+            if field == CrawlerResultFields.POSTER:
+                _setup_site_list(list_widget, filter_poster_default_sites(self._type_sites))
+            else:
+                _setup_site_list(list_widget, self._type_sites)
             skip_check = self._skip_checks.get(field)
             if skip_check:
                 skip_check.setChecked(False)

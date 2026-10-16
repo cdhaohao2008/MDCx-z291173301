@@ -191,6 +191,22 @@ def default_field_config(language: Language = Language.UNDEFINED, translate: boo
     return FieldConfig(site_prority=list(DEFAULT_FIELD_SITE_PRIORITY), language=language, translate=translate)
 
 
+# 海报默认排除的有水印站点：JavDB 系列与 FreeJavBT 的海报自带水印。
+# 重置/自动生成海报优先级时一律排除；用户手动添加的不在此处过滤、下次加载也会保留。
+POSTER_DEFAULT_EXCLUDED_SITES = frozenset(
+    {
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
+        Website.FREEJAVBT,
+    }
+)
+
+
+def filter_poster_default_sites(sites: list[Website]) -> list[Website]:
+    return [site for site in sites if site not in POSTER_DEFAULT_EXCLUDED_SITES]
+
+
 SENSITIVE_FIELDS = frozenset(
     {
         "baidu_key",
@@ -1003,6 +1019,12 @@ class Config(BaseModel):
             sites = [site for site in field_sites if site in type_site_set]
             if not sites:
                 sites = list(type_sites)
+            if crawler_field == CrawlerResultFields.POSTER:
+                sites = filter_poster_default_sites(sites)
+                if not sites:
+                    # 交集被水印站点占满时（如动漫默认只有 Getchu+JavDB 系），
+                    # 回退到类型名单再排除水印，避免海报默认直接为空。
+                    sites = filter_poster_default_sites(list(type_sites))
             configs[crawler_field] = FieldPriorityConfig(site_prority=sites)
         return configs
 
@@ -1022,8 +1044,11 @@ class Config(BaseModel):
                 sites = [site for site in self.parse_sites(old_sites) if site in type_site_set]
                 if not sites:
                     # 与 build_type_field_configs 一致：交集为空时回退到类型名单，
-                    # 否则该字段被永久静默跳过（_call_crawlers 中 f_sites 为空直接 continue）
+                    # 否则该字段被永久静默跳过（_call_crawlers 中 f_sites 为空直接 continue）。
+                    # 海报回退时同样排除有水印站点；用户已手动保留的水印站点（sites 非空）原样保留。
                     sites = list(type_site_set)
+                    if crawler_field == CrawlerResultFields.POSTER:
+                        sites = filter_poster_default_sites(sites)
                 normalized[crawler_field] = FieldPriorityConfig(site_prority=sites)
             else:
                 normalized[crawler_field] = default[crawler_field]
