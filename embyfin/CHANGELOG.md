@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0 (2026-10-15)
+
+### Added
+
+- each of the three SDKs has `Operations`, a table of every operation it has: its name, method and path, the group whose client holds it, and whether it changes nothing on the server
+
+### Changed
+
+- built on go-kt 0.9.0 and pandorest 0.11.0. Nothing a tool does changes, and the SDKs change only by the table above
+- `embyfin-mcp tools` gives each tool's first sentence whole: it cut two descriptions short at "e.g." and "etc.", and ran two on past the question they open with
+
 ## 0.8.1 (2026-10-13)
 
 ### Added
