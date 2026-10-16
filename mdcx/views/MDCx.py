@@ -13073,17 +13073,8 @@ class Ui_MDCx(object):
         self.pushButton_copy_logs.setText(_translate("MDCx", "复制日志"))
         self.pushButton_view_failed_list.setText(_translate("MDCx", "失败 0"))
         self.pushButton_scraper_failed_list.setText(_translate("MDCx", "当有失败任务时，点击可以一键刮削当前失败列表"))
-        self.pushButton_check_net.setToolTip(
-            _translate("MDCx", "从头检测全部项目：基础连通性、各刮削站点、账号 API 与辅助服务")
-        )
         self.pushButton_check_net.setText(_translate("MDCx", "开始检测"))
-        self.pushButton_net_copy.setToolTip(
-            _translate(
-                "MDCx", "把本页全部检测结果（含版本与系统概要，代理地址自动脱敏）复制到剪贴板，方便提 issue 求助"
-            )
-        )
         self.pushButton_net_copy.setText(_translate("MDCx", "复制结果"))
-        self.pushButton_net_retry.setToolTip(_translate("MDCx", "只重新检测上次结果为失败/警告的项目，不重复全部检测"))
         self.pushButton_net_retry.setText(_translate("MDCx", "重试失败项"))
         self.groupBox_7.setTitle(
             _translate("MDCx", "单文件刮削（指定某个文件的番号网址进行刮削，当存在相同番号时可用这个）")
@@ -13152,33 +13143,13 @@ class Ui_MDCx(object):
         self.label_actor_db_update_nfo_desc.setText(
             _translate("MDCx", "用本地库新ID覆盖NFO旧ID；原本没有的补上，NFO是持久源，改这里Emby重新扫描才一致")
         )
-        self.pushButton_actor_db_sync_aliases.setToolTip(
-            _translate(
-                "MDCx",
-                "从所选来源TMDB/Minnano/JavDB同步别名到Keyword列，默认仅处理别名列为空的条目，勾选「全量更新」后所有条目都并入来源别名，不覆盖本地已有别名",
-            )
-        )
         self.pushButton_actor_db_sync_aliases.setText(_translate("MDCx", "补全别名"))
         self.comboBox_actor_db_alias_source.setItemText(0, _translate("MDCx", "TMDB"))
         self.comboBox_actor_db_alias_source.setItemText(1, _translate("MDCx", "JavDB"))
         self.comboBox_actor_db_alias_source.setItemText(2, _translate("MDCx", "Minnano"))
-        self.checkBox_actor_db_alias_all.setToolTip(
-            _translate("MDCx", "勾选后对全部条目补别名，含已有别名的行，并入不覆盖本地已有别名")
-        )
         self.checkBox_actor_db_alias_all.setText(_translate("MDCx", "全量更新并入"))
         self.label_actor_db_sync_offset.setText(_translate("MDCx", "起始行数"))
-        self.spinBox_actor_db_sync_offset.setToolTip(
-            _translate(
-                "MDCx",
-                "跳过数据文件前 N 行（不含表头）再扫描。用于上次中断后的手动续跑：填入上次日志中已处理的最大行号，从下一行继续。",
-            )
-        )
         self.label_actor_db_sync_limit.setText(_translate("MDCx", "单次限制"))
-        self.spinBox_actor_db_sync_limit.setToolTip(
-            _translate(
-                "MDCx", "本次最多处理的条目数。0 表示不限制；非 0 时分片推进，建议 500~2000 之间按网络状况选择。"
-            )
-        )
         self.spinBox_actor_db_sync_limit.setSpecialValueText(_translate("MDCx", "不限"))
         self.label_actor_db_sync_slice_hint.setText(_translate("MDCx", "起始行数0+单次限制5000=默认更新数据表行数"))
         self.label_actor_db_sync_aliases_desc.setText(

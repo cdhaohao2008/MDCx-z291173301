@@ -1,5 +1,12 @@
 
 # Changelog
+## v2.5.2 (2026-10-20)
+### 改进
+- **版本号**：`2.5.1` 升 `2.5.2`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx`；`LOCAL_VERSION` 保持 `20261020` 与前几个版本同批，时间标签不倒退）。仍是当前最新版本。
+- **网络检测页三个按钮的鼠标悬停提示全部删掉（`mdcx/views/MDCx.ui` + 重编译 `MDCx.py`）**：按用户要求——`开始检测`（从头检测全部项目…）、`复制结果`（把本页全部检测结果…复制到剪贴板…）、`重试失败项`（只重新检测上次失败/警告项目…），按钮名本身已经自明，悬停弹长句多此一举，三条 `toolTip` 逐条移除。按钮文字与顺序、几何、检测逻辑一行未动。`MDCx.py` 按仓库口径 `pyuic6` + `scripts/fix_qt_enums.py` + `ruff format` 重生成，`test_mdcx_py_in_sync_with_ui` 同步转绿。
+- **演员库维护下半区四个控件的鼠标悬停提示全部删掉（`mdcx/views/MDCx.ui` + 重编译 `MDCx.py`）**：按用户要求——上次特意保留的下半区别名分片行：`补全别名`按钮（从所选来源同步别名到 Keyword 列…）、`全量更新并入`复选框（勾选后对全部条目补别名…）、`起始行数` spin（跳过数据文件前 N 行…手动续跑…）、`单次限制` spin（本次最多处理的条目数…分片推进…），控件名与组内说明 label（`来源TMDB需配置TMDB API KEY；…用「起始行数/单次限制」可分片续跑`）已经讲清用法，悬停再弹长句多此一举，四条 `toolTip` 逐条移除。控件文字与顺序、几何（`_ACTOR_DB_TOOL_DESIGN` / `_sync_actor_db_tool_layout` 一行未动）、组内说明 label、`不限`特殊值文案照旧。`MDCx.py` 与上条同一次重编译，diff 仅删 7 段 `setToolTip`（网络 3 + 别名 4，共 29 行）。
+### 验证
+- 回归：`tests/test_ui_structure.py::test_mdcx_py_in_sync_with_ui` 与 `tests/test_version_consistency.py` 全过；`scripts/bump.py --check` 报「五处版本点一致」。
 ## v2.5.1 (2026-10-20)
 ### 改进
 - **版本号**：`2.5.0` 升 `2.5.1`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx`；`LOCAL_VERSION` 保持 `20261020` 与前几个版本同批，时间标签不倒退）。仍是当前最新版本。

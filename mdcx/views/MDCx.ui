@@ -1561,9 +1561,6 @@
                 <height>40</height>
               </rect>
             </property>
-            <property name="toolTip">
-              <string>从头检测全部项目：基础连通性、各刮削站点、账号 API 与辅助服务</string>
-            </property>
             <property name="text">
               <string>开始检测</string>
             </property>
@@ -1577,9 +1574,6 @@
                 <height>40</height>
               </rect>
             </property>
-            <property name="toolTip">
-              <string>把本页全部检测结果（含版本与系统概要，代理地址自动脱敏）复制到剪贴板，方便提 issue 求助</string>
-            </property>
             <property name="text">
               <string>复制结果</string>
             </property>
@@ -1592,9 +1586,6 @@
                 <width>110</width>
                 <height>40</height>
               </rect>
-            </property>
-            <property name="toolTip">
-              <string>只重新检测上次结果为失败/警告的项目，不重复全部检测</string>
             </property>
             <property name="text">
               <string>重试失败项</string>
@@ -2603,9 +2594,6 @@
                       <height>40</height>
                     </rect>
                   </property>
-                  <property name="toolTip">
-                    <string>从所选来源TMDB/Minnano/JavDB同步别名到Keyword列，默认仅处理别名列为空的条目，勾选「全量更新」后所有条目都并入来源别名，不覆盖本地已有别名</string>
-                  </property>
                   <property name="text">
                     <string>补全别名</string>
                   </property>
@@ -2644,9 +2632,6 @@
                       <height>28</height>
                     </rect>
                   </property>
-                  <property name="toolTip">
-                    <string>勾选后对全部条目补别名，含已有别名的行，并入不覆盖本地已有别名</string>
-                  </property>
                   <property name="text">
                     <string>全量更新并入</string>
                   </property>
@@ -2683,9 +2668,6 @@
                   <property name="styleSheet">
                     <string notr="true">QSpinBox::up-button { margin-right: 5px; }
 QSpinBox::down-button { margin-right: 5px; }</string>
-                  </property>
-                  <property name="toolTip">
-                    <string>跳过数据文件前 N 行（不含表头）再扫描。用于上次中断后的手动续跑：填入上次日志中已处理的最大行号，从下一行继续。</string>
                   </property>
                   <property name="minimum">
                     <number>0</number>
@@ -2729,9 +2711,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                   <property name="styleSheet">
                     <string notr="true">QSpinBox::up-button { margin-right: 5px; }
 QSpinBox::down-button { margin-right: 5px; }</string>
-                  </property>
-                  <property name="toolTip">
-                    <string>本次最多处理的条目数。0 表示不限制；非 0 时分片推进，建议 500~2000 之间按网络状况选择。</string>
                   </property>
                   <property name="specialValueText">
                     <string>不限</string>
