@@ -13142,42 +13142,12 @@ class Ui_MDCx(object):
             _translate("MDCx", "提示：补全结果将输出到日志页所有按钮均防重入，运行中按钮将禁用")
         )
         self.pushButton_actor_db_clean_male.setText(_translate("MDCx", "删除所有男性演员"))
-        self.pushButton_actor_db_fill_Minnano.setToolTip(
-            _translate(
-                "MDCx",
-                "从Minnano-av补全缺生日/简介的条目，已有生日且简介非空的行跳过，只补空缺不覆盖已有值，作用于当前用户演员库，补全时会将出身/爱好/事务所/标签等日文字段翻译成中文，事务所/标签优先用内置信息库映射，其余用已配置的翻译引擎，需联网",
-            )
-        )
         self.pushButton_actor_db_fill_Minnano.setText(_translate("MDCx", "Minnano-AV补全"))
-        self.pushButton_actor_db_verify_tmdbid.setToolTip(
-            _translate(
-                "MDCx",
-                "校验库中所有TMDB ID是否仍有效，TMDB是公开平台，个人ID可能被删除/重建，失效ID会被清除并自动按名字重新搜索补回新ID，搜索不到则保持无ID，刮削按名字兜底搜索，需配置TMDB API KEY",
-            )
-        )
         self.pushButton_actor_db_verify_tmdbid.setText(_translate("MDCx", "校验TMDB ID字段"))
-        self.pushButton_actor_db_check.setToolTip(
-            _translate(
-                "MDCx",
-                "检查当前使用的演员运行库中的格式错误和数据异常，弹窗报告问题，安全项格式/结构/生日/生涯可一键自动修复，TMDB相关项重复ID、无ID有URL等需人工处理后给出详细步骤",
-            )
-        )
         self.pushButton_actor_db_check.setText(_translate("MDCx", "检查用户演员数据"))
-        self.pushButton_actor_db_fill_zh_javdb.setToolTip(
-            _translate(
-                "MDCx",
-                "从JavDB移动端API查询演员的中文名/繁体名，仅处理「中文名==日文原名」的行，即未做中文化、且日文原名含汉字的条目，用JavDB的name_zht/name字段补全正式中文名，繁体转简体写入中文名列，繁体写入繁体名列，无需TMDB API KEY按日文原名搜索，配合「起始行/限量」可分片续跑",
-            )
-        )
         self.pushButton_actor_db_fill_zh_javdb.setText(_translate("MDCx", "JavDB演员中文名"))
         self.lineEdit_actor_db_nfo_dir.setPlaceholderText(_translate("MDCx", "选择NFO文件目录"))
         self.pushButton_actor_db_pick_nfo_dir.setText(_translate("MDCx", "选择目录"))
-        self.pushButton_actor_db_update_nfo_tmdbid.setToolTip(
-            _translate(
-                "MDCx",
-                "批量更新指定目录下所有NFO中Actor的TMDB ID，用本地演员库已校验+补回的新ID覆盖NFO旧ID，NFO原本没有TMDB ID的也补上，仅改TMDB ID值，保留NFO其他内容",
-            )
-        )
         self.pushButton_actor_db_update_nfo_tmdbid.setText(_translate("MDCx", "更新TMDB ID字段"))
         self.label_actor_db_update_nfo_desc.setText(
             _translate("MDCx", "用本地库新ID覆盖NFO旧ID；原本没有的补上，NFO是持久源，改这里Emby重新扫描才一致")
