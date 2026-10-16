@@ -188,27 +188,22 @@ def test_write_xlsx_roundtrip(tmp_path):
                 assert cell.alignment.horizontal == "center"
             else:
                 assert cell.alignment.horizontal == ("center" if idx in (0, 1, 2, 3, 4, 8) else "left")
-    # 列宽：状态/头像/简介（A/C/D）5.44，姓名（B）18，出生日期（E）12，
-    # 出生地（F）36，影片数（I，标签右侧）8，详情/标签（G/H）平分剩余列宽，
+    # 列宽：WPS 显示值应为状态/头像/简介（A/C/D）5.44，姓名（B）18，
+    # 出生日期（E）12，出生地（F）36，影片数（I，标签右侧）8，
+    # 详情/标签（G/H）平分剩余列宽；xlsx 实际写入值是显示值加 WPS 显示补偿，
     # 表总宽不变、默认占满整个可用列宽。
-    assert ws.column_dimensions["E"].width == ex.EXPORT_BIRTHDAY_COL_WIDTH == 12
+    stored = ex._wps_stored_column_width
+    assert ex.WPS_COLUMN_WIDTH_OFFSET == 0.78
+    assert ws.column_dimensions["E"].width == stored(ex.EXPORT_BIRTHDAY_COL_WIDTH) == pytest.approx(12.78)
     for col in ("A", "C", "D"):
-        assert ws.column_dimensions[col].width == ex.EXPORT_ICON_COL_WIDTH == 5.44
-    assert ws.column_dimensions["B"].width == ex.EXPORT_NAME_COL_WIDTH == 18
-    assert ws.column_dimensions["F"].width == ex.EXPORT_BIRTHPLACE_COL_WIDTH == 36
-    assert ws.column_dimensions["I"].width == ex.EXPORT_MOVIE_COL_WIDTH == 8
+        assert ws.column_dimensions[col].width == stored(ex.EXPORT_ICON_COL_WIDTH) == pytest.approx(6.22)
+    assert ws.column_dimensions["B"].width == stored(ex.EXPORT_NAME_COL_WIDTH) == pytest.approx(18.78)
+    assert ws.column_dimensions["F"].width == stored(ex.EXPORT_BIRTHPLACE_COL_WIDTH) == pytest.approx(36.78)
+    assert ws.column_dimensions["I"].width == stored(ex.EXPORT_MOVIE_COL_WIDTH) == pytest.approx(8.78)
     text_widths = {ws.column_dimensions[c].width for c in ("G", "H")}
     assert len(text_widths) == 1
-    assert text_widths.pop() == ex.EXPORT_TEXT_COL_WIDTH == pytest.approx(
-        (
-            ex.EXPORT_TABLE_WIDTH
-            - ex.EXPORT_BIRTHDAY_COL_WIDTH
-            - 3 * ex.EXPORT_ICON_COL_WIDTH
-            - ex.EXPORT_NAME_COL_WIDTH
-            - ex.EXPORT_BIRTHPLACE_COL_WIDTH
-            - ex.EXPORT_MOVIE_COL_WIDTH
-        )
-        / 2
+    assert text_widths.pop() == stored(ex.EXPORT_TEXT_COL_WIDTH) == pytest.approx(
+        ex.EXPORT_TEXT_COL_WIDTH + ex.WPS_COLUMN_WIDTH_OFFSET
     )
     # I 列之后的列（J:XFD）全部隐藏，表右侧无空白列。
     assert ws.column_dimensions["J"].hidden is True
@@ -256,6 +251,14 @@ def test_export_table_fits_viewport():
         table_px = total_units * ex.EXCEL_UNIT_PX + ex.EXCEL_TABLE_PADDING_PX
         content_px = px - ex.SCREEN_ROW_HEADER_PX - ex.SCREEN_VSCROLL_PX
         assert table_px == pytest.approx(content_px - ex.EXPORT_TABLE_MARGIN_PX)
+
+
+def test_wps_stored_column_width_adds_display_offset():
+    """xlsx 写入值 = WPS 显示值 + 0.78：按本机 WPS COM 实测锁死。"""
+    from mdcx.tools import emby_actor_export as ex
+
+    for display in (5.44, 18.0, 12.0, 36.0, 8.0, ex.EXPORT_TEXT_COL_WIDTH, 30.0):
+        assert ex._wps_stored_column_width(display) == pytest.approx(display + 0.78)
 
 
 def _fake_screen(width: float, dpr: float, dpi: float):
@@ -310,9 +313,11 @@ def test_write_xlsx_custom_text_width(tmp_path):
 
     path = ex.write_actor_export_xlsx(tmp_path / "t.xlsx", [_actor(name="甲")], text_col_width=30)
     ws = openpyxl.load_workbook(path).active
-    assert {ws.column_dimensions[c].width for c in ("G", "H")} == {30}
-    assert ws.column_dimensions["B"].width == ex.EXPORT_NAME_COL_WIDTH == 18
-    assert ws.column_dimensions["F"].width == ex.EXPORT_BIRTHPLACE_COL_WIDTH == 36
+    custom_widths = {ws.column_dimensions[c].width for c in ("G", "H")}
+    assert custom_widths == {ex._wps_stored_column_width(30)}
+    assert all(width == pytest.approx(30.78) for width in custom_widths)
+    assert ws.column_dimensions["B"].width == ex._wps_stored_column_width(ex.EXPORT_NAME_COL_WIDTH) == pytest.approx(18.78)
+    assert ws.column_dimensions["F"].width == ex._wps_stored_column_width(ex.EXPORT_BIRTHPLACE_COL_WIDTH) == pytest.approx(36.78)
     assert ws.freeze_panes == "A2"
 
 
@@ -823,9 +828,11 @@ def test_do_export_uses_filtered_actors_and_dir(app, monkeypatch, tmp_path):
         else:
             screen_px = ex.effective_screen_width_px(screen)
         assert ws.column_dimensions["G"].width == pytest.approx(
-            ex.text_col_width_for_screen_width(screen_px)
+            ex._wps_stored_column_width(ex.text_col_width_for_screen_width(screen_px))
         )
-        assert ws.column_dimensions["B"].width == ex.EXPORT_NAME_COL_WIDTH == 18
+        assert ws.column_dimensions["B"].width == pytest.approx(
+            ex._wps_stored_column_width(ex.EXPORT_NAME_COL_WIDTH)
+        )
         assert "共导出 1 个演员" in infos[-1]
     finally:
         dlg.close()

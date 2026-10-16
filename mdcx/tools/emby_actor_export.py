@@ -16,13 +16,15 @@
 - 影片数：``actor.movie_count`` 原值（整数），与管理器表格第九列一致；
 - 样式：全表宋体 11pt，对齐方式
   （状态/姓名/头像/简介/出生日期/影片数居中，出生地/详情/标签居左，纵向全部居中）。
-- 列宽：状态/头像/简介三列 5.44；姓名 18；出生日期 12，
+- 列宽（均为 WPS 里看到的显示值）：状态/头像/简介三列 5.44；姓名 18；出生日期 12，
   完整展示 ``1958-04-29`` 这类日期（不出现 ``###``）的前提下尽量收窄；
   出生地 36；影片数 8（标签右侧）；
   详情/标签两列平分扣除上述固定列宽后的剩余列宽：调用方按用户屏幕实际宽度
   算出可分配宽度后传入（见 :func:`text_col_width_for_screen_width`），
   缺省时按总表宽 260 均分；I 列之后的列（J:XFD）全部隐藏，表总宽不变、
-  默认占满整个可用列宽。
+  默认占满整个可用列宽。写入 xlsx 时每个显示列宽都要再加
+  ``WPS_COLUMN_WIDTH_OFFSET``，否则 WPS 会把同一份文件读小约 0.78
+  （见该常量的实测说明）。
 - 首行表头冻结（``A2``），向下滚动时状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数
   始终置顶显示。
 """
@@ -74,8 +76,22 @@ EXPORT_MOVIE_COL_WIDTH = 8
 EXPORT_BIRTHDAY_COL_WIDTH = 12
 """出生日期列宽：完整展示 ``1958-04-29`` 这类日期（不出现 ``###``）的前提下尽量收窄。"""
 
+WPS_COLUMN_WIDTH_OFFSET = 0.78
+"""写入 xlsx 时的列宽补偿：让 WPS 显示值正好等于上面的显示列宽。
+
+2026-10-17 用本机 ``ET.Application`` COM 实测：openpyxl 按显示值写入时，
+WPS 读出的列宽统一小约 0.78（5.44→4.67、18→17.22、12→11.22、36→35.22、
+8→7.22）；把写入值统一加 0.78 后，WPS 读数回到 5.44/18/12/36/8，
+详情/标签两列也回到均分值。此处只补偿 WPS 的显示口径，文件本身仍是标准 xlsx。
+"""
+
+
+def _wps_stored_column_width(display_width: float) -> float:
+    """把 WPS 显示列宽换算成 xlsx 里实际要写入的列宽。"""
+    return display_width + WPS_COLUMN_WIDTH_OFFSET
+
 EXPORT_TABLE_WIDTH = 260
-"""导出表总宽（列宽单位）。详情/标签两列按 1:1 平分扣除出生日期列、
+"""导出表总宽（WPS 显示列宽单位）。详情/标签两列按 1:1 平分扣除出生日期列、
 状态/头像/简介三列、姓名列、出生地列与影片数列后的剩余宽度，
 把表右侧的大片空白默认摊进这两列，表总宽不变、默认占满整个可用列宽。"""
 
@@ -338,19 +354,21 @@ def write_actor_export_xlsx(
     ws.title = "Sheet1"
     # 首行冻结：向下滚动时表头始终置顶显示。
     ws.freeze_panes = "A2"
-    # 列宽：状态/头像/简介（A/C/D）5.44，姓名（B）18，出生日期（E）12，
+    # 列宽：下面是 WPS 显示目标值，实际写入时每个都要加 WPS 显示补偿；
+    # 状态/头像/简介（A/C/D）5.44，姓名（B）18，出生日期（E）12，
     # 出生地（F）36，影片数（I，标签右侧）8，详情/标签（G/H）平分剩余列宽，
     # 表总宽不变、默认占满整个可用列宽。
+    stored_text_width = _wps_stored_column_width(text_width)
     for col_letter, width in (
-        ("A", EXPORT_ICON_COL_WIDTH),
-        ("B", EXPORT_NAME_COL_WIDTH),
-        ("C", EXPORT_ICON_COL_WIDTH),
-        ("D", EXPORT_ICON_COL_WIDTH),
-        ("E", EXPORT_BIRTHDAY_COL_WIDTH),
-        ("F", EXPORT_BIRTHPLACE_COL_WIDTH),
-        ("G", text_width),
-        ("H", text_width),
-        ("I", EXPORT_MOVIE_COL_WIDTH),
+        ("A", _wps_stored_column_width(EXPORT_ICON_COL_WIDTH)),
+        ("B", _wps_stored_column_width(EXPORT_NAME_COL_WIDTH)),
+        ("C", _wps_stored_column_width(EXPORT_ICON_COL_WIDTH)),
+        ("D", _wps_stored_column_width(EXPORT_ICON_COL_WIDTH)),
+        ("E", _wps_stored_column_width(EXPORT_BIRTHDAY_COL_WIDTH)),
+        ("F", _wps_stored_column_width(EXPORT_BIRTHPLACE_COL_WIDTH)),
+        ("G", stored_text_width),
+        ("H", stored_text_width),
+        ("I", _wps_stored_column_width(EXPORT_MOVIE_COL_WIDTH)),
     ):
         ws.column_dimensions[col_letter].width = width
     # I 列之后的列（J:XFD）全部隐藏，表右侧不再出现空白列。
