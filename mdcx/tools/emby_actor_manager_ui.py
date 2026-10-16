@@ -3163,8 +3163,9 @@ class EmbyActorManagerDialog(QDialog):
         except Exception as e:
             self.log(f"🔶 数据导出目录保存失败，继续使用所选目录: {e}")
         # 列宽按用户屏幕逻辑宽度计算（物理宽 / Windows 缩放比，如 1920@125% → 1536）：
-        # 扣除左侧序号列、右侧滚动条与出生日期/头像/简介/状态固定列宽后，
-        # 剩余均分给姓名/详情/出生地/标签，保证头像/简介/状态三列默认可见、无需横向滚动。
+        # 扣除左侧序号列、右侧滚动条与表右侧安全边距后，再扣除状态/头像/简介/
+        # 出生日期/姓名/出生地/影片数固定列宽（列宽转像素时每列另有约 5px 内边距，
+        # 九列共 45px），剩余均分给详情/标签，保证九列默认一屏放下、无需横向滚动。
         screen = self.screen()
         if screen is None:
             screen = QGuiApplication.primaryScreen()

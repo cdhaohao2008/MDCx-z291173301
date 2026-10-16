@@ -222,9 +222,17 @@ def test_text_col_width_for_screen_width():
 
     def _expect(px):
         return (
-            (px - ex.SCREEN_ROW_HEADER_PX - ex.SCREEN_VSCROLL_PX - ex.EXPORT_TABLE_MARGIN_PX)
-            - ex.EXCEL_TABLE_PADDING_PX
-        ) / ex.EXCEL_UNIT_PX - ex.EXPORT_BIRTHDAY_COL_WIDTH - 3 * ex.EXPORT_ICON_COL_WIDTH - ex.EXPORT_NAME_COL_WIDTH - ex.EXPORT_BIRTHPLACE_COL_WIDTH - ex.EXPORT_MOVIE_COL_WIDTH
+            (
+                (px - ex.SCREEN_ROW_HEADER_PX - ex.SCREEN_VSCROLL_PX - ex.EXPORT_TABLE_MARGIN_PX)
+                - ex.EXPORT_COLUMN_COUNT * ex.EXCEL_TABLE_PADDING_PX
+            )
+            / ex.EXCEL_UNIT_PX
+            - ex.EXPORT_BIRTHDAY_COL_WIDTH
+            - 3 * ex.EXPORT_ICON_COL_WIDTH
+            - ex.EXPORT_NAME_COL_WIDTH
+            - ex.EXPORT_BIRTHPLACE_COL_WIDTH
+            - ex.EXPORT_MOVIE_COL_WIDTH
+        )
 
     assert ex.text_col_width_for_screen_width(1920) == pytest.approx(_expect(1920) / 2)
     # 屏幕越宽，分到的列越宽（头像/简介/状态三列无需横向滚动即默认可见）。
@@ -248,7 +256,7 @@ def test_export_table_fits_viewport():
             + ex.EXPORT_BIRTHPLACE_COL_WIDTH
             + ex.EXPORT_MOVIE_COL_WIDTH
         )
-        table_px = total_units * ex.EXCEL_UNIT_PX + ex.EXCEL_TABLE_PADDING_PX
+        table_px = total_units * ex.EXCEL_UNIT_PX + ex.EXPORT_COLUMN_COUNT * ex.EXCEL_TABLE_PADDING_PX
         content_px = px - ex.SCREEN_ROW_HEADER_PX - ex.SCREEN_VSCROLL_PX
         assert table_px == pytest.approx(content_px - ex.EXPORT_TABLE_MARGIN_PX)
 

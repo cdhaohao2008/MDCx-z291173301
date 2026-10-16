@@ -114,8 +114,15 @@ SCREEN_VSCROLL_PX = 17
 EXCEL_UNIT_PX = 7
 """一个 Excel 列宽单位约等于的像素数（Calibri 11 下数字 `0` 宽）。"""
 
+EXPORT_COLUMN_COUNT = 9
+"""导出表列数（状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数）。"""
+
 EXCEL_TABLE_PADDING_PX = 5
-"""表格整体附加边距（像素）。"""
+"""每列列宽自带的内边距（像素）。Excel/WPS 把列宽换算成像素时，每列都要加约 5px
+（九列共 45px），而不是整表只加一次。此前按整表 5px 算，少算了 40px，
+在 1920@125% 下表格实际比算出来的宽约 50 物理像素，I 列（影片数）右边缘
+被垂直滚动条盖住约 37px（2026-10-17 本机 WPS 截屏实测：表宽 1896px，
+可用网格 1859px）。"""
 
 EXPORT_TABLE_MARGIN_PX = 48
 """表右侧安全边距（像素）。表总宽与视口严丝合缝时，Office/WPS 自身的边框差异
@@ -207,7 +214,7 @@ def text_col_width_for_screen_width(screen_px: object) -> float:
     except (TypeError, ValueError):
         return EXPORT_MIN_TEXT_COL_WIDTH
     content_px = width_px - SCREEN_ROW_HEADER_PX - SCREEN_VSCROLL_PX - EXPORT_TABLE_MARGIN_PX
-    total_units = (content_px - EXCEL_TABLE_PADDING_PX) / EXCEL_UNIT_PX
+    total_units = (content_px - EXPORT_COLUMN_COUNT * EXCEL_TABLE_PADDING_PX) / EXCEL_UNIT_PX
     text_width = (
         total_units
         - EXPORT_BIRTHDAY_COL_WIDTH
