@@ -264,6 +264,7 @@ class ConfigV1:
     gfriends_github: str = r"https://github.com/gfriends/gfriends"
     gfriends_local_path: str = ""
     actor_photo_folder: str = r""
+    actor_export_folder: str = r""
     actor_photo_kodi_auto: bool = False
 
     # mark

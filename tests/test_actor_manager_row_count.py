@@ -148,14 +148,13 @@ def test_fit_never_freezes_nor_inflates_minhint(app):
 
 
 def test_wide_state_buttons_scale_like_source_test_window(app):
-    """最大化（桩）：按钮行按数据源测试窗同款比例拉升，三处定宽按宽态不变，行数仍精确。"""
+    """最大化（桩）：按钮行按数据源测试窗同款比例拉升，宽态定宽不变，行数仍精确。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     names = [
         "btn_connect",
         "btn_fetch",
         "cmb_fetch_mode",
-        "btn_preview",
         "btn_clean",
         "btn_sync",
         "btn_test_source",
@@ -164,6 +163,12 @@ def test_wide_state_buttons_scale_like_source_test_window(app):
     ]
     dlg = EmbyActorManagerDialog()
     dlg.show()
+    _pump(app)
+    # 窄态定宽先落定：六个按钮按文字实际占用宽度定宽。
+    narrow_widths = {
+        n: (getattr(dlg, n).minimumWidth(), getattr(dlg, n).maximumWidth())
+        for n in ("btn_connect", "btn_fetch", "btn_sync", "btn_test_source", "btn_clear_cache", "btn_settings")
+    }
     real = dlg.isMaximized
     dlg.isMaximized = lambda: True
     try:
@@ -180,8 +185,13 @@ def test_wide_state_buttons_scale_like_source_test_window(app):
             assert w.maximumHeight() == dlg._HELP_MAX_W, f"{n} 宽态不得锁 max（只抬 min）"
         cmb = dlg.cmb_fetch_mode
         assert (cmb.minimumWidth(), cmb.maximumWidth()) == (220, 220), "宽态下拉定宽 220 不变"
-        for b in (dlg.btn_clean, dlg.btn_settings):
-            assert b.minimumWidth() == 0 and b.maximumWidth() == dlg._HELP_MAX_W, "宽态恢复自适应"
+        assert dlg.btn_clean.minimumWidth() == 0 and dlg.btn_clean.maximumWidth() == dlg._HELP_MAX_W, (
+            "宽态数据下拉恢复自适应"
+        )
+        # 六个按钮最大化与最小化宽度一致：宽态保持窄态定宽，不再恢复自适应。
+        for n in ("btn_connect", "btn_fetch", "btn_sync", "btn_test_source", "btn_clear_cache", "btn_settings"):
+            w = getattr(dlg, n)
+            assert (w.minimumWidth(), w.maximumWidth()) == narrow_widths[n], f"{n} 宽态应与窄态同宽"
         t = dlg.table
         count, _vp = _full_table_rows(t)
         assert count == 20, f"按钮拉升后表格仍应 20 整行: 实得 {count}"

@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -1038,7 +1039,7 @@ class EmbyActorManagerDialog(QDialog):
         # 主窗口 hide 会级联隐藏 dialog，最大化 dialog 又会把主窗口带出。
         super().__init__(None)
         self.setWindowTitle("Emby/Jellyfin演员管理器")
-        self.setMinimumSize(1080, 720)
+        self.setMinimumSize(self._BASE_MIN_W, 720)
         self.setWindowFlags(
             self.windowFlags()
             | Qt.WindowType.Window
@@ -1089,11 +1090,12 @@ class EmbyActorManagerDialog(QDialog):
         self._log_file: Path | None = None
         # 获取演员列表支持未手动连接时自动连接：_connected 初始 False，_pending_auto_fetch
         # 标记“获取按钮触发的连接成功后继续走媒体库流程”；_pending_auto_preview
-        # 标记“根据设定获取数据按钮触发的链式流程（连接→取演员列表→取数预览）”。
+        # 标记“数据获取选项触发的链式流程（连接→取演员列表→取数预览）”。
         self._connected: bool = False
         self._pending_auto_fetch: bool = False
         self._pending_auto_preview: bool = False
         self._pending_auto_clean: bool = False
+        self._pending_auto_export: bool = False
         self._emby_url: str = str(manager.config.emby_url or "")
         self._emby_key: str = manager.config.api_key or ""
         # 输入框修改自动保存（防抖）：每击键只重启计时，停顿 800ms 后写配置，
@@ -1259,7 +1261,8 @@ class EmbyActorManagerDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(4)
         btn_layout.setContentsMargins(0, 0, 0, 0)
-        self.btn_connect = QPushButton("连接 Emby/Jellyfin")
+        self._btn_layout = btn_layout
+        self.btn_connect = QPushButton("连接Emby/Jellyfin")
         self.btn_connect.setObjectName("btnPrimary")
         btn_layout.addWidget(self.btn_connect)
         self.btn_fetch = QPushButton("获取演员列表")
@@ -1316,30 +1319,35 @@ class EmbyActorManagerDialog(QDialog):
         # 最小宽 1080 预算：下拉 220→210（-10，仍 > sizeHint 199，最长项不裁字）
         self.cmb_fetch_mode.setFixedWidth(210)
         btn_layout.addWidget(self.cmb_fetch_mode)
-        self.btn_preview = QPushButton("根据设定获取数据")
-        self.btn_preview.setObjectName("btnPrimary")
-        self.btn_preview.setEnabled(True)
-        btn_layout.addWidget(self.btn_preview)
-        # 议题 #149: 数据清洗按钮, 按需求置于「根据设定获取数据」与「开始全部更新同步」之间
-        self.btn_clean = QPushButton("数据清洗")
-        self.btn_clean.setObjectName("btnPrimary")
-        self.btn_clean.setEnabled(True)
-        # 最小宽 1080 预算（窄态默认）：数据清洗 80→70（-10，文字 52px+边距仍不裁字，宽态恢复自适应）
-        self.btn_clean.setFixedWidth(70)
-        self.btn_clean.setToolTip(
-            "原地清洗服务器存量演员数据（不经取数流程）:\n"
-            "① 0000-00-00 等非法生日 → 重置为未设置\n"
-            "② 「无维基百科信息」占位简介 → 清空\n"
-            "<br>/换行/==== 段落标题属合法结构, 客户端按其渲染分行, 不压平（议题 #171）\n"
-            "清洗后可选「更新所有演员数据」做全量信息刷新；头像与影片数不受影响"
+        # 数据工具下拉框：数据获取（原「根据设定获取数据」按钮并入）/数据清洗/
+        # 数据导出/数据导入，按此顺序排列；默认选中数据获取。
+        self.cmb_data_tool = QComboBox()
+        self.cmb_data_tool.addItems(["数据获取", "数据清洗", "数据导出", "数据导入"])
+        self.cmb_data_tool.setItemData(
+            0, "按获取模式取数：缺失补全或全量重新获取（取数中再次选择可停止）", Qt.ItemDataRole.ToolTipRole
         )
-        btn_layout.addWidget(self.btn_clean)
+        self.cmb_data_tool.setItemData(1, "原地清洗服务器存量演员数据（不经取数流程）", Qt.ItemDataRole.ToolTipRole)
+        self.cmb_data_tool.setItemData(2, "把已获取的演员数据导出为 xlsx 表格", Qt.ItemDataRole.ToolTipRole)
+        self.cmb_data_tool.setItemData(3, "从 xlsx 表格导入演员数据", Qt.ItemDataRole.ToolTipRole)
+        self.cmb_data_tool.setToolTip("数据工具：按需选择数据获取/数据清洗/数据导出/数据导入")
+        # 最小宽 1080 预算（窄态默认）：下拉按自身 sizeHint 定宽（恰容下文字+箭头，
+        # 不裁字）；腾出的空间由「数据源测试」「清空缓存目录」收窄补回，宽态恢复自适应。
+        btn_layout.addWidget(self.cmb_data_tool)
+        # 兼容别名：既有测试与按钮行高度逻辑仍通过 btn_clean 取到本下拉框。
+        self.btn_clean = self.cmb_data_tool
         self.btn_sync = QPushButton("开始全部更新同步")
         self.btn_sync.setObjectName("btnSync")
         self.btn_sync.setEnabled(False)
         btn_layout.addWidget(self.btn_sync)
         self._help_single = "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获取数据→④绿色行==待更新→⑤同步到服务器，双击行查看编辑详情"
-        self._help_double = "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获\n取数据→④绿色行==待更新→⑤同步到服务器，双击行查看编辑详情"
+        # 窄态（还原/常规/最小化）固定两行：在「③选择模式获取数据」处断行，
+        # 两行等长，故窄态按钮行省下的就是「单行宽度 - 两行宽度」这一段，
+        # 窗口最小宽度可据此下调（见 _narrow_min_width）。宽态仍用单行原文。
+        # 断点按用户指定：第一行结尾「③选择模式获」，第二行以「取数据」开头。
+        self._help_narrow = (
+            "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获\n"
+            "取数据→④绿色行==待更新→⑤同步到服务器，双击行查看编辑详情"
+        )
         help_label = QLabel(self._help_single)
         self.help_label = help_label
         # 不写 font-size：跟随 _load_stylesheet 里放大后的统一字号，写死 12px 会反盖回去。
@@ -1348,6 +1356,17 @@ class EmbyActorManagerDialog(QDialog):
         # 窄窗两行（断点按实测字宽动态平衡）、宽窗一行：见 _update_help_line_break（resize/show 时按实宽切换）。
         help_label.setWordWrap(True)
         help_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        # 关键：开启 wordWrap 的 QLabel，其 sizeHint/minimumSizeHint 仍按【单行】文字宽返回，
+        # 布局据此算出的最小宽是单行态（实测 1383px），而非两行态（963+420=1383 同值但
+        # 那是巧合；真正需要的是让布局认两行后的宽度）。这里显式压住 minimumWidth：
+        # 窄态由 _narrow_help_width 给两行实宽、宽态归零（恢复自适应），
+        # 使布局最小宽随窗口状态切换，而不是恒按单行计。
+        help_label.setMinimumWidth(0)
+        # 窄态下 help 改按自身文字宽度定宽（Maximum/Fixed）：它此前是 Expanding，
+        # 会把整行富余宽度全吸收，于是「使用说明→数据源测试」之间出现几十像素
+        # 的大缝（实测 max_gap=23 ~ 37），用户看到的“按钮之间有空白”其实全来自它。
+        # 定宽后富余宽度落到按钮行末尾（帮助 label 右侧空白），窄态两段按钮互贴。
+        # 宽态仍在 _apply_button_row_compact 里恢复 Expanding，最大化逐像素不变。
         help_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         help_label.setStyleSheet("color: #888888; padding: 0;")
         btn_layout.addWidget(help_label, 1)
@@ -1364,8 +1383,7 @@ class EmbyActorManagerDialog(QDialog):
         btn_layout.addWidget(self.btn_clear_cache)
         self.btn_settings = QPushButton("设置")
         self.btn_settings.setObjectName("btnPrimary")
-        # 最小宽 1080 预算（窄态默认）：设置 80→70（-10，文字 26px+边距仍不裁字，宽态恢复自适应）
-        self.btn_settings.setFixedWidth(70)
+        # 窄态宽度由 _apply_button_widths 按窗口状态统一管（等宽组取半），此处保持自适应。
         btn_layout.addWidget(self.btn_settings)
         grid.addLayout(btn_layout, 1, 0, 1, 4)
         parent_layout.addWidget(group)
@@ -1510,20 +1528,32 @@ class EmbyActorManagerDialog(QDialog):
     }  # 姓名(1)不再定宽，跟随出生地
     _DETAIL_WIDTH_RATIO = 0.75  # 历史比例（议题 #136），现仅保留兼容，实际按出生日期倍率定宽
 
-    # 最小宽 1080 预算（窄态才收窄，宽态/最大化保持原样逐像素不变）：
-    # 下拉 220→210（-10，仍 > sizeHint 199）、数据清洗 80→70（-10）、设置 80→70（-10），合计 -30，
-    # 覆盖窗口 1100→1080 的 -20，多出 10px 让连接按钮/使用说明在 1080 下不再比原来更挤。
+    # 最小宽 1080 预算：获取模式下拉 220→210 沿用既有定值；数据工具下拉按自身 sizeHint
+    # 定宽（恰容下最长项+箭头，随字体自适应）；其余六个按钮（连接/获取演员列表/
+    # 全部更新同步/数据源测试/清空缓存/设置）任何窗口状态都按文字实际占用宽度定宽
+    # （最大化与最小化一致；同步按钮文案带计数后缀时会变长，按当前文案实测，不裁字）。
     _FETCH_W_WIDE = 220
     _FETCH_W_NARROW = 210
-    _CLEAN_W_NARROW = 70
-    _SETTINGS_W_NARROW = 70
+    # 宽态（最大化/全屏）保持的原始最小宽；窄态由 _narrow_min_width 实测下调。
+    _BASE_MIN_W = 1080
+    # 窄态最小宽下限：计数栏（8 个统计标签 + 筛选 + 搜索框 + 计数方式）横向排布，
+    # 窄于它 Qt 会挤压控件；另加余量。不低于该值时表格/统计栏观感正常。
+    _NARROW_MIN_W_FLOOR = 720
 
-    # 按钮行高度只动这 9 个（提示 label 是文本、随行高居中，不碰）。
+    # 按文字实际占用宽度定宽的六个按钮：最大化与最小化宽度一致。
+    _TEXT_FIT_BUTTONS = (
+        ("btn_connect", "_connect_hint_w"),
+        ("btn_fetch", "_fetch_hint_w"),
+        ("btn_test_source", "_test_source_hint_w"),
+        ("btn_clear_cache", "_clear_cache_hint_w"),
+        ("btn_settings", "_settings_hint_w"),
+    )
+
+    # 按钮行高度只动这 8 个（提示 label 是文本、随行高居中，不碰）。
     _CONN_BUTTON_NAMES = (
         "btn_connect",
         "btn_fetch",
         "cmb_fetch_mode",
-        "btn_preview",
         "btn_clean",
         "btn_sync",
         "btn_test_source",
@@ -1590,12 +1620,45 @@ class EmbyActorManagerDialog(QDialog):
         self._update_help_line_break()
         QTimer.singleShot(0, self._fit_visible_rows)
 
-    def _apply_button_widths(self) -> None:
-        """按窗口状态切换三处控件宽度：宽态恢复原宽，窄态收窄 30px。
+    def _button_natural_width(self, attr: str, widget) -> int:
+        """按钮自然宽度：优先用首次显示时记录的值；未记录（首次显示前）且尚未定宽时
+        直接读 sizeHint——setFixedWidth 后 sizeHint 即返回固定值，不能再用它反推，
+        否则越收越窄（此处只在定宽前调用，读到的是真自然宽度）。"""
+        hint = getattr(self, attr, 0)
+        if hint:
+            return int(hint)
+        try:
+            return int(widget.sizeHint().width())
+        except (RuntimeError, AttributeError):
+            return 0
 
-        宽态（最大化/全屏）逐像素不变：下拉 220，清洗/设置恢复自适应（≈80）；
-        窄态（还原/常规/最小化）才收窄到 210/70/70，腾出 30px 给 1080 最小宽。
-        只改三处 min/max，不碰布局、行数、列宽、提示词逻辑；重复调用幂等。
+    def _sync_button_natural_width(self) -> int:
+        """同步按钮自然宽度：文案带计数后缀（“开始全部更新同步(N 项)”），长度会变，
+        故每次按当前文案实测字宽 + 内边距开销；开销取首次显示时记录值，未记录时
+        按当前（未定宽即自然）sizeHint 与字宽之差现算。"""
+        btn = getattr(self, "btn_sync", None)
+        if btn is None:
+            return 0
+        try:
+            advance = btn.fontMetrics().horizontalAdvance(btn.text())
+        except (RuntimeError, AttributeError):
+            return 0
+        overhead = getattr(self, "_sync_overhead_w", 0)
+        if not overhead:
+            try:
+                overhead = btn.sizeHint().width() - advance
+            except (RuntimeError, AttributeError):
+                overhead = 0
+        return int(advance + (overhead if overhead > 0 else 15))
+
+    def _apply_button_widths(self) -> None:
+        """按钮行各控件宽度：六个按钮按文字实际占用宽度定宽（最大化与最小化一致）。
+
+        获取模式下拉宽态 220 / 窄态 210；数据工具下拉窄态按自身 sizeHint 定宽、
+        宽态恢复自适应；连接/获取演员列表/全部更新同步/数据源测试/清空缓存/
+        设置六个按钮在任何窗口状态下都按各自文字实际占用宽度定宽（同步按钮按
+        当前文案实测，计数后缀变长时跟随变宽，不裁字）。
+        只改 min/max，不碰布局、行数、列宽、提示词逻辑；重复调用幂等。
         """
         try:
             wide = self._is_wide_state()
@@ -1603,30 +1666,146 @@ class EmbyActorManagerDialog(QDialog):
             return
         try:
             cmb = getattr(self, "cmb_fetch_mode", None)
-            clean = getattr(self, "btn_clean", None)
-            settings = getattr(self, "btn_settings", None)
-            if cmb is None or clean is None or settings is None:
+            data_tool = getattr(self, "cmb_data_tool", None)
+            if cmb is None or data_tool is None:
                 return
             if wide:
                 if cmb.minimumWidth() != self._FETCH_W_WIDE or cmb.maximumWidth() != self._FETCH_W_WIDE:
                     cmb.setFixedWidth(self._FETCH_W_WIDE)
-                # 恢复自适应：与改动前一致（无固定宽，布局按 sizeHint≈80 分配）
-                if clean.minimumWidth() != 0 or clean.maximumWidth() != self._HELP_MAX_W:
-                    clean.setMinimumWidth(0)
-                    clean.setMaximumWidth(self._HELP_MAX_W)
-                if settings.minimumWidth() != 0 or settings.maximumWidth() != self._HELP_MAX_W:
-                    settings.setMinimumWidth(0)
-                    settings.setMaximumWidth(self._HELP_MAX_W)
+                if data_tool.minimumWidth() != 0 or data_tool.maximumWidth() != self._HELP_MAX_W:
+                    data_tool.setMinimumWidth(0)
+                    data_tool.setMaximumWidth(self._HELP_MAX_W)
             else:
                 if cmb.minimumWidth() != self._FETCH_W_NARROW or cmb.maximumWidth() != self._FETCH_W_NARROW:
                     cmb.setFixedWidth(self._FETCH_W_NARROW)
-                if clean.minimumWidth() != self._CLEAN_W_NARROW or clean.maximumWidth() != self._CLEAN_W_NARROW:
-                    clean.setFixedWidth(self._CLEAN_W_NARROW)
-                if (
-                    settings.minimumWidth() != self._SETTINGS_W_NARROW
-                    or settings.maximumWidth() != self._SETTINGS_W_NARROW
-                ):
-                    settings.setFixedWidth(self._SETTINGS_W_NARROW)
+                data_hint = getattr(self, "_data_tool_hint_w", 0) or data_tool.sizeHint().width()
+                if data_tool.minimumWidth() != data_hint or data_tool.maximumWidth() != data_hint:
+                    data_tool.setFixedWidth(data_hint)
+            # 六个按钮：按文字实际占用宽度定宽，最大化与最小化一致。
+            for name, hint_attr in self._TEXT_FIT_BUTTONS:
+                w = getattr(self, name, None)
+                if w is None:
+                    continue
+                want = self._button_natural_width(hint_attr, w)
+                if want <= 0:
+                    continue
+                if w.minimumWidth() != want or w.maximumWidth() != want:
+                    w.setFixedWidth(want)
+            sync = getattr(self, "btn_sync", None)
+            if sync is not None:
+                want = self._sync_button_natural_width()
+                if want > 0 and (sync.minimumWidth() != want or sync.maximumWidth() != want):
+                    sync.setFixedWidth(want)
+            self._apply_button_row_compact()
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+
+    def _narrow_help_width(self) -> int:
+        """窄态帮助标签的定宽：固定两行文案（`_help_narrow`）中较宽一行的文字实宽 + 4px。
+
+        既避免 Expanding 把富余宽度全吸收（按钮之间出现大缝），又留 4px 余量，
+        不让折行文本被裁。窄态恒两行、宽态恒单行，两者互不换算，故只算两行文案。
+        """
+        label = getattr(self, "help_label", None)
+        narrow = getattr(self, "_help_narrow", None)
+        if label is None or not narrow:
+            return 0
+        try:
+            fm = label.fontMetrics()
+            return int(max(fm.horizontalAdvance(line) for line in narrow.split("\n"))) + 4
+        except (RuntimeError, AttributeError):
+            return 0
+
+    def _narrow_min_width(self) -> int:
+        """窄态窗口最小宽：按钮行（各控件按文字实宽定宽 + 两行帮助）实测最宽。
+
+        窄态下帮助恒两行、六个按钮各按文字实宽定宽，整行宽度即各控件实宽之和，
+        布局最宽即最小宽度——逐控件实测，不写死常量，随系统字号/字体自动跟随。
+        宽态仍用 _BASE_MIN_W(1080)，最大化布局与最小尺寸语义均不变。
+        """
+        try:
+            fixed = 0
+            for name in self._CONN_BUTTON_NAMES:
+                w = getattr(self, name, None)
+                if w is not None:
+                    fixed += w.width()
+            help_w = self._narrow_help_width()
+            # 组边框 + 表格列宽下限（详情列等）由布局自身决定，取实测值加余量即可，
+            # 不再叠加额外固定量，避免把最小宽推得远大于真实需求。
+            row = fixed + help_w
+            return int(max(row, self._NARROW_MIN_W_FLOOR))
+        except (RuntimeError, AttributeError):
+            return self._BASE_MIN_W
+
+    def _apply_button_row_compact(self) -> None:
+        """按钮行紧凑排布：仅窄态（还原/常规/最小化）生效，宽态恢复原样。
+
+        窄态去掉按钮项之间的间距（spacing 4→0），并删掉连接组左右内边距
+        （6→0，即连接按钮左侧与设置按钮右侧的多余空白）；上下边距与垂直
+        间距一律不动，故窄态高度不变。宽态（最大化/全屏）布局、控件、提示词
+        逐像素不变。重复调用幂等。
+        """
+        try:
+            wide = self._is_wide_state()
+        except Exception:
+            return
+        try:
+            btn_layout = getattr(self, "_btn_layout", None)
+            grid = getattr(self, "_conn_grid", None)
+            help_label = getattr(self, "help_label", None)
+            if btn_layout is None or grid is None or help_label is None:
+                return
+            if wide:
+                if btn_layout.spacing() != 4:
+                    btn_layout.setSpacing(4)
+                margins = grid.contentsMargins()
+                base = self.CONN_BASE_MARGINS
+                if (margins.left(), margins.top(), margins.right(), margins.bottom()) != base:
+                    grid.setContentsMargins(*base)
+                # 宽态：帮助标签恢复自适应（最大化逐像素不变），最低宽归零。
+                if help_label.maximumWidth() != self._HELP_MAX_W or help_label.minimumWidth() != 0:
+                    help_label.setMaximumWidth(self._HELP_MAX_W)
+                    help_label.setMinimumWidth(0)
+                    _lay = help_label.parentWidget().layout() if help_label.parentWidget() is not None else None
+                    if _lay is not None:
+                        _lay.activate()
+                    # 宽度放开后排下一拍，把文案从窄态两行切回宽态单行。
+                    QTimer.singleShot(0, self._update_help_line_break)
+            else:
+                if btn_layout.spacing() != 0:
+                    btn_layout.setSpacing(0)
+                margins = grid.contentsMargins()
+                if margins.left() != 0 or margins.right() != 0:
+                    grid.setContentsMargins(0, margins.top(), 0, margins.bottom())
+                # 窄态：帮助标签按自身文字宽度定宽，不再吸收富余宽度。
+                want_help = self._narrow_help_width()
+                if want_help > 0 and help_label.maximumWidth() != want_help:
+                    help_label.setMaximumWidth(want_help)
+                    help_label.setMinimumWidth(want_help)
+                    _lay = help_label.parentWidget().layout() if help_label.parentWidget() is not None else None
+                    if _lay is not None:
+                        _lay.activate()
+            # 窄态同步下调窗口最小宽（两行帮助文案省下的宽度即所减部分）；
+            # 宽态恢复原最小宽，最大化布局与最小尺寸语义均不变。
+            try:
+                self._apply_narrow_min_width()
+            except (RuntimeError, AttributeError):
+                pass
+        except (RuntimeError, AttributeError):
+            pass
+        except Exception:
+            pass
+
+    def _apply_narrow_min_width(self) -> None:
+        """按窗口状态同步对话框最小宽：窄态用 `_narrow_min_width`（实测两行态最宽），
+        宽态恢复 1080。只改最小宽，窗口自身几何/高度一律不动。"""
+        try:
+            want = self._BASE_MIN_W if self._is_wide_state() else self._narrow_min_width()
+            base_h = max(720, int(self.minimumHeight() or 720))
+            if self.minimumWidth() != want or self.minimumHeight() != base_h:
+                self.setMinimumSize(want, base_h)
         except (RuntimeError, AttributeError):
             pass
         except Exception:
@@ -1827,6 +2006,41 @@ class EmbyActorManagerDialog(QDialog):
 
     def showEvent(self, a0):
         super().showEvent(a0)
+        # 首次显示时样式已 polish（QSS 放大字号已生效），此时先解除定宽再记录各控件
+        # 的自然宽度，供窄态做基准；构造时/定宽后的 sizeHint（默认字号/固定值）都偏小。
+        if not getattr(self, "_hints_captured", False):
+            self._hints_captured = True
+            _widgets = [
+                ("_data_tool_hint_w", getattr(self, "cmb_data_tool", None)),
+                ("_connect_hint_w", getattr(self, "btn_connect", None)),
+                ("_fetch_hint_w", getattr(self, "btn_fetch", None)),
+                ("_test_source_hint_w", getattr(self, "btn_test_source", None)),
+                ("_clear_cache_hint_w", getattr(self, "btn_clear_cache", None)),
+                ("_settings_hint_w", getattr(self, "btn_settings", None)),
+            ]
+            for _attr, _w in _widgets:
+                if _w is None:
+                    continue
+                try:
+                    _w.setMinimumWidth(0)
+                    _w.setMaximumWidth(self._HELP_MAX_W)
+                except (RuntimeError, AttributeError):
+                    pass
+            for _attr, _w in _widgets:
+                if _w is None:
+                    continue
+                try:
+                    setattr(self, _attr, _w.sizeHint().width())
+                except (RuntimeError, AttributeError):
+                    pass
+            # 同步按钮内边距开销：自然宽度 - 当前文案字宽，窄态按实时文案重算自然宽度时用。
+            _sync = getattr(self, "btn_sync", None)
+            if _sync is not None:
+                try:
+                    _adv = _sync.fontMetrics().horizontalAdvance(_sync.text())
+                    self._sync_overhead_w = _sync.sizeHint().width() - _adv
+                except (RuntimeError, AttributeError):
+                    pass
         self._apply_button_widths()
         self._apply_button_heights()
         self._apply_column_widths()
@@ -1843,15 +2057,24 @@ class EmbyActorManagerDialog(QDialog):
         （视觉上右边比左边宽）。改按当前字体实测字宽取差值最小的断点，两行等长；
         可行时再把 label 最大宽度钳到最长行宽——行尾与 label 右缘对齐，右边距只剩
         一份 layout spacing（4px），与左侧「同步→使用说明」对称，多出的宽度落在
-        行尾（设置按钮右侧空白），各按钮与文字位置不动。宽窗（单行放得下）仍用
-        原文单行且不限宽，最大化渲染与原来逐字相同；窄到两行塞不下回落固定双行
-        且不限宽（保持现状）。
+        行尾（设置按钮右侧空白），各按钮与文字位置不动。
+
+        窄态（还原/常规/最小化）不再做动态折行：恒用用户指定的固定两行文案
+        `_help_narrow`（在「③选择模式获取数据」处断行），并按两行文字实宽定宽
+        （`_narrow_help_width`）——既不吸收富余宽度（此前让「使用说明→数据源测试」
+        之间出现 23~37px 大缝），又省下「单行宽度 - 两行宽度」这段宽度用于下调
+        窄态最小宽。宽态逻辑与最大化渲染逐像素不变。
         """
         label = getattr(self, "help_label", None)
         single = getattr(self, "_help_single", None)
-        double = getattr(self, "_help_double", None)
-        if label is None or single is None or double is None:
+        narrow = getattr(self, "_help_narrow", None)
+        if label is None or single is None or narrow is None:
             return
+        try:
+            wide = self._is_wide_state()
+        except Exception:
+            wide = True
+        narrow_width = 0 if wide else self._narrow_help_width()
         # 先解除上一轮限宽并同步一次布局，再量 label 真正能拿到的宽度；
         # 否则加宽窗口后读到的还是被钳住的旧宽，永远切不回单行。
         if label.maximumWidth() != self._HELP_MAX_W:
@@ -1862,19 +2085,33 @@ class EmbyActorManagerDialog(QDialog):
                     lay.activate()
             except Exception:
                 pass
+        if not wide:
+            # 窄态：恒用固定两行文案（用户指定在「③选择模式获取数据」处断行），
+            # 并按两行文字实宽定宽——不再按可用宽度做动态折行，也不再吸收富余宽度。
+            if label.text() != narrow:
+                label.setText(narrow)
+            if narrow_width > 0 and label.maximumWidth() != narrow_width:
+                label.setMaximumWidth(narrow_width)
+                try:
+                    lay = label.parentWidget().layout() if label.parentWidget() is not None else None
+                    if lay is not None:
+                        lay.activate()
+                except Exception:
+                    pass
+            return
+        # 宽态：单行放得下就用原文单行，否则按实测字宽找两行等长断点（最大化不变）。
         avail = label.width()
         if avail <= 0:
             return
         fm = label.fontMetrics()
-        need = fm.horizontalAdvance(single) + 4
-        if need <= avail:
+        if fm.horizontalAdvance(single) + 4 <= avail:
             if label.text() != single:
                 label.setText(single)
             return
         balanced = self._balanced_help_text(single, fm, avail)
         if balanced is None:
-            if label.text() != double:
-                label.setText(double)
+            if label.text() != narrow:
+                label.setText(narrow)
             return
         if label.text() != balanced:
             label.setText(balanced)
@@ -2056,8 +2293,7 @@ class EmbyActorManagerDialog(QDialog):
     def _connect_signals(self):
         self.btn_connect.clicked.connect(self._on_connect)
         self.btn_fetch.clicked.connect(self._on_fetch)
-        self.btn_preview.clicked.connect(self._on_prepare_preview)
-        self.btn_clean.clicked.connect(self._on_clean_data)
+        self.cmb_data_tool.activated.connect(self._on_data_tool_chosen)
         self.btn_sync.clicked.connect(self._on_sync)
         self.btn_settings.clicked.connect(self._on_open_settings)
         self.btn_test_source.clicked.connect(self._on_open_test_source)
@@ -2167,7 +2403,7 @@ class EmbyActorManagerDialog(QDialog):
         self.btn_fetch.setEnabled(enabled)
         actors = getattr(self, "_actors", None) or []
         # 预览/清洗按钮常开：无演员列表时点击会自动走完链路，故只看总开关。
-        self.btn_preview.setEnabled(enabled)
+        self.cmb_data_tool.setEnabled(enabled)
         self.btn_clean.setEnabled(enabled)
         pending = any(a.need_update_info or a.need_update_image or a.need_update_backdrop for a in actors)
         self.btn_sync.setEnabled(enabled and pending)
@@ -2207,7 +2443,7 @@ class EmbyActorManagerDialog(QDialog):
         except Exception as e:
             future = None
             self.btn_connect.setEnabled(True)
-            self.btn_connect.setText("已连接" if self._connected else "连接 Emby/Jellyfin")
+            self.btn_connect.setText("已连接" if self._connected else "连接Emby/Jellyfin")
             self.btn_fetch.setEnabled(True)
             self._pending_auto_fetch = False
             self._set_status("连接失败")
@@ -2229,11 +2465,12 @@ class EmbyActorManagerDialog(QDialog):
         ok, msg = result
         self.btn_connect.setEnabled(True)
         # 手动用错误地址复测失败时，已有连接不应被按钮文案抹掉。
-        self.btn_connect.setText("已连接" if (ok or self._connected) else "连接 Emby/Jellyfin")
+        self.btn_connect.setText("已连接" if (ok or self._connected) else "连接Emby/Jellyfin")
         # 获取/预览/清洗按钮触发的自动连接：恢复可点状态由后续流程接管，失败时才在此恢复。
         pending_fetch = self._pending_auto_fetch
         pending_preview = self._pending_auto_preview
         pending_clean = self._pending_auto_clean
+        pending_export = self._pending_auto_export
         if ok:
             self._connected = True
             self._emby_url = getattr(self, "_pending_url", self.txt_url.text().strip())
@@ -2260,6 +2497,15 @@ class EmbyActorManagerDialog(QDialog):
                 else:
                     self._pending_auto_clean = True
                     self._request_media_folders()
+            elif pending_export:
+                self._pending_auto_export = False
+                # 配置已持久化：有演员列表直接导出，
+                # 否则先走媒体库流程，取到列表后再自动导出。
+                if self._actors:
+                    self._do_export_actors()
+                else:
+                    self._pending_auto_export = True
+                    self._request_media_folders()
             elif pending_fetch:
                 self._pending_auto_fetch = False
                 # 配置已持久化，后续媒体库/演员请求走新地址，直接进入取数流程。
@@ -2272,6 +2518,8 @@ class EmbyActorManagerDialog(QDialog):
                 self._pending_auto_preview = False
             if pending_clean:
                 self._pending_auto_clean = False
+            if pending_export:
+                self._pending_auto_export = False
             self._set_status("连接失败")
             self.log(f"❌ {msg}")
             QMessageBox.critical(self, "连接失败", f"服务器地址或 API 密钥错误\n{msg}")
@@ -2282,7 +2530,7 @@ class EmbyActorManagerDialog(QDialog):
             self.txt_url.text().strip(), self.txt_api_key.text().strip()
         ):
             self._connected = False
-            self.btn_connect.setText("连接 Emby/Jellyfin")
+            self.btn_connect.setText("连接Emby/Jellyfin")
             self._set_status("连接信息已修改，请重新连接或获取")
         self._conn_save_timer.start()
 
@@ -2344,10 +2592,11 @@ class EmbyActorManagerDialog(QDialog):
             return
         if not self._is_connection_current(url, key):
             # 未连接或输入框改过地址/密钥：先自动连接，成功后继续取数。
-            # 新链路接管，旧的预览/清洗待处理标记作废，避免后续回调误触发。
+            # 新链路接管，旧的预览/清洗/导出待处理标记作废，避免后续回调误触发。
             self._pending_auto_fetch = True
             self._pending_auto_preview = False
             self._pending_auto_clean = False
+            self._pending_auto_export = False
             self.btn_fetch.setEnabled(False)
             self.log("⏳ 正在自动连接服务器...")
             if not self._start_connect_test(url, key):
@@ -2375,18 +2624,21 @@ class EmbyActorManagerDialog(QDialog):
             self.log("❌ 无法获取媒体库列表")
             self._pending_auto_preview = False
             self._pending_auto_clean = False
+            self._pending_auto_export = False
             return
         dlg = LibrarySelectDialog(libraries, self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             self.log("⏹ 用户取消")
             self._pending_auto_preview = False
             self._pending_auto_clean = False
+            self._pending_auto_export = False
             return
         selected_ids = dlg.get_selected_ids()
         if not selected_ids:
             QMessageBox.warning(self, "提示", "请至少选择一个媒体库")
             self._pending_auto_preview = False
             self._pending_auto_clean = False
+            self._pending_auto_export = False
             return
         library_ids = None if len(selected_ids) == len(libraries) else selected_ids
         self._current_library_ids = library_ids  # 供同步后自动刷新复用，避免丢媒体库过滤
@@ -2424,7 +2676,6 @@ class EmbyActorManagerDialog(QDialog):
         )
         self._populate_table(actors)
         self._update_statistics(actors)
-        self.btn_preview.setEnabled(True)
         self._set_buttons_enabled(True)
         # 清洗链式流程无需等头像索引：取到列表后直接进清洗流程（含确认弹窗）。
         if self._pending_auto_clean:
@@ -2433,6 +2684,13 @@ class EmbyActorManagerDialog(QDialog):
                 self._start_clean()
             else:
                 self.log("⚠️ 未获取到演员，无法继续数据清洗")
+        # 导出链式流程同样无需等头像索引：取到列表后直接导出。
+        if self._pending_auto_export:
+            self._pending_auto_export = False
+            if actors:
+                self._do_export_actors()
+            else:
+                self.log("⚠️ 未获取到演员，无法导出")
         try:
             future = executor.submit(get_gfriends_index())
         except Exception as e:
@@ -2463,7 +2721,6 @@ class EmbyActorManagerDialog(QDialog):
             # 不再等旧线程收尾信号（旧版依赖它恢复按钮，cancel→快速重开存在覆盖窗口）
             self._session_gen += 1
             self.log("⏹️ 用户取消")
-            self.btn_preview.setText("根据设定获取数据")
             self._set_status("已取消")
             self._set_buttons_enabled(True)
             return
@@ -2474,10 +2731,11 @@ class EmbyActorManagerDialog(QDialog):
             return
         if not self._is_connection_current(url, key):
             # 未连接或输入框改过地址/密钥：先自动连接，成功后继续取数预览。
-            # 新链路接管，旧的获取/清洗待处理标记作废，避免后续回调误触发。
+            # 新链路接管，旧的获取/清洗/导出待处理标记作废，避免后续回调误触发。
             self._pending_auto_preview = True
             self._pending_auto_fetch = False
             self._pending_auto_clean = False
+            self._pending_auto_export = False
             self.log("⏳ 正在自动连接服务器...")
             if not self._start_connect_test(url, key):
                 self._pending_auto_preview = False
@@ -2487,6 +2745,7 @@ class EmbyActorManagerDialog(QDialog):
             self._pending_auto_preview = True
             self._pending_auto_fetch = False
             self._pending_auto_clean = False
+            self._pending_auto_export = False
             self._request_media_folders()
             return
         self._start_preview()
@@ -2509,8 +2768,8 @@ class EmbyActorManagerDialog(QDialog):
             self.log("✅ 按当前模式没有需要获取数据的演员")
             return
         self._set_buttons_enabled(False)
-        self.btn_preview.setEnabled(True)
-        self.btn_preview.setText("停止获取")
+        # 取数中下拉框保持可用：再次选择「数据获取」即停止获取（旧「停止获取」按钮同款）。
+        self.cmb_data_tool.setEnabled(True)
         self._set_status("获取数据中...")
         self.log(f"📥 正在获取数据（模式: {self.cmb_fetch_mode.currentText()}，共 {len(targets)} 人）")
         self._preview_thread = PreparePreviewThread(self)
@@ -2541,7 +2800,6 @@ class EmbyActorManagerDialog(QDialog):
         self.btn_sync.setText(f"开始全部更新同步({len(to_sync)} 项)")
         self._set_status("数据准备完成")
         self.log(f"✅ 预览准备完成，{len(to_sync)} 项待同步")
-        self.btn_preview.setText("根据设定获取数据")
         self._set_buttons_enabled(True)
 
     def _on_clean_data(self):
@@ -2552,10 +2810,11 @@ class EmbyActorManagerDialog(QDialog):
             return
         if not self._is_connection_current(url, key):
             # 未连接或输入框改过地址/密钥：先自动连接，成功后继续清洗流程。
-            # 新链路接管，旧的获取/预览待处理标记作废，避免后续回调误触发。
+            # 新链路接管，旧的获取/预览/导出待处理标记作废，避免后续回调误触发。
             self._pending_auto_clean = True
             self._pending_auto_fetch = False
             self._pending_auto_preview = False
+            self._pending_auto_export = False
             self.log("⏳ 正在自动连接服务器...")
             if not self._start_connect_test(url, key):
                 self._pending_auto_clean = False
@@ -2565,9 +2824,126 @@ class EmbyActorManagerDialog(QDialog):
             self._pending_auto_clean = True
             self._pending_auto_fetch = False
             self._pending_auto_preview = False
+            self._pending_auto_export = False
             self._request_media_folders()
             return
         self._start_clean()
+
+    def _on_data_tool_chosen(self, index: int):
+        """数据工具下拉框：0 数据获取 / 1 数据清洗 / 2 数据导出 / 3 数据导入。"""
+        try:
+            text = self.cmb_data_tool.itemText(index)
+        except (RuntimeError, AttributeError):
+            return
+        if text == "数据获取":
+            self._on_prepare_preview()
+            return
+        if self._preview_thread and self._preview_thread.isRunning():
+            # 取数中下拉框保持可用作停止开关：其他选项此时不执行，避免并发互踩。
+            QMessageBox.information(self, "提示", "正在获取中，请稍候")
+            return
+        if text == "数据导出":
+            self._on_export_data()
+        elif text == "数据导入":
+            self._on_import_data()
+        else:
+            self._on_clean_data()
+
+    def _on_export_data(self):
+        """数据导出：未连接时自动连接，无演员列表时自动获取后再导出。"""
+        url = self.txt_url.text().strip()
+        key = self.txt_api_key.text().strip()
+        if not url or not key:
+            QMessageBox.warning(self, "提示", "请填写服务器地址和 API 密钥")
+            return
+        if not self._is_connection_current(url, key):
+            # 未连接或输入框改过地址/密钥：先自动连接，成功后继续导出流程。
+            # 新链路接管，旧的获取/预览/清洗待处理标记作废，避免后续回调误触发。
+            self._pending_auto_export = True
+            self._pending_auto_fetch = False
+            self._pending_auto_preview = False
+            self._pending_auto_clean = False
+            self.log("⏳ 正在自动连接服务器...")
+            if not self._start_connect_test(url, key):
+                self._pending_auto_export = False
+            return
+        if not self._actors:
+            # 已连接但尚无演员列表：先走媒体库流程，取到列表后自动导出。
+            self._pending_auto_export = True
+            self._pending_auto_fetch = False
+            self._pending_auto_preview = False
+            self._pending_auto_clean = False
+            self._request_media_folders()
+            return
+        self._do_export_actors()
+
+    def _on_import_data(self):
+        """数据导入：暂未实现，给出明确提示。"""
+        QMessageBox.information(self, "数据导入", "数据导入功能开发中，暂不可用。")
+
+    def _do_export_actors(self):
+        """把当前演员列表导出为 xlsx（文件名：演员数据表<时间>.xlsx）。
+
+        每次导出都弹文件保存框让用户确认：文件名显示框内预填本次要导出的文件名，
+        初始目录为设置里的导出目录（有效时）；用户确认后按所选路径导出，
+        所选目录写回配置；取消则中止导出。
+        """
+        from .emby_actor_export import (
+            EXPORT_FALLBACK_SCREEN_PX,
+            effective_screen_width_px,
+            export_filename,
+            resolve_export_dir,
+            text_col_width_for_screen_width,
+            write_actor_export_xlsx,
+        )
+
+        actors = self._get_filtered_actors() if self._actors else []
+        if not actors:
+            QMessageBox.information(self, "数据导出", "当前没有可导出的演员数据。")
+            return
+        configured = resolve_export_dir(getattr(manager.config, "actor_export_folder", ""))
+        default_path = (
+            str(Path(str(configured)) / export_filename())
+            if configured
+            else export_filename()
+        )
+        chosen, _selected_filter = QFileDialog.getSaveFileName(
+            self, "选择数据导出目录", default_path, "Excel 工作簿 (*.xlsx)"
+        )
+        if not chosen:
+            self.log("⏹ 已取消数据导出（未选择导出目录）")
+            return
+        file_path = Path(chosen)
+        if file_path.suffix.lower() != ".xlsx":
+            file_path = file_path.with_suffix(".xlsx")
+        export_dir = file_path.parent
+        try:
+            cfg = manager.config.model_copy(deep=True)
+            cfg.actor_export_folder = str(export_dir)
+            manager._replace_config(cfg)
+            manager.save()
+            self.log(f"💾 已保存数据导出目录到配置: {export_dir}")
+        except Exception as e:
+            self.log(f"🔶 数据导出目录保存失败，继续使用所选目录: {e}")
+        # 列宽按用户屏幕逻辑宽度计算（物理宽 / Windows 缩放比，如 1920@125% → 1536）：
+        # 扣除左侧序号列、右侧滚动条与出生日期/头像/简介/状态固定列宽后，
+        # 剩余均分给姓名/详情/出生地/标签，保证头像/简介/状态三列默认可见、无需横向滚动。
+        screen = self.screen()
+        if screen is None:
+            screen = QGuiApplication.primaryScreen()
+        if screen is None:
+            screen_px = EXPORT_FALLBACK_SCREEN_PX
+        else:
+            screen_px = effective_screen_width_px(screen)
+        text_width = text_col_width_for_screen_width(screen_px)
+        try:
+            write_actor_export_xlsx(file_path, actors, text_col_width=text_width)
+        except Exception as e:
+            self.log(f"❌ 数据导出失败: {e}")
+            QMessageBox.critical(self, "数据导出失败", f"❌ 数据导出失败:\n{e}")
+            return
+        self.log(f"✅ 数据导出完成，共 {len(actors)} 个演员: {file_path}")
+        QMessageBox.information(self, "数据导出完成", f"✅ 共导出 {len(actors)} 个演员:\n{file_path}")
 
     def _start_clean(self, rules=None):
         """数据清洗: 无规则时先弹独立规则编辑窗, 有规则时直接按规则扫描执行。
@@ -2861,7 +3237,6 @@ class EmbyActorManagerDialog(QDialog):
             self._all_staff_count = all_staff_count
         self._populate_table(actors)
         self._update_statistics(actors)
-        self.btn_preview.setEnabled(True)
         self._set_status("自动刷新完成")
         unique_names = len({a.name for a in actors})
         self.log(
@@ -2872,12 +3247,12 @@ class EmbyActorManagerDialog(QDialog):
     def _on_thread_error(self, msg: str):
         if self._is_stale_session():
             return
-        # 链式流程中断：清掉待处理的自动获取/预览/清洗标记，避免后续回调误触发。
+        # 链式流程中断：清掉待处理的自动获取/预览/清洗/导出标记，避免后续回调误触发。
         self._pending_auto_fetch = False
         self._pending_auto_preview = False
         self._pending_auto_clean = False
-        # 线程已结束，恢复按钮文本与状态，避免"停止/同步中..."残留
-        self.btn_preview.setText("根据设定获取数据")
+        self._pending_auto_export = False
+        # 线程已结束，恢复按钮状态，避免"同步中..."残留
         self.btn_sync.setText("开始全部更新同步")
         self._set_buttons_enabled(True)
         self.log(f"🔶 错误: {msg}")
@@ -3163,6 +3538,8 @@ class EmbyActorManagerDialog(QDialog):
         sync_count = len(to_sync)
         self.btn_sync.setEnabled(sync_count > 0)
         self.btn_sync.setText(f"开始全部更新同步({sync_count} 项)" if sync_count > 0 else "开始全部更新同步")
+        # 同步按钮文案带计数后缀，长度会变：按当前文案重算自然宽度，避免裁字。
+        self._apply_button_widths()
 
 
 IMAGE_SOURCE_NAMES = source_catalog.IMAGE_SOURCE_NAMES
@@ -3317,6 +3694,11 @@ class EmbyActorSettingsDialog(QDialog):
             self.info_list.addItem(item)
         layout.addWidget(self.info_list)
 
+        self.export_folder_edit = QLineEdit(getattr(manager.config, "actor_export_folder", "") or "")
+        layout.addLayout(
+            make_folder_row("数据导出目录:", self.export_folder_edit, self._browse_export_folder),
+        )
+
         self.photo_folder_edit = QLineEdit(manager.config.actor_photo_folder)
         layout.addLayout(
             make_folder_row("本地头像目录:", self.photo_folder_edit, self._browse_photo_folder),
@@ -3344,6 +3726,9 @@ class EmbyActorSettingsDialog(QDialog):
         # 目录 / Gfriends 地址等显示框内容优先从左展示（长 URL 不被滚掉前缀）
         left_anchor_text_edits(self)
 
+    def _browse_export_folder(self):
+        browse_folder(self, "选择数据导出目录", self.export_folder_edit, cursor_reset=False)
+
     def _browse_photo_folder(self):
         browse_folder(self, "选择本地头像目录", self.photo_folder_edit, cursor_reset=False)
 
@@ -3356,6 +3741,7 @@ class EmbyActorSettingsDialog(QDialog):
         cfg.actor_filter_only = self.filter_only_check.isChecked()
         cfg.actor_deduplicate = self.deduplicate_check.isChecked()
         cfg.actor_photo_folder = self.photo_folder_edit.text().strip()
+        cfg.actor_export_folder = self.export_folder_edit.text().strip()
         cfg.use_database = self.use_db_check.isChecked()
         try:
             cfg.gfriends_github = self.gfriends_edit.text().strip()
