@@ -1032,7 +1032,10 @@ class EmbyActorManagerDialog(QDialog):
     # 按钮行高度：数据源测试窗 `_sync_panel_stretch` 同款——最大化/全屏时按
     # 对话框当前高度/基准高度比例拉升，还原恢复；只设 minimumHeight（不锁 max），
     # 宽度由 `_apply_button_widths` 管——两者正交。
-    CONN_BASE_MARGINS = (6, 4, 6, 4)
+    # 连接组左内边距 16：QSS 标题 `left:10 + padding 4 =14` 距组左，
+    # 标签 x = 边距+1（组边框）；13→14 与标题文本左对齐后，用户要求再右移 3px，
+    # 故 16→17；右 6/上下 4 不动。
+    CONN_BASE_MARGINS = (16, 4, 6, 4)
 
     def __init__(self, parent=None):
         # 不传 parent：始终保持独立顶层窗口。议题 #61——以主窗口为 parent 时，
@@ -1742,8 +1745,10 @@ class EmbyActorManagerDialog(QDialog):
     def _apply_button_row_compact(self) -> None:
         """按钮行紧凑排布：仅窄态（还原/常规/最小化）生效，宽态恢复原样。
 
-        窄态去掉按钮项之间的间距（spacing 4→0），并删掉连接组左右内边距
-        （6→0，即连接按钮左侧与设置按钮右侧的多余空白）；上下边距与垂直
+        窄态去掉按钮项之间的间距（spacing 4→0），连接组左内边距保持 16
+        （服务器地址先与组标题文本左对齐：标题 left:10+padding 4=14，标签 x=边距+1；
+        再按用户要求右移 3px，故 16→17），
+        右内边距 6→0（即设置按钮右侧多余空白）；上下边距与垂直
         间距一律不动，故窄态高度不变。宽态（最大化/全屏）布局、控件、提示词
         逐像素不变。重复调用幂等。
         """
@@ -1777,8 +1782,8 @@ class EmbyActorManagerDialog(QDialog):
                 if btn_layout.spacing() != 0:
                     btn_layout.setSpacing(0)
                 margins = grid.contentsMargins()
-                if margins.left() != 0 or margins.right() != 0:
-                    grid.setContentsMargins(0, margins.top(), 0, margins.bottom())
+                if margins.left() != 16 or margins.right() != 0:
+                    grid.setContentsMargins(16, margins.top(), 0, margins.bottom())
                 # 窄态：帮助标签按自身文字宽度定宽，不再吸收富余宽度。
                 want_help = self._narrow_help_width()
                 if want_help > 0 and help_label.maximumWidth() != want_help:

@@ -366,7 +366,7 @@ def test_button_widths_narrow_and_wide(app):
 
 
 def test_button_row_compact_narrow_and_wide(app):
-    """窄态按钮行无项间距、连接组无左右边距（上下边距不动，高度不变）；宽态恢复原样。"""
+    """窄态按钮行无项间距、连接组左 16（与标题对齐后再右移 3px）/右 0（上下边距不动，高度不变）；宽态恢复原样。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     dlg = EmbyActorManagerDialog()
@@ -377,10 +377,10 @@ def test_button_row_compact_narrow_and_wide(app):
         assert dlg._btn_layout is not None and dlg._conn_grid is not None
         group = dlg._conn_grid.parentWidget()
         height_before = group.height()
-        # 窄态：项间距 0，左右边距 0，上下边距保持 4/4。
+        # 窄态：项间距 0，左 16（标题对齐后再右移 3px）、右 0，上下边距保持 4/4。
         assert dlg._btn_layout.spacing() == 0
         margins = dlg._conn_grid.contentsMargins()
-        assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (0, 4, 0, 4)
+        assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (16, 4, 0, 4)
         # 窄态：帮助标签恒两行、按文字实宽定宽，不再吸收富余宽度（曾致 23~37px 大缝）。
         assert dlg.help_label.text() == dlg._help_narrow
         assert dlg.help_label.maximumWidth() == dlg._narrow_help_width()
@@ -403,7 +403,7 @@ def test_button_row_compact_narrow_and_wide(app):
         dlg._apply_button_widths()
         assert dlg._btn_layout.spacing() == 0
         margins = dlg._conn_grid.contentsMargins()
-        assert margins.left() == 0 and margins.right() == 0
+        assert margins.left() == 16 and margins.right() == 0
     finally:
         dlg.isMaximized = real
         dlg.close()

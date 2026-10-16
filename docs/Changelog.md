@@ -1,5 +1,9 @@
 
 # Changelog
+## v2.4.9 (2026-10-20)
+### 调整
+- **版本号**：`2.4.8` → `2.4.9`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`，故本段日期仍为 `2026-10-20`，与前五个版本段一致）。改完以 `scripts/bump.py --check` 与 `tests/test_version_consistency.py` 复核五处同步点。
+- **演员管理器「服务器地址：」标签再右移 3px（`mdcx/tools/emby_actor_manager_ui.py` 的 `CONN_BASE_MARGINS` 与 `_apply_button_row_compact`）**：上版已把连接组左内边距由 6 改为 13，使标签 x（= 边距 + 1 组边框 = 14）与组标题「Emby/Jellyfin 连接设置」文本左缘（QSS 标题 `left:10 + padding 4 = 14`）对齐；本版按用户要求再右移约 2-3px，取 3px，左内边距 13 → 16（标签 x 14 → 17），宽/窄两态一致，右/上下边距不动。回归：`tests/test_actor_export.py::test_button_row_compact_narrow_and_wide` 断言同步为 `(16, 4, 0, 4)` / `left == 16`。
 ## v2.4.8 (2026-10-20)
 ### 调整
 - **版本号**：`2.4.7` → `2.4.8`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根包 `mdcx`；`LOCAL_VERSION` 保持 `20261020`，故本段日期仍为 `2026-10-20`，与前四个版本段一致）。改完以 `scripts/bump.py --check` 与 `tests/test_version_consistency.py` 复核五处同步点。
