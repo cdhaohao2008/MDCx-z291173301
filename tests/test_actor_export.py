@@ -366,7 +366,7 @@ def test_button_widths_narrow_and_wide(app):
 
 
 def test_button_row_compact_narrow_and_wide(app):
-    """窄态按钮行无项间距、连接组左 16（与标题对齐后再右移 3px）/右 0（上下边距不动，高度不变）；宽态恢复原样。"""
+    """窄态按钮行无项间距、连接组左 0/右 0（1/10 号空白删掉，按钮贴边紧贴）；宽态恢复原样。"""
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     dlg = EmbyActorManagerDialog()
@@ -377,10 +377,12 @@ def test_button_row_compact_narrow_and_wide(app):
         assert dlg._btn_layout is not None and dlg._conn_grid is not None
         group = dlg._conn_grid.parentWidget()
         height_before = group.height()
-        # 窄态：项间距 0，左 16（标题对齐后再右移 3px）、右 0，上下边距保持 4/4。
+        # 窄态：项间距 0，左 0、右 0（1-10 号空白删掉，按钮之间紧贴），上下边距保持 4/4。
         assert dlg._btn_layout.spacing() == 0
         margins = dlg._conn_grid.contentsMargins()
-        assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (16, 4, 0, 4)
+        assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (0, 4, 0, 4)
+        # 窄态：服务器地址文本与组标题严格左对齐（垫左 13px），按钮仍贴组边框。
+        assert dlg._lbl_server.styleSheet() == "padding-left: 13px;"
         # 窄态：帮助标签恒两行、按文字实宽定宽，不再吸收富余宽度（曾致 23~37px 大缝）。
         assert dlg.help_label.text() == dlg._help_narrow
         assert dlg.help_label.maximumWidth() == dlg._narrow_help_width()
@@ -394,6 +396,7 @@ def test_button_row_compact_narrow_and_wide(app):
         dlg._apply_button_widths()
         assert dlg._btn_layout.spacing() == 4
         assert dlg.help_label.maximumWidth() == dlg._HELP_MAX_W
+        assert dlg._lbl_server.styleSheet() == ""
         margins = dlg._conn_grid.contentsMargins()
         assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == tuple(
             dlg.CONN_BASE_MARGINS
@@ -403,7 +406,8 @@ def test_button_row_compact_narrow_and_wide(app):
         dlg._apply_button_widths()
         assert dlg._btn_layout.spacing() == 0
         margins = dlg._conn_grid.contentsMargins()
-        assert margins.left() == 16 and margins.right() == 0
+        assert margins.left() == 0 and margins.right() == 0
+        assert dlg._lbl_server.styleSheet() == "padding-left: 13px;"
     finally:
         dlg.isMaximized = real
         dlg.close()
@@ -429,13 +433,18 @@ def test_narrow_help_two_lines_and_min_width(app):
         # 两行化后帮助标签确实比单行窄（单行态最小宽高于两行态）。
         fm = dlg.help_label.fontMetrics()
         assert dlg._narrow_help_width() < fm.horizontalAdvance(dlg._help_single)
-        # 窄态最小宽由布局实测决定（各控件实宽之和，已无空白可删）。
+        # 窄态最小宽由布局实测决定（按钮行实宽和 + 组边框 2 + 主布局左右 12+12）。
         row_sum = sum(
             dlg._btn_layout.itemAt(i).widget().width()
             for i in range(dlg._btn_layout.count())
             if dlg._btn_layout.itemAt(i).widget() is not None
         )
-        assert narrow_w == row_sum, "最小宽应等于按钮行实宽和（无多余空白）"
+        main = dlg.layout()
+        outer = 2
+        if main is not None:
+            mg = main.contentsMargins()
+            outer += int(mg.left() + mg.right())
+        assert narrow_w == row_sum + outer, "最小宽应等于按钮行实宽和加外层边框/边距"
         # 高度不变（两行文案仍在一行按钮行内，不占额外行高）。
         assert dlg.minimumHeight() == 720
         # 宽态：最小宽复原、帮助标签放开限宽（恢复自适应）。

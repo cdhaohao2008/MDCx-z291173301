@@ -1252,7 +1252,8 @@ class EmbyActorManagerDialog(QDialog):
         self._conn_grid = grid
         grid.setVerticalSpacing(4)
         grid.setHorizontalSpacing(6)
-        grid.addWidget(QLabel("服务器地址:"), 0, 0)
+        self._lbl_server = QLabel("服务器地址:")
+        grid.addWidget(self._lbl_server, 0, 0)
         self.txt_url = QLineEdit(str(manager.config.emby_url or ""))
         self.txt_url.setPlaceholderText("http://192.168.1.100:8096")
         grid.addWidget(self.txt_url, 0, 1)
@@ -1706,10 +1707,11 @@ class EmbyActorManagerDialog(QDialog):
             pass
 
     def _narrow_help_width(self) -> int:
-        """窄态帮助标签的定宽：固定两行文案（`_help_narrow`）中较宽一行的文字实宽 + 4px。
+        """窄态帮助标签的定宽：固定两行文案（`_help_narrow`）中较宽一行的文字实宽（无附加余量）。
 
-        既避免 Expanding 把富余宽度全吸收（按钮之间出现大缝），又留 4px 余量，
-        不让折行文本被裁。窄态恒两行、宽态恒单行，两者互不换算，故只算两行文案。
+        按钮之间紧贴着没空白没间距：帮助标签按文字实宽精确取宽，不再多留 4px，
+        与前后按钮间距 0 配合，窄态 2-9 号缝隙归零。窄态恒两行、宽态恒单行，
+        两者互不换算，故只算两行文案。宽态逻辑不动。
         """
         label = getattr(self, "help_label", None)
         narrow = getattr(self, "_help_narrow", None)
@@ -1717,15 +1719,17 @@ class EmbyActorManagerDialog(QDialog):
             return 0
         try:
             fm = label.fontMetrics()
-            return int(max(fm.horizontalAdvance(line) for line in narrow.split("\n"))) + 4
+            return int(max(fm.horizontalAdvance(line) for line in narrow.split("\n")))
         except (RuntimeError, AttributeError):
             return 0
 
     def _narrow_min_width(self) -> int:
         """窄态窗口最小宽：按钮行（各控件按文字实宽定宽 + 两行帮助）实测最宽。
 
-        窄态下帮助恒两行、六个按钮各按文字实宽定宽，整行宽度即各控件实宽之和，
-        布局最宽即最小宽度——逐控件实测，不写死常量，随系统字号/字体自动跟随。
+        窄态下帮助恒两行、六个按钮各按文字实宽定宽，整行宽度即各控件实宽之和
+        （窄态项间距 0、组左右 0，故不另加）；对话框最小宽还需容下组边框
+        2px + 主布局左右 12+12，合计外层 26，由布局自身决定，取实测值加此外层，
+        不再叠加额外固定量，避免把最小宽推得远大于真实需求。
         宽态仍用 _BASE_MIN_W(1080)，最大化布局与最小尺寸语义均不变。
         """
         try:
@@ -1738,19 +1742,28 @@ class EmbyActorManagerDialog(QDialog):
             # 组边框 + 表格列宽下限（详情列等）由布局自身决定，取实测值加余量即可，
             # 不再叠加额外固定量，避免把最小宽推得远大于真实需求。
             row = fixed + help_w
-            return int(max(row, self._NARROW_MIN_W_FLOOR))
+            try:
+                main = self.layout()
+                outer = 2  # 连接组左右边框各 1px（QSS border:1px）。
+                if main is not None:
+                    mg = main.contentsMargins()
+                    outer += int(mg.left() + mg.right())
+            except (RuntimeError, AttributeError):
+                outer = 26
+            return int(max(row + outer, self._NARROW_MIN_W_FLOOR))
         except (RuntimeError, AttributeError):
             return self._BASE_MIN_W
 
     def _apply_button_row_compact(self) -> None:
         """按钮行紧凑排布：仅窄态（还原/常规/最小化）生效，宽态恢复原样。
 
-        窄态去掉按钮项之间的间距（spacing 4→0），连接组左内边距保持 16
-        （服务器地址先与组标题文本左对齐：标题 left:10+padding 4=14，标签 x=边距+1；
-        再按用户要求右移 3px，故 16→17），
-        右内边距 6→0（即设置按钮右侧多余空白）；上下边距与垂直
-        间距一律不动，故窄态高度不变。宽态（最大化/全屏）布局、控件、提示词
-        逐像素不变。重复调用幂等。
+        窄态按钮之间紧贴着没空白没间距：项间距 4→0，连接组左 16→0（删掉 1 号
+        左空白，按钮贴组边框）、右 6→0（删掉 10 号右空白），2-9 号项缝同步归零；
+        服务器地址标签垫左 13px，文本与组标题「Emby/Jellyfin 连接设置」严格上下
+        左对齐（标题 left:10+padding 4=14，标签 x=边距 0+边框 1+垫左 13=14），
+        按钮自身仍贴边（x=1）。上下边距与垂直间距一律不动，故窄态高度不变。
+        宽态（最大化/全屏）布局、控件、提示词逐像素不变（左 16/右 6/间距 4、
+        服务器标签无垫左原样）。重复调用幂等。
         """
         try:
             wide = self._is_wide_state()
@@ -1769,6 +1782,10 @@ class EmbyActorManagerDialog(QDialog):
                 base = self.CONN_BASE_MARGINS
                 if (margins.left(), margins.top(), margins.right(), margins.bottom()) != base:
                     grid.setContentsMargins(*base)
+                # 宽态：服务器地址标签恢复无垫左（最大化逐像素不变）。
+                lbl_server = getattr(self, "_lbl_server", None)
+                if lbl_server is not None and lbl_server.styleSheet() != "":
+                    lbl_server.setStyleSheet("")
                 # 宽态：帮助标签恢复自适应（最大化逐像素不变），最低宽归零。
                 if help_label.maximumWidth() != self._HELP_MAX_W or help_label.minimumWidth() != 0:
                     help_label.setMaximumWidth(self._HELP_MAX_W)
@@ -1782,8 +1799,12 @@ class EmbyActorManagerDialog(QDialog):
                 if btn_layout.spacing() != 0:
                     btn_layout.setSpacing(0)
                 margins = grid.contentsMargins()
-                if margins.left() != 16 or margins.right() != 0:
-                    grid.setContentsMargins(16, margins.top(), 0, margins.bottom())
+                if margins.left() != 0 or margins.right() != 0:
+                    grid.setContentsMargins(0, margins.top(), 0, margins.bottom())
+                # 窄态：服务器地址文本与组标题严格左对齐（按钮仍贴组边框）。
+                lbl_server = getattr(self, "_lbl_server", None)
+                if lbl_server is not None and lbl_server.styleSheet() != "padding-left: 13px;":
+                    lbl_server.setStyleSheet("padding-left: 13px;")
                 # 窄态：帮助标签按自身文字宽度定宽，不再吸收富余宽度。
                 want_help = self._narrow_help_width()
                 if want_help > 0 and help_label.maximumWidth() != want_help:
