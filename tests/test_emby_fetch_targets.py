@@ -211,8 +211,11 @@ def test_missing_both_thread_fetches_both_fields():
     assert "missing_both" in flags.get("need_info", set()), "交集模式须取简介"
 
 
-def test_fetch_mode_dropdown_map_tooltip_in_sync():
-    """下拉项、mode_map、tooltip 三处一一对账: 新增/改名模式漏任何一处即红。"""
+def test_fetch_mode_dropdown_map_in_sync_without_tooltip():
+    """下拉项与 mode_map 一一对账; 且下拉项一律不挂 tooltip（悬停提示已按用户要求删除）。
+
+    新增/改名模式漏 mode_map 即红; 谁再把 tooltip 挂回这两个下拉框也一并红。
+    """
     import ast
     from pathlib import Path
 
@@ -222,7 +225,7 @@ def test_fetch_mode_dropdown_map_tooltip_in_sync():
     tree = ast.parse(src)
 
     items: list[str] = []
-    tooltip_indexes: set[int] = set()
+    tooltip_receivers: set[str] = set()
     mode_map_keys: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
@@ -233,16 +236,14 @@ def test_fetch_mode_dropdown_map_tooltip_in_sync():
                         isinstance(e, ast.Constant) and e.value == "缺失头像或缺失简介" for e in arg.elts
                     ):
                         items = [e.value for e in arg.elts if isinstance(e, ast.Constant)]
-            # 只统计获取模式下拉的 tooltip: setItemData 的 receiver 为 self.cmb_fetch_mode
+            # 记录仍挂着悬停提示的下拉框: setItemData / setToolTip 的 receiver
             if (
                 isinstance(f, ast.Attribute)
-                and f.attr == "setItemData"
-                and node.args
-                and isinstance(node.args[0], ast.Constant)
+                and f.attr in ("setItemData", "setToolTip")
                 and isinstance(f.value, ast.Attribute)
-                and f.value.attr == "cmb_fetch_mode"
+                and f.value.attr in ("cmb_fetch_mode", "cmb_data_tool")
             ):
-                tooltip_indexes.add(node.args[0].value)
+                tooltip_receivers.add(f"{f.value.attr}.{f.attr}")
         if (
             isinstance(node, ast.Assign)
             and isinstance(node.targets[0], ast.Name)
@@ -253,7 +254,7 @@ def test_fetch_mode_dropdown_map_tooltip_in_sync():
 
     assert "头像和简介都缺" in items
     assert items == mode_map_keys, "下拉项与 mode_map 必须一一对应且同序"
-    assert tooltip_indexes == set(range(len(items))), "每个下拉项都必须有 tooltip"
+    assert tooltip_receivers == set(), f"下拉框不应再有悬停提示: {sorted(tooltip_receivers)}"
 
 
 # ==================== 议题 #164: 重排/默认锚定/仅简介重新获取模式 ====================

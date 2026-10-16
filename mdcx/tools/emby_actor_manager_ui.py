@@ -1305,8 +1305,9 @@ class EmbyActorManagerDialog(QDialog):
         self.btn_fetch.setEnabled(True)
         btn_layout.addWidget(self.btn_fetch)
         self.cmb_fetch_mode = QComboBox()
-        # 议题 #164: 按「单缺字段 → 双缺 → 并集 → 重新获取组」范围递增排序;
-        # 去掉（并集）（交集）标注——名称已自明, 集合术语保留在 tooltip。
+        # 议题 #164: 按「单缺字段 → 双缺 → 并集 → 重新获取组」范围递增排序。
+        # 下拉项一律不挂 tooltip: 选项名已自明(缺失/重新获取的对象都写在名字里),
+        # 悬停再弹一段同义长句纯属多此一举。
         self.cmb_fetch_mode.addItems(
             [
                 "仅缺失简介",
@@ -1319,36 +1320,6 @@ class EmbyActorManagerDialog(QDialog):
                 "重新获取所有演员头像和简介",
             ]
         )
-        # 议题 #147: 明确「或=并集(缺任一即取)/且=交集(两者都缺)」, 并说明占位简介按缺失处理,
-        # 与统计栏分项统一口径。议题 #155: 补「交集」独立入口, 与统计栏「全缺」分项对应。
-        self.cmb_fetch_mode.setItemData(
-            0, "仅缺简介的演员（简介仅剩「无维基百科信息」占位也按缺处理）", Qt.ItemDataRole.ToolTipRole
-        )
-        self.cmb_fetch_mode.setItemData(1, "仅缺头像的演员（含缺简介者，只要缺头像）", Qt.ItemDataRole.ToolTipRole)
-        self.cmb_fetch_mode.setItemData(
-            2,
-            "缺头像 且 缺简介 = 交集（两者都缺才选取，对应统计栏「全缺」；占位简介按缺处理）",
-            Qt.ItemDataRole.ToolTipRole,
-        )
-        self.cmb_fetch_mode.setItemData(
-            3, "缺头像 或 缺简介 = 并集（缺任其一即选取；全缺也在内）", Qt.ItemDataRole.ToolTipRole
-        )
-        # 议题 #149: 全量刷新简介/出生日期/出生地/标签等信息; 影片数来自服务器、
-        # 头像交由第三方工具, 均不在本模式范围内。
-        self.cmb_fetch_mode.setItemData(
-            4,
-            "不筛缺失，为全部演员 重新获取 简介/出生日期/出生地/标签（不动头像与影片数）",
-            Qt.ItemDataRole.ToolTipRole,
-        )
-        # 议题 #164: 仅简介的重新获取——同步出口按真值逐字段写入, 只回写简介,
-        # 不覆盖手动修正过的出生日期/出生地/标签。
-        self.cmb_fetch_mode.setItemData(
-            5,
-            "不筛缺失，为全部演员 重新获取 简介（只回写简介，出生日期/出生地/标签/头像/影片数均不动）",
-            Qt.ItemDataRole.ToolTipRole,
-        )
-        self.cmb_fetch_mode.setItemData(6, "不筛缺失，为全部演员 重新获取 头像", Qt.ItemDataRole.ToolTipRole)
-        self.cmb_fetch_mode.setItemData(7, "不筛缺失，为全部演员 重新获取 头像+简介", Qt.ItemDataRole.ToolTipRole)
         # 议题 #164: 重排后默认项显式锚定并集(index 3)——保持"打开即最通用模式"的既有行为
         self.cmb_fetch_mode.setCurrentIndex(3)
         # 最小宽 1080 预算：下拉 220→210（-10，仍 > sizeHint 199，最长项不裁字）
@@ -1358,13 +1329,6 @@ class EmbyActorManagerDialog(QDialog):
         # 数据导出/数据导入，按此顺序排列；默认选中数据获取。
         self.cmb_data_tool = QComboBox()
         self.cmb_data_tool.addItems(["数据获取", "数据清洗", "数据导出", "数据导入"])
-        self.cmb_data_tool.setItemData(
-            0, "按获取模式取数：缺失补全或全量重新获取（取数中再次选择可停止）", Qt.ItemDataRole.ToolTipRole
-        )
-        self.cmb_data_tool.setItemData(1, "原地清洗服务器存量演员数据（不经取数流程）", Qt.ItemDataRole.ToolTipRole)
-        self.cmb_data_tool.setItemData(2, "把已获取的演员数据导出为 xlsx 表格", Qt.ItemDataRole.ToolTipRole)
-        self.cmb_data_tool.setItemData(3, "从 xlsx 表格导入演员数据", Qt.ItemDataRole.ToolTipRole)
-        self.cmb_data_tool.setToolTip("数据工具：按需选择数据获取/数据清洗/数据导出/数据导入")
         # 最小宽 1080 预算（窄态默认）：下拉按自身 sizeHint 定宽（恰容下文字+箭头，
         # 不裁字）；腾出的空间由「数据源测试」「清空缓存目录」收窄补回，宽态恢复自适应。
         btn_layout.addWidget(self.cmb_data_tool)
