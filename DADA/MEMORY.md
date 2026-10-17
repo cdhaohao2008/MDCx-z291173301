@@ -22,6 +22,12 @@
   - **长时间任务标准做法**：① background_terminal 后台终端；② checkpoint 断点续传（state 落盘，后台终端 1 小时上限连 wrapper 一起回收，checkpoint 是唯一恢复手段）；③ 分批处理批间落盘；④ wrapper 45-50 分钟自重启；⑤ 进度看落盘文件不看终端日志（stdout 全缓冲可能 0 字节假象）。
   - **功能移除类需求先调研证据再答**：查活跃度、底层共享依赖、移除成本；用户转述与代码证据矛盾时以代码为准。
 
+- **Qt 窗口生命周期四个必须记住的坑（2026-10-17 实测，源自上面那条 access violation 的根因修复）**：①**测试里写了 `w.deleteLater()` ≠ 销毁了**——`QCoreApplication.processEvents()` 按 Qt 语义**不投递 DeferredDelete 事件**，必须显式 `sendPostedEvents(None, QEvent.Type.DeferredDelete)`；所以全仓 92 处 `deleteLater()` 实际都没生效，会跨文件泄漏几百个顶层窗口。②**从未 `show()` 过的窗口调 `close()` 不发 `hideEvent`**——它本来就是 `WA_WState_Hidden` 态、`setVisible(false)` 直接早退；靠 `hideEvent` 做清理的窗口在这类测试里会漏网，`closeEvent` 必须一并兜住。③**`MyMAinWindow.closeEvent` 是 `WindowOpsMixin` 提供的（`window_ops.py`），末尾总是 `a0.ignore()`（窗口根本不真关），逻辑是「`HIDE_CLOSE` 开 → `hide()`，否则 → `ready_to_exit()`」**；要在主窗口加 `closeEvent` 清理**绝不能新写同名方法**，那会遮蔽 mixin、把托盘隐藏与退出流程变成死代码，正确做法是加在 `WindowOpsMixin.closeEvent` 内部（新增 `hideEvent` 则安全，mixin 没这个方法）。④多继承类里查某事件处理器归属用 `"closeEvent" not in MyMAinWindow.__dict__` 或 `WindowOpsMixin.closeEvent is MyMAinWindow.closeEvent`，别用 `isinstance` 比 `method` 与普通函数（恒 False）。
+
+- **并行会话可能同时改这个仓库（2026-10-17 撞到）**：工作区冒出我没碰过的成组改动、且修改时间与我的完全相同（疑似对方做了 stash/pop）。因此：**提交一律 `git add -- <具体文件>`，绝不用 `git add -A`**；绝不用 `git checkout -- <file>` 去动不是自己改的文件；推送前先 `git status` 分清哪些是自己的。pre-push 门禁跑的是整个工作区（含别人未提交的半成品），可能因此跑红或触发那个间歇性崩溃。
+  - **`edit` 工具会静默忽略缩进差异**：改 Python 代码块时 oldString/newString 若与文件真实缩进不一致，它可能照样报「1 replacement」却写坏了。**改完立刻 `read` 复核真实缩进**，别指望工具容错。
+  - **回归测试必须在撤掉修复后验证它会红**（`git stash push -- <生产文件>` → 跑 → `git stash pop`），否则排除不了「假测试」。写 Qt 重入类测试还要注意：复用「会顺带装好被测对象」的 helper 会让一次重入事件被两个实例各处理一次，量出的深度混进另一层，测的就不是被测对象了。
+
 ## 议题定性与证据
 
 - Date: 2026-09-02（持续更新）
