@@ -923,11 +923,21 @@ def Init_Ui(self: "MyMAinWindow"):
 
 
 def _setup_combo_boxes(self: "MyMAinWindow") -> None:
+    """给所有下拉框统一装 QListView 视图（每下拉至多露 10 行、逐像素滚动）。
+
+    view 上**不再设 maximumHeight**（原先写死 322）：弹窗外框（`QComboBoxPrivateContainer`）
+    的高度由 `maxVisibleItems × 行高` 决定，与 view 的 maximumHeight 无关，两者一旦
+    对不齐，外框那套 QVBoxLayout 就会把撑不满的 view 垂直居中，于是弹窗上下各多出
+    一条空白带（站点下拉行高约 40px，322 只够 8 行、外框按 10 行留高，上下各空约 40px，
+    即用户截图里「指定网站」「当前网站」下拉上下那两条空白控件）。行高本身随字体/缩放
+    浮动，写死上限迟早又会错位，干脆不设：外框多高 view 就多高，正好贴满。
+    弹窗外框尺寸与改前完全一致（那 322 从来只裁 view、不参与外框高度计算），
+    变的只是同一块地方从「8 行 + 上下空白」变成「10 行」。
+    """
     for combo_box in self.findChildren(QComboBox):
         view = QListView(combo_box)
         view.setUniformItemSizes(True)
         view.setSpacing(0)
-        view.setMaximumHeight(322)
         combo_box.setMaxVisibleItems(10)
         combo_box.setView(view)
         combo_view = combo_box.view()
