@@ -451,16 +451,63 @@ signals_module.set_signal = lambda signal_instance: None
 sys.modules.setdefault("mdcx.signals", signals_module)
 
 
+@pytest.fixture(autouse=True)
+def _flush_deferred_deletes():
+    """每个用例跑完后真正投递一次 DeferredDelete，让用例里的 deleteLater() 生效。
+
+    Qt 语义坑：`QCoreApplication.processEvents()` **不投递 DeferredDelete 事件**，
+    只有事件循环退到 deleteLater() 调用点所在层级才会自动投递。测试里没有事件循环，
+    于是全仓 92 处 `deleteLater()`（约 35 个测试文件）后面跟的那个 processEvents()
+    等于什么都没销毁——签名不报错、不告警，对象照旧活着。
+
+    后果是堆积：例如 tests/test_window_state_matrix.py 的 win fixture 是函数级、
+    每个用例新建一个 MyMAinWindow，单文件就泄漏 128 个，而每个窗口都带
+    QSystemTrayIcon、QThread、线程池与 asyncio 事件循环。线程堆到几百个后，
+    任意一个后续用例的 app.processEvents() 派发事件时就会踩到状态不一致的控件，
+    抛 `Windows fatal exception: access violation` 且**退出码非 0**（直接打红门禁），
+    崩溃位置还随缘漂移。
+
+    这里在每个用例结束时补投递一次。刻意只投递「已经排进队列的」DeferredDelete，
+    不遍历 topLevelWidgets() 去销毁没标记删除的对象——那会毁掉 module/session 级
+    夹具持有的窗口，回归面远大于收益。没写 deleteLater() 的测试行为完全不变。
+    """
+    yield
+    try:
+        from PyQt6.QtCore import QCoreApplication, QEvent
+        from PyQt6.QtWidgets import QApplication
+    except ImportError:
+        return
+    app = QApplication.instance()
+    if app is None:
+        return
+    try:
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        app.processEvents()
+    except RuntimeError:
+        # C++ 对象可能已被销毁；投递失败不应影响后续用例。
+        pass
+
+
 def _teardown_qt():
     """解释器退出前按正确顺序销毁 Qt 对象，避免 Windows 下 DLL 卸载时析构崩溃。
 
     实证：用例构造过 MyMAinWindow/QDialog 后（各含 QSystemTrayIcon、未关闭的顶层
     窗口），即使走 os._exit(0) 跳过解释器收尾，进程退出时 Qt DLL 卸载仍会因存活
     的 C++ 对象而 access violation。因此先在 Python 侧主动清理：隐藏托盘图标、
-    关闭顶层窗口、处理延后删除、退出 QApplication，最后 gc 回收。
+    关闭顶层窗口、投递 DeferredDelete 真正销毁、退出 QApplication，最后 gc 回收。
     任何一步遇到已销毁的 C++ 对象（RuntimeError）都跳过，保证清理本身不抛异常。
+
+    关键在于下面那段 sendPostedEvents：**processEvents() 按 Qt 语义不投递
+    DeferredDelete 事件**，所以只写 deleteLater() + processEvents() 等于什么都没
+    销毁，全量跑下来 300+ 个 Qt 对象全部存活到进程退出，Windows 上 DLL detach 期
+    析构它们就会 access violation（退出码随机、时红时绿地打红门禁）。
+    之前没补这一步，是因为一旦真销毁就会引爆
+    mdcx/controllers/main_window/init.py 的 _SiteComboTipFilter.eventFilter 无限
+    递归（self._combo.view() 内部重入自身 → 爆栈 0xC0000409）；该递归已由
+    重入守卫修掉，这里才敢把销毁真正做实。
     """
     try:
+        from PyQt6.QtCore import QCoreApplication, QEvent
         from PyQt6.QtWidgets import QApplication, QSystemTrayIcon
     except ImportError:
         return
@@ -468,7 +515,7 @@ def _teardown_qt():
         app = QApplication.instance()
         if app is None:
             return
-        for widget in app.topLevelWidgets():
+        for widget in list(app.topLevelWidgets()):
             try:
                 for tray in widget.findChildren(QSystemTrayIcon):
                     try:
@@ -483,6 +530,14 @@ def _teardown_qt():
             app.processEvents()
         except RuntimeError:
             pass
+        # 真正投递 DeferredDelete：没有这一步，上面所有 deleteLater() 全是空操作。
+        # 先投一次、处理它带来的事件、再补投一次（销毁过程中可能又排入新的）。
+        for _ in range(2):
+            try:
+                QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+                app.processEvents()
+            except RuntimeError:
+                break
         try:
             app.quit()
         except RuntimeError:
