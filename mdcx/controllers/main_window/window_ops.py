@@ -310,6 +310,11 @@ class WindowOpsMixin:
             self.show()
 
     def closeEvent(self, a0):
+        # 先停轮播定时器：关窗起就没人看日志/没人等版本检查了，100ms 的热表白跳。
+        # 也兜住「从未 show() 过的窗口」——那种窗口调 close() 走不到 hideEvent
+        # （本就是 WA_WState_Hidden 态，setVisible(false) 直接早退、不发 Hide 事件）。
+        # 重新显示时由 showEvent 起回来，故托盘隐藏/唤回不受影响。
+        self._stop_polling_timers()
         if Switch.HIDE_CLOSE in manager.config.switch_on:
             self.hide()
             # 主窗口收起时把预览/裁剪窗口连带关闭，不留孤儿窗口在屏幕/任务栏上

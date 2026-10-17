@@ -325,6 +325,8 @@ class MyMAinWindow(
         self.timer_remain_task = QTimer()  # 初始化一个定时器，用于显示保存剩余任务
         self.timer_remain_task.timeout.connect(save_remain_list)
         self.timer_remain_task.start(1500)  # 设置间隔1.5秒
+        # 记下 _stop_polling_timers 停掉了哪些定时器、间隔多少，供重新显示时原样起回来
+        self._polling_timers_was_active: list[tuple[str, int]] = []
         self.atuo_scrape_count = 0  # 循环刮削次数
         # endregion
 
@@ -682,7 +684,44 @@ class MyMAinWindow(
                     self._layout_scrape_cache_columns()
         return super().eventFilter(a0, a1)
 
+    def _stop_polling_timers(self) -> None:
+        """隐藏/关闭时停掉四个轮播定时器，并记下哪些本来在跑、间隔多少。
+
+        为什么必须停：`timer` 是 100ms 一跳的日志热表，回调 `show_detail_log()` 会
+        emit 信号去刷日志控件、`_flush_main_log_queue()` 会消费队列。窗口看不见时这些
+        刷新纯属白做（既费 CPU，又去摸看不见的控件），所以隐藏起就不再跳。
+
+        只停不删：重新显示时 `_start_polling_timers()` 会按记录的间隔原样起回来，
+        隐藏到托盘（hide_to_tray）与托盘唤回（tray_icon_show）这条正常流程不受影响。
+
+        用 `isActive()` 过滤而不是无条件全停，是为了让 `timer_scrape` 这类由业务流程
+        自己 start/stop 的定时器保持「当前该不该跑」的语义不变。
+        """
+        stopped: list[tuple[str, int]] = []
+        for name in ("timer", "timer_scrape", "timer_update", "timer_remain_task"):
+            timer = getattr(self, name, None)
+            if isinstance(timer, QTimer) and timer.isActive():
+                stopped.append((name, timer.interval()))
+                timer.stop()
+        self._polling_timers_was_active = stopped
+
+    def _start_polling_timers(self) -> None:
+        """重新显示时把 `_stop_polling_timers` 停掉的那些定时器原样起回来。
+
+        已经 active 的跳过：隐藏期间若有业务流程自行 start 了同名定时器，
+        以业务的决定为准，不覆盖回记录的间隔。
+        """
+        for name, interval in self._polling_timers_was_active:
+            timer = getattr(self, name, None)
+            if isinstance(timer, QTimer) and not timer.isActive():
+                timer.start(interval)
+
+    def hideEvent(self, a0):
+        self._stop_polling_timers()
+        super().hideEvent(a0)
+
     def showEvent(self, a0):
+        self._start_polling_timers()
         if not self._did_apply_initial_size:
             self._did_apply_initial_size = True
             self._apply_adaptive_default_size()  # 首次显示时按屏幕自适应默认窗口大小并居中
