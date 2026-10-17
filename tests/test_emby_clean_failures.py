@@ -39,7 +39,7 @@ def _fake_dialog(actors):
     logs: list[str] = []
     ns = SimpleNamespace(
         _actors=actors,
-        _clean_items={a.actor_id: ("清洗后", False) for a in actors},
+        _clean_items={a.actor_id: ("清洗后", ["清洗后标签"], False) for a in actors},
         _clean_failed=[],
         log=logs.append,
         progress_bar=SimpleNamespace(setVisible=lambda *_: None),
@@ -69,6 +69,8 @@ def test_clean_success_updates_state_not_failed_list():
     dialog_cls._on_clean_actor_done(ns, "id-成功者", True, "✅ 成功者 数据清洗成功")
     assert ns._clean_failed == []
     assert actors[0].existing_overview == "清洗后"
+    # 标签(Taglines)与简介同步就地更新, 否则刷新后表格「标签」列仍显旧值
+    assert actors[0].existing_taglines == ["清洗后标签"]
 
 
 def test_clean_finished_dialog_lists_failures_and_retry_hint(monkeypatch):

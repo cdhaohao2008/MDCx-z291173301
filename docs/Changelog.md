@@ -1,5 +1,15 @@
 
 # Changelog
+## v2.5.3 (2026-10-20)
+### 改进
+- **版本号**：`2.5.2` 升 `2.5.3`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx`；`LOCAL_VERSION` 保持 `20261020` 与前几个版本同批，时间标签不倒退）。仍是当前最新版本。
+- **数据清洗除了替换详情，也替换「标签」列（`mdcx/models/emby.py`、`mdcx/tools/emby_actor_clean_rules.py`、`mdcx/tools/emby_actor_manager.py`、`mdcx/tools/emby_actor_manager_ui.py`）**：按用户要求——替换规则原先只作用于简介，表格「标签」列里的词条从不参与清洗。`scan_actor_data_noise()` 的返回值由三元组改为四元组 `(actor, 新简介, 新标签, 是否重置生日)`，**标签有变化也进噪声名单**；`clean_actor_data()` 新增第四参 `new_taglines`（`None` 表示旧调用、不碰标签也不发 `Taglines` 字段），与简介同一「有变化才写」口径，故规则把标签全删空时会写 `Taglines: []` 把服务器上的标签清空。清洗成功后除更新 `existing_overview` 外同步更新 `existing_taglines` 并清掉行内编辑暂存标记，否则表格刷新后旧的 `new_taglines` 会盖回来、看着像没生效。清洗口径两条路径共用（简介与标签抽成同一个 `_apply_text_clean_rules`），标签额外两端去空白、清洗后为空的直接丢弃、非字符串元素跳过。**注意标签指 `Taglines`（短词条，用户可见可编辑），不是 Emby 元数据标签 `Tags`（UI 全程不展示，清洗不管它，仅原样回填作 #148 空引用兜底）**。
+- **数据清洗新增四条默认替换规则，把 wiki 源的英文身份文案译成中文（`mdcx/tools/emby_actor_clean_rules.py` 的 `DEFAULT_CLEAN_RULES` + `mdcx/config/models.py` 的 `actor_clean_rules` 默认值）**：按用户要求补四条内置规则——`Japanese AV actress → 日本AV女优`、`American pornographic actress → 美国色情女演员`、`American pornographic performer → 美国色情演员`、`Brazilian pornographic actress → 巴西色情女演员`。这四条与原有两条 minnano 占位文案**语义不同**：占位两条是删噪声（整段清空），英文四条是**译名**（保留信息、只把英文身份短语换成中文词条），因为维基百科源的简介/标签里会直接带 `Japanese AV actress` 这类英文短语，中文界面读着别扭。规则作用范围与上一条（数据清洗同时清洗标签）一致——**简介与「标签」列的 Taglines 都替换**，Emby 元数据标签 `Tags` 仍不管（UI 不展示，见 `DADA/MEMORY.md` 的 `Taglines` ≠ `Tags` 条目）。与占位两条共用 `_ensure_default_clean_rules()` 的兜底：老配置存盘只有占位两条时四条自动补齐追加到末尾，删掉也会补回；已有条目按「原始数值」判重，用户主动改过的替换值不会被默认值覆盖回去。`mdcx/tools/emby_actor_manager_ui.py` 同步文档与「恢复默认」按钮提示（`填入内置默认规则(占位文案清理 + 英文身份译名)`），并删掉一处 `scan_actor_data_noise` 后面游离的孤立 docstring。
+### 验证
+- 定点：`tests/test_emby_actor_data_clean.py`、`tests/test_version_consistency.py`、`tests/test_emby_actor_stats_163.py`、`tests/test_emby_clean_failures.py` 共 **54 项全过 / EXIT=0**；新增 `TestDefaultCleanRules` 6 个用例逐条锁定四条英文规则内容、模型默认值与常量一致、老配置补齐时**用户改过的替换值不被覆盖**、删光后补回、规则同时作用于简介与标签且 `actress`/`performer` 两条互不串味、命中默认规则的演员进噪声名单。
+- 全量：`pytest tests -m "not network and not integration"` **3110 通过 / 7 跳过 / 3 失败（EXIT=1）**——3 项失败（`tests/test_actor_manager_restore_geometry.py` ×2、`tests/test_cf_bypass_hosts_validation.py::test_wildcard_without_bare_domain_is_error`）经 `git stash` 剥离本次改动后单独复跑**结果完全相同**，即改动前就存在的既有失败，与本次无关，未顺手改。
+- `ruff format` 已对四个改动 `.py` 落地（含 `emby_actor_manager_ui.py` 里一处此前就存在的折行漂移，一并归正）；`ruff check` 四个文件零告警。`scripts/bump.py --check` 报「五处版本点一致」（`BUMP_EXIT=0`）。**注**：`scripts/bump.py` 本次未能直接用于升版本——`update_local_version()` 在 `LOCAL_VERSION` 未变（仍 `20261020`）时 `re.sub` 结果与原文相同，触发「版本号替换失败」而中止，跑不到 `VERSION_NAME` 那步，故三个版本点手工改后由 `--check` 与 `test_version_consistency.py` 双重复核。
+
 ## v2.5.2 (2026-10-20)
 ### 改进
 - **版本号**：`2.5.1` 升 `2.5.2`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx`；`LOCAL_VERSION` 保持 `20261020` 与前几个版本同批，时间标签不倒退）。仍是当前最新版本。

@@ -60,8 +60,17 @@ def apply_overview_clean_rules(value: object, rules: object = None) -> str:
     原始数值为空/非字符串的行视为无效直接跳过, 替换数值非字符串时按空串处理。
     无有效规则时等价于 clean_overview_text, 保证旧调用与测试口径不变。
     """
-    text = clean_overview_text(value)
-    if not rules:
+    return _apply_text_clean_rules(clean_overview_text(value), rules)
+
+
+def _apply_text_clean_rules(text: str, rules: object = None) -> str:
+    """按用户自定义替换规则对**已内置清洗**的文本逐条做字面量子串替换（公共实现）。
+
+    拆分自 apply_overview_clean_rules：简介与标签共用同一条规则链，只是各自
+    的「内置清洗」入口不同。非法规则行（无法解包 / 原始数值非空串 / 替换数值
+    非字符串按空串）的跳过口径集中在这里, 保证两条路径行为一致。
+    """
+    if not isinstance(text, str) or not text or not rules:
         return text
     try:
         items = list(rules)
@@ -79,6 +88,29 @@ def apply_overview_clean_rules(value: object, rules: object = None) -> str:
         if original in text:
             text = text.replace(original, replacement)
     return text
+
+
+def apply_tagline_clean_rules(taglines: object, rules: object = None) -> list[str]:
+    """按同一套替换规则清洗演员标签(Taglines), 语义与 apply_overview_clean_rules 一致。
+
+    标签与简介共用清洗口径: 先过 clean_overview_text(内置 minnano 占位清洗,
+    占位文案同样可能出现在标签里), 再叠加用户规则。清洗结果两端去空白——字面量
+    替换常把「噪声词」连同其一侧空格吃掉, 留下「 标签」这种前导空格标签, 而标签
+    是短词条, 首尾空白纯属噪声; 内部空白原样保留。清洗后为空/纯空白的标签直接
+    丢弃——「替换数值为空即删除该片段」对标签而言就是整条删除, 写回服务器空标签
+    会被当作脏数据。非字符串元素跳过; 入参非列表(字符串/None 等)一律返回空列表,
+    调用方拿到的一定是可直接写入 payload 的 list[str]。
+    """
+    if not isinstance(taglines, (list, tuple)):
+        return []
+    result: list[str] = []
+    for item in taglines:
+        if not isinstance(item, str):
+            continue
+        cleaned = _apply_text_clean_rules(clean_overview_text(item), rules).strip()
+        if cleaned:
+            result.append(cleaned)
+    return result
 
 
 def clean_overview_text(value: object) -> str:

@@ -743,6 +743,10 @@ class Config(BaseModel):
         default_factory=lambda: [
             ["无维基百科信息, 从 minnano-av 数据库补全女优信息", ""],
             ["无维基百科信息，从 minnano-av 数据库补全女优信息", ""],
+            ["Japanese AV actress", "日本AV女优"],
+            ["American pornographic actress", "美国色情女演员"],
+            ["American pornographic performer", "美国色情演员"],
+            ["Brazilian pornographic actress", "巴西色情女演员"],
         ],
         title="演员数据清洗替换规则(原始数值/替换数值)",
     )

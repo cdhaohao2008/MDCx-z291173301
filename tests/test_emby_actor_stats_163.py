@@ -314,7 +314,7 @@ def test_clean_done_does_not_turn_blank_into_present():
     ns = SimpleNamespace(
         _is_stale_session=lambda: False,
         _clean_failed=[],
-        _clean_items={"id-清洗君": ("   \n", False)},
+        _clean_items={"id-清洗君": ("   \n", [], False)},
         _actors=[actor],
         log=lambda *_a, **_k: None,
     )
@@ -331,7 +331,7 @@ def test_clean_done_marks_real_overview_present():
     ns = SimpleNamespace(
         _is_stale_session=lambda: False,
         _clean_failed=[],
-        _clean_items={"id-清洗君": ("新简介", False)},
+        _clean_items={"id-清洗君": ("新简介", [], False)},
         _actors=[actor],
         log=lambda *_a, **_k: None,
     )

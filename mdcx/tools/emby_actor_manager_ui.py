@@ -246,7 +246,8 @@ class _FlushLogTextEdit(QPlainTextEdit):
 
 
 DEFAULT_CLEAN_RULES = clean_rules.DEFAULT_CLEAN_RULES
-"""数据清洗默认替换规则: 两条 minnano 占位文案(半角/全角逗号)替换为空, 始终保留。"""
+"""数据清洗默认替换规则: 两条 minnano 占位文案(半角/全角逗号)替换为空,
+外加四条 wiki 源英文身份文案译为中文, 始终保留。"""
 
 
 def _ensure_default_clean_rules(
@@ -254,7 +255,9 @@ def _ensure_default_clean_rules(
 ) -> list[tuple[str, str]]:
     """补齐默认规则: 缺失的默认原始数值追加到末尾, 已有条目保持原顺序与替换值不变。
 
-    保证「两条 minnano 占位规则始终保留」——用户误删后下次加载/保存自动补回。
+    保证「默认规则始终保留」——用户误删后下次加载/保存自动补回。已有条目即便
+    用户改过替换值也原样保留, 只按「原始数值」判重, 故用户主动改写过的规则
+    不会被默认值覆盖回去。
     """
     return clean_rules._ensure_default_clean_rules(cleaned)
 
@@ -271,7 +274,8 @@ def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
 def load_clean_rules() -> list[tuple[str, str]]:
     """读出上次保存的清洗替换规则; 无配置/非法时返回默认规则, 缺失的默认条目自动补齐。
 
-    数据清洗窗口弹出时默认加载本函数返回值, 故首开即见两条 minnano 占位规则。
+    数据清洗窗口弹出时默认加载本函数返回值, 故首开即见全部默认规则(占位两条
+    + 英文身份四条)。老配置存盘只有占位两条时, 英文四条自动补齐追加到末尾。
     """
     return clean_rules.load_clean_rules(manager.config)
 
@@ -279,7 +283,7 @@ def load_clean_rules() -> list[tuple[str, str]]:
 def save_clean_rules(rules: object) -> list[tuple[str, str]]:
     """持久化用户确认的清洗替换规则, 返回归一化后的规则。失败时静默返回归一化结果。
 
-    保存时自动补齐缺失的默认规则, 保证两条 minnano 占位规则始终保留。
+    保存时自动补齐缺失的默认规则, 保证默认规则(占位两条 + 英文身份四条)始终保留。
     """
     return clean_rules.save_clean_rules(rules, manager)
 
@@ -439,17 +443,17 @@ class _InlineEditDelegate(QStyledItemDelegate):
         return super().destroyEditor(editor, index)
 
 
-def scan_actor_data_noise(actors: list[ActorInfo], rules: object | None = None) -> list[tuple[ActorInfo, str, bool]]:
-    """议题 #149: 扫描需要清洗的演员——简介含历史噪声(清洗后有变化)或生日非法(0000-00-00 等)。
+def scan_actor_data_noise(
+    actors: list[ActorInfo], rules: object | None = None
+) -> list[tuple[ActorInfo, str, list[str], bool]]:
+    """议题 #149: 扫描需要清洗的演员——简介/标签含历史噪声(清洗后有变化)或生日非法(0000-00-00 等)。
 
-    返回 (actor, 清洗后简介, 是否重置生日) 三元组; 生日为 Emby 未设置零值 0001-01-01
-    或可被 normalize_premiere_date 正常解析时不算噪声。rules 为用户自定义
-    (原始数值, 替换数值) 序列, 为空时仅走内置清洗(旧口径, 保证测试与兼容)。
+    返回 (actor, 清洗后简介, 清洗后标签, 是否重置生日) 四元组; 生日为 Emby 未设置
+    零值 0001-01-01 或可被 normalize_premiere_date 正常解析时不算噪声。rules 为用户
+    自定义 (原始数值, 替换数值) 序列, 对简介与标签同样生效(标签即表格「标签」列
+    展示的 Taglines); 为空时仅走内置清洗(旧口径, 保证测试与兼容)。
     """
     return clean_rules.scan_actor_data_noise(actors, rules)
-
-
-"""数据清洗默认替换规则: 两条 minnano 占位文案(半角/全角逗号)替换为空, 始终保留。"""
 
 
 class LibrarySelectDialog(QDialog):
@@ -1023,8 +1027,8 @@ class ActorCleanRulesDialog(QDialog):
         layout = QVBoxLayout(self)
 
         hint = QLabel(
-            "每行一条替换规则: 简介中出现「原始数值」时替换为「替换数值」"
-            "(替换为空即删除该片段)。内置占位/非法生日清洗始终生效, 此处规则叠加其上。"
+            "每行一条替换规则: 详情、标签中出现「原始数值」时替换为「替换数值」"
+            "，替换为空即删除该片段，内置占位/非法生日清洗始终生效, 此处规则叠加其上。"
         )
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -1052,7 +1056,7 @@ class ActorCleanRulesDialog(QDialog):
         del_btn = QPushButton("删除选中")
         del_btn.clicked.connect(self._on_delete_selected)
         default_btn = QPushButton("恢复默认")
-        default_btn.setToolTip("填入内置 minnano 占位文案示例规则")
+        default_btn.setToolTip("填入内置默认规则(占位文案清理 + 英文身份译名)")
         default_btn.clicked.connect(self._on_restore_default)
         row.addWidget(add_btn)
         row.addWidget(del_btn)
@@ -3257,11 +3261,7 @@ class EmbyActorManagerDialog(QDialog):
             QMessageBox.information(self, "数据导出", "当前没有可导出的演员数据。")
             return
         configured = resolve_export_dir(getattr(manager.config, "actor_export_folder", ""))
-        default_path = (
-            str(Path(str(configured)) / export_filename())
-            if configured
-            else export_filename()
-        )
+        default_path = str(Path(str(configured)) / export_filename()) if configured else export_filename()
         chosen, _selected_filter = QFileDialog.getSaveFileName(
             self, "选择数据导出目录", default_path, "Excel 工作簿 (*.xlsx)"
         )
@@ -3306,7 +3306,7 @@ class EmbyActorManagerDialog(QDialog):
 
         规则窗与管理器互相独立: 无父级、非模态, 可与管理器并存操作,
         最小化/关闭/移动互不级联。单例复用——已存在则提前台。
-        对话框打开时默认加载上次保存的规则(缺省时为两条 minnano 占位规则);
+        对话框打开时默认加载上次保存的规则(缺省时为内置默认: 占位两条 + 英文身份四条);
         点确定经 finished 回调保存用户编辑后的规则并回调用本函数执行,
         点取消/X 则直接返回。按当前规则无待清洗数据时仅提示, 不启动线程(规则已保存)。
         """
@@ -3375,7 +3375,7 @@ class EmbyActorManagerDialog(QDialog):
         self._set_buttons_enabled(False)
         self._set_status("数据清洗中...")
         self.log(f"🧹 开始数据清洗，共 {len(dirty)} 个演员...")
-        self._clean_items = {a.actor_id: (new_ov, fix_birth) for a, new_ov, fix_birth in dirty}
+        self._clean_items = {a.actor_id: (new_ov, new_tags, fix_birth) for a, new_ov, new_tags, fix_birth in dirty}
         self._clean_failed = []
         self._clean_thread = CleanDataThread(self)
         self._clean_thread.items = dirty
@@ -3438,8 +3438,13 @@ class EmbyActorManagerDialog(QDialog):
         item = self._clean_items.get(actor_id)
         if actor is None or item is None:
             return
-        new_ov, fix_birth = item
+        new_ov, new_tags, fix_birth = item
         actor.existing_overview = new_ov
+        # 标签(Taglines)与简介同一口径就地更新: 清洗已写服务器, 内存不跟着改的话
+        # _populate_table 刷新后表格「标签」列仍显示旧值, 看着像清洗没生效;
+        # 同时清掉行内编辑暂存标记, 避免旧 new_taglines 被 _effective_pending 当有效值盖回。
+        actor.existing_taglines = list(new_tags)
+        _clear_inline_edited(actor)
         # 与 is_missing_overview 同口径: 纯空白简介算「缺简介」, 否则清洗出一个空白简介
         # 反而会把「缺简介」计数改小, 出现「越清洗缺得越少」的假象。
         actor.has_overview = bool((new_ov or "").strip())

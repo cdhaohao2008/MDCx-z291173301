@@ -815,12 +815,21 @@ async def update_person_info(actor: ActorInfo) -> tuple[bool, str]:
     return False, f"❌ {actor.name} 信息更新失败: {err or '服务器返回空响应'}"
 
 
-async def clean_actor_data(actor: ActorInfo, new_overview: str, fix_birth: bool) -> tuple[bool, str]:
-    """议题 #149: 原地清洗服务器存量演员数据(简介噪声/非法生日), 不经取数流程。
+async def clean_actor_data(
+    actor: ActorInfo,
+    new_overview: str,
+    fix_birth: bool,
+    new_taglines: list[str] | None = None,
+) -> tuple[bool, str]:
+    """议题 #149: 原地清洗服务器存量演员数据(简介噪声/标签噪声/非法生日), 不经取数流程。
 
     与 update_person_info 的区别: 允许显式写入空简介(清除占位文案)、把非法生日
     (0000-00-00 等)重置为 Emby 原生零值 0001-01-01(服务器与列表均按未设置展示)。
     Genres/Tags/ProviderIds 恒回填服务器已有值, 避免 Emby 4.9 空引用 400(议题 #148)。
+
+    new_taglines 为 None(旧调用/不洗标签)时不碰标签, 绝不发送 Taglines 字段;
+    非 None 且与服务器现有值不同时才发送——与 Overview 同一「有变化才写」口径,
+    标签被规则清空时写空列表即「删掉全部标签」, 属用户显式规则的结果。
     """
     _, _, _, _, _, update_url = _generate_server_url(
         {"Name": actor.name, "Id": actor.actor_id, "ServerId": actor.server_id}
@@ -835,6 +844,8 @@ async def clean_actor_data(actor: ActorInfo, new_overview: str, fix_birth: bool)
     }
     if new_overview != (actor.existing_overview or ""):
         payload["Overview"] = new_overview
+    if new_taglines is not None and new_taglines != list(actor.existing_taglines or []):
+        payload["Taglines"] = list(new_taglines)
     if fix_birth:
         payload["PremiereDate"] = "0001-01-01T00:00:00.0000000Z"
     # 议题 #56: Emby 4.9 对 POST /Items/{id} 无 Content-Type 的 JSON body 判 400
@@ -846,7 +857,7 @@ async def clean_actor_data(actor: ActorInfo, new_overview: str, fix_birth: bool)
 
 
 async def clean_actor_data_batch_async(
-    items: list[tuple[ActorInfo, str, bool]],
+    items: list[tuple[ActorInfo, str, list[str], bool]],
     progress_callback: Callable | None = None,
     actor_callback: Callable | None = None,
 ) -> tuple[int, int]:
@@ -857,11 +868,11 @@ async def clean_actor_data_batch_async(
     sem = asyncio.Semaphore(SYNC_CONCURRENCY)
     completed = 0
 
-    async def _one(item: tuple[ActorInfo, str, bool]) -> bool:
+    async def _one(item: tuple[ActorInfo, str, list[str], bool]) -> bool:
         nonlocal completed
-        actor, new_overview, fix_birth = item
+        actor, new_overview, new_taglines, fix_birth = item
         async with sem:
-            ok, _msg = await clean_actor_data(actor, new_overview, fix_birth)
+            ok, _msg = await clean_actor_data(actor, new_overview, fix_birth, new_taglines)
         completed += 1
         if progress_callback:
             progress_callback(completed, total, f"正在清洗: {actor.name} ({completed}/{total})")
@@ -875,7 +886,7 @@ async def clean_actor_data_batch_async(
 
 
 def clean_actor_data_batch(
-    items: list[tuple[ActorInfo, str, bool]],
+    items: list[tuple[ActorInfo, str, list[str], bool]],
     progress_callback: Callable | None = None,
     actor_callback: Callable | None = None,
 ) -> tuple[int, int]:
