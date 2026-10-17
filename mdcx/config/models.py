@@ -166,7 +166,7 @@ SCRAPING_TYPE_SITE_FIELDS = {
     FixedScrapingType.DONGMAN: "website_dongman",
 }
 
-# 六组「类型刮削网站」默认名单（用户最终口径，组内先后即优先级递减，不得重排）。
+# 七组「类型刮削网站」默认名单（用户最终口径，组内先后即优先级递减，不得重排）。
 #
 # 这里一处定义、两个用途：
 #   1. Config.website_youma / wuma / suren / fc2 / oumei / guochan 的出厂默认值；

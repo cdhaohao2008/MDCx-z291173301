@@ -4,7 +4,7 @@
 
 1. 「收紧国产番号、动漫番号、MyWifes、锁定类型之间的上下间距使得更紧凑，将文字
    说明之间的间距由当前改成一行汉字的高度」；
-2. 「有码番号、无码番号、素人番号、FC2 番号、欧美番号、国产番号下方的绿色文字说明
+2. 「有码番号、无码番号、素人番号、个摄番号、欧美番号、国产番号下方的绿色文字说明
    向上移动一行，文字下方的控件、组件等同步向上移动一行」。
 
 改前实测（真实主窗口 1014 宽，主题字体下一行说明文字高 17px）：`.ui` 里
@@ -23,7 +23,7 @@
   `label_323` 去掉 84px 硬最小高，行高由同行的 `label_322` /
   `label_322`（最小高 30）兜底——余量因此全部留在 `layoutWidget_6` 底部，不会再摊到
   行里制造死白；
-* 国产说明 / 动漫里番 / MyWifes / 锁定类型 四个块之间各插一行固定 9px 的
+* 国产说明 / 动漫 / MyWifes / 锁定类型 四个块之间各插一行固定 9px 的
   QSpacerItem，块间总间隙 = 7 + 9 = 16px ≈ 一行汉字高度（改前 51px）；
 * `layoutWidget_6` 高 930→558、`groupBox_80` 高 970→628，分隔线 `y` 1289→976、
   后续组 `groupBox_35` y 1340→1027，content 高 2470→2157（底部留白仍 130）。
@@ -88,7 +88,7 @@ _ROW_TABLE = {
     10: {"label_217": 0, "lineEdit_website_guochan": 1},
     11: {"label_232": 1},
     12: {"verticalSpacer_guochan_gap": 0},
-    # 2.5.6 起动漫里番也有自己的输入行（与另外六类一样），排在国产番号下面、MyWifes 上面
+    # 2.5.6 起动漫也有自己的输入行（与另外六类一样），排在国产番号下面、MyWifes 上面
     13: {
         "label_dongman_sites": 0,
         "lineEdit_website_dongman": 1,
@@ -112,8 +112,8 @@ _DESC_UNDER_CONTROL = [
     ("lineEdit_website_guochan", "label_232"),
 ]
 # 需求 1 —— 块与块之间（说明文字 ↔ 下一块首个控件）＝ 一行汉字高度
-# 动漫里番 2.5.6 起也有自己的输入框（与另外六类一样），所以它那块的结构变成
-# 动漫里番 2.5.6 起也有自己的输入框（与另外六类一样），结构是「块标签 label_dongman_sites
+# 动漫 2.5.6 起也有自己的输入框（与另外六类一样），所以它那块的结构变成
+# 动漫 2.5.6 起也有自己的输入框（与另外六类一样），结构是「块标签 label_dongman_sites
 # + 输入框」；下面的块是 MyWifes（块标签 label_322 + 说明 label_323），再往下才是锁定类型。
 _DESC_TO_NEXT_BLOCK = [
     ("label_232", "label_dongman_sites"),
@@ -128,7 +128,7 @@ _DESC_TO_NEXT_CONTROL = [
     ("label_158", "lineEdit_website_guochan"),
     ("comboBox_fixed_scraping_type", "label_fixed_scraping_type_desc"),
 ]
-# 动漫里番 / MyWifes 两块是「块标签 + 说明」同行（列 0 / 列 1），顶边必须基本齐平
+# 动漫 / MyWifes 两块是「块标签 + 说明」同行（列 0 / 列 1），顶边必须基本齐平
 _LABEL_TO_OWN_DESC = [
     ("label_322", "label_323"),
 ]
@@ -269,7 +269,7 @@ def test_grid_row_table_in_ui():
             ), f"{name} 应在 gridLayout_36 第 {row} 行第 {column} 列，实为 {got_row}/{got_col}"
 
     # 行数不得悄悄增加（多一行就多一份 verticalSpacing，整组又会松回去）。
-    # 唯一一次合法的增加是 2.5.6 给动漫里番补上的输入行（row 16），下面整块顺延一行。
+    # 唯一一次合法的增加是 2.5.6 给动漫补上的输入行（row 16），下面整块顺延一行。
     rows = {int(m) for m in re.findall(r'<item row="(\d+)"', block)}
     assert rows == set(range(19)), f"gridLayout_36 的行号集合应为 0..19，实为 {sorted(rows)}"
 
@@ -370,22 +370,22 @@ def test_wrapped_desc_texts_regression():
     assert not mismatches, f"类型刮削网站三段说明文案与预期不符: {mismatches}"
 
 
-# 六条番号提示词文案（用户把「个摄番号：」改名为「FC2番号：」后又改为「个人番号：」一并锁死，
-# 防止日后无声改回谐音写法，或某一条被单独改成别的品牌名）。
+# 六条番号提示词文案（用户把「个摄番号：」改名为「FC2番号：」后又改为「个人番号：」，
+# 最后又改回「个摄番号：」一并锁死，防止日后无声改回谐音写法，或某一条被单独改成别的品牌名）。
 # 注意：2026-10-05 全站文案去空格统一后，FC2 后不再带空格，此处与 .ui 保持一致
 # （v2.2.5 改名历史里记的是带空格的旧写法，见 docs/Changelog.md）。
 _NUMBER_LABELS = {
     "label_153": "有码番号：",
     "label_151": "无码番号：",
     "label_152": "素人番号：",
-    "label_148": "个人番号：",
+    "label_148": "个摄番号：",
     "label_149": "欧美番号：",
     "label_217": "国产番号：",
 }
 
 
 def test_number_label_texts_regression():
-    """六条番号提示词文案锁：第四行必须是「个人番号：」（改回「个摄番号：」或「FC2番号：」即失败）。"""
+    """六条番号提示词文案锁：第四行必须是「个摄番号：」（改回「个人番号：」或「FC2番号：」即失败）。"""
     ui_src = _ui_src()
     mismatches = {}
     for name, expected in _NUMBER_LABELS.items():
@@ -448,7 +448,7 @@ def test_desc_to_next_control_gap_is_tight(win, app, width):
 
 @pytest.mark.parametrize("width", _WIDE_WIDTHS)
 def test_block_label_and_its_desc_share_a_row(win, app, width):
-    """动漫里番 / MyWifes：块标签与说明在同一行（顶边基本齐平，说明没被挤到下一行）。"""
+    """动漫 / MyWifes：块标签与说明在同一行（顶边基本齐平，说明没被挤到下一行）。"""
     _show_at_width(win, app, width)
 
     for label, desc in _LABEL_TO_OWN_DESC:
@@ -514,25 +514,25 @@ def test_wrapped_desc_text_is_not_clipped(win, app, width):
 
 
 # --------------------------------------------------------------------------- #
-# 宽态单行收敛（需求③：最大化时「动漫里番」上移一行，最小化逐像素不变）
+# 宽态单行收敛（需求③：最大化时「动漫」上移一行，最小化逐像素不变）
 # --------------------------------------------------------------------------- #
-# 用户需求③：「软件设置-刮削网站-类型刮削网站页最大化时将动漫里番向上移动一行，
-# 因为提示词已经在一行显示了，目前最大化时动漫里番离国产番号的间距太大了」，
+# 用户需求③：「软件设置-刮削网站-类型刮削网站页最大化时将动漫向上移动一行，
+# 因为提示词已经在一行显示了，目前最大化时动漫离国产番号的间距太大了」，
 # 且「最小化时的界面、布局、组件、控件、提示词等等均保持不变」。
 #
 # 根因：label_232（国产番号说明）开了 wordWrap 且 .ui 钉了 maximumSize 高 34
 # （=两行），而 QGridLayout 定行高走 sizeHint 受 maximumSize 夹取、**不走
 # heightForWidth**——所以任何静态 .ui 值都无法让这一行随窗口宽度收缩。最大化后该
-# 说明只需一行（实测 need=15px），行高却仍钉在 34px，行下方 19px 死白把「动漫里番」
+# 说明只需一行（实测 need=15px），行高却仍钉在 34px，行下方 19px 死白把「动漫」
 # 整块顶下去一行。
 #
 # 方案（main_window._sync_site_type_tip_single_line，在 _sync_page_layouts 里排在通用
 # 拉伸之后）：量 need = heightForWidth(width)，确认确实单行且页面已被拉宽时把
 # maximumSize 高收成 need；**同一笔高度必须以 gridLayout_36 的 bottomMargin 归还**
 # ——否则网格自然高度 522→503 而容器仍是 558，QGridLayout 会把少掉的 19px 摊到 18
-# 个 verticalSpacing 上（每档 +1px），结果「动漫里番」只上移 6px 而不是一行（实测）。
+# 个 verticalSpacing 上（每档 +1px），结果「动漫」只上移 6px 而不是一行（实测）。
 _GUOCHAN_TIP = "label_232"
-_DONGMAN_LABEL = "label_dongman_sites"  # 「动漫里番：」输入行，用户要求上移的那一行
+_DONGMAN_LABEL = "label_dongman_sites"  # 「动漫：」输入行，用户要求上移的那一行
 # 收敛只允许动这一行下方的东西；这三项必须在宽窄两态保持一致（间距不得变化）
 _STATE_INVARIANTS = ("lineEdit_website_youma", "label_154", "lineEdit_website_guochan")
 # 宽窄分档按「本测试环境（offscreen）实测 label_232 折几行 + 是否被拉宽」划分，
@@ -639,7 +639,7 @@ def test_wide_state_collapses_guochan_tip_row_to_one_line(win, app, monkeypatch,
 
 @pytest.mark.parametrize("width", _WIDE_SINGLE_LINE_WIDTHS + _NARROW_WIDTHS)
 def test_wide_state_moves_dongman_up_without_touching_gaps(win, app, monkeypatch, width):
-    """需求③ 正题：宽态「动漫里番」上移恰好一行，且行间距与「改动前」的基线逐项相同。"""
+    """需求③ 正题：宽态「动漫」上移恰好一行，且行间距与「改动前」的基线逐项相同。"""
     _show_at_width(win, app, width)
     names = (
         *_STATE_INVARIANTS,
@@ -672,7 +672,7 @@ def test_wide_state_moves_dongman_up_without_touching_gaps(win, app, monkeypatch
         return
 
     moved = base_rows[_DONGMAN_LABEL][0] - new_rows[_DONGMAN_LABEL][0]
-    assert moved == freed, f"{width} 宽下「动漫里番」上移 {moved}px，应恰好一行 {freed}px"
+    assert moved == freed, f"{width} 宽下「动漫」上移 {moved}px，应恰好一行 {freed}px"
     # 说明行本身收高，上方的行纹丝不动
     shrunk = base_rows[_GUOCHAN_TIP][2] - new_rows[_GUOCHAN_TIP][2]
     assert shrunk == freed, f"{width} 宽下国产说明行高只收了 {shrunk}px，应为 {freed}px"
@@ -681,7 +681,7 @@ def test_wide_state_moves_dongman_up_without_touching_gaps(win, app, monkeypatch
     # 间距不变：省下的高度若没归还就会被摊进 verticalSpacing
     assert new_gaps == base_gaps, f"{width} 宽下间距变化: {base_gaps} -> {new_gaps}"
     assert abs(new_gaps["desc→dongman"] - _GAP_BLOCK) <= _TOL_BLOCK, (
-        f"{width} 宽下 国产说明 → 动漫里番 间隙 {new_gaps['desc→dongman']}px，应约 {_GAP_BLOCK}px"
+        f"{width} 宽下 国产说明 → 动漫 间隙 {new_gaps['desc→dongman']}px，应约 {_GAP_BLOCK}px"
     )
 
 

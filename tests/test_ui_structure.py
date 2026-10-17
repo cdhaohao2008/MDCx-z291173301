@@ -1074,19 +1074,19 @@ def test_bypass_trusted_hosts_copy_states_it_is_not_a_bypass_exclusion():
 _ABOUT_SITE_SECTION = ("<h4>四、网站选择</h4>", "<h4>五、Cloudflare Bypass</h4>")
 _TYPE_LIST_LINE_RE = re.compile(r"<li><b>([^<]*)</b>([^<]*)</li>")
 
-# 六组类型 → Config 上的字段名（不含动漫组：使用说明只列影片类型分组）。
+# 七组类型 → Config 上的字段名（组名与 TYPE_TITLES / 设置页各行标签同源）。
 _TYPE_SITE_GROUPS = (
-    ("有码", "website_youma"),
-    ("无码", "website_wuma"),
-    ("素人", "website_suren"),
-    ("FC2", "website_fc2"),
-    ("国产", "website_guochan"),
-    ("欧美", "website_oumei"),
-    ("动漫", "website_dongman"),
+    ("有码番号", "website_youma"),
+    ("无码番号", "website_wuma"),
+    ("素人番号", "website_suren"),
+    ("个摄番号", "website_fc2"),
+    ("国产番号", "website_guochan"),
+    ("欧美番号", "website_oumei"),
+    ("动漫里番", "website_dongman"),
 )
 
-# MyWife 不属任何类型组，默认名单里不该出现；它由「指定网站」或路径含 MyWife 单独指定。
-_MYWIFE_NOTE = "<li><b>MyWife</b>：不属于任何类型组的默认名单，需在「网站偏好」-「指定网站」勾选MyWife"
+# MyWifes 不属任何类型组，默认名单里不该出现；它由「指定网站」或路径含 MyWife 单独指定。
+_MYWIFE_NOTE = "<li><b>MyWifes</b>：不属于任何类型组的默认名单，需在「网站偏好」--「指定网站」勾选MyWife"
 
 
 def _about_site_section() -> str:
@@ -1103,7 +1103,7 @@ def _about_site_section() -> str:
 def _about_type_site_lists() -> dict[str, str]:
     """取「四、网站选择」里各类型组的名单，返回 {组名: 名单原文}。
 
-    名单分隔符统一是「、」；FC2 组的冒号写在 <b> 标签内（「<b>FC2 ：</b>」），
+    名单分隔符统一是「、」；个摄番号组的冒号写在 <b> 标签内（「<b>个摄番号：</b>」），
     其余组写在 </b> 之后，这里都按同一种结果归一：组名去掉尾随冒号与空格。
     """
     lists = {}
@@ -1115,7 +1115,7 @@ def _about_type_site_lists() -> dict[str, str]:
 
 
 def test_about_type_site_lists_match_config_defaults():
-    """使用说明的六组名单与 Config 默认值逐项一致（含顺序）。"""
+    """使用说明的七组名单与 Config 默认值逐项一致（含顺序）。"""
     from mdcx.config.models import Config
 
     config = Config()
@@ -1131,20 +1131,20 @@ def test_about_type_site_lists_match_config_defaults():
 
 
 def test_about_type_site_lists_only_registered_groups_no_comprehensive():
-    """使用说明只有登记在册的分组（六类 + 动漫里番），且不再有代码里不存在的「综合」组。"""
+    """使用说明只有登记在册的分组（七类），且不再有代码里不存在的「综合」组。"""
     about_lists = _about_type_site_lists()
     expected_labels = {label for label, _ in _TYPE_SITE_GROUPS}
-    extra = set(about_lists) - expected_labels - {"MyWife", "官网"}
+    extra = set(about_lists) - expected_labels - {"MyWifes", "官方网站"}
     assert not extra, f"使用说明出现未登记的分组：{sorted(extra)}"
     assert not about_lists.get("综合"), "「综合」组在代码里不存在，应从使用说明移除"
     assert _MYWIFE_NOTE in _about_site_section()
 
 
 def test_about_type_site_lists_official_only_in_coded_types():
-    """Official 只出现在有码/无码/素人三组，与 Official 的收录范围一致。"""
+    """Official 只出现在有码番号/无码番号/素人番号三组，与 Official 的收录范围一致。"""
     about_lists = _about_type_site_lists()
-    assert "Official" in about_lists["有码"]
-    assert "Official" in about_lists["无码"]
-    assert "Official" in about_lists["素人"]
-    for label in ("FC2", "国产", "欧美"):
+    assert "Official" in about_lists["有码番号"]
+    assert "Official" in about_lists["无码番号"]
+    assert "Official" in about_lists["素人番号"]
+    for label in ("个摄番号", "国产番号", "欧美番号"):
         assert "Official" not in about_lists[label], f"{label} 组不该含 Official"
