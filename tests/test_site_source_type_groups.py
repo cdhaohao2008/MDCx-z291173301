@@ -1,19 +1,23 @@
-"""「编辑网站」对话框：可用网站（网址源）按有码/无码/素人/FC2/欧美/国产分组展示。
+"""「编辑网站」对话框：可用网站（网址源）顶部横排分组标题，其下按组铺开全部站点。
 
-用户需求原文（三轮累积）：
+用户需求原文（四轮累积）：
     1.「在所有网站前加上有码、无码、素人、FC2、欧美、国产这几个选项」
        ——逐组给出的站点清单，组内顺序即优先级递减，不得改动排序；
     2.「点击有码、无码、素人、FC2、欧美、国产要将包含的网站加入到启用网站列表里，
         没有【其他】，别加戏OK？按钮高度和其他网站一致，删掉【】，宽度按照字体宽度设定」
     3.「有码、无码、素人、FC2、欧美、国产这样默认排在DMM左边」
+    4.「有码、无码、素人、FC2、欧美、国产、DMM、DMM_API按照这样排序」
 
-所以这里逐条锁住：
-    1. 六个分组标题按用户给的次序出现，且每组内是用户给的名单与顺序；
-    2. 标题行就是类型名本身（无装饰符号）、与站点 chip 同高，横向排在所属组第一个站点
-       的左边（即「有码 DMM DMM_API …」同一行顺排）；
-    3. 单击标题行 = 整组加入启用列表；标题只有这六个，不存在「其他」；
-    4. 标题行不带 UserRole，不会被当成站点混进启用列表或复制结果；
-    5. 启用列表的顺序仍旧完全由用户决定（分组只作用于候选区的展示）。
+第 3 条此前是「顺带」成立的：流式换行下标题 chip 恰好横排在所属组第一个站的左边，
+但另外五个标题仍散落在各自的段落里。第 4 条把它钉死成显式规则——六个标题整体排到
+候选区最上面一行、从左到右横排，第一个站点才是 DMM、第二个是 DMM_API。所以这里逐条锁住：
+    1. 六个分组标题按用户给的次序横排在最上面一行，且每组是用户给的名单与顺序；
+    2. 标题行不可选中、不可拖、不带 UserRole，不会被当成站点混进启用列表或复制结果；
+    3. 标题下方是全部可用站点：按组序去重铺放、每个站只出现一次，DMM、DMM_API 排在最前，
+       六组之外的 MyWife 接在末尾；
+    4. 单击某个标题 chip = 把这一组整组加入启用列表；标题只有这六个，不存在「其他」；
+    5. 站点行的单击仍旧只是选中（加入靠双击或「添加选中」），双击标题行无副作用；
+    6. 启用列表的顺序仍旧完全由用户决定（分组只作用于候选区的展示）。
 
 另外还锁了一条「候选区分组 == 配置默认名单」的不变量：两者同源于
 models.TYPE_DEFAULT_SITES，一旦各改各的，用户看到的分组就会和实际默认行为对不上，
@@ -24,7 +28,8 @@ import pytest
 
 pytest.importorskip("PyQt6.QtWidgets")
 
-from PyQt6.QtCore import Qt  # noqa: E402
+from PyQt6.QtCore import QPoint, Qt  # noqa: E402
+from PyQt6.QtTest import QTest  # noqa: E402
 from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 from mdcx.config.enums import FixedScrapingType, Website  # noqa: E402
@@ -33,9 +38,12 @@ from mdcx.controllers.main_window.site_priority_dialog import (  # noqa: E402
     PALETTE_GROUP_TYPES,
     SITE_GROUP_ROLE,
     SiteListEditorDialog,
-    _group_sites_at,
+    _is_group_item,
     _list_sites,
+    _palette_groups,
+    _site_tooltip_lines,
     grouped_palette_groups,
+    palette_site_order,
 )
 
 # 用注册表全量真实站点，才能覆盖到 Airav.cc / 7mmtv / MyWife 这类边界值
@@ -194,7 +202,7 @@ EXPECTED_GROUPS = {
     UNTITLED_GROUP: ["MyWife"],
 }
 
-# 非分组的原始顺序：按此断言「全部添加」未被分组展示污染
+# 非分组的原始顺序：按此断言「全部添加」未被候选区排序污染
 UNGROUPED_ORDER = [Website.DMM, Website.AVBASE, Website.XCITY, Website.GETCHU]
 
 # 六组各自的 Config 字段名，用于锁「候选区分组 == 配置默认名单」
@@ -217,41 +225,33 @@ def _groups_of(sites) -> dict[str, list[str]]:
     return groups
 
 
-def _groups_from_widget(dialog) -> dict[str, list[str]]:
-    """直接读对话框里已铺好的候选区，确保 UI 用的就是上面那套装序逻辑。
+def _chip_groups_of(dialog) -> dict[str, list[str]]:
+    """读候选区顶部标题行里的各组名单（单击整组加入与右键复制都靠它）。"""
+    return {title: [site.value for site in sites] for title, sites in _palette_groups(dialog.available_list)}
 
-    每组的成员先按标题行携带的名单定位，再逐行核对行序——组内行序与分组数据不一致
-    （比如点击加入时会按错误的次序追加）要当场暴露，不能等到断言整张表时才发现。
-    """
+
+def _site_row_values(dialog) -> list[str]:
+    """候选区里站点行的行序（标题行不带 UserRole，天然被排除在外）。"""
     palette = dialog.available_list
-    groups: dict[str, list[str]] = {}
-    covered: set[int] = set()
-    for row in range(palette.count()):
-        if palette.item(row).data(SITE_GROUP_ROLE) is None:
-            continue
-        title = palette.item(row).data(SITE_GROUP_ROLE)
-        assert title not in groups, f"分组「{title}」重复出现"
-        members = [site.value for site in _group_sites_at(palette, row)]
-        member_rows = [
-            palette.item(row + offset).data(Qt.ItemDataRole.UserRole) for offset in range(1, len(members) + 1)
-        ]
-        assert member_rows == members, f"{title} 组内的行序与该组名单不一致"
-        groups[title] = members
-        covered.update(range(row, row + len(members) + 1))
-    leftover = [
-        palette.item(row).data(Qt.ItemDataRole.UserRole) for row in range(palette.count()) if row not in covered
-    ]
-    if leftover:
-        groups[UNTITLED_GROUP] = leftover
-    return groups
-
-
-def _title_rows(dialog) -> list[int]:
     return [
-        row
-        for row in range(dialog.available_list.count())
-        if dialog.available_list.item(row).data(SITE_GROUP_ROLE) is not None
+        palette.item(row).data(Qt.ItemDataRole.UserRole)
+        for row in range(palette.count())
+        if palette.item(row).data(Qt.ItemDataRole.UserRole) is not None
     ]
+
+
+def _header_row(dialog) -> int:
+    """顶部那一行标题的行号：候选区只允许有一个标题行。"""
+    rows = [row for row in range(dialog.available_list.count()) if _is_group_item(dialog.available_list.item(row))]
+    assert len(rows) == 1, f"候选区应当只有一个标题行，实际 {len(rows)} 个"
+    return rows[0]
+
+
+def _chip_index(dialog, title: str) -> int:
+    """标题 chip 在顶部那一行里是第几个（从 0 起）。"""
+    titles = list(dialog.available_list.item(_header_row(dialog)).data(SITE_GROUP_ROLE))
+    assert title in titles, f"候选区没有「{title}」这个标题，只有 {titles}"
+    return titles.index(title)
 
 
 def _row_of(dialog, site_value: str) -> int:
@@ -262,8 +262,24 @@ def _row_of(dialog, site_value: str) -> int:
     )
 
 
-def _title_row_of(dialog, title: str) -> int:
-    return next(row for row in _title_rows(dialog) if dialog.available_list.item(row).data(SITE_GROUP_ROLE) == title)
+def _click_chip(dialog, title: str) -> None:
+    """真的点一下某个标题 chip（走鼠标事件那条链路，而不是直接调内部方法）。"""
+    point = dialog.available_list.chip_point(_chip_index(dialog, title))
+    assert point is not None, f"标题「{title}」拿不到 chip 位置"
+    QTest.mouseClick(dialog.available_list.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+
+
+def _visible_site_center(dialog, value: str) -> QPoint:
+    """某个站点行在视口里的中心点——先滚到可见处。
+
+    候选区只露得下前几行，直接拿 visualItemRect 的中心会点到视口外面去，
+    于是「点站点不加」这类断言会因为根本没点着而假绿。
+    """
+    palette = dialog.available_list
+    row = _row_of(dialog, value)
+    palette.scrollToItem(palette.item(row))
+    QApplication.processEvents()
+    return palette.visualItemRect(palette.item(row)).center()
 
 
 @pytest.fixture(scope="module")
@@ -331,10 +347,11 @@ def test_grouped_palette_keeps_every_available_site():
 
 def test_empty_candidate_list_produces_no_groups():
     assert grouped_palette_groups([]) == []
+    assert palette_site_order([]) == []
 
 
 def test_group_without_available_sites_leaves_no_empty_title():
-    """某一组在本机没有候选站点时不留空标题，否则会多出五个点开没内容的分组。"""
+    """某一组在本机没有候选站点时不留空标题，否则会多出五个点开没内容的标题 chip。"""
     assert _groups_of([Website.FALENO]) == {"有码": ["Faleno"]}
 
 
@@ -348,39 +365,75 @@ def test_sites_outside_every_group_are_appended_without_a_title():
 def test_does_not_mutate_input():
     source = list(UNGROUPED_ORDER)
     grouped_palette_groups(source)
+    palette_site_order(source)
     assert source == UNGROUPED_ORDER
+
+
+def test_palette_site_order_dedupes_by_first_group():
+    """标题移到顶部之后，组与组的界线没了，同一个站不能因此铺两三次。
+
+    取它第一次出现的组的位置：有码组最全，DMM、DMM_API、LibreDMM 都先落在有码，
+    无码/素人/FC2/欧美/国产再依次补上各自独有的站，六组之外的 MyWife 收尾。
+    """
+    order = palette_site_order(ALL_SITES)
+    assert order == list(dict.fromkeys(order)), "候选区里同一个站出现了多次"
+    assert set(order) == set(ALL_SITES), "有站点在铺放时丢了"
+    assert [site.value for site in order[:2]] == ["DMM", "DMM_API"], "前两个站必须是 DMM、DMM_API"
+    assert order[-1] == Website.MYWIFE, "六组之外的 MyWife 应接在最后"
+
+
+def test_palette_site_order_is_group_order_then_leftovers():
+    """铺放次序 = 六个组依次铺、组内即默认名单序，未分组的按传入次序收尾。"""
+    order = palette_site_order([Website.MYWIFE, Website.DMM, Website.AVSOX])
+    assert [site.value for site in order] == ["DMM", "AVSOX", "MyWife"]
 
 
 # --------------------------------------------------------------------------- 对话框运行期
 
 
 def test_palette_shows_the_requested_groups(dialog):
-    """候选区 = 六个分组（+ 末尾无标题的 MyWife），组内站点与顺序逐项等于需求清单。"""
-    assert _groups_from_widget(dialog) == EXPECTED_GROUPS
+    """候选区顶部六个标题 chip，各带需求里那一份名单（组内顺序逐项一致）。"""
+    assert _chip_groups_of(dialog) == {title: USER_SITE_LISTS[key] for key, title in USER_TITLES.items()}
 
 
-def test_group_title_rows_are_inert(dialog):
+def test_sites_lie_under_the_titles_once_each(dialog):
+    """标题之下铺全部站点：每个站只出现一次，行序即 palette_site_order。"""
+    assert _site_row_values(dialog) == [site.value for site in palette_site_order(ALL_SITES)]
+    assert _site_row_values(dialog)[:2] == ["DMM", "DMM_API"]
+    assert _site_row_values(dialog)[-1] == "MyWife"
+    assert len(_list_sites(dialog.available_list)) == len(ALL_SITES)
+
+
+def test_header_row_sits_above_every_site(dialog):
+    """第 4 条需求的正面：标题行在最上面一行，站点从第二行开始。
+
+    这是本轮改动的核心——此前标题是「顺带」落在 DMM 左边，另外五个标题散在各段里，
+    现在必须是候选区唯一一行标题，且排在所有站点之前。
+    """
+    palette = dialog.available_list
+    header_row = _header_row(dialog)
+    assert header_row == 0, "标题行不是候选区第一行"
+    header_rect = palette.visualItemRect(palette.item(header_row))
+    for value in ("DMM", "DMM_API", "MyWife"):
+        assert header_rect.top() < palette.visualItemRect(palette.item(_row_of(dialog, value))).top()
+
+
+def test_group_title_row_is_inert(dialog):
     """标题行不可选中、不可拖拽、不带 UserRole——不会被当成站点加进启用列表。"""
-    rows = _title_rows(dialog)
-    assert len(rows) == len(EXPECTED_GROUP_ORDER)
-    for row in rows:
-        item = dialog.available_list.item(row)
-        assert not item.flags() & Qt.ItemFlag.ItemIsSelectable
-        assert not item.flags() & Qt.ItemFlag.ItemIsDragEnabled
-        assert item.data(Qt.ItemDataRole.UserRole) is None
-
-    site_rows = sum(1 for row in range(dialog.available_list.count()) if row not in rows)
-    # 站点行总数 = 六组之和 + MyWife；标题行不计入，去重后的站点数则少于行数
-    assert site_rows == sum(len(v) for v in USER_SITE_LISTS.values()) + 1
-    assert len(_list_sites(dialog.available_list)) == len(ALL_SITES) < site_rows
+    row = _header_row(dialog)
+    item = dialog.available_list.item(row)
+    assert not item.flags() & Qt.ItemFlag.ItemIsSelectable
+    assert not item.flags() & Qt.ItemFlag.ItemIsDragEnabled
+    assert item.data(Qt.ItemDataRole.UserRole) is None
+    # 文案是空的（文字由 delegate 自绘），标题存在额外的 ItemDataRole 里
+    assert item.text() == ""
 
 
 def test_group_title_text_is_the_plain_type_name(dialog):
     """标题文案就是类型名本身：删掉【】，也不要别的装饰。"""
-    for row in _title_rows(dialog):
-        item = dialog.available_list.item(row)
-        assert item.text() == item.data(SITE_GROUP_ROLE)
-        assert "【" not in item.text() and "】" not in item.text()
+    titles = [str(title) for title in dialog.available_list.item(_header_row(dialog)).data(SITE_GROUP_ROLE)]
+    assert titles == EXPECTED_GROUP_ORDER
+    assert all("【" not in title and "】" not in title for title in titles)
 
 
 def _laid_out(dlg, qt_app):
@@ -391,77 +444,82 @@ def _laid_out(dlg, qt_app):
     return dlg.available_list
 
 
-def test_first_group_title_sits_left_of_dmm(qt_app):
-    """需求里点名的那个例子：「有码」就横排在 DMM 左边、同一行。
-
-    首组一定从行首开始，所以这一条在任何窗口宽度下都成立。
-    """
+def test_group_titles_are_laid_out_like_site_chips(qt_app):
+    """标题 chip 与网站 chip 同高、宽度随文字走，几个 chip 横排一行互不重叠。"""
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         palette = _laid_out(dlg, qt_app)
-        title_rect = palette.visualItemRect(palette.item(_title_row_of(dlg, "有码")))
-        dmm_rect = palette.visualItemRect(palette.item(_row_of(dlg, "DMM")))
-        assert title_rect.top() == dmm_rect.top(), "「有码」与 DMM 不在同一行"
-        assert title_rect.right() <= dmm_rect.left(), "「有码」不在 DMM 左边"
+        header_rect = palette.visualItemRect(palette.item(_header_row(dlg)))
+        site_rect = palette.visualItemRect(palette.item(_row_of(dlg, "DMM")))
+        assert header_rect.height() == site_rect.height(), "标题行与站点不同高"
+        rects = [palette.chip_point(index) for index in range(len(EXPECTED_GROUP_ORDER))]
+        assert all(point is not None for point in rects), "有 chip 拿不到位置"
+        xs = [point.x() for point in rects]
+        assert xs == sorted(xs) and len(set(xs)) == len(xs), f"chip 没有从左到右排开：{xs}"
+        for index, point in enumerate(rects):
+            assert header_rect.left() <= point.x() <= header_rect.right(), f"chip {index} 越出了标题行"
+            assert header_rect.top() <= point.y() <= header_rect.bottom(), f"chip {index} 越出了标题行"
+        # 宽度按字体来：不会拉成整行宽
+        assert header_rect.width() == palette.viewport().width()
     finally:
         dlg.deleteLater()
 
 
-def test_group_titles_are_laid_out_like_site_chips(qt_app):
-    """标题 chip 与网站 chip 同高、宽度随文字走，且排在组内第一个站点之前。
-
-    标题可能正好落在某一行末尾、它的站点换到下一行（流式换行的正常结果），
-    所以这里只要求「排在前面」；同排时进一步要求在左侧。
-    """
+def test_chip_hit_test_picks_only_its_own_chip(qt_app):
+    """命中判定与绘制用同一份矩形：点 chip 中心得到它自己，点站点/别处没有 chip。"""
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         palette = _laid_out(dlg, qt_app)
-        viewport_width = palette.viewport().width()
-        for title in EXPECTED_GROUP_ORDER:
-            title_row = _title_row_of(dlg, title)
-            title_rect = palette.visualItemRect(palette.item(title_row))
-            site_rect = palette.visualItemRect(palette.item(title_row + 1))
-            assert title_rect.height() == site_rect.height(), f"{title} 标题与站点不同高"
-            # 宽度按字体来：不会拉成整行宽
-            assert title_rect.width() < viewport_width // 2, f"{title} 标题被拉宽了"
-            if title_rect.top() == site_rect.top():
-                assert title_rect.right() <= site_rect.left(), f"{title} 标题不在首个站点左边"
-            else:
-                assert title_rect.top() < site_rect.top(), f"{title} 标题排到了组内站点之后"
+        for index in range(len(EXPECTED_GROUP_ORDER)):
+            assert palette.chip_index_at(palette.chip_point(index)) == index
+        # 第一个站点行的中心不该命中任何 chip
+        site_point = palette.visualItemRect(palette.item(_row_of(dlg, "DMM"))).center()
+        assert palette.chip_index_at(site_point) is None
+        # 标题行下方一行（第一个站点行）也不该命中任何 chip
+        assert palette.chip_index_at(QPoint(palette.chip_point(0).x(), palette.chip_point(0).y() + 40)) is None
     finally:
         dlg.deleteLater()
 
 
 def test_group_sites_read_back_from_the_widget(dialog):
-    """_group_sites_at 读出的组内名单与需求逐项一致（单击整组加入与右键复制都靠它）。"""
+    """标题行回读出的组内名单与需求逐项一致（单击整组加入与右键复制都靠它）。"""
     for title in EXPECTED_GROUP_ORDER:
-        sites = _group_sites_at(dialog.available_list, _title_row_of(dialog, title))
-        assert [site.value for site in sites] == USER_SITE_LISTS[USER_TITLES_INV[title]]
+        assert _chip_groups_of(dialog)[title] == USER_SITE_LISTS[USER_TITLES_INV[title]]
+
+
+def test_site_tooltip_says_which_types_it_serves():
+    """候选区里每个站只出现一次，「它同时属于哪些类型」得靠悬停提示补上。"""
+    dmm_lines = " ".join(_site_tooltip_lines(Website.DMM))
+    assert "适用类型：有码、素人" in dmm_lines
+    # 不属于六组的站点不该编出一个类型来
+    assert "适用类型" not in " ".join(_site_tooltip_lines(Website.MYWIFE))
 
 
 @pytest.mark.parametrize("title", EXPECTED_GROUP_ORDER)
 def test_clicking_group_title_adds_that_whole_group(qt_app, title):
-    """单击分组标题 = 把该组全部网站按组内优先级次序加入启用列表。"""
+    """单击分组标题 chip = 把该组全部网站按组内优先级次序加入启用列表。"""
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
-        dlg._on_available_clicked(dlg.available_list.item(_title_row_of(dlg, title)))
+        _laid_out(dlg, qt_app)
+        _click_chip(dlg, title)
         assert [site.value for site in dlg.selected_sites()] == USER_SITE_LISTS[USER_TITLES_INV[title]]
     finally:
         dlg.deleteLater()
 
 
 def test_clicking_the_last_group_does_not_swallow_untitled_sites(qt_app):
-    """六组之外零星站点（MyWife）没有标题行、就接在最后一组后面，点「国产」不该顺带加上它。
+    """六组之外零星站点（MyWife）没有标题、就接在末尾，点「国产」不该顺带加上它。
 
-    这正是「没有其他分组」带来的坑：成员必须取自标题行自带的名单，不能按行范围读到
-    下一个标题为止，否则最后一段零散站点会被算进上一组。
+    这正是「没有其他分组」带来的坑：成员必须取自标题 chip 自带的名单，不能按行范围读，
+    否则末尾这批零散站点会被算进上一组。
     """
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
-        dlg._on_available_clicked(dlg.available_list.item(_title_row_of(dlg, "国产")))
+        _laid_out(dlg, qt_app)
+        _click_chip(dlg, "国产")
         assert [site.value for site in dlg.selected_sites()] == USER_SITE_LISTS[FixedScrapingType.GUOCHAN]
         assert Website.MYWIFE not in dlg.selected_sites()
-        # 它仍然出现在候选区里，只是不再有自己的标题行
+        # 它仍然出现在候选区里，只是不再有自己的标题 chip
         assert Website.MYWIFE in _list_sites(dlg.available_list)
     finally:
         dlg.deleteLater()
@@ -471,7 +529,8 @@ def test_clicking_group_title_appends_and_keeps_existing_order(qt_app):
     """已启用的站点留在原位不动，新组接在后面。"""
     dlg = SiteListEditorDialog("t", [Website.GETCHU], ALL_SITES, None)
     try:
-        dlg._on_available_clicked(dlg.available_list.item(_title_row_of(dlg, "FC2")))
+        _laid_out(dlg, qt_app)
+        _click_chip(dlg, "FC2")
         values = [site.value for site in dlg.selected_sites()]
         assert values[0] == "Getchu"
         assert values[1:] == [v for v in USER_SITE_LISTS[FixedScrapingType.FC2] if v != "Getchu"]
@@ -483,31 +542,40 @@ def test_clicking_group_title_twice_does_not_duplicate(qt_app):
     """重复单击同一标题是幂等的，不会把同一批站点塞两遍。"""
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
-        row = _title_row_of(dlg, "国产")
-        dlg._on_available_clicked(dlg.available_list.item(row))
+        _laid_out(dlg, qt_app)
+        _click_chip(dlg, "国产")
         first = [site.value for site in dlg.selected_sites()]
-        dlg._on_available_clicked(dlg.available_list.item(_title_row_of(dlg, "国产")))
+        _click_chip(dlg, "国产")
         assert [site.value for site in dlg.selected_sites()] == first
     finally:
         dlg.deleteLater()
 
 
 def test_clicking_a_site_row_does_not_add_it(qt_app):
-    """只有标题是「一点就整组进」；站点行的单击仍旧只是选中。"""
+    """只有标题 chip 是「一点就整组进」；站点行的单击仍旧只是选中。"""
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
-        item = dlg.available_list.item(_row_of(dlg, "Dahlia"))
-        dlg._on_available_clicked(item)
-        assert dlg.selected_sites() == []
+        palette = _laid_out(dlg, qt_app)
+        point = _visible_site_center(dlg, "Dahlia")
+        QTest.mouseClick(palette.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+        # 先确认这一下真落在站点行上（否则「没加进去」是因为根本没点着）
+        assert [palette.row(item) for item in palette.selectedItems()] == [_row_of(dlg, "Dahlia")]
+        assert dlg.selected_sites() == [], "单击站点行就加进了启用列表"
     finally:
         dlg.deleteLater()
 
 
-def test_double_clicking_a_group_title_adds_nothing_extra(qt_app):
-    """双击标题不能把上次选中的残留站点顺带加进去；双击站点仍然正常加入。"""
+def test_double_clicking_the_header_row_adds_nothing_extra(qt_app):
+    """双击标题行不能把上次选中的残留站点顺带加进去；双击站点仍然正常加入。
+
+    这里直接走 `itemDoubleClicked` 的处理函数而不是合成双击事件：离屏环境下
+    QTest.mouseDClick 发出的双击不会被 QListWidget 认成 `mouseDoubleClickEvent`
+    （实测 itemDoubleClicked 一次都不触发），拿它做断言只会假绿。
+    """
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
-        dlg._on_available_double_clicked(dlg.available_list.item(_title_rows(dlg)[0]))
+        _laid_out(dlg, qt_app)
+        dlg._on_available_double_clicked(dlg.available_list.item(_header_row(dlg)))
         assert dlg.selected_sites() == []
 
         row = _row_of(dlg, "7mmtv")
@@ -528,14 +596,14 @@ def test_enabled_order_and_groups_survive_refresh(dialog):
     """_refresh_lists 会重画候选区，分组不能刷没、启用列表也不能被重排。"""
     dialog._refresh_lists()
     assert [site.value for site in dialog.selected_sites()] == ["DMM", "AVBase"]
-    assert _groups_from_widget(dialog) == EXPECTED_GROUPS
+    assert _chip_groups_of(dialog) == {title: USER_SITE_LISTS[key] for key, title in USER_TITLES.items()}
 
 
-def test_add_selected_appends_in_palette_order(qt_app):
-    """一次多选时，新站点按候选区里的行序追加，老站点的相对优先级不动。
+def test_add_selected_appends_in_selection_order(qt_app):
+    """一次多选时，新站点按选中次序追加，老站点的相对优先级不动。
 
-    行序 = 分组序，同一站点取它第一次出现的那一行：DMM、7mmtv、Getchu 里，
-    7mmtv 在有码组、Getchu 也在有码组且排最后，所以 Getchu 反而先加。
+    追加次序取 `selectedItems()` 的给出次序（即用户点选的先后），不是候选区的行序——
+    这一点原测试的注释写反了（说是「行序＝分组序」），断言值其实一直是选中次序。
     """
     dlg = SiteListEditorDialog("t", [Website.XCITY, Website.DMM], ALL_SITES, None)
     try:
@@ -550,13 +618,13 @@ def test_add_selected_appends_in_palette_order(qt_app):
 
 
 def test_add_all_uses_original_order_while_palette_stays_grouped(qt_app):
-    """「全部添加」写进启用列表的是传入原序，候选区展示仍是分组的。"""
+    """「全部添加」写进启用列表的是传入原序，候选区展示仍按分组铺。"""
     dlg = SiteListEditorDialog("t", [], UNGROUPED_ORDER, None)
     try:
         dlg._add_all()
         assert [site.value for site in dlg.selected_sites()] == ["DMM", "AVBase", "Xcity", "Getchu"]
-        # 候选区仍按各组自己的优先级序排：Getchu 在有码/素人组里排最后、无码组里排最前
-        assert _groups_from_widget(dlg) == {
+        # 候选区仍按各组自己的优先级序铺：四个站都属有码，故有码 chip 就是这四个的原序
+        assert _chip_groups_of(dlg) == {
             "有码": ["DMM", "AVBase", "Xcity", "Getchu"],
             "无码": ["Getchu"],
             "素人": ["DMM", "AVBase", "Xcity", "Getchu"],
@@ -564,6 +632,7 @@ def test_add_all_uses_original_order_while_palette_stays_grouped(qt_app):
             "欧美": ["Getchu"],
             "国产": ["Getchu"],
         }
+        assert _site_row_values(dlg) == ["DMM", "AVBase", "Xcity", "Getchu"]
     finally:
         dlg.deleteLater()
 
