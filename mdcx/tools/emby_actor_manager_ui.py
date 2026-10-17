@@ -1490,14 +1490,14 @@ class EmbyActorManagerDialog(QDialog):
         self.btn_sync.setObjectName("btnSync")
         self.btn_sync.setEnabled(False)
         btn_layout.addWidget(self.btn_sync)
-        self._help_single = "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获取数据→④绿色行==待更新→⑤同步，单击编辑、双击查看详情、右键复制"
+        self._help_single = "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获取数据→④绿色行=待更新→⑤同步，单击编辑、双击查看、右键复制"
         # 窄态（还原/常规/最小化）固定两行：在「③选择模式获取数据」处断行，
         # 两行等长，故窄态按钮行省下的就是「单行宽度 - 两行宽度」这一段，
         # 窗口最小宽度可据此下调（见 _narrow_min_width）。宽态仍用单行原文。
         # 断点按用户指定：第一行结尾「③选择模式获」，第二行以「取数据」开头。
         self._help_narrow = (
             "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获\n"
-            "取数据→④绿色行==待更新→⑤同步，单击编辑、双击查看详情、右键复制"
+            "取数据→④绿色行=待更新→⑤同步，单击编辑、双击查看、右键复制"
         )
         help_label = QLabel(self._help_single)
         self.help_label = help_label
@@ -1607,7 +1607,7 @@ class EmbyActorManagerDialog(QDialog):
         self.txt_search.setMaximumWidth(200)
         self.txt_search.textChanged.connect(self._on_filter_changed)
         stats_layout.addWidget(self.txt_search)
-        hint = QLabel("单击编辑 · 双击查看详情 · 右键复制")
+        hint = QLabel("单击编辑 · 双击查看 · 右键复制")
         # 同上：不钉死字号，跟随统一放大的字号
         hint.setStyleSheet("color: #888888;")
         stats_layout.addWidget(hint)

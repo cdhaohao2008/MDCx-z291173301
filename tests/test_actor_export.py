@@ -657,7 +657,7 @@ def test_narrow_help_two_lines_and_min_width(app):
         assert "\n" in dlg._help_narrow, "窄态文案应为两行"
         first, second = dlg._help_narrow.split("\n", 1)
         assert first.endswith("③选择模式获")
-        assert second.startswith("取数据→④绿色行==待更新")
+        assert second.startswith("取数据→④绿色行=待更新")
         assert dlg.help_label.text() == dlg._help_narrow
         narrow_w = dlg._narrow_min_width()
         assert dlg.minimumWidth() == narrow_w, "窄态最小宽应等于实测两行态最宽"
