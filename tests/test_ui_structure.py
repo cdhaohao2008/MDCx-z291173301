@@ -12,6 +12,7 @@ ruff format 整理）。历史上出现过 groupBox 坐标重叠、重复控件�
 这些测试纯离线（解析 XML / 调用本地 pyuic6），不依赖网络和完整应用启动。
 """
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -1058,3 +1059,91 @@ def test_bypass_trusted_hosts_copy_states_it_is_not_a_bypass_exclusion():
     text = _widget_string_prop(desc, "text") or ""
     assert "不控制哪些站点走" in text, f"说明行未点明「不控制哪些站点走Bypass」：{text!r}"
     assert "不含裸域名" in text, f"说明行未点明通配不含裸域名本身：{text!r}"
+
+
+# ---------- 使用说明「各类型网站源」名单 —— 与代码默认值逐项对齐的回归锁 ----------
+
+# 使用说明「四、网站选择」逐组列出的名单必须与 mdcx/config/models.py 里
+# Config.website_* 的默认值逐项一致（含组内顺序）。这里锁的是「文档 == 实际默认
+# 行为」这条不变量：说明里的名单是用户配置新装时真正拿到的默认名单，两边一旦
+# 漂移，用户照说明核对会得到完全对不上的结果，且没有任何报错提示。
+#
+# 名单行取自「四、网站选择」小节：<li><b>组名</b>：站点、站点…</li>。先按小节切片再
+# 解析——整个使用说明里别的章节也有同形的 <li><b>标题</b>：正文</li> 行，不切片会把
+# 「媒体路径」「命名规则」之类也当成类型组。
+_ABOUT_SITE_SECTION = ("<h4>四、网站选择</h4>", "<h4>五、Cloudflare Bypass</h4>")
+_TYPE_LIST_LINE_RE = re.compile(r"<li><b>([^<]*)</b>([^<]*)</li>")
+
+# 六组类型 → Config 上的字段名（不含动漫组：使用说明只列影片类型分组）。
+_TYPE_SITE_GROUPS = (
+    ("有码", "website_youma"),
+    ("无码", "website_wuma"),
+    ("素人", "website_suren"),
+    ("FC2", "website_fc2"),
+    ("国产", "website_guochan"),
+    ("欧美", "website_oumei"),
+)
+
+# MyWife 不属任何类型组，默认名单里不该出现；它由「指定网站」或路径含 MyWife 单独指定。
+_MYWIFE_NOTE = "<li><b>MyWife</b>：不属于任何类型组的默认名单，需在「网站偏好」-「指定网站」勾选 MyWife"
+
+
+def _about_site_section() -> str:
+    """使用说明「四、网站选择」小节的 HTML 原文。"""
+    about_html = _widget_string_prop(_find_widget_by_name(_parse_ui(), "textBrowser_about"), "html") or ""
+    start, end = _ABOUT_SITE_SECTION
+    head = about_html.find(start)
+    assert head >= 0, f"使用说明缺少小节标题 {start}"
+    tail = about_html.find(end, head)
+    assert tail > head, f"使用说明缺少小节结束标题 {end}"
+    return about_html[head:tail]
+
+
+def _about_type_site_lists() -> dict[str, str]:
+    """取「四、网站选择」里各类型组的名单，返回 {组名: 名单原文}。
+
+    名单分隔符统一是「、」；FC2 组的冒号写在 <b> 标签内（「<b>FC2 ：</b>」），
+    其余组写在 </b> 之后，这里都按同一种结果归一：组名去掉尾随冒号与空格。
+    """
+    lists = {}
+    for match in _TYPE_LIST_LINE_RE.finditer(_about_site_section()):
+        label, _, head_sites = match.group(1).partition("：")
+        sites = (head_sites + match.group(2)).strip().lstrip("：").strip()
+        lists[label.strip()] = sites
+    return lists
+
+
+def test_about_type_site_lists_match_config_defaults():
+    """使用说明的六组名单与 Config 默认值逐项一致（含顺序）。"""
+    from mdcx.config.models import Config
+
+    config = Config()
+    about_lists = _about_type_site_lists()
+
+    for label, field in _TYPE_SITE_GROUPS:
+        expected = "、".join(site.value for site in getattr(config, field))
+        assert about_lists.get(label) == expected, (
+            f"使用说明「{label}」名单与 Config.{field} 默认值不一致：\n"
+            f"  使用说明：{about_lists.get(label)}\n"
+            f"  代码默认值：{expected}"
+        )
+
+
+def test_about_type_site_lists_only_six_groups_no_comprehensive():
+    """使用说明只有这六组，且不再有代码里不存在的「综合」组。"""
+    about_lists = _about_type_site_lists()
+    expected_labels = {label for label, _ in _TYPE_SITE_GROUPS}
+    extra = set(about_lists) - expected_labels - {"MyWife", "官网厂牌"}
+    assert not extra, f"使用说明出现未登记的分组：{sorted(extra)}"
+    assert not about_lists.get("综合"), "「综合」组在代码里不存在，应从使用说明移除"
+    assert _MYWIFE_NOTE in _about_site_section()
+
+
+def test_about_type_site_lists_official_only_in_coded_types():
+    """Official 只出现在有码/无码/素人三组，与 Official 的收录范围一致。"""
+    about_lists = _about_type_site_lists()
+    assert "Official" in about_lists["有码"]
+    assert "Official" in about_lists["无码"]
+    assert "Official" in about_lists["素人"]
+    for label in ("FC2", "国产", "欧美"):
+        assert "Official" not in about_lists[label], f"{label} 组不该含 Official"
