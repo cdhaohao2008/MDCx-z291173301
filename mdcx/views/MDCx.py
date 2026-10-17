@@ -14563,7 +14563,7 @@ class Ui_MDCx(object):
                 "<li><b>国产</b>：Madouqu、Madou.club、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API</li>\n"
                 "<li><b>欧美</b>：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、MissAV、MissAV_API、IQQTV、JavFree</li>\n"
                 "<li><b>MyWife</b>：不属于任何类型组的默认名单，需在「网站偏好」-「指定网站」勾选MyWife或让文件路径含MyWife才会启用</li>\n"
-                "<li><b>官网</b>：Dahlia、Faleno、MGStage、Prestige、Official——已在所有网站源中单列，命中对应前缀时自动锁定该站</li>\n"
+                "<li><b>官网</b>：Dahlia、Faleno、MGStage、Prestige、Official已在网站源列表中单列，视频命中对应前缀时将自动路由锁定该站</li>\n"
                 "</ul>\n"
                 "<p><b>Official综合：有码+无码，按番号前缀自动路由到各番号官网，全部走代理：有码片商官网30家：Attackers、AV Opera、BeeFree、Bi-AV、Bibian、Dasdas、E-Body、Fitch、HHH-AV、Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、MKO Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、Prestige、Rookie、S1S1S1、Tamei kegoro、To-Satsu、V-AV、Wanz Factory<br/>\n"
                 "无码官网共5站：JSON API直连10Musume、1Pondo、Caribbeancom、HEYZO、Pacopacomama<br/>\n"
