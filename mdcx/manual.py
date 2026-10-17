@@ -506,6 +506,8 @@ class ManualConfig:
         "lulubar": Website.LULUBAR,
         "theporndb": Website.THEPORNDB,
         "prestige": Website.PRESTIGE,
+        "dahlia-av": Website.DAHLIA,
+        "faleno": Website.FALENO,
     }
     CHAR_LIST = [
         "[高清] (中文字幕)",

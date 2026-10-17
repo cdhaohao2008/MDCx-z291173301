@@ -39,7 +39,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 | Official | 各官网 | 综合：有码+无码 |
 | AVBase | av-base.net | 有码：有码+素人 |
 | FreeJavBT | freejavbt.com | 有码：仅能有码 |
-| MyWife | mywife.cc | MyWife：MyWife No.1234 |
+| MyWife | mywife.cc | 独立系列：人妻・熟女・3P（单独指定，不进任何类型组） |
 | Getchu | getchu.com | 综合：有码+游戏+视频 |
 | LibreDMM | libredmm.com | 有码：仅能有码 |
 | Xcity | xcity.jp | 综合：仅能有码 |
@@ -71,22 +71,24 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 
 | 类型 | 默认网站源 |
 |------|-----------|
-| **有码**（30） | DMM、DMM_API、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavFree、JavBus、JavDay、7mmtv、Airav.cc、FreeJavBT、Getchu、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、LibreDMM、JavLibrary、AVSEX、Dahlia、FALENO |
-| **无码**（17） | AVEntertainments、AVSOX、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、AVSEX |
-| **素人**（30） | DMM、DMM_API、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavFree、JavBus、JavDay、7mmtv、Airav.cc、FreeJavBT、Getchu、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、LibreDMM、JavLibrary、AVSEX、Dahlia、FALENO |
-| **FC2**（11） | AVSOX、FC2、FC2PPVDB、JavDB、JavDB_API、JavDB_APP、JavFree、JavBus、JavDay、7mmtv、IQQTV |
-| **国产**（11） | Madouqu、Madou.club、AVSEX、JavDB、JavDB_API、JavDB_APP、JavFree、JavBus、JavDay、7mmtv、IQQTV |
-| **欧美**（6） | ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus |
+| **有码**（30） | DMM、DMM_API、LibreDMM、AVEntertainments、Dahlia、FALENO、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、JavLibrary、AVSEX、Getchu |
+| **无码**（18） | AVEntertainments、AVSOX、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、AVSEX、Getchu |
+| **素人**（28） | DMM、DMM_API、LibreDMM、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、JavLibrary、AVSEX、Getchu |
+| **FC2**（15） | AVSOX、FC2、FC2PPVDB、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API、AVSEX、Getchu |
+| **国产**（14） | Madouqu、Madou.club、AVSEX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API、Getchu |
+| **欧美**（14） | ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、MissAV、MissAV_API、IQQTV、JavFree、AVSEX、Getchu |
 
 > 组内站点按「该类型专属站 → 有码+素人 → 综合站」排列，前面的站优先级更高。
-> **Official 只出现在有码、无码、素人三组**，国产、欧美、FC2 三组都不含 Official——Official 按番号前缀路由到片商官网，对国产/欧美/FC2 番号没有收录，加进去只会给每条影片白挂一次无效请求。Dahlia、FALENO 是从 Official 拆出的有码厂牌独立站，故随有码、素人两组走。
-> **MyWife 不在任何类型组里**，它单独指定：「网站偏好 → 指定网站」选了 MyWife、或文件路径里含 MyWife 时，程序直接锁定 MyWife 单站刮削（番号规则 `MyWife No.1230`），此时用的是 `FixedScrapingType.YOUMA` 的类型判定但带 `website=MyWife` 覆盖，故素人组名单里不需要、也不应该有它。
+> **Official 只出现在有码、无码、素人三组**，国产、欧美、FC2 三组都不含 Official——Official 按番号前缀路由到片商官网，对国产/欧美/FC2 番号没有收录，加进去只会给每条影片白挂一次无效请求。Dahlia、FALENO 是从 Official 拆出的有码厂牌独立站，故只随有码一组走。
+> **AVEntertainments 同时在有码与无码两组**：该站是正規無修正 DVD 販売/配信的商城，站内有码、无码皆有收录（无码侧待进一步核实），故两组都保留。
+> **MyWife 是独立系列，既不属于「有码」也不属于「素人」，六组名单里都没有它**：MyWife（舞ワイフ）是「人妻・熟女・3P」这一条独立系列线——它不是有码厂牌的片商编号、也不落无码／FC2／欧美／国产任何一类，所以**有码组（30 站）不含它、素人组（28 站）同样不含它**，两个表里都查不到 MyWife。**它走的是「单独指定」而非类型组**：「网站偏好 → 指定网站」选了 MyWife、或文件路径里含 MyWife 时，`mdcx/core/file_crawler.py` 返回 `ScrapeClassification(FixedScrapingType.YOUMA, "auto", website=Website.MYWIFE)`——番号形如 `MyWife No.1230`，不属于任何已知前缀体系，故借用有码的类型判定，但用 `website=MyWife` **覆盖**掉组内名单、直接锁定 MyWife 单站刮削，压根不查六组名单。故 `tests/test_config_conversion.py` 用 `Website.MYWIFE not in config.website_suren` 钉死它不会被误塞回素人组；`Config().website_youma` 里同样没有它（历史配置里若残留过，也只会因不在类型组而从不生效）。
 
 **各爬虫适用类型**（能力分类，统计的是该站实际能处理的番号类型，与上表「说明」列的定位标签不是同一维度，因此会出现 Xcity、Getchu、AVBase 等同时出现在「仅能有码」与带「综合：」标签的站点里；与上面的默认名单也不必一一对应，默认名单只收「该站确实能查到该类型条目」的站）：
 - **仅能有码**：DMM、DMM_API、TheJavDB_API、LibreDMM、R18.dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO、Airav.cc、Dahlia、FALENO
 - **无码专属**：AVEntertainments、AVSOX
 - **综合（有码+无码）**：JavBus、JavDB、JavDB_API、JavDB_APP、MissAV、MissAV_API、JavDay、JavFree、AVSEX、Official、IQQTV、7mmtv
-- **素人**：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MissAV_API、Prestige、Dahlia、FALENO、MyWife（MyWife 单独指定，不进素人组）
+- **素人**：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MissAV_API、Prestige、Dahlia、FALENO
+- **独立系列（不进任何类型组）**：MyWife（人妻・熟女・3P 系列；**不是有码**，也不是无码／FC2／欧美／国产；单独指定，机制见上方 MyWife 注释）
 - **FC2**：7mmtv、FC2、FC2PPVDB、JavDB、JavFree
 - **欧美**：AVheat、ThepornDB
 - **国产**：AVSEX、IQQTV、JavDay、Madou.club、Madouqu

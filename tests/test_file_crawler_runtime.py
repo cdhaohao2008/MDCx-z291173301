@@ -326,6 +326,12 @@ def test_classify_scrape_task_keeps_existing_type_branches(
     ("number", "file_path", "expected_website"),
     [
         ("MYWIFE-1500", "D:/test/mywife/MYWIFE-1500.mp4", Website.MYWIFE),
+        # 厂牌官网独立成站后，前缀直接锁定单站（classification.sites 只是白名单，
+        # 真正保证官网优先的是 website= 强制单站分支）
+        ("DLDSS-539", "", Website.DAHLIA),
+        ("FNS-165", "", Website.FALENO),
+        ("FLN-001", "", Website.FALENO),
+        ("JIMMY-003", "", Website.FALENO),
     ],
 )
 def test_classify_scrape_task_marks_youma_specific_crawlers(number: str, file_path: str, expected_website: Website):

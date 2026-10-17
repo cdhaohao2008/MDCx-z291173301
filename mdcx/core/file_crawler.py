@@ -18,7 +18,7 @@ from ..models.flags import Flags
 from ..models.log_buffer import LogBuffer
 from ..models.model_types import CrawlerInput, CrawlerResponse, CrawlerResult, CrawlersResult, CrawlTask, FailureReason
 from ..models.mosaic import is_guochan_mosaic, is_plain_uncensored_mosaic, normalize_mosaic
-from ..number import is_uncensored
+from ..number import get_number_letters, is_uncensored
 from ..utils import parse_score_number
 from ..utils.dataclass import update
 from ..utils.xml import XML_TEXT_FIELDS, normalize_xml_text
@@ -53,6 +53,17 @@ SPECIFIC_CRAWLER_TITLE_LANGUAGE_SITES = {
     Website.MADOUQU,
     Website.MADOUCLUB,
     Website.LULUBAR,
+}
+
+# 官网厂牌的番号前缀 → 唯一站点。命中后直接锁定单站请求，
+# 保证 DMM 系聚合站之外还能直接命中厂牌官网（Dahlia / FALENO）。
+# 与 crawlers/official.py 的 OFFICIAL_CRAWLER_BY_PREFIX 保持同一套前缀，
+# 不同的是这里产出独立的 Website，Official 侧仅作为兼容回退保留。
+BRAND_PREFIX_SITES: dict[str, Website] = {
+    "DLDSS": Website.DAHLIA,
+    "FNS": Website.FALENO,
+    "FLN": Website.FALENO,
+    "JIMMY": Website.FALENO,
 }
 
 
@@ -178,6 +189,13 @@ def classify_scrape_task(task_input: CrawlTask, config: "Config", use_fixed_type
 
     if "mywife" in file_path_str:
         return ScrapeClassification(FixedScrapingType.YOUMA, "auto", website=Website.MYWIFE)
+
+    # 官网厂牌独立成站后，番号前缀直接锁定唯一站点，保证官网数据优先
+    # （classification.sites 只是白名单，真正的请求顺序取自字段 site_prority，
+    #   只往 sites 里塞站点并不能保证先请求它）。
+    _brand_site = BRAND_PREFIX_SITES.get(get_number_letters(file_number).upper())
+    if _brand_site is not None:
+        return ScrapeClassification(FixedScrapingType.YOUMA, "auto", website=_brand_site)
 
     if "FC2" in file_number.upper():
         file_number_1 = re.search(r"\d{5,}", file_number)

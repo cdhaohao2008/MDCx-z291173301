@@ -114,6 +114,8 @@ def _is_valid_site(site: object) -> bool:
     且界面回写被跳过（表现为「保存不生效」，议题 #55）。故在此静默剔除。
     7mmtv 曾在同一批被移除，2026-09 以聚合站爬虫形式回归（移植自 Hazard804/mdcx），
     旧配置中残留的 7mmtv 值因此自动恢复有效。
+    dahlia/faleno 曾在同一批被移除，2026-10 恢复独立站点身份（厂牌官网重新
+    从 Official 拆出），旧配置中残留的 dahlia/faleno 值同样自动恢复有效。
     """
     value = _enum_value(site)
     return isinstance(value, str) and value in _VALID_SITE_VALUES

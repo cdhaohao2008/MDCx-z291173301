@@ -446,7 +446,9 @@ class Website(Enum):
     AVMOO = "AVMOO"
     AVSEX = "AVSEX"
     AVSOX = "AVSOX"
+    DAHLIA = "Dahlia"
     DMM = "DMM"
+    FALENO = "FALENO"
     FC2 = "FC2"
     FC2PPVDB = "FC2PPVDB"
     FREEJAVBT = "FreeJavBT"
@@ -491,7 +493,9 @@ class Website(Enum):
                 "avmoo": "AVMOO",
                 "avsex": "AVSEX",
                 "avsox": "AVSOX",
+                "dahlia": "Dahlia",
                 "dmm": "DMM",
+                "faleno": "FALENO",
                 "fc2": "FC2",
                 "fc2ppvdb": "FC2PPVDB",
                 "javdbapi": "DMM_API",

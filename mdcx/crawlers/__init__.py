@@ -20,7 +20,9 @@ from .avmoo import AvmooCrawler
 from .avsex import AVSEXCrawler
 from .avsox import AVSOXCrawler
 from .base import get_crawler, get_registered_crawler_sites, register_crawler
+from .dahlia import DahliaCrawler
 from .dmm import DmmCrawler
+from .faleno import FalenoCrawler
 from .fc2 import Fc2Crawler
 from .fc2ppvdb import Fc2ppvdbCrawler
 from .freejavbt import FreejavbtCrawler
@@ -82,6 +84,9 @@ register_crawler(MyWifeCrawler)
 register_crawler(JavLibraryCrawler)
 register_crawler(OfficialCrawler)
 register_crawler(ThepornDBCrawler)
+# Dahlia / FALENO 官网已独立成站（2026-10-17），Official 仍保留前缀回退
+register_crawler(DahliaCrawler)
+register_crawler(FalenoCrawler)
 
 # 模块名以数字开头（7mmtv），无法用常规 import 语法，走 importlib
 from importlib import import_module as _import_module  # noqa: E402

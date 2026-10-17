@@ -142,7 +142,8 @@ async def test_official_crawler_jimmy_prefix_routes_to_faleno():
 
     assert res.debug_info.error is None
     assert res.data is not None
-    assert res.data.source == "Official"
+    # FALENO 独立成站后，source 标记实际产出数据的站点（不再统一记为 Official）
+    assert res.data.source == "FALENO"
     assert res.data.number == "JIMMY-003"
     assert res.data.title == "Faleno Official Title"
     assert res.data.actors == ["Actor F"]

@@ -40,8 +40,9 @@ REMOVED_SITES = [
     "fc2hub",
     "jav321",
     "fantastica",
-    "dahlia",
-    "faleno",
+    # dahlia/faleno 2026-10 恢复独立站点身份（见 mdcx/crawlers/dahlia.py、
+    # faleno.py 与 config/enums.py 的 Website.DAHLIA / Website.FALENO），
+    # 与 7mmtv 同理：旧配置残留值现在能正常解析，不再剔除
 ]
 
 
