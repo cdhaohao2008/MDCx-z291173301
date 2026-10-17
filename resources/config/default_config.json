@@ -156,7 +156,10 @@
   "website_youma": [
     "DMM",
     "DMM_API",
+    "LibreDMM",
     "AVEntertainments",
+    "Dahlia",
+    "FALENO",
     "MGStage",
     "Prestige",
     "Official",
@@ -165,13 +168,12 @@
     "JavDB",
     "JavDB_API",
     "JavDB_APP",
-    "JavFree",
     "JavBus",
     "JavDay",
+    "JavFree",
     "7mmtv",
     "Airav.cc",
     "FreeJavBT",
-    "Getchu",
     "IQQTV",
     "Lulubar",
     "MissAV",
@@ -179,11 +181,9 @@
     "R18.dev",
     "Xcity",
     "TheJavDB_API",
-    "LibreDMM",
     "JavLibrary",
     "AVSEX",
-    "Dahlia",
-    "FALENO"
+    "Getchu"
   ],
   "website_wuma": [
     "AVEntertainments",
@@ -202,11 +202,13 @@
     "Lulubar",
     "MissAV",
     "MissAV_API",
-    "AVSEX"
+    "AVSEX",
+    "Getchu"
   ],
   "website_suren": [
     "DMM",
     "DMM_API",
+    "LibreDMM",
     "AVEntertainments",
     "MGStage",
     "Prestige",
@@ -216,13 +218,12 @@
     "JavDB",
     "JavDB_API",
     "JavDB_APP",
-    "JavFree",
     "JavBus",
     "JavDay",
+    "JavFree",
     "7mmtv",
     "Airav.cc",
     "FreeJavBT",
-    "Getchu",
     "IQQTV",
     "Lulubar",
     "MissAV",
@@ -230,11 +231,9 @@
     "R18.dev",
     "Xcity",
     "TheJavDB_API",
-    "LibreDMM",
     "JavLibrary",
     "AVSEX",
-    "Dahlia",
-    "FALENO"
+    "Getchu"
   ],
   "website_fc2": [
     "AVSOX",
@@ -243,11 +242,15 @@
     "JavDB",
     "JavDB_API",
     "JavDB_APP",
-    "JavFree",
     "JavBus",
     "JavDay",
+    "JavFree",
     "7mmtv",
-    "IQQTV"
+    "IQQTV",
+    "MissAV",
+    "MissAV_API",
+    "AVSEX",
+    "Getchu"
   ],
   "website_oumei": [
     "ThepornDB",
@@ -255,7 +258,15 @@
     "JavDB",
     "JavDB_API",
     "JavDB_APP",
-    "JavBus"
+    "JavBus",
+    "JavDay",
+    "7mmtv",
+    "MissAV",
+    "MissAV_API",
+    "IQQTV",
+    "JavFree",
+    "AVSEX",
+    "Getchu"
   ],
   "website_guochan": [
     "Madouqu",
@@ -264,11 +275,14 @@
     "JavDB",
     "JavDB_API",
     "JavDB_APP",
-    "JavFree",
     "JavBus",
     "JavDay",
+    "JavFree",
     "7mmtv",
-    "IQQTV"
+    "IQQTV",
+    "MissAV",
+    "MissAV_API",
+    "Getchu"
   ],
   "actor_realname": false,
   "outline_format": [

@@ -492,28 +492,28 @@ class Config(BaseModel):
     website_single: Website = Field(default=Website.AIRAV_CC, title="单个网站")  # todo 移除
     website_youma: list[Website] = Field(
         default_factory=lambda: [
-            # 仅能有码
+            # 官网 / 厂牌 / 官方接口
             Website.DMM,
             Website.DMM_API,
+            Website.LIBREDMM,
             Website.AVENTERTAINMENTS,
+            Website.DAHLIA,
+            Website.FALENO,
             Website.MGSTAGE,
             Website.PRESTIGE,
-            # 综合（有码+无码）
             Website.OFFICIAL,
-            # 有码+素人
+            # 第三方 / 聚合站
             Website.AVBASE,
             Website.AVMOO,
             Website.JAVDB,
             Website.JAVDB_API,
             Website.JAVDB_APP,
-            Website.JAVFREE,
             Website.JAVBUS,
             Website.JAVDAY,
+            Website.JAVFREE,
             Website.MMTV,
-            # 仅能有码
             Website.AIRAV_CC,
             Website.FREEJAVBT,
-            Website.GETCHU,
             Website.IQQTV,
             Website.LULUBAR,
             Website.MISSAV,
@@ -521,22 +521,19 @@ class Config(BaseModel):
             Website.R18DEV,
             Website.XCITY,
             Website.THEJAVDB_API,
-            Website.LIBREDMM,
             Website.JAVLIBRARY,
             Website.AVSEX,
-            # Official 拆出的有码厂牌官网
-            Website.DAHLIA,
-            Website.FALENO,
+            Website.GETCHU,
         ],
         title="有码网站源",
     )
     website_wuma: list[Website] = Field(
         default_factory=lambda: [
-            # 无码专属
+            # 官网 / 厂牌 / 官方接口
             Website.AVENTERTAINMENTS,
             Website.AVSOX,
-            # 综合（有码+无码）
             Website.OFFICIAL,
+            # 第三方 / 聚合站
             Website.JAVDB,
             Website.JAVDB_API,
             Website.JAVDB_APP,
@@ -544,7 +541,6 @@ class Config(BaseModel):
             Website.JAVDAY,
             Website.JAVFREE,
             Website.MMTV,
-            # 仅能有码，但无码条目同样收录
             Website.AIRAV_CC,
             Website.FREEJAVBT,
             Website.IQQTV,
@@ -552,29 +548,32 @@ class Config(BaseModel):
             Website.MISSAV,
             Website.MISSAV_API,
             Website.AVSEX,
+            Website.GETCHU,
         ],
         title="无码网站源",
     )
     website_suren: list[Website] = Field(
         default_factory=lambda: [
+            # 官网 / 厂牌 / 官方接口
             Website.DMM,
             Website.DMM_API,
+            Website.LIBREDMM,
             Website.AVENTERTAINMENTS,
             Website.MGSTAGE,
             Website.PRESTIGE,
             Website.OFFICIAL,
+            # 第三方 / 聚合站
             Website.AVBASE,
             Website.AVMOO,
             Website.JAVDB,
             Website.JAVDB_API,
             Website.JAVDB_APP,
-            Website.JAVFREE,
             Website.JAVBUS,
             Website.JAVDAY,
+            Website.JAVFREE,
             Website.MMTV,
             Website.AIRAV_CC,
             Website.FREEJAVBT,
-            Website.GETCHU,
             Website.IQQTV,
             Website.LULUBAR,
             Website.MISSAV,
@@ -582,11 +581,9 @@ class Config(BaseModel):
             Website.R18DEV,
             Website.XCITY,
             Website.THEJAVDB_API,
-            Website.LIBREDMM,
             Website.JAVLIBRARY,
             Website.AVSEX,
-            Website.DAHLIA,
-            Website.FALENO,
+            Website.GETCHU,
             # 注意：MyWife 不在本组。它由「网站偏好-指定网站」或路径含 MyWife 时
             # 经 file_crawler 的 website= 覆盖单独指定，不走任何类型组名单。
         ],
@@ -600,11 +597,15 @@ class Config(BaseModel):
             Website.JAVDB,
             Website.JAVDB_API,
             Website.JAVDB_APP,
-            Website.JAVFREE,
             Website.JAVBUS,
             Website.JAVDAY,
+            Website.JAVFREE,
             Website.MMTV,
             Website.IQQTV,
+            Website.MISSAV,
+            Website.MISSAV_API,
+            Website.AVSEX,
+            Website.GETCHU,
         ],
         title="FC2网站源",
     )
@@ -616,6 +617,14 @@ class Config(BaseModel):
             Website.JAVDB_API,
             Website.JAVDB_APP,
             Website.JAVBUS,
+            Website.JAVDAY,
+            Website.MMTV,
+            Website.MISSAV,
+            Website.MISSAV_API,
+            Website.IQQTV,
+            Website.JAVFREE,
+            Website.AVSEX,
+            Website.GETCHU,
         ],
         title="欧美网站源",
     )
@@ -627,11 +636,14 @@ class Config(BaseModel):
             Website.JAVDB,
             Website.JAVDB_API,
             Website.JAVDB_APP,
-            Website.JAVFREE,
             Website.JAVBUS,
             Website.JAVDAY,
+            Website.JAVFREE,
             Website.MMTV,
             Website.IQQTV,
+            Website.MISSAV,
+            Website.MISSAV_API,
+            Website.GETCHU,
         ],
         title="国产网站源",
     )
