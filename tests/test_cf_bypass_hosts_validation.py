@@ -1,4 +1,4 @@
-"""`cf_bypass_trusted_hosts`（设置页「CF Bypass校验」）输入校验的回归测试。
+"""`cf_bypass_trusted_hosts`（设置页「Cloudfleare 校验服务」）输入校验的回归测试。
 
 这个字段是**静默误伤**高发区：配错平时不报错，只有真走 Bypass 时才拒收响应，
 用户看到的是「昨天能刮的站今天全 403」。所以校验逻辑必须与运行时

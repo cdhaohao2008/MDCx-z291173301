@@ -977,7 +977,7 @@ def load_config(self: "MyMAinWindow"):
             -1,
         )
         self.Ui.comboBox_cf_bypass_backend.setCurrentIndex(backend_index if backend_index >= 0 else 0)
-        # Bypass 落地域名白名单
+        # Cloudfleare 校验服务
         self.Ui.lineEdit_cf_bypass_trusted_hosts.setText(manager.config.cf_bypass_trusted_hosts)
         # HTTPS 证书校验
         self.Ui.checkBox_verify_ssl.setChecked(manager.config.verify_ssl)

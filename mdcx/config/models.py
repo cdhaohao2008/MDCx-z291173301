@@ -988,7 +988,7 @@ class Config(BaseModel):
     )
     cf_bypass_trusted_hosts: str = Field(
         default="",
-        title="Bypass落地域名白名单",
+        title="Cloudfleare 校验服务",
         description="逗号分隔的可信落地域名（支持 *.example.com 子域通配，通配只匹配子域、不含裸域名本身）。"
         "只校验已走 bypass 的请求最终落在哪个域名，不控制哪些站点走 bypass；"
         "落地域名不命中则拒绝该响应，防止第三方服务被劫持时把恶意页面当数据。留空表示不校验。",

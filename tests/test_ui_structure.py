@@ -1012,7 +1012,7 @@ def test_about_official_site_list_red_stale_shape_gone():
     )
 
 
-# 「Bypass 白名单」输入框 placeholder 里给出的示例域名。示例必须自身可用——
+# 「Cloudfleare 校验服务」输入框 placeholder 里给出的示例域名。示例必须自身可用——
 # 用户是照着它抄的，示例写错等于教所有人配错。
 _BYPASS_TRUSTED_HOSTS_EXAMPLE = "javbus.com,*.javbus.com"
 

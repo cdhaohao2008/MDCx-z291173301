@@ -154,7 +154,7 @@ export QT_QPA_PLATFORM=xcb
 
 **配置代理**：设置 → 网络 → 代理，支持 HTTP/HTTPS/SOCKS5。只对"走代理网站"域名列表中的站点走代理，其他默认直连；默认列表包含 `amazon.co.jp, m.media-amazon.com, xcity.jp, minnano-av.com, avbase.net, javbus.com, javdb.com, javlibrary.com, r18.dev, mgstage.com, prestige-av.com, seesaawiki.jp, avsox.click, avsox.com, avmoo.shop, avmoo.com, avheat.shop, avheat.com, heyzo.com, caribbeancom.com, 1pondo.tv, pacopacomama.com, 10musume.com, mywife.cc, github.com, raw.githubusercontent.com, google.com, missav.ws, missav.ai, missav.live, aventertainments.com, javfree.me, 7mmtv.sx, 7tv022.com, avsex.cc, getchu.com, dl.getchu.com`，可按需追加。
 
-**CF Bypass 落地白名单**：设置 → 网络 →「Bypass 白名单」可填写可信落地域名（逗号分隔，支持 `*.example.com` 子域通配，如 `javbus.com,*.javbus.com`）。用于校验 Bypass 服务落地或重定向后的最终域名，防止第三方 Bypass 服务被劫持时把恶意页面当数据写入 NFO；留空表示不校验（默认）。
+**Cloudfleare 校验服务**：设置 → 网络 →「Cloudfleare 校验服务」可填写可信落地域名（逗号分隔，支持 `*.example.com` 子域通配，如 `javbus.com,*.javbus.com`）。用于校验 Bypass 服务落地或重定向后的最终域名，防止第三方 Bypass 服务被劫持时把恶意页面当数据写入 NFO；留空表示不校验（默认）。
 
 > 这个框**不是"哪些站点不走 Bypass"的名单**：Bypass 对全局自动生效（命中 Cloudflare 挑战页即触发），填不填都照常走。它只在**已经走了 Bypass 之后**校验落地页面的域名，名单外的站点若走 Bypass 且落地域名不命中，其响应会被直接拒收（日志出现 `🧱 mirror 落地域名不在白名单内，已拒绝: ...`）。
 >

@@ -676,7 +676,7 @@ def save_config(self: "MyMAinWindow"):
     )  # 外部CF服务后端类型
     manager.config.cf_bypass_trusted_hosts = (
         self.Ui.lineEdit_cf_bypass_trusted_hosts.text().strip()
-    )  # Bypass 落地域名白名单
+    )  # Cloudfleare 校验服务
     manager.config.verify_ssl = self.Ui.checkBox_verify_ssl.isChecked()  # HTTPS 证书校验
     manager.config.proxy_sites = normalize_site_list(
         self.Ui.lineEdit_no_proxy_sites.text()
