@@ -451,8 +451,8 @@ def _site_list_context_menu(list_widget: QListWidget, pos) -> None:
         primary_text = f"复制站点：{site_value}"
         primary_message = f"站点「{site_value}」"
     elif group_sites:
-        primary_text = f"复制本组：{len(group_sites)} 个站点"
-        primary_message = f"「{group_title}」组的 {len(group_sites)} 个站点"
+        primary_text = f"复制本组：{len(group_sites)}个站点"
+        primary_message = f"「{group_title}」组的{len(group_sites)}个站点"
     if primary_text:
         primary = menu.addAction(primary_text)
         menu.addSeparator()
@@ -465,7 +465,7 @@ def _site_list_context_menu(list_widget: QListWidget, pos) -> None:
         _copy_to_clipboard(text, primary_message)
         return
     if chosen is list_action:
-        _copy_to_clipboard(_sites_text(sites), f"{len(sites)} 个站点的列表")
+        _copy_to_clipboard(_sites_text(sites), f"{len(sites)}个站点的列表")
 
 
 def _style_dialog(dialog: QDialog, dark: bool = False) -> None:

@@ -181,7 +181,7 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
         _shown(dlg)
         palette = dlg.available_list
         texts = _right_click(palette, _title_center(palette, "有码"), monkeypatch, "复制本组")
-        assert texts == ["复制本组：29 个站点", "", "复制列表：39个站点"]
+        assert texts == ["复制本组：29个站点", "", "复制列表：39个站点"]
         copied = app.clipboard().text().split(",")
         assert copied[:3] == ["DMM", "DMM_API", "LibreDMM"]
         assert len(copied) == 29 == len(set(copied))
@@ -204,7 +204,7 @@ def test_each_group_title_copies_its_own_list(qt_app, monkeypatch, title, count)
         _shown(dlg)
         palette = dlg.available_list
         texts = _right_click(palette, _title_center(palette, title), monkeypatch, "复制本组")
-        assert texts[0] == f"复制本组：{count} 个站点"
+        assert texts[0] == f"复制本组：{count}个站点"
         copied = app.clipboard().text().split(",")
         assert len(copied) == count
         assert len(copied) < len(_list_sites(palette))
