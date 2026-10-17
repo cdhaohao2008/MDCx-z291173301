@@ -70,6 +70,10 @@ _SITE_RENAMES = {
     "avheat": "AVheat",
     "avsex": "AVSEX",
     "avsox": "AVSOX",
+    # 大小写三代旧值都在：2026-08 下线前写入的全小写 faleno、恢复独立站点
+    # 后写入的全大写 FALENO，均归一到品牌写法 Faleno。
+    "faleno": "Faleno",
+    "FALENO": "Faleno",
     "fc2": "FC2",
     "fc2ppvdb": "FC2PPVDB",
     "iqqtv": "IQQTV",

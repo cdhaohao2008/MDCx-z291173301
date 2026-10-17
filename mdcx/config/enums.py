@@ -448,7 +448,7 @@ class Website(Enum):
     AVSOX = "AVSOX"
     DAHLIA = "Dahlia"
     DMM = "DMM"
-    FALENO = "FALENO"
+    FALENO = "Faleno"
     FC2 = "FC2"
     FC2PPVDB = "FC2PPVDB"
     FREEJAVBT = "FreeJavBT"
@@ -495,7 +495,10 @@ class Website(Enum):
                 "avsox": "AVSOX",
                 "dahlia": "Dahlia",
                 "dmm": "DMM",
-                "faleno": "FALENO",
+                # 大小写两代旧值都在：2026-08 下线前写入的全小写 faleno，
+                # 以及 2026-10 恢复独立站点后曾写入的全大写 FALENO。
+                "faleno": "Faleno",
+                "FALENO": "Faleno",
                 "fc2": "FC2",
                 "fc2ppvdb": "FC2PPVDB",
                 "javdbapi": "DMM_API",

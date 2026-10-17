@@ -56,7 +56,7 @@ SPECIFIC_CRAWLER_TITLE_LANGUAGE_SITES = {
 }
 
 # 官网厂牌的番号前缀 → 唯一站点。命中后直接锁定单站请求，
-# 保证 DMM 系聚合站之外还能直接命中厂牌官网（Dahlia / FALENO）。
+# 保证 DMM 系聚合站之外还能直接命中厂牌官网（Dahlia / Faleno）。
 # 与 crawlers/official.py 的 OFFICIAL_CRAWLER_BY_PREFIX 保持同一套前缀，
 # 不同的是这里产出独立的 Website，Official 侧仅作为兼容回退保留。
 BRAND_PREFIX_SITES: dict[str, Website] = {

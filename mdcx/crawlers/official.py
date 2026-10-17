@@ -14,7 +14,7 @@ from .official_uncensored import crawl_uncensored_official
 from .prestige import PrestigeCrawler
 
 # DLDSS/FNS/JIMMY 未登记在 ManualConfig.OFFICIAL 的前缀表里，Official 无法通过
-# generic 路径命中它们；Dahlia / FALENO 独立成站后，这里保留为 Official 的兼容回退。
+# generic 路径命中它们；Dahlia / Faleno 独立成站后，这里保留为 Official 的兼容回退。
 OFFICIAL_CRAWLER_BY_PREFIX = {
     "DLDSS": DahliaCrawler,
     "FNS": FalenoCrawler,

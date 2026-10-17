@@ -84,7 +84,7 @@ register_crawler(MyWifeCrawler)
 register_crawler(JavLibraryCrawler)
 register_crawler(OfficialCrawler)
 register_crawler(ThepornDBCrawler)
-# Dahlia / FALENO 官网已独立成站（2026-10-17），Official 仍保留前缀回退
+# Dahlia / Faleno 官网已独立成站（2026-10-17），Official 仍保留前缀回退
 register_crawler(DahliaCrawler)
 register_crawler(FalenoCrawler)
 

@@ -1133,7 +1133,7 @@ def test_about_type_site_lists_only_six_groups_no_comprehensive():
     """使用说明只有这六组，且不再有代码里不存在的「综合」组。"""
     about_lists = _about_type_site_lists()
     expected_labels = {label for label, _ in _TYPE_SITE_GROUPS}
-    extra = set(about_lists) - expected_labels - {"MyWife", "官网厂牌"}
+    extra = set(about_lists) - expected_labels - {"MyWife", "官网"}
     assert not extra, f"使用说明出现未登记的分组：{sorted(extra)}"
     assert not about_lists.get("综合"), "「综合」组在代码里不存在，应从使用说明移除"
     assert _MYWIFE_NOTE in _about_site_section()
