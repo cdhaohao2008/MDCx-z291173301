@@ -2,11 +2,13 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
@@ -16,9 +18,11 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QStyledItemDelegate,
     QVBoxLayout,
     QWidget,
 )
@@ -26,6 +30,7 @@ from PyQt6.QtWidgets import (
 from mdcx.config.enums import FixedScrapingType, Website
 from mdcx.config.models import (
     SCRAPING_TYPE_SITE_FIELDS,
+    TYPE_DEFAULT_SITES,
     FieldPriorityConfig,
     expand_site_groups,
     filter_poster_default_sites,
@@ -35,6 +40,7 @@ from mdcx.config.models import (
 from mdcx.crawlers import get_registered_crawler_site_values
 from mdcx.gen.field_enums import CrawlerResultFields
 from mdcx.manual import ManualConfig
+from mdcx.signals import signal_qt
 from mdcx.utils.window_center import CenterOnFirstShowMixin
 
 from .style import build_scrollbar_style, get_theme_tokens
@@ -131,13 +137,53 @@ def _sites_text(sites: list[Website]) -> str:
     return ",".join(site.value for site in sites)
 
 
-def _sorted_sites(sites: Iterable[Website]) -> list[Website]:
-    """按站点名 A-Z 排序（不区分大小写；折叠名相同时再按原名兜底，保证结果稳定）。
+class PaletteEntry(NamedTuple):
+    """「可用网站」候选区的一行：要么是分组标题，要么是站点本身。"""
 
-    只用于「可用网站」候选区的展示顺序。「启用网站」是用户的优先级序列，
-    排序只作用于候选区，不参与也不影响启用列表的顺序。
+    title: str  # 分组标题（如「有码」）；站点行为空串
+    site: Website | None  # 分组行为 None；站点行为该站点
+
+
+# 候选区的分组顺序：与 TYPE_TITLES 的声明序一致（不含动漫里番——那一组只有 Getchu 等
+# 零星几个站，单列一个标题反而更碎，用户实际是按前六组挑网站源）。
+PALETTE_GROUP_TYPES: tuple[FixedScrapingType, ...] = (
+    FixedScrapingType.YOUMA,
+    FixedScrapingType.WUMA,
+    FixedScrapingType.SUREN,
+    FixedScrapingType.FC2,
+    FixedScrapingType.OUMEI,
+    FixedScrapingType.GUOCHAN,
+)
+
+# 落在六组之外、又确实已注册爬虫的站点（目前只有 MyWife）统一归到这里。
+OTHER_PALETTE_GROUP_TITLE = "其他"
+
+
+def grouped_palette_entries(sites: Iterable[Website]) -> list[PaletteEntry]:
+    """把候选站点按有码/无码/素人/FC2/欧美/国产分组成带标题的行序列。
+
+    组内顺序 = TYPE_DEFAULT_SITES 里该组的默认名单顺序（优先级从高到低），不重排。
+    一个站点可同属多组，会在每个组里各出现一次——它确实是这几个类型的可用来源，
+    而「全部添加」用的是 self._all_sites 原序，不会因此重复添加。
+    没落进任何组的站点（如 MyWife）按传入次序收在「其他」里，保证一个都不丢。
     """
-    return sorted(sites, key=lambda site: (site.value.casefold(), site.value))
+    available = list(dict.fromkeys(sites))
+    available_set = set(available)
+    entries: list[PaletteEntry] = []
+    placed: set[Website] = set()
+    for scraping_type in PALETTE_GROUP_TYPES:
+        group = [site for site in TYPE_DEFAULT_SITES.get(scraping_type, ()) if site in available_set]
+        if not group:
+            # 该类型在本机没有已注册爬虫的站点时不留空标题，否则会出现一个没有内容的分组
+            continue
+        entries.append(PaletteEntry(TYPE_TITLES[scraping_type], None))
+        entries.extend(PaletteEntry("", site) for site in group)
+        placed.update(group)
+    rest = [site for site in available if site not in placed]
+    if rest:
+        entries.append(PaletteEntry(OTHER_PALETTE_GROUP_TITLE, None))
+        entries.extend(PaletteEntry("", site) for site in rest)
+    return entries
 
 
 def _site_priority_colors(dark: bool) -> dict[str, str]:
@@ -168,11 +214,19 @@ def _site_priority_colors(dark: bool) -> dict[str, str]:
 
 
 def _list_sites(list_widget: QListWidget) -> list[Website]:
-    return [
-        Website(item.data(Qt.ItemDataRole.UserRole))
-        for row in range(list_widget.count())
-        if (item := list_widget.item(row)) is not None and item.data(Qt.ItemDataRole.UserRole) in Website
-    ]
+    """列表里的站点，按行序去重。
+
+    候选区按类型分组后，同一站点会因同属多个组而在多行各出现一次（DMM 同时落在
+    有码和素人）。去重让「这张列表有哪些站点」只有一个答案——复制、拖拽、移除、
+    启用列表的快照全都拿它做依据，不会因为站点重复出现而多带一次。
+    """
+    return list(
+        dict.fromkeys(
+            Website(item.data(Qt.ItemDataRole.UserRole))
+            for row in range(list_widget.count())
+            if (item := list_widget.item(row)) is not None and item.data(Qt.ItemDataRole.UserRole) in Website
+        )
+    )
 
 
 def _selected_sites(list_widget: QListWidget) -> list[Website]:
@@ -192,6 +246,29 @@ def _make_site_item(site: Website) -> QListWidgetItem:
         item.flags() | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
     )
     return item
+
+
+# 分组标题行不带 UserRole（_list_sites / _selected_sites 靠 UserRole 过滤站点行，
+# 自然把标题行排除在外），这里只用一个额外的角色把「这一行是标题」标出来，
+# 好让 SiteGroupDelegate 认得它并改画成章节标签。
+SITE_GROUP_ROLE = Qt.ItemDataRole.UserRole + 1
+
+
+def _make_group_item(title: str) -> QListWidgetItem:
+    item = QListWidgetItem(f"【{title}】")
+    item.setData(SITE_GROUP_ROLE, title)
+    item.setToolTip(f"{title}类型网站；本组按优先级从高到低排列")
+    item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+    return item
+
+
+def _is_group_item(item: QListWidgetItem | None) -> bool:
+    return item is not None and item.data(SITE_GROUP_ROLE) is not None
+
+
+def _is_site_item(item: QListWidgetItem | None) -> bool:
+    """是否站点行。分组标题行没有 UserRole，靠它把两者分开。"""
+    return item is not None and item.data(Qt.ItemDataRole.UserRole) in Website
 
 
 def _site_tooltip_lines(site: Website) -> list[str]:
@@ -217,10 +294,20 @@ def _site_description(site: Website) -> str:
     return ""
 
 
-def _setup_site_list(list_widget: QListWidget, sites: list[Website]) -> None:
+def _setup_site_list(list_widget: QListWidget, sites: Iterable[Website], *, grouped: bool = False) -> None:
+    """把 sites 铺进列表。grouped=True 时先按六个类型插入分组标题行。
+
+    默认（grouped=False）保持传入的原序——「启用网站」和各字段名单的原序就是用户的
+    优先级序列，任何排序都不能掺进来；候选区才用 grouped=True。
+    """
     list_widget.clear()
-    for site in sites:
-        list_widget.addItem(_make_site_item(site))
+    entries: Iterable[PaletteEntry]
+    if grouped:
+        entries = grouped_palette_entries(sites)
+    else:
+        entries = (PaletteEntry("", site) for site in sites)
+    for entry in entries:
+        list_widget.addItem(_make_group_item(entry.title) if entry.site is None else _make_site_item(entry.site))
 
 
 def _set_site_summary(line_edit: QLineEdit) -> None:
@@ -286,6 +373,38 @@ def _style_site_list(list_widget: QListWidget, min_height: int, dark: bool = Fal
         }}
         """
     )
+    # 右键：点在某个站点上复制该站点，点在空白处（或分组标题上）复制整张列表。
+    # 复制出的文本用逗号分隔，和设置页输入框里的格式一致，粘回去就能被 _parse_sites 认出来。
+    list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+    list_widget.customContextMenuRequested.connect(partial(_site_list_context_menu, list_widget))
+
+
+def _copy_to_clipboard(text: str, message: str) -> None:
+    QApplication.clipboard().setText(text)
+    signal_qt.show_log_text(f"✅ {message}已复制到剪贴板")
+
+
+def _site_list_context_menu(list_widget: QListWidget, pos) -> None:
+    """站点列表的右键菜单：复制单个站点 / 复制整张列表。"""
+    item = list_widget.itemAt(pos)
+    site_value = item.data(Qt.ItemDataRole.UserRole) if _is_site_item(item) else None
+    sites = _list_sites(list_widget)
+    if site_value is None and not sites:
+        return
+
+    menu = QMenu(list_widget)
+    site_action = menu.addAction(f"复制站点：{site_value}") if site_value is not None else None
+    if site_action is not None:
+        menu.addSeparator()
+    list_action = menu.addAction(f"复制列表（{len(sites)} 个站点）")
+
+    if (chosen := menu.exec(list_widget.viewport().mapToGlobal(pos))) is None:
+        return
+    if site_action is not None and chosen is site_action:
+        _copy_to_clipboard(str(site_value), f"站点「{site_value}」")
+        return
+    if chosen is list_action:
+        _copy_to_clipboard(_sites_text(sites), f"{len(sites)} 个站点的列表")
 
 
 def _style_dialog(dialog: QDialog, dark: bool = False) -> None:
@@ -312,6 +431,46 @@ def _localize_dialog_buttons(buttons: QDialogButtonBox) -> None:
         cancel_button.setText("取消")
 
 
+class SiteGroupDelegate(QStyledItemDelegate):
+    """把分组标题行画成章节标签：加粗、accent 边框、压深的底色、比站点略高。
+
+    标题行不能只靠 item 的 FontRole 区分——样式表里 `QListWidget::item { color: … }`
+    会盖掉 delegate 设的前景色，只有 font 因为没被样式表声明才留得住，太脆弱；
+    背景更是完全由样式表的 `background` 说了算。所以标题行干脆不调 super().paint()，
+    整块自己画，样式表一点都插不上手。底色取 surface_pressed（比站点的 surface_muted
+    明显更深一档），隔着两行也能一眼看出「这里换了一个组」。
+    """
+
+    def __init__(self, colors: dict[str, str], parent: QWidget | None = None):
+        super().__init__(parent)
+        self._colors = colors
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        if not index.data(SITE_GROUP_ROLE):
+            super().paint(painter, option, index)
+            return
+        rect = option.rect.adjusted(2, 2, -2, -2)
+        title = str(index.data(Qt.ItemDataRole.DisplayRole))
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(QPen(QColor(self._colors["border_active"]), 1))
+        painter.setBrush(QColor(self._colors["surface_pressed"]))
+        painter.drawRoundedRect(rect, 7, 7)
+        font = QFont(option.font)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QColor(self._colors["text"]))
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, title)
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        hint = super().sizeHint(option, index)
+        if index.data(SITE_GROUP_ROLE):
+            # 标题是章节分隔，给它多几像素高度，扫视时能一眼分出「换了一个组」
+            hint.setHeight(hint.height() + 6)
+        return hint
+
+
 class SitePaletteList(QListWidget):
     def __init__(
         self,
@@ -320,6 +479,7 @@ class SitePaletteList(QListWidget):
         *,
         removable_source=None,
         dark: bool = False,
+        grouped: bool = False,
     ):
         super().__init__(parent)
         self._removable_source = removable_source
@@ -333,8 +493,13 @@ class SitePaletteList(QListWidget):
         self.setDropIndicatorShown(True)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setDefaultDropAction(Qt.DropAction.CopyAction)
-        _style_site_list(self, 82, dark)
-        _setup_site_list(self, sites)
+        _style_site_list(self, 150, dark)
+        # grouped：是否按类型插入分组标题行。_setup_site_list 之后每次重建都要带着这个标志，
+        # 否则刷新一次分组就没了，故存成公开属性给调用方原样传回去。
+        self.grouped = grouped
+        if grouped:
+            self.setItemDelegate(SiteGroupDelegate(_site_priority_colors(dark), self))
+        _setup_site_list(self, sites, grouped=grouped)
 
     def _removable_drop_source(self, source) -> QListWidget | None:
         if self._removable_source is not None:
@@ -506,31 +671,37 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.resize(780, 540)
+        self.resize(860, 640)
         self._dark = bool(getattr(parent, "dark_mode", False))
         _style_dialog(self, self._dark)
         self._all_sites = list(dict.fromkeys(all_sites))
         self._selected_sites = list(dict.fromkeys(selected_sites))
-        # 可用网站（网址源）按 A-Z 展示。_all_sites 的原序仍然保留：它是「全部添加」
-        # 写入启用列表的顺序，也是拖拽插入时的落点参照，都属于用户自定的优先级序列，
-        # 不受这里的排序影响。
-        self._palette_sites = _sorted_sites(self._all_sites)
+        # 可用网站（网址源）按有码/无码/素人/FC2/欧美/国产分组展示，组内用该类型默认名单
+        # 的优先级次序（见 grouped_palette_entries）。_all_sites 的原序仍然保留着：
+        # 它是「全部添加」写入启用列表的顺序，也是拖拽插入时的落点参照，都属于用户
+        # 自定的优先级序列，不受这里的分组影响。
+        self._palette_sites = self._all_sites
 
         layout = QVBoxLayout(self)
 
         self.selected_list = PrioritySiteList(self._all_sites, 168, self, self._dark, auto_group=True)
         self.available_list = SitePaletteList(
-            self._palette_sites, self, removable_source=self.selected_list, dark=self._dark
+            self._palette_sites, self, removable_source=self.selected_list, dark=self._dark, grouped=True
         )
         self.available_list.on_removed = self._sync_selected_from_list
 
-        layout.addWidget(self._build_panel("可用网站", self.available_list))
+        layout.addWidget(self._build_panel("可用网站（按类型分组）", self.available_list))
         layout.addWidget(self._build_panel("启用网站（从左到右优先级递减）", self.selected_list), 1)
 
         group_hint = QLabel("联动组：加入组内任意一个站点即自动加入组内其余站点，加入后可在「启用网站」中手动移除")
         group_hint.setWordWrap(True)
         group_hint.setStyleSheet(f"color: {get_theme_tokens(self._dark)['text_muted']};")
         layout.addWidget(group_hint)
+
+        copy_hint = QLabel("右键点击：站点上复制该站点、空白处复制整张列表（逗号分隔，可直接粘回上方输入框）")
+        copy_hint.setWordWrap(True)
+        copy_hint.setStyleSheet(f"color: {get_theme_tokens(self._dark)['text_muted']};")
+        layout.addWidget(copy_hint)
 
         actions = QHBoxLayout()
         add_button = QPushButton("添加选中")
@@ -550,7 +721,7 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         remove_button.clicked.connect(self._remove_selected)
         add_all_button.clicked.connect(self._add_all)
         clear_button.clicked.connect(self._clear_selected)
-        self.available_list.itemDoubleClicked.connect(lambda _item: self._add_selected())
+        self.available_list.itemDoubleClicked.connect(self._on_available_double_clicked)
         self.selected_list.itemDoubleClicked.connect(lambda _item: self._remove_selected())
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -578,8 +749,14 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         layout.addWidget(list_widget)
         return panel
 
+    def _on_available_double_clicked(self, item) -> None:
+        # 双击分组标题不做任何事：标题行不可选中，若照旧调 _add_selected，
+        # 会把「上一次选中残留」当成双击结果顺带加进去。
+        if _is_site_item(item):
+            self._add_selected()
+
     def _refresh_lists(self) -> None:
-        _setup_site_list(self.available_list, self._palette_sites)
+        _setup_site_list(self.available_list, self._palette_sites, grouped=self.available_list.grouped)
         _setup_site_list(self.selected_list, self._selected_sites)
 
     def _add_selected(self) -> None:

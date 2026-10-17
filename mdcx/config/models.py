@@ -166,6 +166,163 @@ SCRAPING_TYPE_SITE_FIELDS = {
     FixedScrapingType.DONGMAN: "website_dongman",
 }
 
+# 六组「类型刮削网站」默认名单（用户最终口径，组内先后即优先级递减，不得重排）。
+#
+# 这里一处定义、两个用途：
+#   1. Config.website_youma / wuma / suren / fc2 / oumei / guochan 的出厂默认值；
+#   2. 「软件设置-刮削网站-类型刮削网站-编辑网站」里「可用网站」候选区的分类分组依据
+#      （见 controllers/main_window/site_priority_dialog.py 的 grouped_palette_entries）。
+# 两处同源，才不会出现「默认名单是一套、候选区分组又是另一套」的自相矛盾。
+#
+# 组序 = 有码 / 无码 / 素人 / FC2 / 欧美 / 国产，与 UI 的分组标题顺序一致。
+# 一个站点可同属多组（它是多个类型的可用来源），各组之间互不影响。
+TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
+    FixedScrapingType.YOUMA: (
+        # 官网 / 厂牌 / 官方接口
+        Website.DMM,
+        Website.DMM_API,
+        Website.LIBREDMM,
+        Website.AVENTERTAINMENTS,
+        Website.DAHLIA,
+        Website.FALENO,
+        Website.MGSTAGE,
+        Website.PRESTIGE,
+        Website.OFFICIAL,
+        # 第三方 / 聚合站
+        Website.AVBASE,
+        Website.AVMOO,
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
+        Website.JAVBUS,
+        Website.JAVDAY,
+        Website.JAVFREE,
+        Website.MMTV,
+        Website.AIRAV_CC,
+        Website.FREEJAVBT,
+        Website.IQQTV,
+        Website.LULUBAR,
+        Website.MISSAV,
+        Website.MISSAV_API,
+        Website.R18DEV,
+        Website.XCITY,
+        Website.THEJAVDB_API,
+        Website.JAVLIBRARY,
+        Website.AVSEX,
+        Website.GETCHU,
+    ),
+    FixedScrapingType.WUMA: (
+        # 官网 / 厂牌 / 官方接口
+        Website.AVENTERTAINMENTS,
+        Website.AVSOX,
+        Website.OFFICIAL,
+        # 第三方 / 聚合站
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
+        Website.JAVBUS,
+        Website.JAVDAY,
+        Website.JAVFREE,
+        Website.MMTV,
+        Website.AIRAV_CC,
+        Website.FREEJAVBT,
+        Website.IQQTV,
+        Website.LULUBAR,
+        Website.MISSAV,
+        Website.MISSAV_API,
+        Website.AVSEX,
+        Website.GETCHU,
+    ),
+    FixedScrapingType.SUREN: (
+        # 官网 / 厂牌 / 官方接口
+        Website.DMM,
+        Website.DMM_API,
+        Website.LIBREDMM,
+        Website.AVENTERTAINMENTS,
+        Website.MGSTAGE,
+        Website.PRESTIGE,
+        Website.OFFICIAL,
+        # 第三方 / 聚合站
+        Website.AVBASE,
+        Website.AVMOO,
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
+        Website.JAVBUS,
+        Website.JAVDAY,
+        Website.JAVFREE,
+        Website.MMTV,
+        Website.AIRAV_CC,
+        Website.FREEJAVBT,
+        Website.IQQTV,
+        Website.LULUBAR,
+        Website.MISSAV,
+        Website.MISSAV_API,
+        Website.R18DEV,
+        Website.XCITY,
+        Website.THEJAVDB_API,
+        Website.JAVLIBRARY,
+        Website.AVSEX,
+        Website.GETCHU,
+    ),
+    FixedScrapingType.FC2: (
+        # 官网 / 厂牌 / 官方接口
+        Website.AVSOX,
+        Website.FC2,
+        Website.FC2PPVDB,
+        # 第三方 / 聚合站
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
+        Website.JAVBUS,
+        Website.JAVDAY,
+        Website.JAVFREE,
+        Website.MMTV,
+        Website.IQQTV,
+        Website.MISSAV,
+        Website.MISSAV_API,
+        Website.AVSEX,
+        Website.GETCHU,
+    ),
+    FixedScrapingType.OUMEI: (
+        # 官网 / 厂牌 / 官方接口
+        Website.THEPORNDB,
+        Website.AVHEAT,
+        # 第三方 / 聚合站
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
+        Website.JAVBUS,
+        Website.JAVDAY,
+        Website.MMTV,
+        Website.MISSAV,
+        Website.MISSAV_API,
+        Website.IQQTV,
+        Website.JAVFREE,
+        Website.AVSEX,
+        Website.GETCHU,
+    ),
+    FixedScrapingType.GUOCHAN: (
+        # 官网 / 厂牌 / 官方接口
+        Website.MADOUQU,
+        Website.MADOUCLUB,
+        # 第三方 / 聚合站
+        Website.AVSEX,
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
+        Website.JAVBUS,
+        Website.JAVDAY,
+        Website.JAVFREE,
+        Website.MMTV,
+        Website.IQQTV,
+        Website.MISSAV,
+        Website.MISSAV_API,
+        Website.GETCHU,
+    ),
+}
+
+
 DEFAULT_FIELD_SITE_PRIORITY = [
     Website.THEPORNDB,
     Website.AVHEAT,
@@ -491,160 +648,29 @@ class Config(BaseModel):
     # region: Website Settings
     website_single: Website = Field(default=Website.AIRAV_CC, title="单个网站")  # todo 移除
     website_youma: list[Website] = Field(
-        default_factory=lambda: [
-            # 官网 / 厂牌 / 官方接口
-            Website.DMM,
-            Website.DMM_API,
-            Website.LIBREDMM,
-            Website.AVENTERTAINMENTS,
-            Website.DAHLIA,
-            Website.FALENO,
-            Website.MGSTAGE,
-            Website.PRESTIGE,
-            Website.OFFICIAL,
-            # 第三方 / 聚合站
-            Website.AVBASE,
-            Website.AVMOO,
-            Website.JAVDB,
-            Website.JAVDB_API,
-            Website.JAVDB_APP,
-            Website.JAVBUS,
-            Website.JAVDAY,
-            Website.JAVFREE,
-            Website.MMTV,
-            Website.AIRAV_CC,
-            Website.FREEJAVBT,
-            Website.IQQTV,
-            Website.LULUBAR,
-            Website.MISSAV,
-            Website.MISSAV_API,
-            Website.R18DEV,
-            Website.XCITY,
-            Website.THEJAVDB_API,
-            Website.JAVLIBRARY,
-            Website.AVSEX,
-            Website.GETCHU,
-        ],
+        default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.YOUMA]),
         title="有码网站源",
     )
     website_wuma: list[Website] = Field(
-        default_factory=lambda: [
-            # 官网 / 厂牌 / 官方接口
-            Website.AVENTERTAINMENTS,
-            Website.AVSOX,
-            Website.OFFICIAL,
-            # 第三方 / 聚合站
-            Website.JAVDB,
-            Website.JAVDB_API,
-            Website.JAVDB_APP,
-            Website.JAVBUS,
-            Website.JAVDAY,
-            Website.JAVFREE,
-            Website.MMTV,
-            Website.AIRAV_CC,
-            Website.FREEJAVBT,
-            Website.IQQTV,
-            Website.LULUBAR,
-            Website.MISSAV,
-            Website.MISSAV_API,
-            Website.AVSEX,
-            Website.GETCHU,
-        ],
+        default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.WUMA]),
         title="无码网站源",
     )
+    # 注意：MyWife 不在任何类型组里。它由「网站偏好-指定网站」或路径含 MyWife 时
+    # 经 file_crawler 的 website= 覆盖单独指定，走的是另一条通道。
     website_suren: list[Website] = Field(
-        default_factory=lambda: [
-            # 官网 / 厂牌 / 官方接口
-            Website.DMM,
-            Website.DMM_API,
-            Website.LIBREDMM,
-            Website.AVENTERTAINMENTS,
-            Website.MGSTAGE,
-            Website.PRESTIGE,
-            Website.OFFICIAL,
-            # 第三方 / 聚合站
-            Website.AVBASE,
-            Website.AVMOO,
-            Website.JAVDB,
-            Website.JAVDB_API,
-            Website.JAVDB_APP,
-            Website.JAVBUS,
-            Website.JAVDAY,
-            Website.JAVFREE,
-            Website.MMTV,
-            Website.AIRAV_CC,
-            Website.FREEJAVBT,
-            Website.IQQTV,
-            Website.LULUBAR,
-            Website.MISSAV,
-            Website.MISSAV_API,
-            Website.R18DEV,
-            Website.XCITY,
-            Website.THEJAVDB_API,
-            Website.JAVLIBRARY,
-            Website.AVSEX,
-            Website.GETCHU,
-            # 注意：MyWife 不在本组。它由「网站偏好-指定网站」或路径含 MyWife 时
-            # 经 file_crawler 的 website= 覆盖单独指定，不走任何类型组名单。
-        ],
+        default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.SUREN]),
         title="素人网站源",
     )
     website_fc2: list[Website] = Field(
-        default_factory=lambda: [
-            Website.AVSOX,
-            Website.FC2,
-            Website.FC2PPVDB,
-            Website.JAVDB,
-            Website.JAVDB_API,
-            Website.JAVDB_APP,
-            Website.JAVBUS,
-            Website.JAVDAY,
-            Website.JAVFREE,
-            Website.MMTV,
-            Website.IQQTV,
-            Website.MISSAV,
-            Website.MISSAV_API,
-            Website.AVSEX,
-            Website.GETCHU,
-        ],
+        default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.FC2]),
         title="FC2网站源",
     )
     website_oumei: list[Website] = Field(
-        default_factory=lambda: [
-            Website.THEPORNDB,
-            Website.AVHEAT,
-            Website.JAVDB,
-            Website.JAVDB_API,
-            Website.JAVDB_APP,
-            Website.JAVBUS,
-            Website.JAVDAY,
-            Website.MMTV,
-            Website.MISSAV,
-            Website.MISSAV_API,
-            Website.IQQTV,
-            Website.JAVFREE,
-            Website.AVSEX,
-            Website.GETCHU,
-        ],
+        default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.OUMEI]),
         title="欧美网站源",
     )
     website_guochan: list[Website] = Field(
-        default_factory=lambda: [
-            Website.MADOUQU,
-            Website.MADOUCLUB,
-            Website.AVSEX,
-            Website.JAVDB,
-            Website.JAVDB_API,
-            Website.JAVDB_APP,
-            Website.JAVBUS,
-            Website.JAVDAY,
-            Website.JAVFREE,
-            Website.MMTV,
-            Website.IQQTV,
-            Website.MISSAV,
-            Website.MISSAV_API,
-            Website.GETCHU,
-        ],
+        default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.GUOCHAN]),
         title="国产网站源",
     )
     website_dongman: list[Website] = Field(
