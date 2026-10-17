@@ -248,7 +248,7 @@ class FalenoCrawler(GenericBaseCrawler[FalenoContext]):
     # 2026-10-17 从 Official 拆出独立站点：Faleno 作为厂牌官网，番号前缀
     # FNS/FLN/JIMMY 由 core.file_crawler.BRAND_PREFIX_SITES 锁定到本站；
     # Official 侧保留 FNS/JIMMY 同前缀回退。
-    description = "有码：仅能有码"
+    description = "有码：仅限有码"
     # FNS 系列真实作品（见 tests/crawlers/test_faleno.py 测试数据），官网搜索可命中
     probe_number = "FNS-165"
     parser = FalenoParser()

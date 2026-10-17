@@ -200,6 +200,8 @@ def load_config(self: "MyMAinWindow"):
         self.Ui.lineEdit_website_oumei.setText(",".join([site.value for site in manager.config.website_oumei]))
         # 国产番号刮削网站
         self.Ui.lineEdit_website_guochan.setText(",".join([site.value for site in manager.config.website_guochan]))
+        # 动漫里番刮削网站
+        self.Ui.lineEdit_website_dongman.setText(",".join([site.value for site in manager.config.website_dongman]))
         # 锁定刮削类型
         _type_labels = ["自动判断", "有码", "无码", "素人", "FC2", "欧美", "国产", "动漫"]
         _type_values = ["auto", "youma", "wuma", "suren", "fc2", "oumei", "guochan", "dongman"]

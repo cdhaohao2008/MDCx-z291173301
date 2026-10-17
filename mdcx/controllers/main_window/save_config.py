@@ -164,6 +164,7 @@ def save_config(self: "MyMAinWindow"):
     manager.config.website_fc2 = get_sites(self.Ui.lineEdit_website_fc2.text())
     manager.config.website_oumei = get_sites(self.Ui.lineEdit_website_oumei.text())
     manager.config.website_guochan = get_sites(self.Ui.lineEdit_website_guochan.text())
+    manager.config.website_dongman = get_sites(self.Ui.lineEdit_website_dongman.text())
     # 动漫网站源保存（无独立输入框时保持默认值）
     # manager.config.website_dongman 保留当前配置
     _type_values = ["auto", "youma", "wuma", "suren", "fc2", "oumei", "guochan", "dongman"]

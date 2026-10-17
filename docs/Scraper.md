@@ -38,8 +38,8 @@ MDCx 刮削网站类型汇总表
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
     JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
     JavFree           https://javfree.me                菜单 Censored…Uncensored / FC2 / Caribbeancom / 1pondo / Heyzo / 10musume
-    Javlibrary·镜像    https://www.f101w.com/cn           zlibz.com 公布的 JavLibrary 镜像（无 CF 墙，默认中文页 /cn）
     JavLibrary        https://www.javlibrary.com        业界标准 有碼/無碼/FC2 三分类（Cloudflare 拦截，经公开资料交叉确认）
+    Javlibrary·镜像    https://www.f101w.com/cn           zlibz.com 公布的 JavLibrary 镜像（无 CF 墙，默认中文页 /cn）
     Lulubar           https://lulubar.co                lulubar.co。HTML 关键词命中 有码/无码/欧美/素人/国产
     Missav            https://missav.ws                 混合：有码 + 无码 + 素人（IPBZ-023 / INMR-029 等 IP 女優流出）
     Missav_API        https://missav.ws                 Missav 接口实现（fourhoi.com）
@@ -47,16 +47,16 @@ MDCx 刮削网站类型汇总表
     TheJavDB          https://thejavdb.net              thejavdb.net 网页版，取数走它自己的免 CF 接口
 
 ================================================================================================================
-【无码（无修正 / 流出）】  合计 16 站   （官网 3 + 第三方 13）
+【无码（无修正 / 流出）】  合计 16 站   （官网 2 + 第三方 14）
 ================================================================================================================
-  ── 官网 / 厂牌 / 官方接口 (3) ──
-    AVEntertainments  https://www.aventertainments.com  AV 安态。「正規無修正」DVD 販売 / 配信
+  ── 官网 / 厂牌 / 官方接口 (2) ──
     Official                                            官网聚合入口。30 家有码片商官网 + 5 家无码官网 JSON 直连；按番号前缀路由
 
-  ── 第三方 / 聚合站 (13) ──
+  ── 第三方 / 聚合站 (14) ──
     7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     Airav.cc          https://airav.io                  airav.io。分类磁贴含 素人 / 無碼，按分类切换有码/无码
     AVSOX             https://avsox.click               avsox.click。与 avmoo/avheat 同 tellme.pw AIO 平台，纯无码
+    AVEntertainments  https://www.aventertainments.com  AV 安态。「正規無修正」DVD 販売 / 配信
     FreeJavBT         https://freejavbt22.cc            导航 有碼 / 無碼 / 歐美 / FC2 + 系列 LUXU / ARA / SIRO / AV Bro
     IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
     JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
@@ -94,8 +94,8 @@ MDCx 刮削网站类型汇总表
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
     JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
     JavFree           https://javfree.me                菜单 Censored…Uncensored / FC2 / Caribbeancom / 1pondo / Heyzo / 10musume
-    Javlibrary·镜像    https://www.f101w.com/cn           zlibz.com 公布的 JavLibrary 镜像（无 CF 墙，默认中文页 /cn）
     JavLibrary        https://www.javlibrary.com        业界标准 有碼/無碼/FC2 三分类（Cloudflare 拦截，经公开资料交叉确认）
+    Javlibrary·镜像    https://www.f101w.com/cn           zlibz.com 公布的 JavLibrary 镜像（无 CF 墙，默认中文页 /cn）
     Lulubar           https://lulubar.co                lulubar.co。HTML 关键词命中 有码/无码/欧美/素人/国产
     Missav            https://missav.ws                 混合：有码 + 无码 + 素人（IPBZ-023 / INMR-029 等 IP 女優流出）
     Missav_API        https://missav.ws                 Missav 接口实现（fourhoi.com）
@@ -170,15 +170,16 @@ MDCx 刮削网站类型汇总表
     PacopacoMama      https://www.pacopacomama.com            「パコパコママ - 人妻・熟女専門アダルト動画」
 
 ================================================================================================================
-【补充类别】里番 / 同人 / 书籍 / 动漫（MDCx 内置 dongman 组，不属于上述六类）
+【动漫里番（里番 / 同人 / 书籍 / 动漫，MDCx 内置 dongman 类型组）】  合计 4 站
 ================================================================================================================
     Getchu            http://www.getchu.com                   里番/同人志/书籍/动漫商品邮购；DLID* 前缀强制路由本站
     JavDB             https://javdb.com                       Tags 含 Anime
     JavDB_API         https://javdb573.com                    同 JavDB
+    JavDB_APP         https://javdbapp.com                    同 JavDB（App 接口，免 CF）
 
-    注：Getchu 不在上面六组默认名单里（原站与 avsex.cc 对大陆 IP 都过不了 Cloudflare
-        墙，加进来只会白挂一次请求，2.5.6 起从六组名单移除）；本类别说的是「该站还能处理
-        里番/动漫这类非番号内容」，与默认名单不冲突。
+    注：这一组现在也是「类型刮削网站」下的一个类型（动漫里番），默认勾这 4 个站；
+        Getchu 在前六组里都没有（原站与 avsex.cc 对大陆 IP 都过不了 Cloudflare 墙，
+        加进来只会白挂一次请求，2.5.6 起从前六组移除），只有动漫里番这一组默认带着它。
 
     MyWife 不在任何一组里：它是「人妻・熟女・3P」独立系列，既非有码厂牌编号、也不落无码/
     FC2/欧美/国产任一类，走「网站偏好 → 指定网站」或路径含 mywife 单独指定。
@@ -190,20 +191,20 @@ MDCx 刮削网站类型汇总表
 站点              MDCx 站点说明             实访内容类型                      官网地址                                探针番号
 ----------------------------------------------------------------------------------------------------------------
 7mmtv             综合：有码+无码+素人+FC2   有码+无码+素人+FC2+国产           https://www.7mmtv.sx                    
-Airav.cc          有码：仅能有码            有码+无码+素人                    https://airav.io                        
+Airav.cc          有码：仅限有码            有码+无码+素人                    https://airav.io                        
 AVBase            有码：有码+素人           有码+素人                         https://www.avbase.net                  
-AVEntertainments  无码：DVD                无码（有码侧待核实）              https://www.aventertainments.com        TRG-095
+AVEntertainments  无码：仅限无码            无码（该站只有无码番号）              https://www.aventertainments.com        TRG-095
 AVheat            欧美：欧美番号            欧美                              https://avheat.shop                     Men.26.08.17
-AVMOO             有码：仅能有码            有码                              https://avmoo.shop                      
+AVMOO             有码：仅限有码            有码                              https://avmoo.shop                      
 AVSEX             综合：有码+无码+国产       有码+无码+国产                    https://avsex.cc                        SSNI-452
-AVSOX             无码：仅能无码            无码                              https://avsox.click                     081826_100
-Dahlia            有码：仅能有码            有码                              https://dahlia-av.jp                    DLDSS-539
-DMM               有码：仅能有码            有码+素人                                                                 
-DMM_API           有码：仅能有码            有码                              https://api.dmm.com                     
-Faleno            有码：仅能有码            有码                              https://faleno.jp                       FNS-165
+AVSOX             无码：仅限无码            无码                              https://avsox.click                     081826_100
+Dahlia            有码：仅限有码            有码                              https://dahlia-av.jp                    DLDSS-539
+DMM               有码：仅限有码            有码+素人                                                                 
+DMM_API           有码：仅限有码            有码                              https://api.dmm.com                     
+Faleno            有码：仅限有码            有码                              https://faleno.jp                       FNS-165
 FC2               FC2：FC2官网             无码+素人+FC2                     https://adult.contents.fc2.com          FC2-4680562
 FC2PPVDB          FC2：FC2网站             素人+FC2                          https://fc2cmadb.com                    FC2-4988506
-FreeJavBT         有码：仅能有码            有码+无码+FC2+欧美                https://freejavbt22.cc                  
+FreeJavBT         有码：仅限有码            有码+无码+FC2+欧美                https://freejavbt22.cc                  
 Getchu            综合：有码+游戏+视频       有码（另有里番/同人/书籍/动漫）   http://www.getchu.com                   AIV
 IQQTV             综合：有码+无码+素人+国产  有码+无码+素人+欧美+国产          https://iqqq3.quest                     
 JavBus            综合：有码+无码           有码+无码+FC2+欧美                https://www.dmmsee.cyou                 
@@ -212,22 +213,22 @@ JavDB             综合：有码+无码           有码+无码+FC2+欧美     
 JavDB_API         综合：有码+无码           有码+无码+FC2+欧美                https://javdb573.com                    
 JavDB_APP         综合：有码+无码           有码+无码+FC2+欧美                https://apidd.czssdgz.com               
 JavFree           综合：有码+FC2            有码+无码+FC2                     https://javfree.me                      SSNI-647
-JavLibrary        有码：仅能有码            有码+无码+FC2                     https://www.javlibrary.com              
-Javlibrary·镜像   有码：仅能有码                同 JavLibrary（默认中文页 /cn）  https://www.f101w.com/cn              
-LibreDMM          有码：仅能有码            有码                              https://www.libredmm.com                IPX-535
-Lulubar           综合：仅能有码            有码+无码+素人+欧美+国产          https://lulubar.co                      IPZZ-547
+JavLibrary        有码：仅限有码            有码+无码+FC2                     https://www.javlibrary.com              
+Javlibrary·镜像   有码：仅限有码                同 JavLibrary（默认中文页 /cn）  https://www.f101w.com/cn              
+LibreDMM          有码：仅限有码            有码                              https://www.libredmm.com                IPX-535
+Lulubar           综合：仅限有码            有码+无码+素人+欧美+国产          https://lulubar.co                      IPZZ-547
 Madou.club        麻豆：国产番号            国产                              https://madou.club                      MDX0236
-Madouqu           国产：仅能国产            国产                              https://madouqu.shop                    MDX0216
+Madouqu           国产：仅限国产            国产                              https://madouqu.shop                    MDX0216
 MGStage           有码：有码+素人           有码+素人                         https://www.mgstage.com                 ABF-389
 Missav            综合：有码+无码           有码+无码+素人                    https://missav.ws                       
 Missav_API        综合：有码+无码           有码+无码+素人                    https://missav.ws                       
 MyWife            素人：MyWife系列          不进任何类型组（单独指定）        https://mywife.cc                       mywife-2306
 Official          综合：有码+无码           有码+无码                                                                 
 Prestige          有码：有码+素人           有码+素人                         https://www.prestige-av.com             ABW-130
-R18.dev           有码：仅能有码            有码                              https://r18.dev                         
-TheJavDB          有码：仅能有码            有码                              https://thejavdb.net             
+R18.dev           有码：仅限有码            有码                              https://r18.dev                         
+TheJavDB          有码：仅限有码            有码                              https://thejavdb.net             
 ThepornDB         欧美：欧美番号            无码+欧美                         https://api.theporndb.net               
-Xcity             综合：仅能有码            有码                              https://tc.xcity.jp                     ABF-050
+Xcity             综合：仅限有码            有码                              https://tc.xcity.jp                     ABF-050
 
 ################################################################################################################
 # 第三部分   调度机制：字段优先级 / 联动组 / 排除项 / 强制单站路由

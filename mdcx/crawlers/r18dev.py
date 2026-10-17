@@ -184,7 +184,7 @@ async def _upgrade_dmm_cover(ctx, data: CrawlerData) -> None:
 
 
 class R18DevCrawler(BaseCrawler):
-    description = "有码：仅能有码"
+    description = "有码：仅限有码"
     _last_request_at: float = 0.0
 
     @classmethod

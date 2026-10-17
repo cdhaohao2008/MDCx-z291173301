@@ -3782,22 +3782,6 @@ class Ui_MDCx(object):
         )
         self.label_151.setObjectName("label_151")
         self.gridLayout_36.addWidget(self.label_151, 2, 0, 1, 1)
-        self.label_316 = QtWidgets.QLabel(parent=self.layoutWidget_6)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.label_316.sizePolicy().hasHeightForWidth())
-        self.label_316.setSizePolicy(sizePolicy)
-        self.label_316.setMinimumSize(QtCore.QSize(0, 30))
-        self.label_316.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
-        self.label_316.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        self.label_316.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignRight
-            | QtCore.Qt.AlignmentFlag.AlignTrailing
-            | QtCore.Qt.AlignmentFlag.AlignVCenter
-        )
-        self.label_316.setObjectName("label_316")
-        self.gridLayout_36.addWidget(self.label_316, 13, 0, 1, 1)
         self.lineEdit_website_fc2 = QtWidgets.QLineEdit(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -3926,17 +3910,6 @@ class Ui_MDCx(object):
         self.label_155.setWordWrap(False)
         self.label_155.setObjectName("label_155")
         self.gridLayout_36.addWidget(self.label_155, 3, 1, 1, 3)
-        self.label_318 = QtWidgets.QLabel(parent=self.layoutWidget_6)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.label_318.sizePolicy().hasHeightForWidth())
-        self.label_318.setSizePolicy(sizePolicy)
-        self.label_318.setStyleSheet("color: rgb(8, 128, 128);")
-        self.label_318.setMaximumSize(QtCore.QSize(16777215, 34))
-        self.label_318.setWordWrap(True)
-        self.label_318.setObjectName("label_318")
-        self.gridLayout_36.addWidget(self.label_318, 13, 1, 1, 3)
         self.label_323 = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -3952,6 +3925,55 @@ class Ui_MDCx(object):
             20, 9, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
         )
         self.gridLayout_36.addItem(spacerItem3, 12, 0, 1, 4)
+        self.label_dongman_sites = QtWidgets.QLabel(parent=self.layoutWidget_6)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.label_dongman_sites.sizePolicy().hasHeightForWidth())
+        self.label_dongman_sites.setSizePolicy(sizePolicy)
+        self.label_dongman_sites.setMinimumSize(QtCore.QSize(120, 30))
+        self.label_dongman_sites.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        self.label_dongman_sites.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.label_dongman_sites.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignRight
+            | QtCore.Qt.AlignmentFlag.AlignTrailing
+            | QtCore.Qt.AlignmentFlag.AlignVCenter
+        )
+        self.label_dongman_sites.setObjectName("label_dongman_sites")
+        self.gridLayout_36.addWidget(self.label_dongman_sites, 13, 0, 1, 1)
+        self.lineEdit_website_dongman = QtWidgets.QLineEdit(parent=self.layoutWidget_6)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.lineEdit_website_dongman.sizePolicy().hasHeightForWidth())
+        self.lineEdit_website_dongman.setSizePolicy(sizePolicy)
+        self.lineEdit_website_dongman.setMinimumSize(QtCore.QSize(300, 30))
+        self.lineEdit_website_dongman.setStyleSheet(
+            ' font: "Courier New";\n'
+            "                                border: 1px solid rgba(0,0,0, 50);\n"
+            "                                border-radius: 15px;\n"
+            ""
+        )
+        self.lineEdit_website_dongman.setObjectName("lineEdit_website_dongman")
+        self.gridLayout_36.addWidget(self.lineEdit_website_dongman, 13, 1, 1, 1)
+        self.pushButton_edit_website_dongman = QtWidgets.QPushButton(parent=self.layoutWidget_6)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.pushButton_edit_website_dongman.sizePolicy().hasHeightForWidth())
+        self.pushButton_edit_website_dongman.setSizePolicy(sizePolicy)
+        self.pushButton_edit_website_dongman.setMinimumSize(QtCore.QSize(0, 28))
+        self.pushButton_edit_website_dongman.setObjectName("pushButton_edit_website_dongman")
+        self.gridLayout_36.addWidget(self.pushButton_edit_website_dongman, 13, 2, 1, 1)
+        self.pushButton_priority_website_dongman = QtWidgets.QPushButton(parent=self.layoutWidget_6)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.pushButton_priority_website_dongman.sizePolicy().hasHeightForWidth())
+        self.pushButton_priority_website_dongman.setSizePolicy(sizePolicy)
+        self.pushButton_priority_website_dongman.setMinimumSize(QtCore.QSize(0, 28))
+        self.pushButton_priority_website_dongman.setObjectName("pushButton_priority_website_dongman")
+        self.gridLayout_36.addWidget(self.pushButton_priority_website_dongman, 13, 3, 1, 1)
         spacerItem4 = QtWidgets.QSpacerItem(
             20, 9, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
         )
@@ -13429,7 +13451,6 @@ class Ui_MDCx(object):
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab1), _translate("MDCx", " 刮削模式 "))
         self.groupBox_80.setTitle(_translate("MDCx", "类型刮削网站"))
         self.label_151.setText(_translate("MDCx", "无码番号："))
-        self.label_316.setText(_translate("MDCx", "动漫里番："))
         self.label_322.setText(_translate("MDCx", "MyWifes："))
         self.label_232.setText(
             _translate(
@@ -13442,18 +13463,15 @@ class Ui_MDCx(object):
         self.label_158.setText(_translate("MDCx", "比如：sexart.11.11.11"))
         self.label_149.setText(_translate("MDCx", "欧美番号："))
         self.label_155.setText(_translate("MDCx", "比如：111111-111，111111_111，n1111，HEYZO-1111，SMD-111"))
-        self.label_318.setText(
-            _translate(
-                "MDCx",
-                "<p>「网站偏好」-「指定网站」指定Getchu、DMM等站点或者文件路径里包含有「里番」、「动漫」时，程序将会自动使用Getchu进行刮削</p>",
-            )
-        )
         self.label_323.setText(
             _translate(
                 "MDCx",
                 "<p>「网站偏好」-「指定网站」指定MyWife或文件路径里含有MyWife时，程序将自动使用MyWife刮削，MyWife番号规则：MyWife No.1230</p>",
             )
         )
+        self.label_dongman_sites.setText(_translate("MDCx", "动漫里番："))
+        self.pushButton_edit_website_dongman.setText(_translate("MDCx", "编辑网站"))
+        self.pushButton_priority_website_dongman.setText(_translate("MDCx", "字段优先级"))
         self.label_154.setText(_translate("MDCx", "比如：MIDE-111，以及不符合以下类型的番号"))
         self.label_152.setText(_translate("MDCx", "素人番号："))
         self.label_153.setText(_translate("MDCx", "有码番号："))
@@ -14556,12 +14574,13 @@ class Ui_MDCx(object):
                 "<h4>四、网站选择</h4>\n"
                 "<p>网站下拉框由已注册的爬虫自动生成，当前53个，可按需选用全部网站或指定网站；下列六组即「软件设置→刮削网站」里各类型的默认名单（组内顺序即优先级，从高到低），可在设置中自行增删与调序：</p>\n"
                 "<ul>\n"
-                "<li><b>有码</b>：DMM、DMM_API、LibreDMM、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、Javlibrary·镜像、JavLibrary</li>\n"
-                "<li><b>无码</b>：AVEntertainments、AVSOX、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API</li>\n"
-                "<li><b>素人</b>：DMM、DMM_API、LibreDMM、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、Javlibrary·镜像、JavLibrary</li>\n"
+                "<li><b>有码</b>：DMM、DMM_API、LibreDMM、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像</li>\n"
+                "<li><b>无码</b>：AVSOX、AVEntertainments、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API</li>\n"
+                "<li><b>素人</b>：DMM、DMM_API、LibreDMM、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像</li>\n"
                 "<li><b>FC2 ：</b>FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
                 "<li><b>国产</b>：Madouqu、Madou.club、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
                 "<li><b>欧美</b>：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、Missav、Missav_API、IQQTV、JavFree</li>\n"
+                "              <li><b>动漫</b>：Getchu、JavDB、JavDB_API、JavDB_APP</li>\n"
                 "<li><b>MyWife</b>：不属于任何类型组的默认名单，需在「网站偏好」-「指定网站」勾选MyWife或让文件路径含MyWife才会启用</li>\n"
                 "<li><b>官网</b>：Dahlia、Faleno、MGStage、Prestige、Official已在网站源列表中单列，视频命中对应前缀时将自动路由锁定该站</li>\n"
                 "</ul>\n"

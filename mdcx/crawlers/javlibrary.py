@@ -146,7 +146,7 @@ def language_path(language: Language) -> str:
 
 
 class JavLibraryCrawler(BaseCrawler):
-    description = "有码：仅能有码"
+    description = "有码：仅限有码"
 
     @classmethod
     @override

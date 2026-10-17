@@ -207,13 +207,13 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         Website.XCITY,
         Website.THEJAVDB,
         # 镜像站排在原站前面：原站对大陆 IP 有 CF 墙，镜像没有，可达性优先
-        Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
+        Website.JAVLIBRARY_MIRROR,
     ),
     FixedScrapingType.WUMA: (
         # 官网 / 厂牌 / 官方接口
-        Website.AVENTERTAINMENTS,
         Website.AVSOX,
+        Website.AVENTERTAINMENTS,
         Website.OFFICIAL,
         # 第三方 / 聚合站
         Website.JAVDB,
@@ -258,8 +258,8 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         Website.XCITY,
         Website.THEJAVDB,
         # 镜像站排在原站前面：原站对大陆 IP 有 CF 墙，镜像没有，可达性优先
-        Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
+        Website.JAVLIBRARY_MIRROR,
     ),
     FixedScrapingType.FC2: (
         # 官网 / 厂牌 / 官方接口
@@ -309,6 +309,14 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         Website.IQQTV,
         Website.MISSAV,
         Website.MISSAV_API,
+    ),
+    # 动漫里番：番号库里没有的「里番 / 同人 / 书籍 / 动漫」条目，只能靠这几个站找到——
+    # Getchu 的 DLID* 前缀会强制路由本站，JavDB 三源用 Tags=Anime。
+    FixedScrapingType.DONGMAN: (
+        Website.GETCHU,
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
     ),
 }
 
@@ -670,11 +678,7 @@ class Config(BaseModel):
         title="国产网站源",
     )
     website_dongman: list[Website] = Field(
-        default_factory=lambda: [
-            Website.GETCHU,
-            Website.JAVDB,
-            Website.JAVDB_API,
-        ],
+        default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.DONGMAN]),
         title="动漫网站源",
     )
     fixed_scraping_type: FixedScrapingType = Field(

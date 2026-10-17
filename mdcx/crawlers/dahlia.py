@@ -82,7 +82,7 @@ def get_trailer(html):  # 获取预览片
 class DahliaCrawler(BaseCrawler):
     # 2026-10-17 从 Official 拆出独立站点：Dahlia 作为厂牌官网，番号前缀 DLDSS
     # 由 core.file_crawler.BRAND_PREFIX_SITES 锁定到本站；Official 侧保留同前缀回退。
-    description = "有码：仅能有码"
+    description = "有码：仅限有码"
     probe_number = "DLDSS-539"
 
     @classmethod

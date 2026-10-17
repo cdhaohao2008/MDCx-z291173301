@@ -171,12 +171,12 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.R18DEV,
         Website.XCITY,
         Website.THEJAVDB,
-        Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
+        Website.JAVLIBRARY_MIRROR,
     ]
     assert config.website_wuma == [
-        Website.AVENTERTAINMENTS,
         Website.AVSOX,
+        Website.AVENTERTAINMENTS,
         Website.OFFICIAL,
         Website.JAVDB,
         Website.JAVDB_API,
@@ -217,8 +217,8 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.R18DEV,
         Website.XCITY,
         Website.THEJAVDB,
-        Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
+        Website.JAVLIBRARY_MIRROR,
     ]
     # MyWife 由「指定网站」或路径含 MyWife 单独指定（file_crawler 走 website= 覆盖），
     # 不进任何类型组名单，素人组里不该有它。

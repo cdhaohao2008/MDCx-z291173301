@@ -96,7 +96,7 @@ class _DmmApiItem(BaseModel):
 
 
 class DmmApiCrawler(DmmCrawler):
-    description = "有码：仅能有码"
+    description = "有码：仅限有码"
 
     @staticmethod
     def _log(message: str):

@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import QApplication, QListWidget, QMenu  # noqa: E402
 from mdcx.config.enums import Website  # noqa: E402
 from mdcx.config.models import FieldPriorityConfig  # noqa: E402
 from mdcx.controllers.main_window.site_priority_dialog import (  # noqa: E402
+    PALETTE_SORT_KEYS,
     FieldPriorityDialog,
     SiteListEditorDialog,
     SitePaletteList,
@@ -44,7 +45,7 @@ ALL_SITES = [Website(site) for site in __import__("mdcx.crawlers", fromlist=["c"
 CUSTOM_ORDER = [Website.XCITY, Website.MGSTAGE, Website.GETCHU, Website.DMM]
 
 # 顶部六个标题的次序（与需求给的次序一致）
-CHIP_ORDER = ["有码", "无码", "素人", "FC2", "欧美", "国产"]
+CHIP_ORDER = ["有码", "无码", "素人", "FC2官网", "欧美", "国产", "动漫里番"]
 
 
 @pytest.fixture(scope="module")
@@ -110,7 +111,7 @@ def _fill_at(list_widget, point) -> str:
 
 
 def _title_rows(palette) -> dict[str, int]:
-    """{标题: 行号}；候选区应当恰好六个标题。"""
+    """{标题: 行号}；候选区应当恰好七个标题（六类 + 动漫里番）。"""
     rows = {str(palette.item(row).text()): row for row in range(palette.count()) if _is_group_item(palette.item(row))}
     assert list(rows) == CHIP_ORDER, f"标题不是 {CHIP_ORDER}：{list(rows)}"
     return rows
@@ -194,7 +195,7 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
 
 @pytest.mark.parametrize(
     ("title", "count"),
-    [("有码", 28), ("无码", 16), ("素人", 26), ("FC2", 13), ("欧美", 12), ("国产", 12)],
+    [("有码", 28), ("无码", 16), ("素人", 26), ("FC2官网", 13), ("欧美", 12), ("国产", 12), ("动漫里番", 4)],
 )
 def test_each_group_title_copies_its_own_list(qt_app, monkeypatch, title, count):
     """六个标题各自复制各自那份名单，互不相等，也不会复制成 39 站。"""
@@ -219,9 +220,9 @@ def test_group_copy_is_readable_back_by_the_parser(qt_app, monkeypatch):
     try:
         _shown(dlg)
         palette = dlg.available_list
-        _right_click(palette, _title_center(palette, "FC2"), monkeypatch, "复制本组")
-        assert _parse_sites(app.clipboard().text()) == _group_at(palette, "FC2")
-        assert app.clipboard().text() == _sites_text(_group_at(palette, "FC2"))
+        _right_click(palette, _title_center(palette, "FC2官网"), monkeypatch, "复制本组")
+        assert _parse_sites(app.clipboard().text()) == _group_at(palette, "FC2官网")
+        assert app.clipboard().text() == _sites_text(_group_at(palette, "FC2官网"))
     finally:
         dlg.deleteLater()
 
@@ -258,7 +259,9 @@ def test_palette_copy_covers_every_site_once(qt_app, monkeypatch):
         _right_click(dlg.available_list, _blank_corner(dlg.available_list), monkeypatch, "复制列表")
         copied = app.clipboard().text().split(",")
         assert len(copied) == len(set(copied)) == len(_list_sites(dlg.available_list))
-        assert copied == sorted(copied, key=str.casefold), "候选区复制出来的不是 A-Z 序"
+        # 少数几站有单独的排序键（PALETTE_SORT_KEYS），比对时用同一把尺子
+        keys = [PALETTE_SORT_KEYS.get(Website(value), value).casefold() for value in copied]
+        assert keys == sorted(keys), "候选区复制出来的不是排序键顺序"
         assert copied[:2] == ["7mmtv", "Airav.cc"]
         # 不属任何一组的 MyWife 也在里面（它只是没有自己的标题，不是不能选）
         assert "MyWife" in copied and copied[-1] == "Xcity"

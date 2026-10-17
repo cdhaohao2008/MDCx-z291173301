@@ -10,7 +10,7 @@
 改前实测（真实主窗口 1014 宽，主题字体下一行说明文字高 17px）：`.ui` 里
 `layoutWidget_6` 声明高 930，而 `gridLayout_36` 的自然高只有 618，多出的 312px 余量
 被 QGridLayout 摊到每一行，于是「输入框 → 说明文字」被撑到 24px（需求 2 的
-「上移一行」= 减 17px）；`label_318` / `label_323` 上还挂着 84px 的硬最小高，把三段
+「上移一行」= 减 17px）；`label_323` 上还挂着 84px 的硬最小高，把两段
 说明下方的块间间隙顶到 51px（需求 1 要的「一行汉字高度」= 17px）。
 
 改后方案（全部落在 .ui，MDCx.py 由 pyuic6 重编译，测试
@@ -18,9 +18,9 @@
 
 * `gridLayout_36` 显式 `verticalSpacing = 7`，单行说明行行高=文字高，故「输入框 →
   说明」「说明 → 下一组控件」两侧都精确为 7px（改前 24px，正好上移一行）；
-* 三段会换行的说明（`label_232` / `label_318` / `label_323`）所在行锚死为 34px
+* 两段会换行的说明（`label_232` / `label_323`）所在行锚死为 34px
   （两行文字的高度：主题字体下一行 17px）：三者都加 `maximumSize` 高度 34，
-  `label_318` / `label_323` 去掉 84px 硬最小高，行高由同行的 `label_316` /
+  `label_323` 去掉 84px 硬最小高，行高由同行的 `label_322` /
   `label_322`（最小高 30）兜底——余量因此全部留在 `layoutWidget_6` 底部，不会再摊到
   行里制造死白；
 * 国产说明 / 动漫里番 / MyWifes / 锁定类型 四个块之间各插一行固定 9px 的
@@ -88,7 +88,13 @@ _ROW_TABLE = {
     10: {"label_217": 0, "lineEdit_website_guochan": 1},
     11: {"label_232": 1},
     12: {"verticalSpacer_guochan_gap": 0},
-    13: {"label_316": 0, "label_318": 1},
+    # 2.5.6 起动漫里番也有自己的输入行（与另外六类一样），排在国产番号下面、MyWifes 上面
+    13: {
+        "label_dongman_sites": 0,
+        "lineEdit_website_dongman": 1,
+        "pushButton_edit_website_dongman": 2,
+        "pushButton_priority_website_dongman": 3,
+    },
     14: {"verticalSpacer_dongman_gap": 0},
     15: {"label_322": 0, "label_323": 1},
     16: {"verticalSpacer_mywifes_gap": 0},
@@ -106,9 +112,11 @@ _DESC_UNDER_CONTROL = [
     ("lineEdit_website_guochan", "label_232"),
 ]
 # 需求 1 —— 块与块之间（说明文字 ↔ 下一块首个控件）＝ 一行汉字高度
+# 动漫里番 2.5.6 起也有自己的输入框（与另外六类一样），所以它那块的结构变成
+# 动漫里番 2.5.6 起也有自己的输入框（与另外六类一样），结构是「块标签 label_dongman_sites
+# + 输入框」；下面的块是 MyWifes（块标签 label_322 + 说明 label_323），再往下才是锁定类型。
 _DESC_TO_NEXT_BLOCK = [
-    ("label_232", "label_316"),
-    ("label_318", "label_322"),
+    ("label_232", "label_dongman_sites"),
     ("label_323", "comboBox_fixed_scraping_type"),
 ]
 # 说明文字下方的控件同步上移（说明底 → 下一控件顶）
@@ -122,7 +130,6 @@ _DESC_TO_NEXT_CONTROL = [
 ]
 # 动漫里番 / MyWifes 两块是「块标签 + 说明」同行（列 0 / 列 1），顶边必须基本齐平
 _LABEL_TO_OWN_DESC = [
-    ("label_316", "label_318"),
     ("label_322", "label_323"),
 ]
 
@@ -261,9 +268,10 @@ def test_grid_row_table_in_ui():
                 column,
             ), f"{name} 应在 gridLayout_36 第 {row} 行第 {column} 列，实为 {got_row}/{got_col}"
 
-    # 行数不得悄悄增加（多一行就多一份 verticalSpacing，整组又会松回去）
+    # 行数不得悄悄增加（多一行就多一份 verticalSpacing，整组又会松回去）。
+    # 唯一一次合法的增加是 2.5.6 给动漫里番补上的输入行（row 16），下面整块顺延一行。
     rows = {int(m) for m in re.findall(r'<item row="(\d+)"', block)}
-    assert rows == set(range(19)), f"gridLayout_36 的行号集合应为 0..18，实为 {sorted(rows)}"
+    assert rows == set(range(19)), f"gridLayout_36 的行号集合应为 0..19，实为 {sorted(rows)}"
 
 
 def test_grid_vertical_spacing_in_ui():
@@ -293,12 +301,12 @@ def test_block_gap_spacers_in_ui():
 def test_wrapped_desc_labels_anchored_at_desc_row_height():
     """三段换行说明不再挂 84px 硬最小高（那是原来 51px 死白的根因），行高锚在 34px。"""
     ui_src = _ui_src()
-    for name in ("label_318", "label_323"):
+    for name in ("label_323",):
         head = _widget_head(ui_src, name)
         assert 'name="minimumSize"' not in head or "84" not in head, f"{name} 不应再保留 84px 硬最小高：{head}"
 
     # 三段说明都用 maximumSize 把所在行钉在两行文字（34px）
-    for name in ("label_232", "label_318", "label_323"):
+    for name in ("label_232", "label_323"):
         block = _widget_block(ui_src, name)
         assert 'name="maximumSize"' in block, f"{name} 应用 maximumSize 锚死行高"
         max_size = block[block.index('name="maximumSize"') :]
@@ -309,7 +317,7 @@ def test_wrapped_desc_labels_anchored_at_desc_row_height():
     assert "Qt::AlignTop" in _widget_block(ui_src, "label_232"), "label_232 必须 AlignTop，否则文字不会紧贴输入框下方"
 
     # 行高由同行的块标签兜底（最小高 30，允许被 34 的说明撑高）
-    for name in ("label_316", "label_322"):
+    for name in ("label_322",):
         head = _widget_head(ui_src, name)
         assert "<height>30</height>" in head, f"{name} 的最小高应为 30（决定说明行高）：{head}"
 
@@ -338,10 +346,6 @@ _WRAPPED_DESC_TEXTS = {
     "label_232": (
         "<span>「网站偏好」-「指定网站」指定Madouqu、Madou.club或者文件路径里含有「国产」、「麻豆」时，"
         "将自动使用以上网站刮削国产番号</span>"
-    ),
-    "label_318": (
-        "<p>「网站偏好」-「指定网站」指定Getchu、DMM等站点或者文件路径里包含有「里番」、「动漫」时，"
-        "程序将会自动使用Getchu进行刮削</p>"
     ),
     "label_323": (
         "<p>「网站偏好」-「指定网站」指定MyWife或文件路径里含有MyWife时，程序将自动使用MyWife刮削，"
@@ -489,7 +493,7 @@ def test_group_keeps_declared_height_and_does_not_overlap_next_group(win, app, w
 
 # 断言宽度取本测试环境（offscreen，见文件头平台钉死）实测「三段说明都只需 ≤34px」的档位：
 #   1920 / 1400 → label_232/318/323 的 heightForWidth 实测 15 / 30 / 30，钉死的 34px 装得下；
-#   1014        → label_323（124 字）在 495px 列宽下折三行 need=45 > 34，已进入下面的「窄态截断」取舍；
+#   1014        → label_323（MyWife 那段）在 495px 列宽下折三行 need=45 > 34，已进入下面的「窄态截断」取舍；
 #   860         → 三段全部 need=45~60，远超 34。
 # 真实 Windows 字体下的门槛要低一档（1014 宽 label_323 正好 need=34 == 34 装得下），那是产品侧的真实
 # 保证；此处退到 1400 纯属离屏平台 QFontDatabase 为空、全部 CJK 落 .notdef 后横向 advance 被放大所致，
@@ -503,7 +507,7 @@ def test_wrapped_desc_text_is_not_clipped(win, app, width):
     """
     _show_at_width(win, app, width)
 
-    for name in ("label_232", "label_318", "label_323"):
+    for name in ("label_232", "label_323"):
         label = getattr(win.Ui, name)
         need = label.heightForWidth(label.width())
         assert label.height() >= need, f"{width} 宽下 {name} 高 {label.height()} < 需要 {need}（文字被截断）"
@@ -528,7 +532,7 @@ def test_wrapped_desc_text_is_not_clipped(win, app, width):
 # ——否则网格自然高度 522→503 而容器仍是 558，QGridLayout 会把少掉的 19px 摊到 18
 # 个 verticalSpacing 上（每档 +1px），结果「动漫里番」只上移 6px 而不是一行（实测）。
 _GUOCHAN_TIP = "label_232"
-_DONGMAN_LABEL = "label_316"  # 「动漫里番：」块标签，用户要求上移的那一行
+_DONGMAN_LABEL = "label_dongman_sites"  # 「动漫里番：」输入行，用户要求上移的那一行
 # 收敛只允许动这一行下方的东西；这三项必须在宽窄两态保持一致（间距不得变化）
 _STATE_INVARIANTS = ("lineEdit_website_youma", "label_154", "lineEdit_website_guochan")
 # 宽窄分档按「本测试环境（offscreen）实测 label_232 折几行 + 是否被拉宽」划分，
@@ -641,7 +645,7 @@ def test_wide_state_moves_dongman_up_without_touching_gaps(win, app, monkeypatch
         *_STATE_INVARIANTS,
         _GUOCHAN_TIP,
         _DONGMAN_LABEL,
-        "label_318",
+        "lineEdit_website_dongman",
         "label_322",
         "label_fixed_scraping_type_desc",
     )
@@ -652,7 +656,7 @@ def test_wide_state_moves_dongman_up_without_touching_gaps(win, app, monkeypatch
             {
                 "input→desc": _gap(win, _GUOCHAN_TIP, "lineEdit_website_guochan"),
                 "desc→dongman": _gap(win, _DONGMAN_LABEL, _GUOCHAN_TIP),
-                "dongman→mywifes": _gap(win, "label_322", "label_318"),
+                "dongman→mywifes": _gap(win, "label_322", _DONGMAN_LABEL),
             },
         )
 

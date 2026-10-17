@@ -37,16 +37,30 @@ import pytest
 
 pytest.importorskip("PyQt6.QtWidgets")
 
-from PyQt6.QtCore import Qt  # noqa: E402
+from PyQt6.QtCore import QPoint, Qt  # noqa: E402
 from PyQt6.QtTest import QTest  # noqa: E402
-from PyQt6.QtWidgets import QApplication  # noqa: E402
+from PyQt6.QtWidgets import (  # noqa: E402
+    QApplication,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+)
 
 from mdcx.config.enums import FixedScrapingType, Website  # noqa: E402
 from mdcx.config.models import TYPE_DEFAULT_SITES, Config  # noqa: E402
 from mdcx.controllers.main_window import site_priority_dialog as spd  # noqa: E402
 from mdcx.controllers.main_window.site_priority_dialog import (  # noqa: E402
+    DIALOG_HEIGHT,
+    FIELD_PALETTE_VISIBLE_ROWS,
+    FIELD_PRIORITY_FIELDS,
+    FIELD_PRIORITY_VISIBLE_ROWS,
     PALETTE_GROUP_TYPES,
+    PALETTE_SORT_KEYS,
+    SITE_EDITOR_PALETTE_ROWS,
+    SITE_EDITOR_SELECTED_ROWS,
+    FieldPriorityDialog,
     SiteListEditorDialog,
+    SitePaletteList,
     _group_sites_at,
     _is_group_item,
     _list_sites,
@@ -88,12 +102,12 @@ USER_SITE_LISTS = {
         "R18.dev",
         "Xcity",
         "TheJavDB",
-        "Javlibrary\u00b7\u955c\u50cf",
         "JavLibrary",
+        "Javlibrary\u00b7\u955c\u50cf",
     ],
     FixedScrapingType.WUMA: [
-        "AVEntertainments",
         "AVSOX",
+        "AVEntertainments",
         "Official",
         "JavDB",
         "JavDB_API",
@@ -134,8 +148,8 @@ USER_SITE_LISTS = {
         "R18.dev",
         "Xcity",
         "TheJavDB",
-        "Javlibrary\u00b7\u955c\u50cf",
         "JavLibrary",
+        "Javlibrary\u00b7\u955c\u50cf",
     ],
     FixedScrapingType.FC2: [
         # FC2 自己家的站排在第三方聚合站前面（提交 e30bdbb 定的序）
@@ -181,10 +195,16 @@ USER_SITE_LISTS = {
         "Missav",
         "Missav_API",
     ],
+    FixedScrapingType.DONGMAN: [
+        "Getchu",
+        "JavDB",
+        "JavDB_API",
+        "JavDB_APP",
+    ],
 }
 
 # 需求标题里给出的分组次序：有码、无码、素人、FC2、欧美、国产
-EXPECTED_GROUP_ORDER = ["有码", "无码", "素人", "FC2", "欧美", "国产"]
+EXPECTED_GROUP_ORDER = ["有码", "无码", "素人", "FC2官网", "欧美", "国产", "动漫里番"]
 
 # 候选区各组的标题（取自 TYPE_TITLES，六组之外的 DONGMAN 不参与分组）
 USER_TITLES = dict(zip(PALETTE_GROUP_TYPES, EXPECTED_GROUP_ORDER, strict=True))
@@ -196,10 +216,11 @@ USER_TITLES_INV = {title: key for key, title in USER_TITLES.items()}
 UNTITLED_GROUP = ""
 EXPECTED_GROUPS = {
     **{title: USER_SITE_LISTS[key] for key, title in USER_TITLES.items()},
-    # AVSEX 与 Getchu 已从六组默认名单移除（对大陆 IP 过不了 CF 墙，2.5.6 起）：
+    # AVSEX 与 Getchu 已从六组默认名单移除（对大陆 IP 过不了 CF 墙，2.5.6 起），
+    # 其中 Getchu 后来进了动漫里番组：
     # 两者现在和 MyWife 一起落到这个无标题的末组里，仍然出现在候选区里可选，
     # 只是没有任何一组会默认勾选它们。
-    UNTITLED_GROUP: ["AVSEX", "Getchu", "MyWife"],
+    UNTITLED_GROUP: ["AVSEX", "MyWife"],
 }
 
 # 非分组的原始顺序：按此断言「全部添加」未被候选区排序污染
@@ -210,6 +231,7 @@ UNGROUPED_ORDER = [
     Website.AVSOX,
     Website.MADOUQU,
     Website.THEPORNDB,
+    Website.GETCHU,
 ]
 
 # 六组各自的 Config 字段名，用于锁「候选区分组 == 配置默认名单」
@@ -220,6 +242,7 @@ TYPE_CONFIG_FIELDS = {
     FixedScrapingType.FC2: "website_fc2",
     FixedScrapingType.OUMEI: "website_oumei",
     FixedScrapingType.GUOCHAN: "website_guochan",
+    FixedScrapingType.DONGMAN: "website_dongman",
 }
 
 
@@ -248,15 +271,23 @@ def dialog(qt_app):
 
 
 def _laid_out(dlg, qt_app):
-    """把对话框摆到固定尺寸并完成布局，拿到可用的 visualItemRect。"""
+    """把「编辑网站」摆到固定尺寸并完成布局，拿到可用的 visualItemRect。"""
     dlg.resize(860, 640)
     dlg.show()
     qt_app.processEvents()
     return dlg.available_list
 
 
+def _shown(dlg, qt_app):
+    """把「字段优先级」摆开并跑完布局（它没有 available_list，只有 _field_lists）。"""
+    dlg.resize(860, DIALOG_HEIGHT)
+    dlg.show()
+    qt_app.processEvents()
+    return dlg
+
+
 def _title_rows(dialog) -> dict[str, int]:
-    """{分组标题: 所在行号}；候选区应当恰好六个标题。"""
+    """{分组标题: 所在行号}；候选区应当恰好七个标题（六类 + 动漫里番）。"""
     rows = {
         str(dialog.available_list.item(row).text()): row
         for row in range(dialog.available_list.count())
@@ -386,7 +417,7 @@ def test_group_without_available_sites_leaves_no_empty_title():
 def test_sites_outside_every_group_are_appended_without_a_title():
     """落在六组之外的站点（如 MyWife）按传入次序接在末尾，但不另起「其他」标题。"""
     groups = grouped_palette_groups([Website.MYWIFE, Website.DMM, Website.AVSOX])
-    assert [title for title, _ in groups] == ["有码", "无码", "素人", "FC2", ""]
+    assert [title for title, _ in groups] == ["有码", "无码", "素人", "FC2官网", ""]
     assert [site.value for site in groups[-1][1]] == ["MyWife"]
 
 
@@ -398,16 +429,27 @@ def test_does_not_mutate_input():
 
 
 def test_palette_site_order_is_alphabetical_without_duplicates():
-    """候选区的站点是一份去重后的 A-Z 名单（用户要「从 DMM 到 MyWife 一路 A-Z 看下去」）。
+    """候选区的站点是一份去重后的 A-Z 名单（用户要「一路 A-Z 看下去」）。
 
-    分组只留在开头那六个标题上；站点本身既不按组分段、也不按各组默认名单的优先级排。
+    分组只留在开头那几个标题上；站点本身既不按组分段、也不按各组默认名单的优先级排。
+    少数几站有单独的排序键（PALETTE_SORT_KEYS），所以比对时用同一把尺子。
     """
     order = palette_site_order(ALL_SITES)
     values = [site.value for site in order]
+    keys = [PALETTE_SORT_KEYS.get(site, site.value).casefold() for site in order]
     assert order == list(dict.fromkeys(order)), "候选区里同一个站出现了多次"
-    assert values == sorted(values, key=str.casefold), "候选区没有按 A-Z 排序"
+    assert keys == sorted(keys), "候选区没有按排序键排列"
     assert set(order) == set(ALL_SITES), "有站点在铺放时丢了"
     assert values[0] == "7mmtv" and values[-1] == "Xcity", "A-Z 的首尾应当是 7mmtv、Xcity"
+
+
+def test_palette_sort_keys_put_the_two_sites_where_the_user_wanted():
+    """用户单独点名过两站的位置：AVEntertainments 排在 AVheat/AVMOO/AVSEX/AVSOX 之后、
+    Madouqu 排在 Madou.club 之前。"""
+    values = [site.value for site in palette_site_order(ALL_SITES)]
+    assert values.index("AVEntertainments") == values.index("AVSOX") + 1
+    assert values.index("AVEntertainments") > values.index("AVheat") > values.index("AVBase")
+    assert values.index("Madouqu") + 1 == values.index("Madou.club")
 
 
 def test_palette_site_order_ignores_input_order():
@@ -445,8 +487,9 @@ def test_titles_come_first_and_sites_continue_right_after(qt_app):
     try:
         palette = _laid_out(dlg, qt_app)
         order = _visual_order(palette)
-        assert order[:6] == EXPECTED_GROUP_ORDER, f"标题不在最前面：{order[:8]}"
-        assert order[6] == "7mmtv", f"标题后面没有紧接站点：{order[6:10]}"
+        assert order[: len(EXPECTED_GROUP_ORDER)] == EXPECTED_GROUP_ORDER, f"标题不在最前面：{order[:8]}"
+        first_site = order[len(EXPECTED_GROUP_ORDER)]
+        assert first_site == "7mmtv", f"标题后面没有紧接站点：{order[: len(EXPECTED_GROUP_ORDER) + 3]}"
         # 「不留空」= 同一行：第一个标题与第一个站点行的行矩形 top 相同
         title_rect = palette.visualItemRect(palette.item(_title_rows(dlg)["有码"]))
         site_rect = palette.visualItemRect(palette.item(_row_of(dlg, "7mmtv")))
@@ -587,7 +630,7 @@ def test_clicking_group_title_appends_and_keeps_existing_order(qt_app):
     dlg = SiteListEditorDialog("t", [Website.XCITY], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _click_title(dlg, "FC2")
+        _click_title(dlg, "FC2官网")
         values = [site.value for site in dlg.selected_sites()]
         assert values[0] == "Xcity"
         assert values[1:] == USER_SITE_LISTS[FixedScrapingType.FC2]
@@ -686,17 +729,19 @@ def test_add_all_uses_original_order_while_palette_stays_grouped(qt_app):
             "AVSOX",
             "Madouqu",
             "ThepornDB",
+            "Getchu",
         ]
         # 候选区仍按各组自己的优先级序铺：四个站都属有码，故有码标题带的就是这四个的原序
         assert _groups_from_widget(dlg) == {
             "有码": ["DMM", "AVBase", "Xcity"],
             "无码": ["AVSOX"],
             "素人": ["DMM", "AVBase", "Xcity"],
-            "FC2": ["AVSOX"],
+            "FC2官网": ["AVSOX"],
             "欧美": ["ThepornDB"],
             "国产": ["Madouqu"],
+            "动漫里番": ["Getchu"],
         }
-        assert _site_row_values(dlg) == ["AVBase", "AVSOX", "DMM", "Madouqu", "ThepornDB", "Xcity"]
+        assert _site_row_values(dlg) == ["AVBase", "AVSOX", "DMM", "Getchu", "Madouqu", "ThepornDB", "Xcity"]
     finally:
         dlg.deleteLater()
 
@@ -708,5 +753,161 @@ def test_group_expansion_still_works_from_grouped_palette(qt_app):
         dlg.available_list.item(_row_of(dlg, "DMM")).setSelected(True)
         dlg._add_selected()
         assert set(dlg.selected_sites()) == {Website.DMM, Website.DMM_API, Website.LIBREDMM}
+    finally:
+        dlg.deleteLater()
+
+
+# --------------------------------------------------------------------------- 两个弹窗的观感
+
+
+def test_clear_button_is_named_clearing_sites(dialog):
+    """清空按钮写「清空站点」——它清的是右侧那份列表，不是「清空当前选中」之类。"""
+    texts = [btn.text() for btn in dialog.findChildren(QPushButton)]
+    assert "清空站点" in texts, texts
+    assert "清空" not in texts
+
+
+def test_save_and_cancel_sit_on_the_same_row_as_the_add_buttons(qt_app):
+    """保存 / 取消与「添加选中」「移除选中」同排，不必沉到对话框最底下去够鼠标。"""
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        _laid_out(dlg, qt_app)
+        buttons = {b.text(): b for b in dlg.findChildren(QPushButton)}
+        assert {"添加选中", "移除选中", "全部添加", "清空站点", "保存", "取消"} <= set(buttons)
+        tops = {name: buttons[name].mapTo(dlg, buttons[name].rect().topLeft()).y() for name in buttons}
+        reference = tops["添加选中"]
+        for name in ("移除选中", "全部添加", "清空站点", "保存", "取消"):
+            assert abs(tops[name] - reference) <= 2, f"「{name}」不在同一行：{tops}"
+    finally:
+        dlg.deleteLater()
+
+
+def test_both_dialogs_use_the_same_height(qt_app):
+    """「编辑网站」与「字段优先级」一样高，且都不超过屏幕。
+
+    高度跟着「字段优先级」的实际排布走：字体/界面缩放一大它就得高一点，
+    这时另一个窗口也跟着高，不会一个 680 一个 720。
+    """
+    priority = FieldPriorityDialog("t", FixedScrapingType.YOUMA, ALL_SITES, {}, None)
+    editor = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        _shown(priority, qt_app)
+        _laid_out(editor, qt_app)
+        assert editor.height() == priority.height()
+        assert priority.height() >= DIALOG_HEIGHT
+        screen = priority.screen() or QApplication.primaryScreen()
+        assert priority.height() <= screen.availableGeometry().height()
+    finally:
+        priority.deleteLater()
+        editor.deleteLater()
+
+
+def test_editing_caption_sits_between_the_two_lists(qt_app):
+    """「启用网站」那行说明垂直居中在两个显示框之间，而不是贴着下面那个框。"""
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        _shown(dlg, qt_app)
+        palette = dlg.available_list
+        caption = next(label for label in dlg.findChildren(QLabel) if label.text().startswith("启用网站（"))
+        top_box_bottom = palette.mapTo(dlg, QPoint(0, palette.height())).y()
+        bottom_box_top = dlg.selected_list.mapTo(dlg, QPoint(0, 0)).y()
+        caption_center = caption.mapTo(dlg, QPoint(0, caption.height() // 2)).y()
+        assert bottom_box_top > top_box_bottom, "两个显示框没有上下分开"
+        caption_center = caption.mapTo(dlg, QPoint(0, caption.height() // 2)).y()
+        size = caption.sizeHint().height()
+        # 空带够高时说明行在正中间；空带压到一行以内（两个框各分一半富余高度）时，
+        # 它紧跟在上面那个框底下——两种都算「在两个框之间」
+        assert top_box_bottom < caption_center <= bottom_box_top + 2, (
+            f"说明行没待在两个框之间：{caption_center} / {top_box_bottom} / {bottom_box_top}"
+        )
+        if bottom_box_top - top_box_bottom >= size:
+            gap_center = (top_box_bottom + bottom_box_top) // 2
+            assert abs(caption_center - gap_center) <= 2, f"说明行偏离两框中点：{caption_center} vs {gap_center}"
+        # 左边也要跟「可用网站（按类型分组）」那行严格对齐：两行字一个像素都不得错开
+        top_caption_x = dlg.top_title.mapTo(dlg, QPoint(0, 0)).x()
+        caption_x = caption.mapTo(dlg, QPoint(0, 0)).x()
+        assert caption_x == top_caption_x, f"说明行没有与上方那行左对齐：{caption_x} vs {top_caption_x}"
+    finally:
+        dlg.deleteLater()
+
+
+def test_field_priority_shows_exactly_four_and_six_rows(qt_app):
+    """「字段优先级」上方正好四行、下方正好六行——半截行看着像渲染坏了。"""
+    dlg = FieldPriorityDialog("t", FixedScrapingType.YOUMA, ALL_SITES, {}, None)
+    try:
+        _shown(dlg, qt_app)
+        palette = next(iter(dlg.findChildren(SitePaletteList)))
+        tops = sorted({palette.visualItemRect(palette.item(r)).top() for r in range(palette.count())})
+        assert len(tops) > FIELD_PALETTE_VISIBLE_ROWS
+        assert tops[FIELD_PALETTE_VISIBLE_ROWS] >= palette.viewport().height(), "上方露出了半截第五行"
+
+        scroll = next(w for w in dlg.findChildren(QScrollArea))
+        viewport_height = scroll.viewport().height()
+        fields = FIELD_PRIORITY_FIELDS[:FIELD_PRIORITY_VISIBLE_ROWS]
+        starts = [dlg._field_lists[f].mapTo(scroll.viewport(), QPoint(0, 0)).y() for f in fields]
+        bottoms = [
+            dlg._field_lists[f].mapTo(scroll.viewport(), QPoint(0, dlg._field_lists[f].height())).y() for f in fields
+        ]
+        assert starts == sorted(starts), f"字段行顺序乱了：{starts}"
+        assert max(bottoms) <= viewport_height, f"下方第六行被切了：{max(bottoms)} > {viewport_height}"
+    finally:
+        dlg.deleteLater()
+
+
+def test_both_dialogs_open_centered_on_screen(qt_app):
+    """两个弹窗都摆在屏幕正中央——Qt 默认只保证「在父控件中央」，父控件偏下时窗口就掉下去了。
+
+    判定沿用项目自己的约定（`tests/test_window_centering.py` / `mdcx.utils.window_center`）：
+    比可用区还宽/高时贴左上角，其余情况居中（误差 4 像素内）。两个弹窗都宽 860，
+    在窄屏上就是「贴左」那一支。
+    """
+    editor = SiteListEditorDialog("t", [], ALL_SITES, None)
+    priority = FieldPriorityDialog("t", FixedScrapingType.YOUMA, ALL_SITES, {}, None)
+    try:
+        for dlg in (editor, priority):
+            _shown(dlg, qt_app)
+            screen = dlg.screen() or QApplication.primaryScreen()
+            avail = screen.availableGeometry()
+            frame = dlg.frameGeometry()
+            if frame.width() > avail.width():
+                assert frame.x() == avail.x(), f"比屏幕宽时应当贴左边缘：{frame} vs {avail}"
+            else:
+                assert abs(frame.center().x() - avail.center().x()) <= 4, f"没有水平居中：{frame}"
+            if frame.height() > avail.height():
+                assert frame.y() == avail.y(), f"比屏幕高时应当贴上边缘：{frame} vs {avail}"
+            else:
+                assert abs(frame.center().y() - avail.center().y()) <= 4, f"没有垂直居中：{frame}"
+    finally:
+        editor.deleteLater()
+        priority.deleteLater()
+
+
+def test_site_editor_boxes_show_six_and_four_rows(qt_app):
+    """「编辑网站」两个框定死为上方五行、下方四行。
+
+    跟着内容伸缩会让同一个对话框在不同类型下时高时矮（六种类型的候选站数量差很多），
+    固定行数之后窗口的高、宽、样式在六种类型下一模一样，区别只在框里能滚动多少行。
+    """
+    dlg = SiteListEditorDialog("t", ALL_SITES[:12], ALL_SITES, None)
+    try:
+        _laid_out(dlg, qt_app)
+        dlg._fit_lists_to_content()  # 显式跑一次，别让断言取决于 showEvent 的时序
+
+        def row_pitch(widget) -> int:
+            """行距 = 相邻两「视觉行」顶边之差（同一行里的站顶边相同，取最小正差）。"""
+            tops = sorted({widget.visualItemRect(widget.item(r)).top() for r in range(widget.count())})
+            deltas = [b - a for a, b in zip(tops, tops[1:]) if b - a > 0]
+            assert deltas, "内容还没排开"
+            return min(deltas)
+
+        for widget, rows in (
+            (dlg.available_list, SITE_EDITOR_PALETTE_ROWS),
+            (dlg.selected_list, SITE_EDITOR_SELECTED_ROWS),
+        ):
+            # 两个框的行距未必一样（启用区的行更矮），各自量各自的
+            pitch = row_pitch(widget)
+            height = widget.viewport().height()
+            # 至多 rows 行（露半截行是最难看的）、至少 rows-1 行（不能塌成一两行）
+            assert (rows - 1) * pitch <= height <= rows * pitch, f"框高不是 {rows} 行档位：{height} / {pitch}"
     finally:
         dlg.deleteLater()

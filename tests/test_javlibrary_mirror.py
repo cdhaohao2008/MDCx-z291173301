@@ -221,13 +221,13 @@ def test_mirror_crawler_reuses_the_javlibrary_parsing():
 def test_mirror_crawler_identity():
     """站点值、展示名、说明都要是镜像自己的，不能串到原站上。
 
-    说明与原站同为「有码：仅能有码」——定位说明只说它能刮什么类型，不夹带「镜像站」
+    说明与原站同为「有码：仅限有码」——定位说明只说它能刮什么类型，不夹带「镜像站」
     「无 CF 墙」这类额外措辞（用户明确要求过不要在说明里加戏）。
     """
     crawler = _crawler()
     assert crawler.site() == Website.JAVLIBRARY_MIRROR
     assert crawler.display_name() == "Javlibrary\u00b7\u955c\u50cf"
-    assert crawler.description == "有码：仅能有码"
+    assert crawler.description == "有码：仅限有码"
 
 
 def test_mirror_crawler_default_base_url_is_the_chinese_page():
@@ -254,11 +254,11 @@ def test_mirror_crawler_defaults_to_the_chinese_language():
     assert JavLibraryMirrorCrawler._needs_localized_language is not JavLibraryCrawler._needs_localized_language
 
 
-def test_mirror_site_sits_right_before_javlibrary_in_coded_types():
-    """用户指定的位置：有码与素人两组里镜像排在原站前面（原站对大陆 IP 有 CF 墙）。"""
+def test_mirror_site_sits_right_after_javlibrary_in_coded_types():
+    """用户指定的位置：有码与素人两组里镜像紧跟在原站后面。"""
     for scraping_type in (FixedScrapingType.YOUMA, FixedScrapingType.SUREN):
         sites = list(TYPE_DEFAULT_SITES[scraping_type])
-        assert sites.index(Website.JAVLIBRARY_MIRROR) == sites.index(Website.JAVLIBRARY) - 1
+        assert sites.index(Website.JAVLIBRARY_MIRROR) == sites.index(Website.JAVLIBRARY) + 1
 
 
 def test_mirror_site_only_joins_the_coded_types():

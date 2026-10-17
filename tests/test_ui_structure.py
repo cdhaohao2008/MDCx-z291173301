@@ -1082,6 +1082,7 @@ _TYPE_SITE_GROUPS = (
     ("FC2", "website_fc2"),
     ("国产", "website_guochan"),
     ("欧美", "website_oumei"),
+    ("动漫", "website_dongman"),
 )
 
 # MyWife 不属任何类型组，默认名单里不该出现；它由「指定网站」或路径含 MyWife 单独指定。
@@ -1129,8 +1130,8 @@ def test_about_type_site_lists_match_config_defaults():
         )
 
 
-def test_about_type_site_lists_only_six_groups_no_comprehensive():
-    """使用说明只有这六组，且不再有代码里不存在的「综合」组。"""
+def test_about_type_site_lists_only_registered_groups_no_comprehensive():
+    """使用说明只有登记在册的分组（六类 + 动漫里番），且不再有代码里不存在的「综合」组。"""
     about_lists = _about_type_site_lists()
     expected_labels = {label for label, _ in _TYPE_SITE_GROUPS}
     extra = set(about_lists) - expected_labels - {"MyWife", "官网"}

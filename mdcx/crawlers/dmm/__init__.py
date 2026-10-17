@@ -59,7 +59,7 @@ class DMMContext(Context):
 
 
 class DmmCrawler(GenericBaseCrawler[DMMContext]):
-    description = "有码：仅能有码"
+    description = "有码：仅限有码"
     supports_browser = False
     mono = MonoParser()
     digital = DigitalParser()

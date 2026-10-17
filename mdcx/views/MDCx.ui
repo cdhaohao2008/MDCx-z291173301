@@ -8402,34 +8402,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="13" column="0">
-                          <widget class="QLabel" name="label_316">
-                            <property name="sizePolicy">
-                              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                                <horstretch>0</horstretch>
-                                <verstretch>0</verstretch>
-                              </sizepolicy>
-                            </property>
-                            <property name="minimumSize">
-                              <size>
-                                <width>0</width>
-                                <height>30</height>
-                              </size>
-                            </property>
-                            <property name="layoutDirection">
-                              <enum>Qt::LeftToRight</enum>
-                            </property>
-                            <property name="frameShape">
-                              <enum>QFrame::NoFrame</enum>
-                            </property>
-                            <property name="text">
-                              <string>动漫里番：</string>
-                            </property>
-                            <property name="alignment">
-                              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                            </property>
-                          </widget>
-                        </item>
                         <item row="6" column="1">
                           <widget class="QLineEdit" name="lineEdit_website_fc2">
                             <property name="sizePolicy">
@@ -8647,31 +8619,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="13" column="1" colspan="3">
-                          <widget class="QLabel" name="label_318">
-                            <property name="sizePolicy">
-                              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                                <horstretch>0</horstretch>
-                                <verstretch>0</verstretch>
-                              </sizepolicy>
-                            </property>
-                            <property name="styleSheet">
-                              <string notr="true">color: rgb(8, 128, 128);</string>
-                            </property>
-                            <property name="maximumSize">
-                              <size>
-                                <width>16777215</width>
-                                <height>34</height>
-                              </size>
-                            </property>
-                            <property name="text">
-                              <string>&lt;p&gt;「网站偏好」-「指定网站」指定Getchu、DMM等站点或者文件路径里包含有「里番」、「动漫」时，程序将会自动使用Getchu进行刮削&lt;/p&gt;</string>
-                            </property>
-                            <property name="wordWrap">
-                              <bool>true</bool>
-                            </property>
-                            </widget>
-                        </item>
                         <item row="15" column="1" colspan="3">
                           <widget class="QLabel" name="label_323">
                             <property name="sizePolicy">
@@ -8712,6 +8659,94 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               </size>
                             </property>
                           </spacer>
+                        </item>
+                        <item row="13" column="0">
+                          <widget class="QLabel" name="label_dongman_sites">
+                            <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                <horstretch>0</horstretch>
+                                <verstretch>0</verstretch>
+                              </sizepolicy>
+                            </property>
+                            <property name="minimumSize">
+                              <size>
+                                <width>120</width>
+                                <height>30</height>
+                              </size>
+                            </property>
+                            <property name="layoutDirection">
+                              <enum>Qt::LeftToRight</enum>
+                            </property>
+                            <property name="frameShape">
+                              <enum>QFrame::NoFrame</enum>
+                            </property>
+                            <property name="text">
+                              <string>动漫里番：</string>
+                            </property>
+                            <property name="alignment">
+                              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="13" column="1">
+                          <widget class="QLineEdit" name="lineEdit_website_dongman">
+                            <property name="sizePolicy">
+                              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                                <horstretch>0</horstretch>
+                                <verstretch>0</verstretch>
+                              </sizepolicy>
+                            </property>
+                            <property name="minimumSize">
+                              <size>
+                                <width>300</width>
+                                <height>30</height>
+                              </size>
+                            </property>
+                            <property name="styleSheet">
+                              <string notr="true"> font: "Courier New";
+                                border: 1px solid rgba(0,0,0, 50);
+                                border-radius: 15px;
+</string>
+                            </property>
+                          </widget>
+                        </item>
+                                              <item row="13" column="2">
+                          <widget class="QPushButton" name="pushButton_edit_website_dongman">
+                            <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                <horstretch>0</horstretch>
+                                <verstretch>0</verstretch>
+                              </sizepolicy>
+                            </property>
+                            <property name="minimumSize">
+                              <size>
+                                <width>0</width>
+                                <height>28</height>
+                              </size>
+                            </property>
+                            <property name="text">
+                              <string>编辑网站</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="13" column="3">
+                          <widget class="QPushButton" name="pushButton_priority_website_dongman">
+                            <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                <horstretch>0</horstretch>
+                                <verstretch>0</verstretch>
+                              </sizepolicy>
+                            </property>
+                            <property name="minimumSize">
+                              <size>
+                                <width>0</width>
+                                <height>28</height>
+                              </size>
+                            </property>
+                            <property name="text">
+                              <string>字段优先级</string>
+                            </property>
+                          </widget>
                         </item>
                         <item row="14" column="0" colspan="4">
                           <spacer name="verticalSpacer_dongman_gap">
@@ -25400,12 +25435,13 @@ p,li{white-space:pre-wrap;}
 &lt;h4&gt;四、网站选择&lt;/h4&gt;
 &lt;p&gt;网站下拉框由已注册的爬虫自动生成，当前53个，可按需选用全部网站或指定网站；下列六组即「软件设置→刮削网站」里各类型的默认名单（组内顺序即优先级，从高到低），可在设置中自行增删与调序：&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;b&gt;有码&lt;/b&gt;：DMM、DMM_API、LibreDMM、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、Javlibrary·镜像、JavLibrary&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;无码&lt;/b&gt;：AVEntertainments、AVSOX、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;素人&lt;/b&gt;：DMM、DMM_API、LibreDMM、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、Javlibrary·镜像、JavLibrary&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;有码&lt;/b&gt;：DMM、DMM_API、LibreDMM、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;无码&lt;/b&gt;：AVSOX、AVEntertainments、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;素人&lt;/b&gt;：DMM、DMM_API、LibreDMM、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;FC2 ：&lt;/b&gt;FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;国产&lt;/b&gt;：Madouqu、Madou.club、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;欧美&lt;/b&gt;：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、Missav、Missav_API、IQQTV、JavFree&lt;/li&gt;
+              &lt;li&gt;&lt;b&gt;动漫&lt;/b&gt;：Getchu、JavDB、JavDB_API、JavDB_APP&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;MyWife&lt;/b&gt;：不属于任何类型组的默认名单，需在「网站偏好」-「指定网站」勾选MyWife或让文件路径含MyWife才会启用&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;官网&lt;/b&gt;：Dahlia、Faleno、MGStage、Prestige、Official已在网站源列表中单列，视频命中对应前缀时将自动路由锁定该站&lt;/li&gt;
 &lt;/ul&gt;
