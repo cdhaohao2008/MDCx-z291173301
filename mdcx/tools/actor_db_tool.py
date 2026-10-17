@@ -30,6 +30,7 @@ from ..config.resources import (
     DB_HEADERS,
     get_actor_db_sheet,
     resources,
+    save_actor_db_workbook,
 )
 from ..core.tmdb_actor import (
     _actor_db_write_lock,
@@ -482,7 +483,7 @@ async def run(
         try:
             _ws = get_actor_db_sheet(_wb)
             _format_db_worksheet(_ws)
-            _wb.save(db_path)
+            save_actor_db_workbook(_wb, db_path)
             _wb.close()
             resources.reload_actor_db()
             from mdcx.core.tmdb_actor import _ACTOR_DB_ROW_INDEX, _ACTOR_DB_ROW_INDEX_LOCK
@@ -1225,7 +1226,7 @@ def auto_fix_actor_db(db_path: Path) -> dict:
         _incr("career_no_year")
     # 孤儿 hyperlink 删除（通过重存消除）
     try:
-        wb.save(db_path)
+        save_actor_db_workbook(wb, db_path)
     except Exception as e:
         # 保存失败必须上报：避免用户看到"修复了 N 项"但实际未落盘
         result["save_error"] = str(e)
@@ -1405,7 +1406,7 @@ async def run_actor_db_xlsx(
             if bio and bio != raw:
                 ws.cell(row=row_idx, column=COL_BIO + 1, value=bio)
                 reformatted += 1
-        wb.save(db_path)
+        save_actor_db_workbook(wb, db_path)
         _log_line(f" ✅ 重排完成：{reformatted} 行简介已重排为结构化格式")
         wb.close()
         return
@@ -1431,7 +1432,7 @@ async def run_actor_db_xlsx(
                 ws.cell(row=row_idx, column=COL_KEYWORD + 1, value=",".join(merged_list))
             ws.cell(row=row_idx, column=COL_BIO + 1, value="")
             merged += 1
-        wb.save(db_path)
+        save_actor_db_workbook(wb, db_path)
         _log_line(f" ✅ 名字合入别名完成：{merged} 行已处理，简介已清空")
         wb.close()
         return
@@ -1475,7 +1476,7 @@ async def run_actor_db_xlsx(
             if new_bio != bio:
                 ws.cell(row=row_idx, column=COL_BIO + 1, value=new_bio.strip(" |,"))
                 cleaned += 1
-        wb.save(db_path)
+        save_actor_db_workbook(wb, db_path)
         _log_line(f" ✅ 清理完成：{cleaned} 行简介已清理")
         wb.close()
         return
@@ -1505,7 +1506,7 @@ async def run_actor_db_xlsx(
             if changed:
                 ws.cell(row=row_idx, column=COL_KEYWORD + 1, value=",".join(cleaned_parts))
                 cleaned += 1
-        wb.save(db_path)
+        save_actor_db_workbook(wb, db_path)
         _log_line(f" ✅ 别名清洗完成：{cleaned} 行已处理")
         wb.close()
         return
@@ -1768,7 +1769,7 @@ async def run_actor_db_xlsx(
                 _log_line(f"  📊 进度: {completed}/{total}")
 
     _format_db_worksheet(ws)
-    wb.save(db_path)
+    save_actor_db_workbook(wb, db_path)
     wb.close()
     resources.reload_actor_db()
     from mdcx.core.tmdb_actor import _ACTOR_DB_ROW_INDEX, _ACTOR_DB_ROW_INDEX_LOCK
@@ -2154,7 +2155,7 @@ async def sync_from_avdb(
                     _log_line(f"  ❌ [AVdb同步] {actor.jp or actor.zh_cn or '<未知>'} 处理失败: {e}")
 
             _format_db_worksheet(ws)
-            wb.save(db_path)
+            save_actor_db_workbook(wb, db_path)
             wb.close()
     except Exception as e:
         result.failed.append(("<落盘>", str(e)))
@@ -2269,7 +2270,7 @@ async def clean_male_actors(*, limit: int = 5000, concurrency: int = 5) -> Clean
                         backup_ws.append([c.value for c in ws[row_idx]])
                         ws.delete_rows(row_idx)
                     _format_db_worksheet(ws)
-                    wb.save(db_path)
+                    save_actor_db_workbook(wb, db_path)
                 wb.close()
                 return result
 
@@ -2353,7 +2354,7 @@ async def clean_male_actors(*, limit: int = 5000, concurrency: int = 5) -> Clean
             result.kept = result.checked - len(all_male_rows)
 
             _format_db_worksheet(ws)
-            wb.save(db_path)
+            save_actor_db_workbook(wb, db_path)
             wb.close()
     except Exception as e:
         result.failed.append(("<落盘>", str(e)))
@@ -2524,7 +2525,7 @@ async def verify_tmdb_ids(*, limit: int = 5000, concurrency: int = 5) -> VerifyT
                     ws.cell(row=row_idx, column=COL_TMDBID + 1).value = None
                     ws.cell(row=row_idx, column=COL_TMDB_URL + 1).value = None
                 _format_db_worksheet(ws)
-                wb.save(db_path)
+                save_actor_db_workbook(wb, db_path)
                 _log_line(f" 🗑️ [校验tmdbid] 清除失效 id {len(invalid_rows)} 个")
 
                 # 按名字重搜补回新 id（TMDB 可能重建了档案）；并发查询提高恢复速度
@@ -2560,7 +2561,7 @@ async def verify_tmdb_ids(*, limit: int = 5000, concurrency: int = 5) -> VerifyT
                     recovered = sum(r for r in results if isinstance(r, int))
                 if recovered:
                     _format_db_worksheet(ws)
-                    wb.save(db_path)
+                    save_actor_db_workbook(wb, db_path)
                     _log_line(f" 🔁 [校验tmdbid] 按名重搜补回 {recovered} 个新 id")
                 result.recovered = recovered
             wb.close()

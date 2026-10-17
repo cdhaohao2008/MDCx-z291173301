@@ -38,6 +38,45 @@ COL_BIO = 8
 
 DB_HEADERS = ["日文原名", "中文名", "繁体名", "别名", "链接", "tmdbid", "tmdb url", "出生日期", "简介"]
 
+# 演员库 xlsx 单写者锁（全库审查 M5，对齐 ASIN 库 _asin_db_write_lock）。
+# actor_database.xlsx 的写者分散在 tmdb_actor._flush_wb / update_actor_db_row、
+# scraper._flush_actor_db_wb、actor_db_tool 的多处落盘、resources 的出厂库合并，
+# 各自只有 asyncio 级或完全没有锁，互相不排斥：并发 save 会真并行
+# （load→改→save 交错丢更新），且两路 save 同时原地覆盖同一个 zip 会写出
+# 「zipfile 能打开、namelist 正常、唯独缺 [Content_Types].xml」的半写文件，
+# 下次启动 load_workbook 直接 KeyError 把演员库废掉。这里收敛成一把进程级锁。
+ACTOR_DB_XLSX_WRITE_LOCK = threading.Lock()
+
+
+def save_actor_db_workbook_atomic(wb, local_path: Path) -> None:
+    """演员库 xlsx 原子保存（不加锁）：先写 .tmp 再 os.replace（全库审查 B4）。
+
+    wb.save() 直接原地覆盖时，进程被杀（停止刮削/强关）或磁盘满会让 zip
+    半写损坏。Windows 上 replace 目标被占用时抛 PermissionError，与原语义
+    一致向上传。失败时清掉半写 tmp，避免残留占盘。
+    """
+    tmp_path = local_path.with_name(local_path.name + ".tmp")
+    try:
+        wb.save(tmp_path)
+        os.replace(tmp_path, local_path)
+    except Exception:
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def save_actor_db_workbook(wb, local_path: Path) -> None:
+    """演员库 xlsx 单写者 + 原子保存（所有 actor_database.xlsx 写者的统一入口）。
+
+    已持有 ACTOR_DB_XLSX_WRITE_LOCK 时请改用 save_actor_db_workbook_atomic
+    （threading.Lock 不可重入）。
+    """
+    with ACTOR_DB_XLSX_WRITE_LOCK:
+        save_actor_db_workbook_atomic(wb, local_path)
+
 
 def _tmdb_person_url(tmdbid: int | str) -> str:
     return f"https://www.themoviedb.org/person/{tmdbid}"
@@ -421,6 +460,11 @@ class Resources:
             self.actor_db = old
             self.actor_db_reverse_index = None
             LogBuffer.log().write(f"  ❌ [演员数据库] 模块缺失: {e}")
+            LogBuffer.web().write(
+                f"  ❌ [演员数据库] 模块缺失，演员库重载失败（不影响其他数据）: {e}\n"
+                f"     请确认打包时已包含: {e.name if hasattr(e, 'name') else 'unknown'}"
+                f"（常见缺失模块: openpyxl, defusedxml, lxml）"
+            )
             log_console.show_traceback_log(
                 f"[演员数据库] 初始化失败 (模块缺失): {e}\n"
                 f"  请确认打包时已包含: {e.name if hasattr(e, 'name') else 'unknown'}\n"
@@ -430,6 +474,14 @@ class Resources:
             self.actor_db = old
             tb = traceback.format_exc()
             LogBuffer.log().write(f"  ❌ [演员数据库] 重载失败: {e}")
+            # 必须同时写 web 通道：actor_database.xlsx 是用户库主数据，加载失败时
+            # 只有 log_console 的话网页日志零输出，用户只看到「数据库连接成功」的
+            # 绿灯（那条读的是 SQLite Info 表，与本文件无关），误以为一切正常。
+            LogBuffer.web().write(
+                f"  ❌ [演员数据库] 重载失败，演员库不可用（已保留当前缓存，刮削可继续）: {e}\n"
+                f"     文件: {db_path}\n"
+                f"     修复: 删除该文件让程序重建，或用「工具 → 演员库维护 → 检查用户库」修复\n{tb}"
+            )
             log_console.show_traceback_log(f"[演员数据库] 重载失败，保留当前缓存: {e}\n{tb}")
 
     def reload_info_db(self):
@@ -540,53 +592,56 @@ def merge_actor_db_from_backup(backup_path: Path, local_path: Path) -> None:
         if marker_path.exists() and marker_path.read_text(encoding="utf-8").strip() == backup_hash:
             return  # 出厂库未变化，无需合并
 
-        wb = openpyxl.load_workbook(local_path)
-        ws = get_actor_db_sheet(wb)
-        jp_row_map: dict[str, int] = {}
-        next_row = ws.max_row + 1
-        for row_no, row in enumerate(ws.iter_rows(min_row=2, max_col=len(DB_HEADERS), values_only=True), start=2):
-            if row and row[COL_JP]:
-                jp_val = str(row[COL_JP]).strip()
-                jp_row_map.setdefault(jp_val, row_no)
+        # load→改→save 必须整体持有单写者锁，否则与刮削/TMDB 落盘并发时会
+        # 交错丢更新，且两路原地覆盖同一个 zip 会写出半写损坏文件
+        with ACTOR_DB_XLSX_WRITE_LOCK:
+            wb = openpyxl.load_workbook(local_path)
+            ws = get_actor_db_sheet(wb)
+            jp_row_map: dict[str, int] = {}
+            next_row = ws.max_row + 1
+            for row_no, row in enumerate(ws.iter_rows(min_row=2, max_col=len(DB_HEADERS), values_only=True), start=2):
+                if row and row[COL_JP]:
+                    jp_val = str(row[COL_JP]).strip()
+                    jp_row_map.setdefault(jp_val, row_no)
 
-        added = 0
-        filled = 0
-        backup_wb = openpyxl.load_workbook(backup_path, read_only=True, data_only=True)
-        backup_ws = get_actor_db_sheet(backup_wb)
-        for row in backup_ws.iter_rows(min_row=2, max_col=len(DB_HEADERS), values_only=True):
-            if not row or not row[COL_JP]:
-                continue
-            jp = str(row[COL_JP]).strip()
-            if jp in jp_row_map:
-                # 字段补全：仅填空缺，不覆盖已有值；别名列做并集合并（中文优先）
-                existing_row = jp_row_map[jp]
-                for col_idx in range(len(DB_HEADERS)):
-                    if col_idx == COL_JP or col_idx == COL_TMDB_URL:
-                        continue
-                    cur = ws.cell(row=existing_row, column=col_idx + 1).value
-                    new = row[col_idx] if col_idx < len(row) else None
-                    if col_idx == COL_KEYWORD:
-                        cur_str = str(cur or "").strip()
-                        new_str = str(new or "").strip()
-                        if cur_str or new_str:
-                            merged = _merge_keyword_union(cur_str, new_str)
-                            if merged != cur_str:
-                                ws.cell(row=existing_row, column=COL_KEYWORD + 1, value=merged)
-                                filled += 1
-                        continue
-                    if (cur is None or str(cur).strip() == "") and new not in (None, ""):
-                        ws.cell(row=existing_row, column=col_idx + 1, value=new)
-                        filled += 1
-                continue
-            ws.append(list(row[: len(DB_HEADERS)]))
-            jp_row_map[jp] = next_row
-            next_row += 1
-            added += 1
-        backup_wb.close()
+            added = 0
+            filled = 0
+            backup_wb = openpyxl.load_workbook(backup_path, read_only=True, data_only=True)
+            backup_ws = get_actor_db_sheet(backup_wb)
+            for row in backup_ws.iter_rows(min_row=2, max_col=len(DB_HEADERS), values_only=True):
+                if not row or not row[COL_JP]:
+                    continue
+                jp = str(row[COL_JP]).strip()
+                if jp in jp_row_map:
+                    # 字段补全：仅填空缺，不覆盖已有值；别名列做并集合并（中文优先）
+                    existing_row = jp_row_map[jp]
+                    for col_idx in range(len(DB_HEADERS)):
+                        if col_idx == COL_JP or col_idx == COL_TMDB_URL:
+                            continue
+                        cur = ws.cell(row=existing_row, column=col_idx + 1).value
+                        new = row[col_idx] if col_idx < len(row) else None
+                        if col_idx == COL_KEYWORD:
+                            cur_str = str(cur or "").strip()
+                            new_str = str(new or "").strip()
+                            if cur_str or new_str:
+                                merged = _merge_keyword_union(cur_str, new_str)
+                                if merged != cur_str:
+                                    ws.cell(row=existing_row, column=COL_KEYWORD + 1, value=merged)
+                                    filled += 1
+                            continue
+                        if (cur is None or str(cur).strip() == "") and new not in (None, ""):
+                            ws.cell(row=existing_row, column=col_idx + 1, value=new)
+                            filled += 1
+                    continue
+                ws.append(list(row[: len(DB_HEADERS)]))
+                jp_row_map[jp] = next_row
+                next_row += 1
+                added += 1
+            backup_wb.close()
 
-        if added or filled:
-            wb.save(local_path)
-        wb.close()
+            if added or filled:
+                save_actor_db_workbook_atomic(wb, local_path)
+            wb.close()
         marker_path.write_text(backup_hash, encoding="utf-8")
         if added or filled:
             LogBuffer.log().write(f"  ℹ️ [演员数据库] 出厂库增量合并: 新增 {added} 条, 补全 {filled} 个字段")

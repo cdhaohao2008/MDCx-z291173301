@@ -1,5 +1,17 @@
 
 # Changelog
+## v2.5.5 (2026-10-20)
+### 改进
+- **版本号**：`2.5.4` 升 `2.5.5`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx`；`LOCAL_VERSION` 保持 `20261020` 与前几个版本同批，时间标签不倒退）。仍是当前最新版本。
+- **演员库 `actor_database.xlsx` 并发写安全：写者收敛到一把进程级锁 + 落盘改原子写（`mdcx/config/resources.py`、`mdcx/core/scraper.py`、`mdcx/core/tmdb_actor.py`、`mdcx/tools/actor_db_tool.py`）**：根因是这个 xlsx 的**写者分散在五处**——`tmdb_actor` 的 `_flush_wb` 与 `update_actor_db_row`、`scraper` 的 `_flush_actor_db_wb`、`actor_db_tool` 里的 `run` / `auto_fix_actor_db` / `run_actor_db_xlsx`（重排·名字合入·简介清理·别名清理）/ `sync_from_avdb` / `clean_male_actors`（分片落盘·最终落盘）/ `verify_tmdb_ids`（剔除·按名重搜回填）、以及 `resources` 的出厂库合并——而这些路径各自只有 asyncio 锁、或干脆没有锁，**互不排斥**。于是两路落盘真会并行跑「load→改→save」交错更新；更糟的是它们都直接 `wb.save(db_path)` **原地覆盖同一个 zip**，两路同时写就会产出半写损坏文件：ZipFile 能打开、namelist 也正常，唯独缺 `[Content_Types].xml`，下次启动 `load_workbook` 直接抛 `KeyError`，把用户的演员库整个废掉。现新增模块级 `ACTOR_DB_XLSX_WRITE_LOCK`（对齐 ASIN 库既有的 `ASIN_DB_WRITE_LOCK` 做法）把这批写者收敛成单写者，另配 `save_actor_db_workbook()`（持锁 + 原子保存）与 `save_actor_db_workbook_atomic()`（**先写 `.tmp` 再 `os.replace`**），并把上列全部 `wb.save(db_path)` 逐个替换掉——进程被杀或磁盘满不再留下半截 zip。已持锁时必须改用 `_atomic` 版本，因为 `threading.Lock` 不可重入。
+- **演员库损坏时降级为只读继续刮削，不再把已成功的任务判为失败（`mdcx/core/tmdb_actor.py`）**：上面那种半写损坏的文件一旦存在，`load_workbook` 的 `KeyError` 会一路窜到 `_process_one_file_impl`，把**当片其实已经刮削成功**的任务报成失败。现给 `_fetch_actor_tmdb_ids_locked()` 加 `_wb_broken` 标志：加载异常时降级成只读内存缓存、跳过所有写库路径，已匹配上的 tmdbid 照常返回，写库处回报 `actor_db_unavailable` 状态并多打一条提示日志。
+- **演员库加载失败补写 web 通道日志（`mdcx/config/resources.py` 的 `reload_actor_db()`）**：`actor_database.xlsx` 是用户库的主数据，加载失败时若只写 `log_console`，设置页与日志界面**零输出**，用户只会看到「刮削数据库加载成功」的误导信息。现把「[演员数据库] 加载失败，演员库不可用（已保留当前缓存，刮削可继续）」+ 文件路径 + 两条修复建议（删掉该文件让程序重建／用「工具→演员库维护」检查用户库）+ traceback 一并写进 `LogBuffer.web()`。
+- **`tests/conftest.py` 的 `mdcx.config.resources` stub 镜像上述两个新名字（+28 行）**：conftest 会把 `mdcx.config.resources` 整个替换成 stub 模块，生产代码新 import 的 `ACTOR_DB_XLSX_WRITE_LOCK` / `save_actor_db_workbook` / `save_actor_db_workbook_atomic` 在测试里必须有对应实现，否则整批演员库测试无法收集。stub 里的 `_save_actor_db_workbook_atomic` / `_save_actor_db_workbook` 与真实实现保持一致（注释已注明）。
+### 验证
+- 门禁自查：`ruff format --check` → `550 files already formatted`；`ruff check` → `All checks passed!`；`mypy mdcx/` → `Success: no issues found in 193 source files`。
+- 相关测试合跑 `tests/test_tmdb_actor.py`、`test_actor_db_tool.py`、`test_actor_db_merge.py`、`test_actor_db_structure.py`、`test_check_actor_db.py`、`test_merge_actor_db_duplicates.py`、`test_clean_actor_db_non_actors.py`、`test_fix_actor_db_url_mismatch.py`、`test_actor_db_check_fix.py`、`test_actor_db_filter_male.py`、`test_actor_stop.py` 共 **174 项全过 / EXIT=0**。
+- `tests/test_tmdb_actor.py` 新增 4 个用例，逐个锁定新行为：`test_fetch_actor_tmdb_ids_reports_broken_db_to_web_log`（用 `_write_half_written_xlsx` 造真损坏文件，断言 web 通道确实有「演员数据库…加载失败」——否则就是假绿灯）、`test_update_actor_db_row_returns_status_on_broken_db`（遇损坏库返回 `write_failed:` 状态字符串而非向上抛异常）、`test_actor_db_save_is_atomic_and_leaves_no_tmp`（落盘后不残留 `.tmp` 且内容正确）、`test_actor_db_atomic_save_replaces_target_in_place`（两次写入后目录里只有 `actor_database.xlsx`，不产生 `actor_database (1).xlsx` 副本）。
+- 版本一致性双复核：`scripts/bump.py --check` 与 `tests/test_version_consistency.py`。
 ## v2.5.4 (2026-10-20)
 ### 改进
 - **版本号**：`2.5.3` 升 `2.5.4`（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx`；`LOCAL_VERSION` 保持 `20261020` 与前几个版本同批，时间标签不倒退）。仍是当前最新版本。

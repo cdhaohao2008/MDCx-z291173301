@@ -717,6 +717,145 @@ async def test_fetch_actor_tmdb_ids_skips_translate_when_both_names_present(
     assert call_count["translations"] == 0
 
 
+# ============= 演员库 xlsx 半写损坏的降级与原子写测试 =============
+
+
+class _LogSink:
+    """最小 LogBuffer 替身，只收集 write() 的文本。"""
+
+    def __init__(self, sink: list[str]) -> None:
+        self._sink = sink
+
+    def write(self, message: str) -> None:
+        self._sink.append(message)
+
+
+def _write_half_written_xlsx(path: Path) -> None:
+    """复刻 openpyxl save() 在 write_data() 中途被打断留下的半写 xlsx。
+
+    特征：zip 结构/EOCD 完整（zipfile 能开、namelist 正常），只保留写成功的
+    前几个条目，缺 [Content_Types].xml → load_workbook 抛
+    KeyError("There is no item named '[Content_Types].xml' in the archive")。
+    """
+    import zipfile
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "演员数据库"
+    ws.append(["日文原名", "中文名"])
+    ws.append(["既有演员", "既有中文名"])
+    wb.save(path)
+    wb.close()
+
+    with zipfile.ZipFile(path) as z:
+        payloads = {n: z.read(n) for n in z.namelist()}
+    keep = [
+        n
+        for n in payloads
+        if n in ("docProps/app.xml", "docProps/core.xml", "xl/theme/theme1.xml", "xl/worksheets/sheet1.xml")
+    ]
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for n in keep:
+            z.writestr(n, payloads[n])
+
+
+@pytest.mark.asyncio
+async def test_fetch_actor_tmdb_ids_survives_half_written_actor_db(
+    monkeypatch: pytest.MonkeyPatch, _tmp_actor_db: Path
+):
+    """演员库半写损坏时，TMDB 查询必须降级返回结果，绝不能让刮削整体失败。"""
+    import zipfile
+
+    _write_half_written_xlsx(_tmp_actor_db)
+    # 损坏文件对 openpyxl 不可读，先确认前提成立
+    with pytest.raises(KeyError):
+        load_workbook(_tmp_actor_db)
+
+    monkeypatch.setattr(tmdb_actor.manager.config, "tmdb_api_key", "fake-key")
+    monkeypatch.setattr(tmdb_actor.manager.config, "tmdb_api_base", "api.tmdb.org")
+
+    async def _stub_tmdb_request(client, method, url, **kwargs):
+        if "/search/person" in url:
+            return tmdb_actor._TmdbResponse(
+                200,
+                '{"results":[{"id":77777,"name":"新演员","original_name":"新演员","gender":1,'
+                '"adult":true,"popularity":1.0}]}',
+            )
+        if "/person/77777" in url and "/translations" not in url:
+            return tmdb_actor._TmdbResponse(
+                200,
+                '{"id":77777,"name":"新演员","gender":1,"also_known_as":["别名A"],"biography":""}',
+            )
+        return None
+
+    monkeypatch.setattr(tmdb_actor, "_tmdb_request", _stub_tmdb_request)
+
+    result = await tmdb_actor.fetch_actor_tmdb_ids(["新演员"], object())
+
+    # 核心断言：不抛异常，且已查到的 tmdbid 照常返回
+    assert result == {"新演员": 77777}
+    # 损坏文件未被覆写（写库路径整体跳过）
+    assert "[Content_Types].xml" not in zipfile.ZipFile(_tmp_actor_db).namelist()
+
+
+@pytest.mark.asyncio
+async def test_fetch_actor_tmdb_ids_reports_broken_db_to_web_log(monkeypatch: pytest.MonkeyPatch, _tmp_actor_db: Path):
+    """演员库加载失败必须写 LogBuffer.web()，否则网页日志零输出＝假绿灯。"""
+    _write_half_written_xlsx(_tmp_actor_db)
+    monkeypatch.setattr(tmdb_actor.manager.config, "tmdb_api_key", "fake-key")
+    monkeypatch.setattr(tmdb_actor.manager.config, "tmdb_api_base", "api.tmdb.org")
+
+    seen: list[str] = []
+    monkeypatch.setattr(LogBuffer, "web", staticmethod(lambda: _LogSink(seen)))
+    monkeypatch.setattr(LogBuffer, "log", staticmethod(lambda: _LogSink(seen)))
+
+    async def _stub_tmdb_request(client, method, url, **kwargs):
+        return None
+
+    monkeypatch.setattr(tmdb_actor, "_tmdb_request", _stub_tmdb_request)
+
+    await tmdb_actor.fetch_actor_tmdb_ids(["查无此人的演员"], object())
+
+    assert any("演员数据库" in line and "加载失败" in line for line in seen), seen
+
+
+@pytest.mark.asyncio
+async def test_update_actor_db_row_returns_status_on_broken_db(_tmp_actor_db: Path):
+    """update_actor_db_row 遇损坏库应返回状态字符串，不向上抛异常。"""
+    _write_half_written_xlsx(_tmp_actor_db)
+
+    status = await tmdb_actor.update_actor_db_row(jp="某演员", zh_cn="某中文名", tmdbid=42)
+
+    assert status.startswith("write_failed:"), status
+
+
+@pytest.mark.asyncio
+async def test_actor_db_save_is_atomic_and_leaves_no_tmp(_tmp_actor_db: Path):
+    """演员库落盘走 tmp + os.replace，成功后不残留 .tmp。"""
+    await tmdb_actor.update_actor_db_row(jp="原子写演员", zh_cn="原子写", tmdbid=8888)
+
+    assert _tmp_actor_db.exists()
+    assert not _tmp_actor_db.with_name(_tmp_actor_db.name + ".tmp").exists()
+    wb = load_workbook(_tmp_actor_db)
+    ws = wb.active
+    assert ws.cell(row=2, column=1).value == "原子写演员"
+    wb.close()
+
+
+@pytest.mark.asyncio
+async def test_actor_db_atomic_save_replaces_target_in_place(_tmp_actor_db: Path):
+    """原子保存覆盖同一路径，不产生 actor_database (1).xlsx 之类副本。"""
+    await tmdb_actor.update_actor_db_row(jp="甲演员", tmdbid=1)
+    await tmdb_actor.update_actor_db_row(jp="乙演员", tmdbid=2)
+
+    siblings = sorted(p.name for p in _tmp_actor_db.parent.glob("actor_database*"))
+    assert siblings == ["actor_database.xlsx"]
+    wb = load_workbook(_tmp_actor_db)
+    names = [row[0] for row in wb.active.iter_rows(min_row=2, max_col=1, values_only=True)]
+    wb.close()
+    assert "甲演员" in names and "乙演员" in names
+
+
 # ============= _ACTOR_DB_ROW_INDEX 索引缓存测试 =============
 
 

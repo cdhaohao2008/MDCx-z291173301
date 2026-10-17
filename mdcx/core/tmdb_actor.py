@@ -31,6 +31,8 @@ from ..config.resources import (
     get_actor_db_sheet,
     read_actor_db_xlsx,
     resources,
+    save_actor_db_workbook,
+    save_actor_db_workbook_atomic,
 )
 from ..models.log_buffer import LogBuffer
 from ..utils import convert_half
@@ -856,7 +858,8 @@ async def update_actor_db_row(
 
             if not external_wb:
                 _format_db_worksheet(ws)
-                wb.save(db_path)
+                # 单写者 + 原子保存：原地覆盖被强杀/磁盘满会留下半写 zip
+                save_actor_db_workbook(wb, db_path)
                 wb.close()
                 resources.reload_actor_db()
             return write_status
@@ -979,7 +982,7 @@ async def migrate_xml_to_xlsx() -> bool:
                         ws.cell(row=last_row, column=COL_TMDB_URL + 1).hyperlink = tmdb_url
 
                 _format_db_worksheet(ws)
-                wb.save(db_path)
+                save_actor_db_workbook(wb, db_path)
                 wb.close()
                 migrated = True
                 LogBuffer.web().write(f"  ℹ️ [演员数据库] 已从 XML 迁移 {len(actor_objects)} 条记录")
@@ -1042,6 +1045,8 @@ async def _fetch_actor_tmdb_ids_locked(actors: list[str], client: Any) -> dict[s
     import openpyxl as _openpyxl
 
     _wb = None
+    # 演员库加载失败标记：为 True 时跳过所有写库路径，只读内存缓存继续刮削
+    _wb_broken = False
     _db_path = _get_db_path()
     _db_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -1059,7 +1064,25 @@ async def _fetch_actor_tmdb_ids_locked(actors: list[str], client: Any) -> dict[s
     except ImportError:
         import traceback
 
+        _wb = None
+        _wb_broken = True
         LogBuffer.web().write(f"[tmdb_actor] openpyxl 导入失败: {traceback.format_exc()}")
+    except Exception as e:
+        # 演员库 xlsx 损坏/被占用/磁盘异常绝不能让已完成的刮削失败。
+        # 以前这里只捕获 ImportError，openpyxl 读半写损坏文件抛的 KeyError
+        # （"There is no item named '[Content_Types].xml' in the archive"）
+        # 会一路穿到 _process_one_file_impl，把影片本体已刮削成功的任务判为失败。
+        # 这里降级为「只读内存 actor_db，跳过写库」，已匹配的 tmdbid 照常返回。
+        import traceback
+
+        _wb = None
+        _wb_broken = True
+        LogBuffer.web().write(
+            f"  ❌ [演员数据库] 加载失败，已跳过本次 TMDB 写库（不影响刮削）: {e}\n"
+            f"     文件: {_db_path}\n"
+            f"     修复: 删除该文件让程序重建，或用「工具 → 演员库维护 → 检查用户库」修复\n"
+            f"     {traceback.format_exc()}"
+        )
 
     for actor in actors:
         if not actor or not actor.strip():
@@ -1096,9 +1119,14 @@ async def _fetch_actor_tmdb_ids_locked(actors: list[str], client: Any) -> dict[s
         if _wb is None:
             return
         try:
-            _ws = get_actor_db_sheet(_wb)
-            _format_db_worksheet(_ws)
-            _wb.save(_db_path)
+            from ..config.resources import ACTOR_DB_XLSX_WRITE_LOCK
+
+            # 格式化与落盘同在单写者锁内，避免与 update_actor_db_row /
+            # 工具页落盘 / 出厂库合并并发覆盖同一文件
+            with ACTOR_DB_XLSX_WRITE_LOCK:
+                _ws = get_actor_db_sheet(_wb)
+                _format_db_worksheet(_ws)
+                save_actor_db_workbook_atomic(_wb, _db_path)
             _wb.close()
             resources.reload_actor_db()
             with _ACTOR_DB_ROW_INDEX_LOCK:
@@ -1137,15 +1165,19 @@ async def _fetch_actor_tmdb_ids_locked(actors: list[str], client: Any) -> dict[s
 
                 # 优先保留站点原始演员名作为 jp 主名，TMDB 主名/别名只作为反查关键字。
                 jp_name = query_name
-                write_status = await update_actor_db_row(
-                    jp=jp_name,
-                    zh_cn=zh_cn,
-                    zh_tw=zh_tw,
-                    keyword=keyword_str,
-                    tmdbid=tmdbid,
-                    append_keyword=True,
-                    _wb=_wb,
-                )
+                if _wb_broken:
+                    # 演员库不可用：只返回 tmdbid，不写库（避免对损坏文件重复 load 报错）
+                    write_status = "actor_db_unavailable"
+                else:
+                    write_status = await update_actor_db_row(
+                        jp=jp_name,
+                        zh_cn=zh_cn,
+                        zh_tw=zh_tw,
+                        keyword=keyword_str,
+                        tmdbid=tmdbid,
+                        append_keyword=True,
+                        _wb=_wb,
+                    )
 
                 _tmdb_log_line(f"  ✅ [TMDB] {actor_name} -> tmdbid={tmdbid}{f' (中文:{zh_cn})' if zh_cn else ''}")
                 if write_status == "inserted_tmdbid":
@@ -1156,6 +1188,10 @@ async def _fetch_actor_tmdb_ids_locked(actors: list[str], client: Any) -> dict[s
                     _tmdb_log_line(f"  ℹ️ [演员数据库] {actor_name} 已存在 tmdbid，保留原值")
                 elif write_status == "missing_openpyxl":
                     _tmdb_log_line(f"  ⚠️ [演员数据库] 缺少 openpyxl，未写入 {actor_name} 的 tmdbid")
+                elif write_status == "actor_db_unavailable":
+                    _tmdb_log_line(
+                        f"  ⚠️ [演员数据库] 演员库不可用（文件损坏/被占用），未写入 {actor_name} 的 tmdbid，刮削继续"
+                    )
                 elif write_status == "file_locked":
                     _tmdb_log_line(f"  ⚠️ [演员数据库] 文件被占用，未写入 {actor_name} 的 tmdbid")
                 elif write_status.startswith("write_failed:"):

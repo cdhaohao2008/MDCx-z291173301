@@ -1571,13 +1571,16 @@ def _load_actor_db_wb():
 
 def _flush_actor_db_wb(wb, db_path):
     """将 workbook 落盘并重载缓存。"""
-    from ..config.resources import resources
+    from ..config.resources import ACTOR_DB_XLSX_WRITE_LOCK, resources, save_actor_db_workbook_atomic
     from .tmdb_actor import _ACTOR_DB_ROW_INDEX, _ACTOR_DB_ROW_INDEX_LOCK, _format_db_worksheet
 
     try:
-        ws = wb.active
-        _format_db_worksheet(ws)
-        wb.save(db_path)
+        # 与 tmdb_actor._flush_wb 同一把单写者锁 + 原子保存：两条刮削写路径
+        # 并发原地覆盖同一个 xlsx 会写出半写损坏文件
+        with ACTOR_DB_XLSX_WRITE_LOCK:
+            ws = wb.active
+            _format_db_worksheet(ws)
+            save_actor_db_workbook_atomic(wb, db_path)
         wb.close()
         with _ACTOR_DB_ROW_INDEX_LOCK:
             _ACTOR_DB_ROW_INDEX.clear()

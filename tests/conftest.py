@@ -1,5 +1,7 @@
+import os
 import sys
 import tempfile
+import threading
 import types
 from pathlib import Path
 from types import SimpleNamespace
@@ -414,6 +416,32 @@ resources_module.get_actor_db_sheet = lambda wb: (
     wb["演员数据库"] if "演员数据库" in getattr(wb, "sheetnames", []) else wb.active
 )
 resources_module.resources = _DummyResources()
+
+# 演员库 xlsx 写者单锁 + 原子保存（与 mdcx/config/resources.py 真实实现保持一致）
+resources_module.ACTOR_DB_XLSX_WRITE_LOCK = threading.Lock()
+
+
+def _save_actor_db_workbook_atomic(wb, local_path: Path) -> None:
+    tmp_path = local_path.with_name(local_path.name + ".tmp")
+    try:
+        wb.save(tmp_path)
+        os.replace(tmp_path, local_path)
+    except Exception:
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def _save_actor_db_workbook(wb, local_path: Path) -> None:
+    with resources_module.ACTOR_DB_XLSX_WRITE_LOCK:
+        _save_actor_db_workbook_atomic(wb, local_path)
+
+
+resources_module.save_actor_db_workbook_atomic = _save_actor_db_workbook_atomic
+resources_module.save_actor_db_workbook = _save_actor_db_workbook
 sys.modules.setdefault("mdcx.config.resources", resources_module)
 
 signals_module = types.ModuleType("mdcx.signals")
