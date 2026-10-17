@@ -507,6 +507,7 @@ class _SiteComboTipFilter(QObject):
         super().__init__(combo)
         self._combo = combo
         self._shown_row: int = -1  # 已显示提示所在行（-1 = 无提示）
+        self._in_filter: bool = False  # 重入守卫，见 eventFilter
 
     def _index_at(self, pos):
         """光标所在行的 index；空白处/无 view 返回 None。"""
@@ -565,6 +566,15 @@ class _SiteComboTipFilter(QObject):
         self._combo._site_tip_in_popup = True  # type: ignore[attr-defined]
 
     def eventFilter(self, obj, event) -> bool:
+        # 重入守卫：`_SiteTipLabel.show_at()` 里的 move()/show()、hide_tip() 里的 hide()
+        # 都会让 Qt 合成新的 MouseMove/Enter/Leave 再送回本过滤器。此刻两道守卫
+        # 「同一行且提示还亮着」与「弹成功后才记账的 _shown_row」都还停留在旧值
+        # （show() 之前 isVisible() 也是 False），于是每一次合成都再弹一次、
+        # 再合成一次，无限递归把栈打爆（Windows 上表现为 `stack overflow` /
+        # 0xC0000409）。重入期间一律放行：最外层那次会把状态记全，无需重复弹。
+        if self._in_filter:
+            return super().eventFilter(obj, event)
+        self._in_filter = True
         try:
             event_type = event.type()
             view = self._combo.view()
@@ -592,6 +602,8 @@ class _SiteComboTipFilter(QObject):
                 return False
         except Exception:
             pass
+        finally:
+            self._in_filter = False
         return super().eventFilter(obj, event)
 
 

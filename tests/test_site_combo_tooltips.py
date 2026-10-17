@@ -27,6 +27,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import sys
+from unittest.mock import patch
 
 import pytest
 from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
@@ -448,3 +449,116 @@ def test_init_ui_installs_tips_on_all_three_site_combos():
     block = source[loop_at:call_at]
     for combo_name in ("comboBox_website_all", "comboBox_custom_website", "comboBox_no_proxy_sites"):
         assert combo_name in block, f"{combo_name} 未装悬停提示"
+
+
+def _make_bare_combo(*, opened: bool) -> QComboBox:
+    """造一个**不带**任何已装过滤器的下拉，供重入守卫用例独占安装一个过滤器。
+
+    不能复用 `_make_combo`：它内部会调 `_install_site_combo_tips` 先装一个，
+    用例再装第二个的话，一次重入事件会被两个过滤器各处理一次，量出来的深度
+    里就混进了「另一个过滤器」这一层，测的就不是守卫本身了。
+    """
+    _ensure_app()
+    combo = QComboBox()
+    combo.setView(QListView(combo))
+    combo.resize(400, 30)
+    for i, (text, tip_text) in enumerate(_ROWS):
+        combo.addItem(text, f"v{i}")
+        if tip_text:
+            combo.setItemData(i, tip_text, Qt.ItemDataRole.ToolTipRole)
+    combo.show()
+    _ensure_app().processEvents()
+    if opened:
+        combo.showPopup()
+        _ensure_app().processEvents()
+    return combo
+
+
+def test_event_filter_survives_reentrant_mousemove_from_show_at(tip):
+    """show_at() 期间被 Qt 合成回来的 MouseMove 不得把 eventFilter 递归打爆。
+
+    回归（真实缺陷）：`eventFilter` → `_show_tip_for` → `label.show_at()` → `move()`/`show()`
+    会让 Qt 合成新的 MouseMove 送回同一个过滤器。此刻两道守卫全都失效——`_shown_row`
+    是「弹成功之后才记账」，重入时还是旧值；`label.is_showing(text)` 又因为 `show()` 还没
+    执行而查到 False。于是每一次合成都再弹一次、再合成一次，无限递归直到爆栈（Windows
+    上表现为 `stack overflow` / 0xC0000409，Linux 上 SIGSEGV）。
+
+    现在由 `_in_filter` 重入守卫兜住：重入期间直接放行，最外层那次会把状态记全。
+    """
+    combo = _make_bare_combo(opened=True)
+    view = combo.view()
+    assert view is not None
+    viewport = view.viewport()
+    tip_filter = _SiteComboTipFilter(combo)
+    viewport.setMouseTracking(True)
+    viewport.installEventFilter(tip_filter)
+
+    depth = {"cur": 0, "max": 0}
+    real_show_at = type(tip).show_at
+
+    def reentrant_show_at(self, text, anchor):
+        depth["cur"] += 1
+        depth["max"] = max(depth["max"], depth["cur"])
+        try:
+            pos = _row_pos(combo, 0)
+            QApplication.sendEvent(
+                viewport,
+                QMouseEvent(
+                    QEvent.Type.MouseMove,
+                    QPointF(pos),
+                    QPointF(viewport.mapToGlobal(pos)),
+                    Qt.MouseButton.NoButton,
+                    Qt.MouseButton.NoButton,
+                    Qt.KeyboardModifier.NoModifier,
+                ),
+            )
+        finally:
+            depth["cur"] -= 1
+        return real_show_at(self, text, anchor)
+
+    with patch.object(type(tip), "show_at", reentrant_show_at):
+        _hover(combo, 0)
+
+    assert depth["max"] == 1, f"show_at 重入了 {depth['max']} 层，重入守卫没兜住"
+    assert tip_filter._in_filter is False, "守卫位没复位，后续事件会被整片吞掉"
+
+
+def test_event_filter_reentrancy_guard_also_covers_closed_state(tip):
+    """闭合态（`_show_closed_tip`）同样要受重入守卫保护。
+
+    闭合态走的是 `label.show_at(text, mapToGlobal(...))`，与弹窗内不同的调用点，
+    所以不能只靠弹窗那条路径的用例兜底。
+    """
+    combo = _make_bare_combo(opened=False)
+    tip_filter = _SiteComboTipFilter(combo)
+    combo.setMouseTracking(True)
+    combo.installEventFilter(tip_filter)
+
+    depth = {"cur": 0, "max": 0}
+    real_show_at = type(tip).show_at
+
+    def reentrant_show_at(self, text, anchor):
+        depth["cur"] += 1
+        depth["max"] = max(depth["max"], depth["cur"])
+        try:
+            pos = QPoint(10, combo.height() // 2)
+            QApplication.sendEvent(
+                combo,
+                QMouseEvent(
+                    QEvent.Type.MouseMove,
+                    QPointF(pos),
+                    QPointF(combo.mapToGlobal(pos)),
+                    Qt.MouseButton.NoButton,
+                    Qt.MouseButton.NoButton,
+                    Qt.KeyboardModifier.NoModifier,
+                ),
+            )
+        finally:
+            depth["cur"] -= 1
+        return real_show_at(self, text, anchor)
+
+    with patch.object(type(tip), "show_at", reentrant_show_at):
+        _hover_closed(combo)
+
+    assert depth["max"] == 1, f"闭合态 show_at 重入了 {depth['max']} 层，重入守卫没兜住"
+    assert tip_filter._in_filter is False, "守卫位没复位，后续事件会被整片吞掉"
