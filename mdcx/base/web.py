@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
+import hashlib
 import html
 import json
 import os
@@ -10,7 +11,7 @@ from concurrent.futures import CancelledError
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Literal, NamedTuple, overload
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import aiofiles
 import aiofiles.os
@@ -810,6 +811,125 @@ async def get_javlibrary_domain() -> str:
         except Exception:
             continue
     return _JAVLIBRARY_DOMAINS[0]
+
+
+# JavLibrary 镜像站（zlibz.com 发布最新地址）——与上面的 javlibrary 两条线互相独立：
+# 原站对大陆 IP 有 CF 墙，镜像没有，可达性不同，故分成两个站点各自配置、各自缓存。
+_JAVLIBRARY_MIRROR_PUBLISHER = "https://zlibz.com/"
+
+# 镜像站的中文页地址（/cn 即用户截图里「右上角 f101w → www.f101w.com/cn」那个形态）。
+# 排在前面的是当前在发布的，其余是地址轮换后仍可能活着的兜底。
+_JAVLIBRARY_MIRROR_DOMAINS = [
+    "https://www.f101w.com/cn",
+    "https://www.c97k.com/cn",
+]
+
+# zlibz.com 把当前地址画成一张图（<img class="text" src="text.gif?101">）贴在页面右上角，
+# HTML 里没有可解析的文本链接、图里也没有 GIF 注释扩展，解析不出「文字」——所以这里按
+# 图片内容的 sha256 认地址：见过哪张图，就等于知道它现在指向哪个地址。
+# 换地址=换图，哈希对不上时走下面的探测列表，日志里会记一笔，便于补这一行。
+_JAVLIBRARY_MIRROR_IMAGE_HASHES = {
+    # 2026-10-17 抓取：1592 字节的 320×60 位图，内容为 f101w / www.f101w.com/cn
+    "74b57aaf7d89868a0d43aa6ec180dcfc503b6668aca24c98bdfde78d4e294579": "https://www.f101w.com/cn",
+}
+
+_JAVLIBRARY_MIRROR_DOMAIN_CACHE: dict[str, tuple[str, float]] = {}
+_JAVLIBRARY_MIRROR_DOMAIN_CACHE_LOCK = threading.Lock()
+_JAVLIBRARY_MIRROR_DOMAIN_CACHE_TTL = 24 * 3600.0  # 1 天
+
+# 页面里地址图的两种写法：<img class="text" …> 与任意位置的 text.gif
+_ZLIBZ_ADDRESS_IMAGE_RES = (
+    re.compile(r'<img[^>]*class="text"[^>]*src="([^"]+)"', re.IGNORECASE),
+    re.compile(r'<img[^>]*src="([^"]*text\.gif[^"]*)"', re.IGNORECASE),
+)
+
+
+def _get_cached_javlibrary_mirror_domain() -> str:
+    now = time.time()
+    with _JAVLIBRARY_MIRROR_DOMAIN_CACHE_LOCK:
+        entry = _JAVLIBRARY_MIRROR_DOMAIN_CACHE.get("domain")
+        if entry and now - entry[1] < _JAVLIBRARY_MIRROR_DOMAIN_CACHE_TTL:
+            return entry[0]
+    return ""
+
+
+def _cache_javlibrary_mirror_domain(domain: str) -> None:
+    with _JAVLIBRARY_MIRROR_DOMAIN_CACHE_LOCK:
+        _JAVLIBRARY_MIRROR_DOMAIN_CACHE["domain"] = (domain, time.time())
+
+
+def _parse_zlibz_address_image(response: str) -> str:
+    """从 zlibz.com 首页取出「右上角地址图」的相对/绝对地址，取不到返回空串。"""
+    if not response:
+        return ""
+    for pattern in _ZLIBZ_ADDRESS_IMAGE_RES:
+        matched = pattern.search(response)
+        if not matched:
+            continue
+        src = matched.group(1).strip()
+        if src.startswith("//"):
+            return "https:" + src
+        if src.startswith(("http://", "https://")):
+            return src
+        return urljoin(_JAVLIBRARY_MIRROR_PUBLISHER, src)
+    return ""
+
+
+def _match_javlibrary_mirror_image(digest: str) -> str:
+    """按地址图的 sha256 认出它现在指向哪个中文地址。"""
+    return _JAVLIBRARY_MIRROR_IMAGE_HASHES.get(digest, "")
+
+
+async def get_javlibrary_mirror_domain() -> str:
+    """获取 JavLibrary 镜像站当前的中文页地址（带 1 天内存缓存）。
+
+    地址由 zlibz.com 首页右上角的那张图发布（见 _JAVLIBRARY_MIRROR_IMAGE_HASHES 的说明），
+    所以流程是「取图 → 按图片内容认地址」；认不出（换了新图）就依次探测已知中文地址，
+    都探不通才用列表第一项——保证刮削永远有个能用的地址，不至于整站失败。
+    """
+    cached = _get_cached_javlibrary_mirror_domain()
+    if cached:
+        return cached
+
+    image_url = ""
+    digest = ""
+    try:
+        async with manager.acquire_computed() as computed:
+            response, error = await computed.async_client.get_text(
+                _JAVLIBRARY_MIRROR_PUBLISHER, headers={"Accept": "text/html"}
+            )
+        if response is not None:
+            image_url = _parse_zlibz_address_image(response)
+        if image_url:
+            async with manager.acquire_computed() as computed:
+                image, image_error = await computed.async_client.request("GET", image_url, timeout=10)
+            if image is not None:
+                digest = hashlib.sha256(bytes(image.content)).hexdigest()
+    except Exception:
+        image_url = ""
+
+    if digest and (domain := _match_javlibrary_mirror_image(digest)):
+        _cache_javlibrary_mirror_domain(domain)
+        return domain
+
+    if digest:
+        log_console.add_log(
+            f"[javlibrary镜像] zlibz.com 发布了新的地址图（sha256={digest[:12]}），"
+            f"暂按已知地址探测；如地址已变请在 mdcx/base/web.py 的 "
+            f"_JAVLIBRARY_MIRROR_IMAGE_HASHES 里补一条映射"
+        )
+
+    # 回退：依次尝试已知中文地址，返回首个可用的
+    for candidate in _JAVLIBRARY_MIRROR_DOMAINS:
+        try:
+            async with manager.acquire_computed() as computed:
+                probe, probe_error = await computed.async_client.request("GET", candidate, timeout=8)
+            if probe is not None:
+                _cache_javlibrary_mirror_domain(candidate)
+                return candidate
+        except Exception:
+            continue
+    return _JAVLIBRARY_MIRROR_DOMAINS[0]
 
 
 async def get_amazon_data(req_url: str) -> tuple[bool, str]:

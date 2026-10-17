@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QPoint, QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -22,7 +22,6 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
-    QStyledItemDelegate,
     QVBoxLayout,
     QWidget,
 )
@@ -258,78 +257,47 @@ def _make_site_item(site: Website) -> QListWidgetItem:
     return item
 
 
-# 分组标题不再各占一行：几个标题合成候选区顶部的那一行横排 chip，由 SiteGroupDelegate
-# 自绘。标题行不带 UserRole（_list_sites / _selected_sites 靠 UserRole 过滤站点行，自然
-# 把它排除在外），这里用两个额外角色标出「这一行是标题行」与「行里有哪几个标题、各自带
-# 哪些站」：单击某个标题加入整组、右键复制该组名单都直接读它，不必按行范围去猜。
+# 分组标题与站点同样占一个条目、同样走默认委托（纯白背景、与站点 chip 同高、宽度按
+# 字体走），只是不带 UserRole、不可选中不可拖动——_list_sites / _selected_sites 靠
+# UserRole 过滤站点行，自然把标题排除在外。单���某个标题即加入该组全部网站、右键复制
+# 该组名单，都直接读这两个角色，不必按行范围去猜（换行位置、组数增减都不影响）。
 SITE_GROUP_ROLE = Qt.ItemDataRole.UserRole + 1
-SITE_GROUPS_ROLE = Qt.ItemDataRole.UserRole + 2
-
-# chip 之间的间隙、chip 左右留白、chip 与行边界的距离
-_GROUP_CHIP_GAP = 6
-_GROUP_CHIP_PAD_X = 10
-_GROUP_CHIP_INSET = 2
+SITE_GROUP_SITES_ROLE = Qt.ItemDataRole.UserRole + 2
 
 
-def _make_group_header_item(groups: list[tuple[str, list[Website]]]) -> QListWidgetItem:
-    """候选区顶部那一行：类型标题横排成几个 chip，各自带自己的成员名单。
+def _make_group_item(title: str, sites: Sequence[Website]) -> QListWidgetItem:
+    """候选区里的一个分组标题：文案就是类型名，成员名单挂在标题自己身上。
 
-    文案不放在 DisplayRole（那行文字是空的，绘制交给 delegate），标题存 SITE_GROUP_ROLE、
-    成员名单存 SITE_GROUPS_ROLE——单击哪个标题、右键复制哪个标题，都按 chip 的次序取。
+    标题排在所有站点之前（用户要求「有码、无码、素人、FC2、欧美、国产这样默认排在 DMM
+    左边」），后面紧跟着站点、与站点共用同一个换行流——所以第一行看起来就是
+    「有码 无码 素人 FC2 欧美 国产 DMM DMM_API LibreDMM …」，右边不留空。
+    标题只用加粗与站点区分，**不再另刷深色底**（用户明确要「和其他站点一样纯白背景」）。
     """
-    item = QListWidgetItem("")
-    item.setData(SITE_GROUP_ROLE, tuple(title for title, _ in groups))
-    item.setData(SITE_GROUPS_ROLE, [(title, [site.value for site in sites]) for title, sites in groups])
-    item.setToolTip(
-        "类型分组标题：单击一个标题即加入该组全部网站，右键复制该组名单\n"
-        "标题下方是全部可用网站，按分组顺序铺放，每个站只出现一次"
-    )
+    item = QListWidgetItem(title)
+    font = item.font()
+    font.setBold(True)
+    item.setFont(font)
+    item.setData(SITE_GROUP_ROLE, title)
+    item.setData(SITE_GROUP_SITES_ROLE, [site.value for site in sites])
+    item.setToolTip(f"类型分组标题：单击即加入该组全部网站（{len(sites)} 个），右键复制该组名单")
     item.setFlags(Qt.ItemFlag.ItemIsEnabled)
     return item
 
 
-def _palette_groups(list_widget: QListWidget) -> list[tuple[str, list[Website]]]:
-    """读候选区顶部标题行里的分组：[(标题, 该组站点), …]；没有标题行时返回空列表。"""
-    for row in range(list_widget.count()):
-        item = list_widget.item(row)
-        raw = item.data(SITE_GROUPS_ROLE) if item is not None else None
-        if raw:
-            return [(title, [Website(value) for value in values]) for title, values in raw]
-    return []
+def _group_sites_at(list_widget: QListWidget, row: int) -> list[Website]:
+    """第 row 行若是分组标题，返回它自己带的成员名单；否则空列表。"""
+    item = list_widget.item(row)
+    values = item.data(SITE_GROUP_SITES_ROLE) if item is not None else None
+    return [Website(value) for value in values] if values else []
 
 
 def _is_group_item(item: QListWidgetItem | None) -> bool:
-    return item is not None and item.data(SITE_GROUPS_ROLE) is not None
+    return item is not None and item.data(SITE_GROUP_SITES_ROLE) is not None
 
 
 def _is_site_item(item: QListWidgetItem | None) -> bool:
     """是否站点行。标题行没有 UserRole，靠它把两者分开。"""
     return item is not None and item.data(Qt.ItemDataRole.UserRole) in Website
-
-
-def _group_chip_font(font: QFont) -> QFont:
-    """标题 chip 的字：加粗，与站点 chip 一样高，宽度完全由字体决定。"""
-    chip_font = QFont(font)
-    chip_font.setBold(True)
-    return chip_font
-
-
-def _group_chip_rects(rect: QRect, titles: Sequence[str], font: QFont) -> list[QRect]:
-    """把标题 chip 依次横排进标题行这一格，绘制与点击命中判定共用这一份算法。
-
-    两者若各算各的，命中就会随留白或字体度量的小数误差整体偏掉几个像素——
-    「点着标题却复制了整张列表」就是这么来的。
-    """
-    metrics = QFontMetrics(font)
-    top = rect.top() + _GROUP_CHIP_INSET
-    height = max(1, rect.height() - _GROUP_CHIP_INSET * 2)
-    left = rect.left() + _GROUP_CHIP_INSET
-    rects: list[QRect] = []
-    for title in titles:
-        width = metrics.horizontalAdvance(title) + _GROUP_CHIP_PAD_X * 2
-        rects.append(QRect(left, top, width, height))
-        left += width + _GROUP_CHIP_GAP
-    return rects
 
 
 def _site_tooltip_lines(site: Website) -> list[str]:
@@ -362,7 +330,11 @@ def _site_description(site: Website) -> str:
 
 
 def _setup_site_list(list_widget: QListWidget, sites: Iterable[Website], *, grouped: bool = False) -> None:
-    """把 sites 铺进列表。grouped=True 时顶部先加一行分组标题，其下按组铺站点。
+    """把 sites 铺进列表。grouped=True 时先放六个分组标题，紧跟着才是站点。
+
+    标题与站点在同一个换行流里顺排，所以第一行就是「有码 无码 素人 FC2 欧美 国产
+    DMM DMM_API LibreDMM …」，右边不留空白（用户要求「不要空着，继续排列站点」），
+    同时又满足「六个标题排在 DMM 之前」。
 
     默认（grouped=False）保持传入的原序——「启用网站」和各字段名单的原序就是用户的
     优先级序列，任何排序都不能掺进来；候选区才用 grouped=True。
@@ -372,10 +344,10 @@ def _setup_site_list(list_widget: QListWidget, sites: Iterable[Website], *, grou
         for site in sites:
             list_widget.addItem(_make_site_item(site))
         return
-    # 标题集中在第一行（见 PALETTE_GROUP_TYPES 的次序），站点从第二行开始按组铺
-    titled = [(title, group) for title, group in grouped_palette_groups(sites) if title]
-    if titled:
-        list_widget.addItem(_make_group_header_item(titled))
+    for title, group in grouped_palette_groups(sites):
+        if title:  # 无标题的末组（MyWife 等）不另起标题，站点照样铺出来
+            list_widget.addItem(_make_group_item(title, group))
+    # 站点按组序去重铺放：标题与站点已不再按段分隔，同一个站铺两三次会让人以为有两份
     for site in palette_site_order(sites):
         list_widget.addItem(_make_site_item(site))
 
@@ -465,16 +437,15 @@ def _event_pos(event) -> QPoint:
 def _site_list_context_menu(list_widget: QListWidget, pos) -> None:
     """站点列表的右键菜单。
 
-    复制的是「点到的那个东西」：点在站点上复制该站点，点在顶部某个分组标题上复制该组
+    复制的是「点到的那个东西」：点在站点上复制该站点，点在某个分组标题上复制该组
     自己的名单（不是整张列表——六个类型就是六份不同的名单，复制整张等于把分类白做了），
     点在空白处才复制整张列表。
     """
     item = list_widget.itemAt(pos)
     site_value = item.data(Qt.ItemDataRole.UserRole) if _is_site_item(item) else None
     sites = _list_sites(list_widget)
-    chip_index = list_widget.chip_index_at(pos) if isinstance(list_widget, SitePaletteList) else None
-    chip_group = _palette_groups(list_widget)[chip_index] if chip_index is not None else None
-    group_title, group_sites = chip_group if chip_group is not None else (None, [])
+    group_title = item.data(SITE_GROUP_ROLE) if _is_group_item(item) else None
+    group_sites = _group_sites_at(list_widget, list_widget.row(item)) if group_title else []
     if site_value is None and not sites:
         return
 
@@ -527,55 +498,7 @@ def _localize_dialog_buttons(buttons: QDialogButtonBox) -> None:
         cancel_button.setText("取消")
 
 
-class SiteGroupDelegate(QStyledItemDelegate):
-    """把候选区顶部那一行画成横排的分组标题 chip。
-
-    六个标题合成一行排在站点之前（用户要求「有码、无码、素人、FC2、欧美、国产这样
-    默认排在 DMM 左边」）：站点从第二行开始按组铺，标题这一行自己占满宽度，故 chip
-    之间留 6px 间隙、各自按字体宽度伸缩，高度与站点 chip 一致（用户要求「按钮高度和
-    其他网站一致」）。chip 仍是整块自绘、不调 super().paint()——样式表里
-    `QListWidget::item { background }` 会盖掉 delegate 设的 opt.backgroundBrush，只有
-    自绘才拿得到底色 + 边框 + 圆角 + 加粗。
-    """
-
-    def __init__(self, colors: dict[str, str], parent: QWidget | None = None, host=None):
-        super().__init__(parent)
-        self._colors = colors
-        # 绘制时把 chip 矩形回写给列表，点击命中判定直接复用这份结果：
-        # 绘制用的字体与命中用的字体若不同源，几个像素的偏差就够把点击落到旁边去。
-        self._host = host
-
-    def _hover_index(self) -> int | None:
-        return getattr(self._host, "_hover_chip", None) if self._host is not None else None
-
-    def paint(self, painter: QPainter, option, index) -> None:
-        groups = index.data(SITE_GROUPS_ROLE)
-        if not groups:
-            super().paint(painter, option, index)
-            return
-        titles = [str(title) for title, _ in groups]
-        font = _group_chip_font(option.font)
-        rects = _group_chip_rects(option.rect, titles, font)
-        if self._host is not None:
-            self._host.chip_rects = rects
-        hover = self._hover_index()
-        painter.save()
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setFont(font)
-        for chip_index, chip_rect in enumerate(rects):
-            hovered = chip_index == hover
-            painter.setPen(QPen(QColor(self._colors["border_active"]), 1))
-            painter.setBrush(QColor(self._colors["surface_hover" if hovered else "surface_pressed"]))
-            painter.drawRoundedRect(chip_rect, 7, 7)
-            painter.setPen(QColor(self._colors["text"]))
-            painter.drawText(chip_rect, Qt.AlignmentFlag.AlignCenter, titles[chip_index])
-        painter.restore()
-
-
 class SitePaletteList(QListWidget):
-    # 单击顶部某个分组标题 chip（从 0 起）：发出该标题的次序，由对话框加入整组网站
-    groupChipClicked = pyqtSignal(int)
-
     def __init__(
         self,
         sites: list[Website],
@@ -588,9 +511,6 @@ class SitePaletteList(QListWidget):
         super().__init__(parent)
         self._removable_source = removable_source
         self.on_removed = None
-        # 标题 chip 的矩形，由 SiteGroupDelegate 绘制时回写（见 chip_index_at）
-        self.chip_rects: list[QRect] = []
-        self._hover_chip: int | None = None
         self.setFlow(QListWidget.Flow.LeftToRight)
         self.setWrapping(True)
         self.setResizeMode(QListWidget.ResizeMode.Adjust)
@@ -601,111 +521,10 @@ class SitePaletteList(QListWidget):
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setDefaultDropAction(Qt.DropAction.CopyAction)
         _style_site_list(self, 150, dark)
-        # grouped：是否在顶部加一行分组标题。_setup_site_list 之后每次重建都要带着这个标志，
-        # 否则刷新一次分组就没了，故存成公开属性给调用方原样传回去。
+        # grouped：是否把六个分组标题排在站点之前。_setup_site_list 之后每次重建都要带着这个
+        # 标志，否则刷新一次分组就没了，故存成公开属性给调用方原样传回去。
         self.grouped = grouped
-        if grouped:
-            self.setItemDelegate(SiteGroupDelegate(_site_priority_colors(dark), self, host=self))
         _setup_site_list(self, sites, grouped=grouped)
-        self._fit_header_row()
-
-    def _header_item(self) -> QListWidgetItem | None:
-        """顶部那行标题（没有分组时返回 None）。"""
-        for row in range(self.count()):
-            item = self.item(row)
-            if _is_group_item(item):
-                return item
-        return None
-
-    def _row_height(self) -> int:
-        """一行有多高：量已排好版的行。
-
-        不能用 `QListWidgetItem.sizeHint()`——没有 SizeHintRole 时它返回无效值（-1），
-        拿这个高度写回 sizeHint 等于把整个 sizeHint 清成无效，这一行就永远按默认窄宽排。
-        """
-        for row in range(self.count()):
-            rect = self.visualItemRect(self.item(row))
-            if rect.isValid() and rect.height() > 0:
-                return rect.height()
-        return max(1, self.fontMetrics().height() + 12)
-
-    def _fit_header_row(self) -> None:
-        """把标题行的宽度撑满——六个 chip 要横排一行，窄了会被挤到折行里去。
-
-        流式布局下每行的宽度按 sizeHint 给，而标题行的文案是空串（文字由 delegate
-        自绘），不显式给宽度它就只占行首一小截、chip 直接画不下，连点击命中也错位。
-        """
-        item = self._header_item()
-        if item is None:
-            return
-        item.setSizeHint(QSize(max(1, self.viewport().width()), self._row_height()))
-        self.scheduleDelayedItemsLayout()
-
-    def _chip_geometry(self, index: int) -> QRect | None:
-        """第 index 个 chip 的矩形；还没画过就先画一次再读回绘制结果。
-
-        chip 矩形只能取自绘制：样式表里 `QListWidget::item` 可能改过字号（实际比
-        `self.font()` 大），外面用列表字体重算会整体偏掉几个像素、越往后偏得越多，
-        点「国产」就落到「素人」头上。故一切以 SiteGroupDelegate 绘制时回写的
-        chip_rects 为准。
-        """
-        item = self._header_item()
-        titles = item.data(SITE_GROUP_ROLE) if item is not None else None
-        if not titles or not 0 <= index < len(titles):
-            return None
-        if len(self.chip_rects) != len(titles):
-            self.viewport().repaint()
-        rects = self.chip_rects
-        return rects[index] if len(rects) == len(titles) else None
-
-    def chip_index_at(self, pos: QPoint) -> int | None:
-        """点落在顶部第几个标题 chip 上（从 0 起）；没落在 chip 上返回 None。"""
-        item = self._header_item()
-        if item is None or self.indexAt(pos).row() != self.row(item):
-            return None
-        titles = item.data(SITE_GROUP_ROLE)
-        for index in range(len(titles)):
-            if (chip := self._chip_geometry(index)) is not None and chip.contains(pos):
-                return index
-        return None
-
-    def chip_point(self, index: int) -> QPoint | None:
-        """第 index 个 chip 的中心点——对它发一次左键点击就等于点这个标题。"""
-        chip = self._chip_geometry(index)
-        return chip.center() if chip is not None else None
-
-    def mousePressEvent(self, event) -> None:
-        if event.button() == Qt.MouseButton.LeftButton:
-            chip = self.chip_index_at(_event_pos(event))
-            if chip is not None:
-                # 标题 chip 是「一点就整组进」：不走默认选中，免得整行标题被当成一个条目选中
-                self.groupChipClicked.emit(chip)
-                event.accept()
-                return
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event) -> None:
-        chip = self.chip_index_at(_event_pos(event))
-        if chip != self._hover_chip:
-            self._hover_chip = chip
-            self.viewport().update()
-        super().mouseMoveEvent(event)
-
-    def leaveEvent(self, event) -> None:
-        if self._hover_chip is not None:
-            self._hover_chip = None
-            self.viewport().update()
-        super().leaveEvent(event)
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        self.chip_rects = []
-        self._fit_header_row()
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        self.chip_rects = []
-        self._fit_header_row()
 
     def _removable_drop_source(self, source) -> QListWidget | None:
         if self._removable_source is not None:
@@ -852,10 +671,7 @@ class PrioritySiteList(QListWidget):
         _setup_site_list(self, [site for site in _list_sites(self) if site in allowed_set])
 
     def _drop_row(self, event) -> int:
-        try:
-            row = self.indexAt(event.position().toPoint()).row()
-        except AttributeError:
-            row = self.indexAt(event.pos()).row()
+        row = self.indexAt(_event_pos(event)).row()
         return self.count() if row < 0 else row
 
     def _insert_sites(self, sites: list[Website], row: int) -> None:
@@ -882,7 +698,7 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         _style_dialog(self, self._dark)
         self._all_sites = list(dict.fromkeys(all_sites))
         self._selected_sites = list(dict.fromkeys(selected_sites))
-        # 可用网站（网址源）的候选区顶部横排一行分组标题，其下按组铺全部站点
+        # 可用网站（网址源）的候选区：先排六个类型分组标题，紧跟着按组铺全部站点
         # （见 grouped_palette_groups / palette_site_order）。_all_sites 的原序仍然保留着：
         # 它是「全部添加」写入启用列表的顺序，也是拖拽插入时的落点参照，都属于用户
         # 自定的优先级序列，不受这里的分组影响。
@@ -905,8 +721,8 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         layout.addWidget(group_hint)
 
         copy_hint = QLabel(
-            "顶部横排的是类型分组标题（有码、无码、素人、FC2、欧美、国产），单击一个标题即加入该组全部网站；"
-            "标题下方是全部可用网站，按分组顺序铺放、每个站只出现一次。"
+            "开头的六个加粗标题是有码、无码、素人、FC2、欧美、国产，单击一个标题即加入该组全部网站，"
+            "后面紧跟全部可用网站（按分组顺序铺放、每个站只出现一次）。"
             "右键：站点上复制该站点、标题上复制本组名单、空白处复制整张列表"
         )
         copy_hint.setWordWrap(True)
@@ -931,7 +747,7 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         remove_button.clicked.connect(self._remove_selected)
         add_all_button.clicked.connect(self._add_all)
         clear_button.clicked.connect(self._clear_selected)
-        self.available_list.groupChipClicked.connect(self._add_group_chip)
+        self.available_list.itemClicked.connect(self._on_available_clicked)
         self.available_list.itemDoubleClicked.connect(self._on_available_double_clicked)
         self.selected_list.itemDoubleClicked.connect(lambda _item: self._remove_selected())
 
@@ -960,30 +776,27 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         layout.addWidget(list_widget)
         return panel
 
+    def _on_available_clicked(self, item) -> None:
+        """单击分组标题 = 整组加入；单击站点行只是选中（加入靠双击或「添加选中」）。
+
+        站点行的单击仍旧只是选中——用户按类型挑网站源时要的是标题那一下，
+        顺着列表扫一眼时不该一路把站点都加进去。
+        """
+        if _is_group_item(item):
+            self._add_sites(_group_sites_at(self.available_list, self.available_list.row(item)))
+
     def _on_available_double_clicked(self, item) -> None:
-        # 双击分组标题不做任何事：单击标题 chip 已经加过整组，这里若照旧调
+        # 双击分组标题不做任何事：单击标题已经加过整组，这里若照旧调
         # _add_selected，会把「上一次选中残留」当成双击结果顺带加进去。
         if _is_site_item(item):
             self._add_selected()
 
     def _refresh_lists(self) -> None:
         _setup_site_list(self.available_list, self._palette_sites, grouped=self.available_list.grouped)
-        self.available_list._fit_header_row()
         _setup_site_list(self.selected_list, self._selected_sites)
 
     def _add_selected(self) -> None:
         self._add_sites(_selected_sites(self.available_list))
-
-    def _add_group_chip(self, chip_index: int) -> None:
-        """单击顶部标题行里的第 chip_index 个标题 = 把该组全部网站按组内优先级序加入。
-
-        站点行的单击仍旧只是选中（加入靠双击或「添加选中」），只有标题 chip 是
-        「一点就整组进」——用户按类型挑网站源时，要的就是这个动作。
-        """
-        groups = _palette_groups(self.available_list)
-        if not 0 <= chip_index < len(groups):
-            return
-        self._add_sites(groups[chip_index][1])
 
     def _add_sites(self, sites: list[Website]) -> None:
         """按给定次序把 sites 追加进启用列表（已启用的保持原位，不重排）。"""

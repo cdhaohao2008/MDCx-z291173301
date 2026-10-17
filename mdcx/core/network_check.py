@@ -114,6 +114,7 @@ SPECIAL_CHECK_PATHS: dict[Website, str] = {
     Website.JAVDB: "/v/D16Q5?locale=zh",
     Website.JAVBUS: "/FSDSS-660",
     Website.JAVLIBRARY: "/cn/?v=javme2j2tu",
+    Website.JAVLIBRARY_MIRROR: "/cn/?v=javme2j2tu",
     Website.JAVDB_APP: "/api/v2/search?q=SSNI-647&page=1",
 }
 
@@ -125,6 +126,7 @@ DEFAULT_SITE_URLS: dict[Website, str] = {
     # javlibrary / madouqu 最新获取网址写入代码（议题 #132）：检测前先用代码里
     # 的网址，无法联通时再通过 get_javlibrary_domain / get_madouqu_domains 获取新网址重试。
     Website.JAVLIBRARY: "https://www.javlibrary.com",
+    Website.JAVLIBRARY_MIRROR: "https://www.f101w.com",
     Website.MADOUQU: "https://madouqu.shop",
     Website.OFFICIAL: "",
 }
@@ -1207,6 +1209,7 @@ async def run_network_check_item(
             # 之后执行（见 _build_site_specs 注释与议题 #132）。
             if spec.site in (
                 Website.JAVLIBRARY,
+                Website.JAVLIBRARY_MIRROR,
                 Website.AVMOO,
                 Website.AVSOX,
                 Website.AVHEAT,
@@ -1216,12 +1219,17 @@ async def run_network_check_item(
                     from mdcx.base.web import (
                         get_aio_domain,
                         get_javlibrary_domain,
+                        get_javlibrary_mirror_domain,
                         get_madouqu_domains,
                     )
 
                     new_url: str | None = None
                     if spec.site == Website.JAVLIBRARY:
                         new_url = await asyncio.wait_for(get_javlibrary_domain(), timeout=DYNAMIC_DOMAIN_TIMEOUT)
+                    elif spec.site == Website.JAVLIBRARY_MIRROR:
+                        # 镜像地址由 zlibz.com 发布，这里换新的是「根域名」（去掉 /cn）
+                        mirror = await asyncio.wait_for(get_javlibrary_mirror_domain(), timeout=DYNAMIC_DOMAIN_TIMEOUT)
+                        new_url = re.sub(r"/(?:cn|ja|tw)/?$", "", mirror) if mirror else None
                     elif spec.site in (Website.AVMOO, Website.AVSOX, Website.AVHEAT):
                         new_url = await asyncio.wait_for(
                             get_aio_domain(spec.site.value.lower()),

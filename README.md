@@ -19,7 +19,7 @@
 
 ## MDCx 是什么
 
-MDCx 是一个桌面工具，自动从 52 个网站抓取视频文件的元数据（标题、演员、封面、简介等），生成标准的 .nfo 文件和整理好的文件夹，给 Emby、Jellyfin、Kodi 这类媒体服务器直接用。
+MDCx 是一个桌面工具，自动从 53 个网站抓取视频文件的元数据（标题、演员、封面、简介等），生成标准的 .nfo 文件和整理好的文件夹，给 Emby、Jellyfin、Kodi 这类媒体服务器直接用。
 
 一句话：把一堆乱七八糟的视频文件，变成媒体服务器能认的整齐资料库。
 
@@ -40,7 +40,7 @@ MDCx 是一个桌面工具，自动从 52 个网站抓取视频文件的元数�
 | **[使用 Wiki](https://github.com/cdlongbow/MDCx/wiki)** | **新用户先看这里** | 三分钟上手、常见问题 FAQ（90% 问题有答案） |
 | [QuickStart.md](docs/QuickStart.md) | 所有人 | 5 分钟上手，完成第一次刮削 |
 | [Install.md](docs/Install.md) | 需要安装的人 | 系统要求、Release/源码两种安装方式 |
-| [Features.md](docs/Features.md) | 想了解能做什么的人 | 全部功能、52 个网站列表、四种刮削模式 |
+| [Features.md](docs/Features.md) | 想了解能做什么的人 | 全部功能、53 个网站列表、四种刮削模式 |
 | [User_Guide.md](docs/User_Guide.md) | 日常使用的人 | 完整使用手册、常见问题、实际场景 |
 | [Configuration.md](docs/Configuration.md) | 想调设置的人 | 每个配置项是干什么的 |
 | [Changelog.md](docs/Changelog.md) | 关注版本更新的人 | 每个版本改了啥 |
@@ -50,7 +50,7 @@ MDCx 是一个桌面工具，自动从 52 个网站抓取视频文件的元数�
 
 ## 核心特色
 
-- **52 个网站爬虫** — 有码、无码、FC2、国产、欧美全覆盖，部分站点免 CF 直连
+- **53 个网站爬虫** — 有码、无码、FC2、国产、欧美全覆盖，部分站点免 CF 直连
 - **智能番号识别** — 自动判断番号类型（有码/无码/FC2/国产/欧美）
 - **标准 NFO 生成** — 30+ 元数据字段，Emby/Jellyfin/Kodi 通用
 - **多引擎翻译** — Google、Bing、Baidu、DeepL、DeepLX、LLM 共 6 种

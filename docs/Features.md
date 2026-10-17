@@ -31,6 +31,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 | JavDB_APP | JavDB 移动端 API | 综合：有码+无码 |
 | JavBus | javbus.com | 综合：有码+无码 |
 | JavLibrary | javlibrary.com | 有码：仅能有码 |
+| Javlibrary·镜像 | zlibz.com 公布的镜像（默认 www.f101w.com/cn） | 有码：仅能有码（镜像站，无 CF 墙，默认中文页） |
 | MissAV | missav.ws | 综合：有码+无码 |
 | MissAV_API | Recombee API | 综合：有码+无码 |
 | MGStage | mgstage.com | 有码：有码+素人 |
@@ -71,9 +72,9 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 
 | 类型 | 默认网站源 |
 |------|-----------|
-| **有码**（30） | DMM、DMM_API、LibreDMM、AVEntertainments、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、JavLibrary、AVSEX、Getchu |
+| **有码**（31） | DMM、DMM_API、LibreDMM、AVEntertainments、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、Javlibrary·镜像、JavLibrary、AVSEX、Getchu |
 | **无码**（18） | AVEntertainments、AVSOX、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、AVSEX、Getchu |
-| **素人**（28） | DMM、DMM_API、LibreDMM、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、JavLibrary、AVSEX、Getchu |
+| **素人**（29） | DMM、DMM_API、LibreDMM、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、Javlibrary·镜像、JavLibrary、AVSEX、Getchu |
 | **FC2**（15） | FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API、AVSEX、Getchu |
 | **国产**（14） | Madouqu、Madou.club、AVSEX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API、Getchu |
 | **欧美**（14） | ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、MissAV、MissAV_API、IQQTV、JavFree、AVSEX、Getchu |
@@ -81,11 +82,13 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 > 组内站点按「该类型专属站 → 有码+素人 → 综合站」排列，前面的站优先级更高。
 > **Official 只出现在有码、无码、素人三组**，国产、欧美、FC2 三组都不含 Official——Official 按番号前缀路由到片商官网，对国产/欧美/FC2 番号没有收录，加进去只会给每条影片白挂一次无效请求。Dahlia、Faleno 是从 Official 拆出的有码厂牌独立站，故只随有码一组走。
 > **AVEntertainments 同时在有码与无码两组**：该站是正規無修正 DVD 販売/配信的商城，站内有码、无码皆有收录（无码侧待进一步核实），故两组都保留。
-> **MyWife 是独立系列，既不属于「有码」也不属于「素人」，六组名单里都没有它**：MyWife（舞ワイフ）是「人妻・熟女・3P」这一条独立系列线——它不是有码厂牌的片商编号、也不落无码／FC2／欧美／国产任何一类，所以**有码组（30 站）不含它、素人组（28 站）同样不含它**，两个表里都查不到 MyWife。**它走的是「单独指定」而非类型组**：「网站偏好 → 指定网站」选了 MyWife、或文件路径里含 MyWife 时，`mdcx/core/file_crawler.py` 返回 `ScrapeClassification(FixedScrapingType.YOUMA, "auto", website=Website.MYWIFE)`——番号形如 `MyWife No.1230`，不属于任何已知前缀体系，故借用有码的类型判定，但用 `website=MyWife` **覆盖**掉组内名单、直接锁定 MyWife 单站刮削，压根不查六组名单。故 `tests/test_config_conversion.py` 用 `Website.MYWIFE not in config.website_suren` 钉死它不会被误塞回素人组；`Config().website_youma` 里同样没有它（历史配置里若残留过，也只会因不在类型组而从不生效）。
-> **同一份名单也是「编辑网站」对话框里「可用网站」候选区的分组依据**（`TYPE_DEFAULT_SITES` 一个常量两处用，界面与默认行为不会漂）：打开「设置→刮削网站 → 类型刮削网站 → 编辑网站」，左侧候选区**最上面一行横排六个分组标题**——`有码 ｜ 无码 ｜ 素人 ｜ FC2 ｜ 欧美 ｜ 国产`，从左到右依次排列；标题下方才开始铺站点，**第一个是 DMM、第二个是 DMM_API**，随后按「有码 → 无码 → 素人 → FC2 → 欧美 → 国产」的顺序铺放，**同一站点只出现一次**（首次出现的组决定它的位置，后面的组不再重复铺），六组之外的站点（`MyWife`）接在末尾，**没有单独的「其他」分组标题**（它不在这六个类型里，但仍可正常勾选；由于每个站只出现一次，「它属于哪些类型」要看悬停提示里新加的「适用类型」一行）。标题 chip 与站点 chip **同高、宽度随文字伸缩**，**单击某个标题即把该组全部网站按组内优先级顺序加入右侧「启用网站」列表**（组内顺序即上表的优先级顺序，联动组会自动补齐）；点标题行上 chip 之间的空白处、以及站点行的单击，都只是选中/无操作，加入仍靠双击站点或「添加选中」。右侧「启用网站」列表不受分组影响，顺序仍完全由用户拖拽决定。**两个列表都支持右键**：点站点复制该站名，**点某个标题 chip 复制它自己那一份名单**（如「有码」得 30 站，点「FC2」得 15 站，互不相等），点空白处复制整张列表（逗号分隔，与对话框上方输入框同格式，可直接粘回去比对或增删）。
+> **MyWife 是独立系列，既不属于「有码」也不属于「素人」，六组名单里都没有它**：MyWife（舞ワイフ）是「人妻・熟女・3P」这一条独立系列线——它不是有码厂牌的片商编号、也不落无码／FC2／欧美／国产任何一类，所以**有码组（31 站）不含它、素人组（29 站）同样不含它**，两个表里都查不到 MyWife。**它走的是「单独指定」而非类型组**：「网站偏好 → 指定网站」选了 MyWife、或文件路径里含 MyWife 时，`mdcx/core/file_crawler.py` 返回 `ScrapeClassification(FixedScrapingType.YOUMA, "auto", website=Website.MYWIFE)`——番号形如 `MyWife No.1230`，不属于任何已知前缀体系，故借用有码的类型判定，但用 `website=MyWife` **覆盖**掉组内名单、直接锁定 MyWife 单站刮削，压根不查六组名单。故 `tests/test_config_conversion.py` 用 `Website.MYWIFE not in config.website_suren` 钉死它不会被误塞回素人组；`Config().website_youma` 里同样没有它（历史配置里若残留过，也只会因不在类型组而从不生效）。
+> **`Javlibrary·镜像` 排在 `JavLibrary` 前面（有码、素人两组都是）**：原站 `javlibrary.com` 对中国大陆 IP 常年挂 Cloudflare 墙（要过 JS challenge，触发 Selenium 兜底），镜像站没有这层墙，故把它做成**独立站点**而不是「换个地址的原站」，并默认排在原站前面——同一条番号两条路都通时，先走不用过墙的那条。爬虫逻辑整体继承 `JavLibraryCrawler`（搜索、详情解析、封面升级都一样），差别只有三点：默认抓**中文页 `/cn`**、站点地址从 `https://zlibz.com/` 右上角公布的那张图里认（`mdcx/base/web.py` 的 `get_javlibrary_mirror_domain()`，带 24 小时缓存），以及有用户自定义网址时按用户填的走。
+> **镜像地址是「认图」而不是「读字」**：`zlibz.com` 主页把地址排成一张 `text.gif` 位图挂在右上角，HTML 里**没有任何文字形式的地址**（`/text.txt`、`/domain.txt` 之类端点全部 404），GIF 内部也没有注释块可读，页面上那张二维码图只解出 `http://zlibz.com` 本身。所以程序取到那张图后用**内容 sha256 查表**（`_JAVLIBRARY_MIRROR_IMAGE_HASHES`）认出它对应哪个地址；**换了图（表里没有的哈希）就退回「依次探测已知镜像域名列表」，再不行用列表首个**（`www.f101w.com/cn`）。也就是说官网换域名时程序仍能工作，但新地址要等表里补一条哈希才会被直接认出来。
+> **同一份名单也是「编辑网站」对话框里「可用网站」候选区的分组依据**（`TYPE_DEFAULT_SITES` 一个常量两处用，界面与默认行为不会漂）：打开「设置→刮削网站 → 类型刮削网站 → 编辑网站」，左侧候选区**开头就是六个加粗的分组标题**——`有码 ｜ 无码 ｜ 素人 ｜ FC2 ｜ 欧美 ｜ 国产`，从左到右排列，**紧接着右边就接着铺站点：第一个是 DMM、第二个是 DMM_API**，随后按「有码 → 无码 → 素人 → FC2 → 欧美 → 国产」的顺序铺放。标题与其它站点一样是普通的一格，**底色不额外加深、只是文字加粗**，后面不留空白——所以首行看起来就是 `有码 无码 素人 FC2 欧美 国产 DMM DMM_API LibreDMM …`。**同一站点只出现一次**（首次出现的组决定它的位置，后面的组不再重复铺），六组之外的站点（`MyWife`）接在末尾，**没有单独的「其他」分组标题**（它不在这六个类型里，但仍可正常勾选；由于每个站只出现一次，「它属于哪些类型」要看悬停提示里的「适用类型」一行）。**单击某个标题即把该组全部网站按组内优先级顺序加入右侧「启用网站」列表**（组内顺序即上表的优先级顺序，联动组会自动补齐）；站点行的单击只是选中，加入靠双击站点或「添加选中」。右侧「启用网站」列表不受分组影响，顺序仍完全由用户拖拽决定。**两个列表都支持右键**：点站点复制该站名，**点某个标题复制它自己那一份名单**（如「有码」得 31 站，点「FC2」得 15 站，互不相等），点空白处复制整张列表（逗号分隔，与对话框上方输入框同格式，可直接粘回去比对或增删）。
 
 **各爬虫适用类型**（能力分类，统计的是该站实际能处理的番号类型，与上表「说明」列的定位标签不是同一维度，因此会出现 Xcity、Getchu、AVBase 等同时出现在「仅能有码」与带「综合：」标签的站点里；与上面的默认名单也不必一一对应，默认名单只收「该站确实能查到该类型条目」的站）：
-- **仅能有码**：DMM、DMM_API、TheJavDB_API、LibreDMM、R18.dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO、Airav.cc、Dahlia、Faleno
+- **仅能有码**：DMM、DMM_API、TheJavDB_API、LibreDMM、R18.dev、AVBase、Xcity、Prestige、MGStage、Getchu、Javlibrary·镜像、JavLibrary、FreeJavBT、Lulubar、AVMOO、Airav.cc、Dahlia、Faleno
 - **无码专属**：AVEntertainments、AVSOX
 - **综合（有码+无码）**：JavBus、JavDB、JavDB_API、JavDB_APP、MissAV、MissAV_API、JavDay、JavFree、AVSEX、Official、IQQTV、7mmtv
 - **素人**：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MissAV_API、Prestige、Dahlia、Faleno
@@ -251,7 +254,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 - **网络连通性检测**：网络页「开始检测」按钮逐站检查连通性与刮削能力——镜像/动态域名站点多地址检测（主站+镜像），API 类爬虫走真实刮削探测，结果按基础环境/连通性/刮削站点/账号 API/辅助服务分组展示
  - **代理**：支持 HTTP/HTTPS/SOCKS5 代理；"走代理网站"列表支持域名与数据源名称两种写法——填数据源名（可从旁边下拉框直接选择，如 MissAV、JavDB、7mmtv）时，该数据源的主域/镜像/备用域名均自动走代理，站点换域名无需改配置（议题 #83）；默认含 amazon.co.jp、m.media-amazon.com、xcity.jp、minnano-av.com、avbase.net、javbus.com、javdb.com、javlibrary.com、r18.dev、mgstage.com、prestige-av.com、seesaawiki.jp、avsox/avmoo/avheat 主镜像、无码官网五站、mywife.cc、github.com 系、google.com、missav 三镜像、aventertainments.com、javfree.me、7mmtv.sx、7tv022.com 等共 37 个域名，完整列表见设置 → 网络页），其他直连
 - **Cloudflare 绕过**：通过CloudFlare 绕过服务（TRAWL `/scrape` 或 FlareSolverr `/v1`）自动绕过 CF 防护页，MDCx 自动拉起协议适配层翻译请求，无需内置浏览器；可选配置独立 Bypass 代理；Bypass 服务失效时自动跳过避免空等
-- **Selenium CF Bypass（JavLibrary 专用）**：JavLibrary 遇 Cloudflare JS challenge 时自动 fallback 到 Selenium+Edge headless 获取页面 HTML（cf_selenium_bypass，默认开启）。需要 Windows 10/11 + Edge 浏览器，首次使用自动安装 selenium；无 Edge 环境优雅降级，连续失败 3 次进入 5 分钟冷却
+- **Selenium CF Bypass（JavLibrary 专用）**：JavLibrary 遇 Cloudflare JS challenge 时自动 fallback 到 Selenium+Edge headless 获取页面 HTML（cf_selenium_bypass，默认开启）。需要 Windows 10/11 + Edge 浏览器，首次使用自动安装 selenium；无 Edge 环境优雅降级，连续失败 3 次进入 5 分钟冷却。`Javlibrary·镜像` 继承同一套逻辑，但镜像站本身没有 CF 墙，实践中走不到这条兜底
 - **Bypass 落地域名白名单**：可配置可信落地域名列表（逗号分隔，支持 `*.example.com` 子域通配），只校验**已走 Bypass** 的请求最终落在哪个域名，不控制哪些站点走 Bypass；防第三方服务被劫持时把恶意页面当数据；留空表示不校验
 - **限流**：并发数与全局线程延时控制请求节奏；Amazon 等高风控源使用自适应退避（429 自动降速冷却）
 - **指纹伪装**：完整 sec-ch-ua、Accept-Language 等请求头，按请求类型动态调整

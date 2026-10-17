@@ -463,6 +463,10 @@ class Website(Enum):
     JAVDB_APP = "JavDB_APP"
     JAVFREE = "JavFree"
     JAVLIBRARY = "JavLibrary"
+    # JavLibrary 镜像站（zlibz.com 发布最新地址）。与 JavLibrary 分成两个站点是必须的：
+    # 原站对大陆 IP 有 CF 墙，镜像没有，两者的可达性完全不同，混成一个站则取到哪个
+    # 全看运气，用户也无法单独指定镜像。名字照用户口述的写法（Javlibrary·镜像）。
+    JAVLIBRARY_MIRROR = "Javlibrary·镜像"
     LIBREDMM = "LibreDMM"
     LULUBAR = "Lulubar"
     MADOUQU = "Madouqu"
@@ -514,6 +518,9 @@ class Website(Enum):
                 "javdb_app": "JavDB_APP",
                 "javfree": "JavFree",
                 "javlibrary": "JavLibrary",
+                "javlibrary·镜像": "Javlibrary·镜像",
+                "javlibrary_mirror": "Javlibrary·镜像",
+                "javlibrarymirror": "Javlibrary·镜像",
                 "libredmm": "LibreDMM",
                 "lulubar": "Lulubar",
                 "madouqu": "Madouqu",

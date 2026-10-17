@@ -35,6 +35,7 @@ from .javdb_api import JavdbApiCrawler
 from .javdb_app import JavdbAppCrawler
 from .javfree import JavFreeCrawler
 from .javlibrary import JavLibraryCrawler
+from .javlibrary_mirror import JavLibraryMirrorCrawler
 from .libredmm import LibreDMMCrawler
 from .lulubar import LulubarCrawler
 from .madou_club import MadouClubCrawler
@@ -82,6 +83,7 @@ register_crawler(AVSEXCrawler)
 register_crawler(GetchuCrawler)
 register_crawler(MyWifeCrawler)
 register_crawler(JavLibraryCrawler)
+register_crawler(JavLibraryMirrorCrawler)
 register_crawler(OfficialCrawler)
 register_crawler(ThepornDBCrawler)
 # Dahlia / Faleno 官网已独立成站（2026-10-17），Official 仍保留前缀回退
