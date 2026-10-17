@@ -365,19 +365,26 @@ class SitePaletteList(QListWidget):
             return
         removable_source = self._removable_drop_source(event.source())
         if removable_source is not None:
-            removed_sites = set(getattr(removable_source, "drag_sites", []) or _selected_sites(removable_source))
-            if not removed_sites and removable_source.currentItem() is not None:
-                site_value = removable_source.currentItem().data(Qt.ItemDataRole.UserRole)
-                removed_sites = {Website(site_value)} if site_value in Website else set()
-            _setup_site_list(
+            self.remove_sites_from(
                 removable_source,
-                [site for site in _list_sites(removable_source) if site not in removed_sites],
+                set(getattr(removable_source, "drag_sites", []) or _selected_sites(removable_source)),
             )
-            if self.on_removed is not None:
-                self.on_removed()
             event.acceptProposedAction()
             return
         super().dropEvent(event)
+
+    def remove_sites_from(self, source_list: QListWidget, sites: set[Website]) -> None:
+        """从启用列表里摘掉 sites（拖回「可用网站」= 移除）。
+
+        按旧规则只删 sites 里那几个站点，**不连带同组站点**——移动才整组同行，
+        移除仍是一次一个，否则用户永远无法只用组内的一个通道。
+        """
+        if not sites and source_list.currentItem() is not None:
+            site_value = source_list.currentItem().data(Qt.ItemDataRole.UserRole)
+            sites = {Website(site_value)} if site_value in Website else set()
+        _setup_site_list(source_list, [site for site in _list_sites(source_list) if site not in sites])
+        if self.on_removed is not None:
+            self.on_removed()
 
 
 class PrioritySiteList(QListWidget):
@@ -427,8 +434,43 @@ class PrioritySiteList(QListWidget):
             self._insert_sites(sites, self._drop_row(event))
             event.acceptProposedAction()
             return
+        if self._auto_group:
+            # 启用列表内部的拖动重排：交给自实现而非 Qt 默认移动，好让整组一起挪。
+            # 默认实现只搬被拖的那一个站点，会把同组站点拆散、破坏它们的相对优先次序。
+            self._move_sites(self._drop_row(event))
+            event.acceptProposedAction()
+            return
         super().dropEvent(event)
         self.normalize()
+
+    def _move_sites(self, row: int) -> None:
+        """在启用列表内部把被拖动的站点（auto_group 开启时含整组）挪到 row 行之前。"""
+        original = _list_sites(self)
+        present = set(original)
+        # 只认当前列表里真实存在的站点：drag_sites 是上次拖拽的快照，取交集可挡住陈旧值
+        moved = [site for site in (self.drag_sites or _selected_sites(self)) if site in present]
+        if not moved:
+            return
+        if self._auto_group:
+            # 只补齐「已经在列表里」的同组站点：移动是重排，不能凭空把未启用的站点加进来
+            moved = expand_site_groups(moved, available=present)
+        # 整块按其在列表中的原有次序排列：移动是「把这一块整体挪走」，
+        # 若改成「被拖的在前、其余按组声明序补在后面」，就会顺带改掉块内站点的相对优先级。
+        order = {site: index for index, site in enumerate(original)}
+        moved.sort(key=lambda site: order[site])
+        moved_set = set(moved)
+        # 落点行号取自移除前的坐标系；向下移动时要扣掉落在落点之前的那些被移动项，
+        # 否则整组会多跳过同样数量的行、落点比指针所指的位置偏后。
+        dropped_before = sum(1 for site in original[:row] if site in moved_set)
+        current = [site for site in original if site not in moved_set]
+        row = max(0, min(row - dropped_before, len(current)))
+        _setup_site_list(self, current[:row] + moved + current[row:])
+        # 保留被移动项的选中态，便于用户接着拖下一次（_setup_site_list 会重建列表）
+        self.clearSelection()
+        for list_row in range(self.count()):
+            item = self.item(list_row)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) in moved_set:
+                item.setSelected(True)
 
     def mimeData(self, items: list[QListWidgetItem]):
         self.drag_sites = _selected_sites(self)
