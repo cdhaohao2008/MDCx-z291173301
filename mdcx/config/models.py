@@ -206,7 +206,7 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         Website.MISSAV_API,
         Website.R18DEV,
         Website.XCITY,
-        Website.THEJAVDB_API,
+        Website.THEJAVDB,
         # 镜像站排在原站前面：原站对大陆 IP 有 CF 墙，镜像没有，可达性优先
         Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
@@ -258,7 +258,7 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         Website.MISSAV_API,
         Website.R18DEV,
         Website.XCITY,
-        Website.THEJAVDB_API,
+        Website.THEJAVDB,
         # 镜像站排在原站前面：原站对大陆 IP 有 CF 墙，镜像没有，可达性优先
         Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,

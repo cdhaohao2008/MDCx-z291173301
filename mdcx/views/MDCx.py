@@ -14556,9 +14556,9 @@ class Ui_MDCx(object):
                 "<h4>四、网站选择</h4>\n"
                 "<p>网站下拉框由已注册的爬虫自动生成，当前53个，可按需选用全部网站或指定网站；下列六组即「软件设置→刮削网站」里各类型的默认名单（组内顺序即优先级，从高到低），可在设置中自行增删与调序：</p>\n"
                 "<ul>\n"
-                "<li><b>有码</b>：DMM、DMM_API、LibreDMM、AVEntertainments、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB_API、Javlibrary·镜像、JavLibrary</li>\n"
+                "<li><b>有码</b>：DMM、DMM_API、LibreDMM、AVEntertainments、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、Javlibrary·镜像、JavLibrary</li>\n"
                 "<li><b>无码</b>：AVEntertainments、AVSOX、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API</li>\n"
-                "<li><b>素人</b>：DMM、DMM_API、LibreDMM、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB_API、Javlibrary·镜像、JavLibrary</li>\n"
+                "<li><b>素人</b>：DMM、DMM_API、LibreDMM、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、Javlibrary·镜像、JavLibrary</li>\n"
                 "<li><b>FC2 ：</b>FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
                 "<li><b>国产</b>：Madouqu、Madou.club、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
                 "<li><b>欧美</b>：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、Missav、Missav_API、IQQTV、JavFree</li>\n"
@@ -14574,7 +14574,7 @@ class Ui_MDCx(object):
                 '<li><b>CloudFlare 绕过服务</b>：在"设置→网络"填写TRAWL/FlareSolverr风格外部CF服务地址如http://127.0.0.1:8191，并在右侧选择后端类型：TRAWL走/scrape原生API或FlareSolverr走/v1兼容API，MDCx会自动在本地拉起协议适配层把请求翻译给外部服务，无需自行填/v1地址</li>\n'
                 "<li><b>Selenium CF Bypass</b>：JavLibrary专用，JavLibrary遇到Cloudflare JS challenge时自动fallback到Selenium+Edge headless获取页面HTML，默认开启cf_selenium_bypass，需要Windows10、11+Edge浏览器，首次使用将自动安装selenium，无Edge环境优雅降级，连续失败3次进入5分钟冷却</li>\n"
                 "<li><b>Cloudfleare 校验服务</b>：可填写可信落地域名，逗号分隔，支持*.example.com子域通配（只匹配子域、不含裸域名本身），只校验走Bypass的请求最终落在哪个域名，不控制哪些站点走Bypass；防止第三方服务被劫持时把恶意页面当数据，默认留空表示不校验，输入框下方实时提示写法问题</li>\n"
-                "<li><b>CloudFlare 直连通道</b>：部分站点提供免CF的数据接口JavDB_API、JavDB_APP、Missav_API、R18.dev、TheJavDB_API，默认已加入网站源，可直接选用获得更稳定的抓取</li>\n"
+                "<li><b>CloudFlare 直连通道</b>：部分站点提供免CF的数据接口JavDB_API、JavDB_APP、Missav_API、R18.dev、TheJavDB，默认已加入网站源，可直接选用获得更稳定的抓取</li>\n"
                 "</ul>\n"
                 "<h4>六、代理设置</h4>\n"
                 '<p>在"设置→网络"中配置：</p>\n'

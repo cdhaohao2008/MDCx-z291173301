@@ -963,16 +963,19 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
                 )
             )
             continue
-        elif site == Website.THEJAVDB_API:
-            url = f"{url.rstrip('/')}/movies?q=ssni-200"
+        elif site == Website.THEJAVDB:
+            from mdcx.crawlers.thejavdb import TheJavDBCrawler
+
+            # 网页版是 SPA + CF 挑战，检测走它自己用的免 CF 直连接口：`/v1/` 根路径
+            # 已废弃（返回 This endpoint does not exist.），只有 `/v1/movies/{番号}` 可用。
             specs.append(
                 NetworkCheckSpec(
                     name=site.value,
                     group="账号/API",
-                    url=url,
+                    url=TheJavDBCrawler.build_api_url("ssni-200"),
                     site=site,
                     headers={"Accept": "application/json"},
-                    validator="TheJavDB_API",
+                    validator="TheJavDB",
                 )
             )
             continue
@@ -1381,8 +1384,8 @@ async def run_network_check_item(
             status, message = _classify_theporndb_token(int(response.status_code), text)
         elif spec.validator == "DMM_API":
             status, message = _classify_dmm_api(int(response.status_code), text)
-        elif spec.validator == "TheJavDB_API":
-            status, message = _classify_thejavdb_api(int(response.status_code), text)
+        elif spec.validator == "TheJavDB":
+            status, message = _classify_thejavdb(int(response.status_code), text)
         elif spec.validator == "Missav_API":
             status, message = _classify_missav_api(int(response.status_code), text)
         elif spec.name == "Cloudflare Bypass" and status == NetworkCheckStatus.OK:
@@ -1450,13 +1453,13 @@ def _classify_dmm_api(status_code: int, text: str) -> tuple[NetworkCheckStatus, 
     )
 
 
-def _classify_thejavdb_api(status_code: int, text: str) -> tuple[NetworkCheckStatus, str]:
+def _classify_thejavdb(status_code: int, text: str) -> tuple[NetworkCheckStatus, str]:
     if status_code == 200 and ("universal_id" in text or "SSNI" in text.upper()):
         return NetworkCheckStatus.OK, "API 查询正常"
     if status_code == 200:
         return NetworkCheckStatus.WARNING, "API 可访问，但 ssni-200 查询返回数据异常"
     return _classify_http_result(
-        NetworkCheckSpec(name="TheJavDB_API", group="账号/API", url="", site=Website.THEJAVDB_API), status_code, text
+        NetworkCheckSpec(name="TheJavDB", group="账号/API", url="", site=Website.THEJAVDB), status_code, text
     )
 
 
@@ -1581,7 +1584,7 @@ async def run_network_check(
     # 站点 specs 只构建/并入一次：join_site_specs() 执行完会把 site_specs_task 置回
     # None（空任务槽），而「账号/API」「辅助服务」组同样不是 STATIC_ONLY_GROUPS，
     # 原先只看 task is None 的话每进一组就重建+再并入一份站点 specs，于是
-    # 账号/API 组的 DMM_API/Missav_API/TheJavDB_API 各被检测两次、报告里出现
+    # 账号/API 组的 DMM_API/Missav_API/TheJavDB 各被检测两次、报告里出现
     # 两行（进度分母也跟着虚高）。用这个独立标志区分「还没建过」与「已经并入过」。
     site_specs_merged = False
     try:
@@ -1778,7 +1781,7 @@ def merge_site_check_cache(results: "list[NetworkCheckResult]") -> None:
     """把检测结果中带站点归属的项合并进持久化缓存。
 
     议题 #129: 由"只收集站点检测组"放宽为凡 spec.site 非空即写——
-    账号/API 组(DMM_API/TheJavDB_API/Missav_API/ThepornDB)的检测结果
+    账号/API 组(DMM_API/TheJavDB/Missav_API/ThepornDB)的检测结果
     同样要回标到网站设置下拉; 基础环境/辅助服务等无站点归属项 site=None 仍排除。
     Official 为五站子检测(议题 #129), 徽标按"取最差"聚合——路由依赖全部五站,
     任一不可达整条链路即有异常。

@@ -25,7 +25,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 |--------|-------|------|
 | DMM | dmm.co.jp | 有码：仅能有码 |
 | DMM_API | DMM 官方 Affiliate API | 有码：仅能有码 |
-| TheJavDB_API | api.thejavdb.net | 有码：仅能有码 |
+| TheJavDB | thejavdb.net | 有码：仅能有码 |
 | JavDB | javdb.com | 综合：有码+无码 |
 | JavDB_API | JavDB 镜像站 | 综合：有码+无码 |
 | JavDB_APP | JavDB 移动端 API | 综合：有码+无码 |
@@ -66,15 +66,15 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 - **Official**：按番号前缀自动路由到 30 家有码片商官网 + 5 家无码官网（Caribbeancom/HEYZO/1Pondo/Pacopacomama/10Musume JSON 直连）+ Dahlia/Faleno 子爬虫；全部走代理；前缀表维护在 `manual.py` 的 `OFFICIAL` 字典。「检测网络」只逐站检测无码 5 站官网。
 - **JavDB_APP**：APK 逆向签名直连，封面/海报/剧照走 App CDN 无水印原图，签名失效自动诊断，详见 [Javdb_App_Signature.md](Javdb_App_Signature.md)。
 
-> 注意：JavDB_API、JavDB_APP、Missav_API、R18.dev、TheJavDB_API 这五条是免 CF 通道，稳定性好，建议优先选用。
+> 注意：JavDB_API、JavDB_APP、Missav_API、R18.dev、TheJavDB 这五条是免 CF 通道，稳定性好，建议优先选用。
 
 **各类型默认网站源**（即「设置→刮削网站 → 类型刮削网站」六组默认名单，按组内先后即优先级递减）：
 
 | 类型 | 默认网站源 |
 |------|-----------|
-| **有码**（29） | DMM、DMM_API、LibreDMM、AVEntertainments、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB_API、Javlibrary·镜像、JavLibrary |
+| **有码**（29） | DMM、DMM_API、LibreDMM、AVEntertainments、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、Javlibrary·镜像、JavLibrary |
 | **无码**（16） | AVEntertainments、AVSOX、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API |
-| **素人**（27） | DMM、DMM_API、LibreDMM、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB_API、Javlibrary·镜像、JavLibrary |
+| **素人**（27） | DMM、DMM_API、LibreDMM、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、Javlibrary·镜像、JavLibrary |
 | **FC2**（13） | FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API |
 | **国产**（12） | Madouqu、Madou.club、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API |
 | **欧美**（12） | ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、Missav、Missav_API、IQQTV、JavFree |
@@ -88,7 +88,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 > **同一份名单也是「编辑网站」对话框里「可用网站」候选区的分组依据**（`TYPE_DEFAULT_SITES` 一个常量两处用，界面与默认行为不会漂）：打开「设置→刮削网站 → 类型刮削网站 → 编辑网站」，左侧候选区**开头就是六个加粗的分组标题**——`有码 ｜ 无码 ｜ 素人 ｜ FC2 ｜ 欧美 ｜ 国产`，从左到右排列，**紧接着右边就接着铺全部可用站点**。标题与其它站点一样是普通的一格，**底色不额外加深、只是文字加粗**，后面不留空白、也没有单独一行，所以首行看起来就是 `有码 无码 素人 FC2 欧美 国产 7mmtv Airav.cc AVBase …`。**标题之下是一份去重后的 A-Z 名单**（`7mmtv` 到 `Xcity`，共 39 个站），同一站点只出现一次，六组之外的站点（`MyWife`）也在里面、**没有单独的「其他」分组标题**（它不在这六个类型里，但仍可正常勾选；由于每个站只出现一次，「它属于哪些类型」要看悬停提示里的「适用类型」一行）。**单击某个标题即把该组全部网站按组内优先级顺序加入右侧「启用网站」列表**（组内顺序即上表的优先级顺序，联动组会自动补齐）；站点行的单击只是选中，加入靠双击站点或「添加选中」。右侧「启用网站」列表不受分组影响，顺序仍完全由用户拖拽决定。**两个列表都支持右键**：点站点复制该站名，**点某个标题复制它自己那一份名单**（如「有码」得 29 站，点「FC2」得 13 站，互不相等），点空白处复制整张列表（逗号分隔，与对话框上方输入框同格式，可直接粘回去比对或增删）。
 
 **各爬虫适用类型**（能力分类，统计的是该站实际能处理的番号类型，与上表「说明」列的定位标签不是同一维度，因此会出现 Xcity、Getchu、AVBase 等同时出现在「仅能有码」与带「综合：」标签的站点里；与上面的默认名单也不必一一对应，默认名单只收「该站确实能查到该类型条目」的站）：
-- **仅能有码**：DMM、DMM_API、TheJavDB_API、LibreDMM、R18.dev、AVBase、Xcity、Prestige、MGStage、Getchu、Javlibrary·镜像、JavLibrary、FreeJavBT、Lulubar、AVMOO、Airav.cc、Dahlia、Faleno
+- **仅能有码**：DMM、DMM_API、TheJavDB、LibreDMM、R18.dev、AVBase、Xcity、Prestige、MGStage、Getchu、Javlibrary·镜像、JavLibrary、FreeJavBT、Lulubar、AVMOO、Airav.cc、Dahlia、Faleno
 - **无码专属**：AVEntertainments、AVSOX
 - **综合（有码+无码）**：JavBus、JavDB、JavDB_API、JavDB_APP、Missav、Missav_API、JavDay、JavFree、AVSEX、Official、IQQTV、7mmtv
 - **素人**：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、Missav、Missav_API、Prestige、Dahlia、Faleno

@@ -28,7 +28,7 @@ UPGRADED_CRAWLERS = [
     "javfree",
     "lulubar",
     "missav_api",
-    "thejavdb_api",
+    "thejavdb",
     "xcity",
 ]
 

@@ -212,30 +212,32 @@ class LibreDMMCrawler(BaseCrawler):
         return "LibreDMM"
 
     async def _fetch_outline_from_javdb(self, ctx: Context, number: str) -> str:
-        """当 LibreDMM 无简介时，尝试从 JavDB_API 补充.
+        """当 LibreDMM 无简介时，尝试从 TheJavDB 补充.
 
-        使用 BaseCrawler 自带的 async_client 请求 JavDB 公开 API，
+        使用 BaseCrawler 自带的 async_client 请求 TheJavDB 的免 CF 直连接口，
         不依赖 dmm_api.py，失败时静默返回空字符串。
         """
-        api_url = f"https://api.thejavdb.net/v1/movies?q={number}"
-        ctx.debug(f"LibreDMM 无简介，尝试 JavDB_API: {api_url}")
+        from .thejavdb import TheJavDBCrawler
+
+        api_url = TheJavDBCrawler.build_api_url(number)
+        ctx.debug(f"LibreDMM 无简介，尝试 TheJavDB: {api_url}")
 
         try:
             response, error = await self.async_client.get_json(api_url, headers={"Accept": "application/json"})
             if response is None:
-                ctx.debug(f"JavDB_API 请求失败: {error}")
+                ctx.debug(f"TheJavDB 请求失败: {error}")
                 return ""
 
             description = response.get("description") or ""
             if description:
-                ctx.debug(f"JavDB_API 获取到简介 ({len(description)} 字符)")
+                ctx.debug(f"TheJavDB 获取到简介 ({len(description)} 字符)")
                 return str(description).strip()
 
-            ctx.debug("JavDB_API 未返回简介字段")
+            ctx.debug("TheJavDB 未返回简介字段")
             return ""
 
         except Exception as e:
-            ctx.debug(f"JavDB_API 调用异常: {e}")
+            ctx.debug(f"TheJavDB 调用异常: {e}")
             return ""
 
     @override

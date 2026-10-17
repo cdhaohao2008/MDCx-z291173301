@@ -171,7 +171,7 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.MISSAV_API,
         Website.R18DEV,
         Website.XCITY,
-        Website.THEJAVDB_API,
+        Website.THEJAVDB,
         Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
     ]
@@ -218,7 +218,7 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.MISSAV_API,
         Website.R18DEV,
         Website.XCITY,
-        Website.THEJAVDB_API,
+        Website.THEJAVDB,
         Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
     ]

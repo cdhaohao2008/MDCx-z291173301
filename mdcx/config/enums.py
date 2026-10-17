@@ -458,7 +458,7 @@ class Website(Enum):
     JAVDAY = "JavDay"
     JAVDB = "JavDB"
     DMM_API = "DMM_API"
-    THEJAVDB_API = "TheJavDB_API"
+    THEJAVDB = "TheJavDB"
     JAVDB_API = "JavDB_API"
     JAVDB_APP = "JavDB_APP"
     JAVFREE = "JavFree"
@@ -513,7 +513,10 @@ class Website(Enum):
                 "javbus": "JavBus",
                 "javday": "JavDay",
                 "javdb": "JavDB",
-                "thejavdb_api": "TheJavDB_API",
+                # 全小写键同时兜住旧的 TheJavDB_API/thejavdb_api（下面的 `.lower()`
+                # 回查），故只需一条，无需像 faleno/madou_club 那样逐字列出。
+                "thejavdb": "TheJavDB",
+                "thejavdb_api": "TheJavDB",
                 "javdb_api": "JavDB_API",
                 "javdb_app": "JavDB_APP",
                 "javfree": "JavFree",

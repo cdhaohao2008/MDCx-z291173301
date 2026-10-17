@@ -9,7 +9,7 @@ from . import (
     madouqu,
     mgstage,
     missav,
-    thejavdb_api,
+    thejavdb,
     xcity,
 )
 from .airav_cc import AiravCcCrawler
@@ -47,7 +47,7 @@ from .mywife import MyWifeCrawler
 from .official import OfficialCrawler
 from .prestige import PrestigeCrawler
 from .r18dev import R18DevCrawler
-from .thejavdb_api import TheJavDBAPICrawler
+from .thejavdb import TheJavDBCrawler
 from .theporndb import ThepornDBCrawler
 from .xcity import XcityCrawler
 
@@ -56,7 +56,7 @@ register_crawler(JavDBCrawler)
 register_crawler(JavdbApiCrawler)
 register_crawler(JavdbAppCrawler)
 register_crawler(dmm_api.DmmApiCrawler)
-register_crawler(TheJavDBAPICrawler)
+register_crawler(TheJavDBCrawler)
 register_crawler(AVBaseCrawler)
 register_crawler(missav.MissavCrawler)
 register_crawler(MissavApiCrawler)

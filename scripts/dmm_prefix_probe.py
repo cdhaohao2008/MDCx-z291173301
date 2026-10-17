@@ -5,8 +5,8 @@
     ``mdcx/crawlers/dmm_direct.py`` 的 ``_PREFIX_GROUPS`` / ``_SPECIAL_THRESHOLDS``。
 
 流程:
-    1. dmmapi（thejavdb API）按番号反推真实 cid（快）
-    2. dmmapi 查不到时用 AVBase 搜系列名拿 product_id（兜底）
+    1. TheJavDB（免 CF 直连接口）按番号反推真实 cid（快）
+    2. TheJavDB 查不到时用 AVBase 搜系列名拿 product_id（兜底）
     3. 反推的前缀最终以 awsimgsrc 直连多编号验证为准（唯一采信标准）
 
 用法:
@@ -39,7 +39,7 @@ from PIL import Image
 _TRIAL_NUMS = [100, 300, 500, 30, 60, 80, 200, 150]
 # 尺寸验证探测的编号段（不同系列编号分布差异大，多段探测取最佳）
 _SIZE_PROBE_NUMS = [100, 300, 538, 600, 800, 900]
-_DMMAPI = "https://api.thejavdb.net/v1/movies"
+_THEJAVDB = "https://api.thejavdb.net/v1/movies"
 _AVBASE = "https://www.avbase.net/works"
 _CDN = "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video"
 
@@ -91,9 +91,9 @@ def _image_area(size: tuple[int, int]) -> int:
     return size[0] * size[1]
 
 
-async def _probe_dmmapi(number: str) -> str | None:
+async def _probe_thejavdb(number: str) -> str | None:
     try:
-        r = requests.get(f"{_DMMAPI}?q={number}", impersonate="chrome", timeout=20)
+        r = requests.get(f"{_THEJAVDB}/{number}", impersonate="chrome", timeout=20)
         if r.status_code != 200:
             return None
         d = r.json()
@@ -147,9 +147,9 @@ async def probe_series(series: str, *, verify: bool = True) -> dict:
         return result
     cid = None
     for trial in _TRIAL_NUMS:
-        cid = await _probe_dmmapi(f"{series}-{trial}")
+        cid = await _probe_thejavdb(f"{series}-{trial}")
         if cid:
-            result["source"] = "dmmapi"
+            result["source"] = "thejavdb"
             break
     if not cid:
         cid = await _probe_avbase(series)
@@ -205,7 +205,7 @@ def _emit_code(rows: list[dict]) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="DMM cid 前缀探测（dmmapi + AVBase + awsimgsrc 验证）")
+    parser = argparse.ArgumentParser(description="DMM cid 前缀探测（TheJavDB + AVBase + awsimgsrc 验证）")
     parser.add_argument("series", nargs="*", help="系列名（逗号分隔），或 @文件路径（每行一个）")
     parser.add_argument("--no-verify", action="store_true", help="跳过 awsimgsrc 验证（只反推前缀）")
     parser.add_argument("--emit-code", action="store_true", help="输出推荐补表代码片段")

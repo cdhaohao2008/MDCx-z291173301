@@ -206,7 +206,7 @@ async def test_retried_site_recovered_after_transient_failure(monkeypatch: pytes
 async def test_failed_site_mark_includes_cause(monkeypatch: pytest.MonkeyPatch):
     """议题 #101：失败标记必须区分失败类因——「请求超时/被拦截/解析失败/请求异常」。
 
-    用户曾把「AVBase/TheJavDB_API/javdb_app 已失败」误解为逻辑 bug，实际是这些站
+    用户曾把「AVBase/TheJavDB/javdb_app 已失败」误解为逻辑 bug，实际是这些站
     在其网络下请求级失败。标注原因后一眼可分辨，且重试行也必须带上原因。
     """
     monkeypatch.setattr(

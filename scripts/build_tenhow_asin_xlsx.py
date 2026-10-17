@@ -34,7 +34,7 @@ STATE_JSON = Path("/tmp/opencode/tenhow_validate_state.json")
 DONE_FLAG = Path("/tmp/opencode/tenhow_validate_done")
 JAVDB_DONE_FLAG = Path("/tmp/opencode/tenhow_validate_javdb_done")
 
-THEJAVDB_API = "https://api.thejavdb.net/v1/movies?q={number}"
+THEJAVDB = "https://api.thejavdb.net/v1/movies/{number}"
 CONCURRENCY = 8
 BATCH_SAVE = 50
 
@@ -179,7 +179,7 @@ async def phase_validate(max_seconds: int) -> None:
             for attempt in range(3):
                 try:
                     async with session.get(
-                        THEJAVDB_API.format(number=num),
+                        THEJAVDB.format(number=num),
                         timeout=aiohttp.ClientTimeout(total=20),
                     ) as r:
                         if r.status == 200:

@@ -80,7 +80,12 @@ _SITE_RENAMES = {
     "javbus": "JavBus",
     "javday": "JavDay",
     "javdb": "JavDB",
-    "thejavdb_api": "TheJavDB_API",
+    # TheJavDB_API 已并入 TheJavDB。三个键都必须列出：`_rename_site` 是精确匹配
+    # （无 `.lower()` 兜底），漏了旧值会让存量配置里的该站被 `_is_valid_site()` 当成
+    # 非法值静默剔除（议题 #55 那条路径），等于升级即丢用户在用的 TheJavDB 源。
+    "thejavdb": "TheJavDB",
+    "thejavdb_api": "TheJavDB",
+    "TheJavDB_API": "TheJavDB",
     "javdb_api": "JavDB_API",
     "javdb_app": "JavDB_APP",
     "javfree": "JavFree",

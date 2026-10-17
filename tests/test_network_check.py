@@ -1622,7 +1622,7 @@ async def test_site_specs_merged_once_for_later_groups(monkeypatch: pytest.Monke
 
     根因：join_site_specs() 把 site_specs_task 置回 None，而「账号/API」「辅助服务」
     同样不是 STATIC_ONLY_GROUPS，原先只看 task is None 的话每进一组就重建并再并入
-    一份站点 specs —— DMM_API/Missav_API/TheJavDB_API（账号/API 组的三项）于是各被
+    一份站点 specs —— DMM_API/Missav_API/TheJavDB（账号/API 组的三项）于是各被
     检测两次、报告里打印两行，进度分母也跟着虚高。
     """
     calls: list[int] = []
@@ -1726,7 +1726,7 @@ def test_merge_cache_includes_api_group_sites(monkeypatch, tmp_path):
     merge_site_check_cache(
         [
             _result(Website.DMM_API, NetworkCheckStatus.OK, group="账号/API"),
-            _result(Website.THEJAVDB_API, NetworkCheckStatus.WARNING, group="账号/API"),
+            _result(Website.THEJAVDB, NetworkCheckStatus.WARNING, group="账号/API"),
             _result(Website.MISSAV_API, NetworkCheckStatus.FAILED, group="账号/API"),
             _result(None or Website.THEPORNDB, NetworkCheckStatus.OK, group="账号/API"),
             # 无站点归属项(基础环境等)不入库
@@ -1739,7 +1739,7 @@ def test_merge_cache_includes_api_group_sites(monkeypatch, tmp_path):
     )
     cache = load_site_check_cache()
     assert cache["DMM_API"]["status"] == "ok"
-    assert cache["TheJavDB_API"]["status"] == "warn"
+    assert cache["TheJavDB"]["status"] == "warn"
     assert cache["Missav_API"]["status"] == "fail"
     assert cache["ThepornDB"]["status"] == "ok"
     assert "通用 HTTPS" not in cache and all(v.get("status") for v in cache.values())
@@ -1845,26 +1845,27 @@ def test_merge_cache_uses_theporndb_token_production_spec(monkeypatch, tmp_path)
 
 
 @pytest.mark.anyio
-async def test_thejavdb_api_spec_has_site_for_badge(monkeypatch: pytest.MonkeyPatch):
-    """thejavdb_api 生产检测项带 site 归属，网站设置下拉能回标（#129/#174）。"""
+async def test_thejavdb_spec_has_site_for_badge(monkeypatch: pytest.MonkeyPatch):
+    """TheJavDB 生产检测项带 site 归属，网站设置下拉能回标（#129/#174）。"""
 
-    class ThejavdbApiCrawlerStub:
+    class ThejavdbCrawlerStub:
         @classmethod
         def base_url_(cls):
-            return "https://api.thejavdb.net/v1"
+            return "https://thejavdb.net"
 
     fake_crawlers = SimpleNamespace(
-        get_registered_crawler_sites=lambda include_hidden=False: [Website.THEJAVDB_API],
-        get_crawler=lambda site: ThejavdbApiCrawlerStub,
+        get_registered_crawler_sites=lambda include_hidden=False: [Website.THEJAVDB],
+        get_crawler=lambda site: ThejavdbCrawlerStub,
     )
     monkeypatch.setitem(sys.modules, "mdcx.crawlers", fake_crawlers)
 
     specs = await build_network_check_specs()
-    spec = next(s for s in specs if s.site == Website.THEJAVDB_API)
-    assert spec.name == "TheJavDB_API"
+    spec = next(s for s in specs if s.site == Website.THEJAVDB)
+    assert spec.name == "TheJavDB"
     assert spec.group == "账号/API"
-    assert spec.validator == "TheJavDB_API"
-    assert spec.url.endswith("/movies?q=ssni-200")
+    assert spec.validator == "TheJavDB"
+    # 网页版是 SPA + CF 挑战，检测走它自己的免 CF 直连接口按番号取
+    assert spec.url == "https://api.thejavdb.net/v1/movies/ssni-200"
 
 
 @pytest.mark.anyio

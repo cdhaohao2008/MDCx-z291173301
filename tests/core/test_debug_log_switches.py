@@ -125,7 +125,7 @@ def test_show_web_log_off_keeps_field_content_block(monkeypatch):
     log.write("\n 🙈 [file] /lib/SSIS-002.mp4")
     web.write("\n 🟡 图片读取失败: timeout")
     res = CrawlersResult.empty()
-    res.field_log = " 📌 outline\n 🟢 thejavdb_api"
+    res.field_log = " 📌 outline\n 🟢 thejavdb"
     res.site_log = "\n 🌐 [website] javdb (1.0s)"
     show_result(res, start_time=0.0)
     file_info = FileInfo.empty()
