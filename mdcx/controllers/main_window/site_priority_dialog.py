@@ -1,4 +1,5 @@
 # mypy: ignore-errors
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING
@@ -26,7 +27,9 @@ from mdcx.config.enums import FixedScrapingType, Website
 from mdcx.config.models import (
     SCRAPING_TYPE_SITE_FIELDS,
     FieldPriorityConfig,
+    expand_site_groups,
     filter_poster_default_sites,
+    site_group_of,
     str_to_list,
 )
 from mdcx.crawlers import get_registered_crawler_site_values
@@ -128,6 +131,15 @@ def _sites_text(sites: list[Website]) -> str:
     return ",".join(site.value for site in sites)
 
 
+def _sorted_sites(sites: Iterable[Website]) -> list[Website]:
+    """按站点名 A-Z 排序（不区分大小写；折叠名相同时再按原名兜底，保证结果稳定）。
+
+    只用于「可用网站」候选区的展示顺序。「启用网站」是用户的优先级序列，
+    排序只作用于候选区，不参与也不影响启用列表的顺序。
+    """
+    return sorted(sites, key=lambda site: (site.value.casefold(), site.value))
+
+
 def _site_priority_colors(dark: bool) -> dict[str, str]:
     tokens = get_theme_tokens(dark)
     if dark:
@@ -175,12 +187,21 @@ def _selected_sites(list_widget: QListWidget) -> list[Website]:
 def _make_site_item(site: Website) -> QListWidgetItem:
     item = QListWidgetItem(site.value)
     item.setData(Qt.ItemDataRole.UserRole, site.value)
-    description = _site_description(site)
-    item.setToolTip(description or site.value)
+    item.setToolTip("\n".join(_site_tooltip_lines(site)) or site.value)
     item.setFlags(
         item.flags() | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
     )
     return item
+
+
+def _site_tooltip_lines(site: Website) -> list[str]:
+    """站点项的悬停提示：定位说明 + 联动组成员（说明加入一个会带上哪些）。"""
+    lines: list[str] = []
+    if description := _site_description(site):
+        lines.append(description)
+    if group := site_group_of(site):
+        lines.append("联动组（加入其一即默认加入全组）：" + "、".join(member.value for member in group))
+    return lines
 
 
 def _site_description(site: Website) -> str:
@@ -361,10 +382,18 @@ class SitePaletteList(QListWidget):
 
 class PrioritySiteList(QListWidget):
     def __init__(
-        self, allowed_sites: list[Website], height: int = 74, parent: QWidget | None = None, dark: bool = False
+        self,
+        allowed_sites: list[Website],
+        height: int = 74,
+        parent: QWidget | None = None,
+        dark: bool = False,
+        auto_group: bool = False,
     ):
         super().__init__(parent)
         self._allowed_sites = list(dict.fromkeys(allowed_sites))
+        # auto_group：新增站点时按 SITE_GROUPS 补齐同组站点（仅「编辑网站」对话框开启，
+        # 「字段优先级」对话框里的每字段名单仍完全由用户手动指定）
+        self._auto_group = auto_group
         self.drag_sites: list[Website] = []
         self.setFlow(QListWidget.Flow.LeftToRight)
         self.setWrapping(True)
@@ -421,6 +450,9 @@ class PrioritySiteList(QListWidget):
         inserted = [site for site in sites if site in allowed_set]
         if not inserted:
             return
+        if self._auto_group:
+            # 拖拽加入与「添加选中」保持一致：组内任一站点加入即补齐同组其余站点
+            inserted = expand_site_groups(inserted, available=allowed_set)
         current = [site for site in _list_sites(self) if site not in inserted]
         row = max(0, min(row, len(current)))
         _setup_site_list(self, current[:row] + inserted + current[row:])
@@ -437,17 +469,26 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         _style_dialog(self, self._dark)
         self._all_sites = list(dict.fromkeys(all_sites))
         self._selected_sites = list(dict.fromkeys(selected_sites))
+        # 可用网站（网址源）按 A-Z 展示。_all_sites 的原序仍然保留：它是「全部添加」
+        # 写入启用列表的顺序，也是拖拽插入时的落点参照，都属于用户自定的优先级序列，
+        # 不受这里的排序影响。
+        self._palette_sites = _sorted_sites(self._all_sites)
 
         layout = QVBoxLayout(self)
 
-        self.selected_list = PrioritySiteList(self._all_sites, 168, self, self._dark)
+        self.selected_list = PrioritySiteList(self._all_sites, 168, self, self._dark, auto_group=True)
         self.available_list = SitePaletteList(
-            self._all_sites, self, removable_source=self.selected_list, dark=self._dark
+            self._palette_sites, self, removable_source=self.selected_list, dark=self._dark
         )
         self.available_list.on_removed = self._sync_selected_from_list
 
         layout.addWidget(self._build_panel("可用网站", self.available_list))
         layout.addWidget(self._build_panel("启用网站（从左到右优先级递减）", self.selected_list), 1)
+
+        group_hint = QLabel("联动组：加入组内任意一个站点即自动加入组内其余站点，加入后可在「启用网站」中手动移除")
+        group_hint.setWordWrap(True)
+        group_hint.setStyleSheet(f"color: {get_theme_tokens(self._dark)['text_muted']};")
+        layout.addWidget(group_hint)
 
         actions = QHBoxLayout()
         add_button = QPushButton("添加选中")
@@ -496,14 +537,17 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         return panel
 
     def _refresh_lists(self) -> None:
-        _setup_site_list(self.available_list, self._all_sites)
+        _setup_site_list(self.available_list, self._palette_sites)
         _setup_site_list(self.selected_list, self._selected_sites)
 
     def _add_selected(self) -> None:
-        self._selected_sites = self.selected_sites()
-        for site in _selected_sites(self.available_list):
-            if site not in self._selected_sites:
-                self._selected_sites.append(site)
+        current = self.selected_sites()
+        self._selected_sites = current
+        added = [site for site in _selected_sites(self.available_list) if site not in current]
+        # 只让「本次新加入」的站点触发组联动：用户手动移除过的同组站点不会借机复活，
+        # 而新加入组内任一站点时同组其余站点默认一并加入（随后可在上方列表手动移除）
+        triggered = expand_site_groups(added, available=self._all_sites)
+        self._selected_sites = current + [site for site in triggered if site not in current]
         self._refresh_lists()
 
     def _remove_selected(self) -> None:

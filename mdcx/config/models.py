@@ -1,5 +1,5 @@
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import lru_cache
@@ -205,6 +205,67 @@ POSTER_DEFAULT_EXCLUDED_SITES = frozenset(
 
 def filter_poster_default_sites(sites: list[Website]) -> list[Website]:
     return [site for site in sites if site not in POSTER_DEFAULT_EXCLUDED_SITES]
+
+
+# 联动站点组：同一数据源的多种访问通道（网页版 / 官方 API / 移动版 APP / 镜像站）。
+# 在「软件设置-刮削网站-类型刮削网站-编辑网站」里加入组内任意一个站点时，同组其余站点
+# 会一并加入，避免只勾一个通道时被 Cloudflare 拦住导致该类型整体刮不到数据。
+# 加入后仍可在对话框里手动移除单个站点，移除结果原样保存，不会被再次自动加回。
+SITE_GROUPS: tuple[tuple[Website, ...], ...] = (
+    (
+        Website.DMM,
+        Website.DMM_API,
+        Website.LIBREDMM,
+    ),
+    (
+        Website.MISSAV,
+        Website.MISSAV_API,
+    ),
+    (
+        Website.FC2,
+        Website.FC2PPVDB,
+    ),
+    (
+        Website.THEPORNDB,
+        Website.AVHEAT,
+    ),
+    (
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
+    ),
+    (
+        Website.MADOUQU,
+        Website.MADOUCLUB,
+    ),
+)
+
+_SITE_GROUP_OF: dict[Website, tuple[Website, ...]] = {site: group for group in SITE_GROUPS for site in group}
+
+
+def site_group_of(site: Website) -> tuple[Website, ...]:
+    """返回 site 所属联动组；不属任何组时返回空元组。"""
+    return _SITE_GROUP_OF.get(site, ())
+
+
+def expand_site_groups(sites: Iterable[Website], *, available: Collection[Website] | None = None) -> list[Website]:
+    """把 sites 中每个站点所属联动组的其余成员补齐进结果（保持原顺序，缺失成员追加在后）。
+
+    available 给定时只补齐其中确实存在的站点——对话框的候选站点来自已注册爬虫，
+    未注册的成员即便补进去也无法刮削。
+    """
+    result = list(dict.fromkeys(sites))
+    known = set(result)
+    for site in tuple(result):
+        group = _SITE_GROUP_OF.get(site)
+        if group is None:
+            continue
+        for member in group:
+            if member in known or (available is not None and member not in available):
+                continue
+            result.append(member)
+            known.add(member)
+    return result
 
 
 SENSITIVE_FIELDS = frozenset(
