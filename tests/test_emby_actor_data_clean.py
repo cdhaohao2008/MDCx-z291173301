@@ -442,3 +442,153 @@ class TestDefaultCleanRules:
         assert new_ov == "She is a 日本AV女优 from Tokyo."
         assert new_tags == ["美国色情演员"]
         assert fix_birth is False
+
+
+_PINNED = [
+    ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
+    ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
+]
+
+
+class _FakeManager:
+    """只实现清洗规则持久化用到的三个成员, 免得测纯函数也要起真实 ConfigManager 写盘。"""
+
+    def __init__(self, config=None):
+        from mdcx.config.models import Config
+
+        self.config = config or Config()
+        self.save_calls = 0
+
+    def _replace_config(self, cfg):
+        self.config = cfg
+
+    def save(self):
+        self.save_calls += 1
+
+
+class TestSavedDefaultCleanRules:
+    """规则窗「保存默认」/「恢复默认」: 用户保存的那份取代内置出厂成为默认规则。
+
+    规则分三层层层兜底: 生效规则 ⊇ 用户默认 ⊇ 内置出厂。
+    """
+
+    def test_pinned_constant_is_first_two_of_builtin_defaults(self):
+        from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES, PINNED_CLEAN_RULES
+
+        assert PINNED_CLEAN_RULES == _PINNED
+        assert DEFAULT_CLEAN_RULES[:2] == _PINNED
+
+    def test_config_default_field_matches_builtin_default(self):
+        """新配置项的出厂默认必须与常量一致, 否则新装用户和常量兜底看到的规则不同。"""
+        from mdcx.config.models import Config
+        from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES
+
+        assert Config().actor_clean_rules_default == [list(rule) for rule in DEFAULT_CLEAN_RULES]
+
+    def test_restore_default_uses_builtin_before_any_save(self):
+        from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES, load_default_clean_rules
+
+        assert load_default_clean_rules(_FakeManager().config) == DEFAULT_CLEAN_RULES
+
+    def test_empty_or_invalid_stored_default_falls_back_to_builtin(self):
+        """存盘为空/非列表时不能炸, 也不能给出一份空规则让「恢复默认」清空表格。"""
+        from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES, load_default_clean_rules
+
+        for bad in ([], None, "不是列表", [("原始",), "非二元组", ["", "原始数值为空"]]):
+            mgr = _FakeManager()
+            mgr.config.actor_clean_rules_default = bad
+            assert load_default_clean_rules(mgr.config) == DEFAULT_CLEAN_RULES, bad
+
+    def test_saved_rules_become_the_default(self):
+        """保存自定义规则后, 恢复默认读到的是用户那份。"""
+        from mdcx.tools.emby_actor_clean_rules import load_default_clean_rules, save_default_clean_rules
+
+        mgr = _FakeManager()
+        save_default_clean_rules([*_PINNED, ("noise", "噪声")], mgr)
+        rules = load_default_clean_rules(mgr.config)
+        assert rules[:2] == _PINNED
+        assert ("noise", "噪声") in rules
+        assert mgr.save_calls == 1
+
+    def test_pinned_rules_restored_to_front_even_if_user_deleted_them(self):
+        """用户把两条占位规则删光, 保存时仍补回并排最前两条(需求硬约束)。"""
+        from mdcx.tools.emby_actor_clean_rules import save_default_clean_rules
+
+        saved = save_default_clean_rules([("noise", "噪声")], _FakeManager())
+        assert saved[:2] == _PINNED
+        assert ("noise", "噪声") in saved
+
+    def test_pinned_keeps_user_edited_replacement(self):
+        """置顶只挪位置不覆盖内容: 用户改过的替换值仍在最前两条。"""
+        from mdcx.tools.emby_actor_clean_rules import save_default_clean_rules
+
+        saved = save_default_clean_rules([("我自造的占位", "x"), (_PINNED[1][0], "用户改的替换值")], _FakeManager())
+        assert saved[0] == _PINNED[0]
+        assert saved[1] == (_PINNED[1][0], "用户改的替换值")
+
+    def test_pinned_order_is_canonical_regardless_of_table_order(self):
+        """表格里把全角那条拖到半角前面, 保存后仍按半角→全角的既定顺序置顶。"""
+        from mdcx.tools.emby_actor_clean_rules import save_default_clean_rules
+
+        saved = save_default_clean_rules([_PINNED[1], _PINNED[0]], _FakeManager())
+        assert saved[:2] == _PINNED
+
+    def test_builtin_english_rules_are_re_added(self):
+        """内置英文身份译名缺失也补齐, 追加在用户自定义规则之后。"""
+        from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES, save_default_clean_rules
+
+        saved = save_default_clean_rules([*_PINNED, ("noise", "噪声")], _FakeManager())
+        assert saved[2] == ("noise", "噪声"), "用户自定义规则保持原相对顺序"
+        assert saved[3:] == DEFAULT_CLEAN_RULES[2:]
+
+    def test_duplicate_originals_collapse_in_saved_default(self):
+        from mdcx.tools.emby_actor_clean_rules import save_default_clean_rules
+
+        saved = save_default_clean_rules([("noise", "第一份"), ("noise", "第二份")], _FakeManager())
+        assert [rule for rule in saved if rule[0] == "noise"] == [("noise", "第二份")]
+
+    def test_saving_default_does_not_touch_active_rules(self):
+        """「保存默认」只改默认, 当前生效的规则原封不动(用不用仍由「确定」决定)。"""
+        from mdcx.tools.emby_actor_clean_rules import save_default_clean_rules
+
+        mgr = _FakeManager()
+        before = [list(rule) for rule in mgr.config.actor_clean_rules]
+        save_default_clean_rules([("noise", "噪声")], mgr)
+        assert mgr.config.actor_clean_rules == before
+
+    def test_saved_default_becomes_floor_of_active_rules(self):
+        """保存默认后, 生效规则里缺失的自定义规则也会被补回(层层兜底)。"""
+        from mdcx.tools.emby_actor_clean_rules import load_clean_rules, save_clean_rules, save_default_clean_rules
+
+        mgr = _FakeManager()
+        save_default_clean_rules([*_PINNED, ("noise", "噪声")], mgr)
+        mgr.config.actor_clean_rules = []
+        assert ("noise", "噪声") in load_clean_rules(mgr.config)
+        # 「确定」保存同样以用户默认为底座
+        mgr.config.actor_clean_rules = []
+        assert ("noise", "噪声") in save_clean_rules([], mgr)
+
+    def test_builtin_defaults_still_restored_without_any_saved_default(self):
+        """没保存过默认时, 内置出厂仍是生效规则的兜底底座(旧行为不回归)。"""
+        from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES, load_clean_rules
+
+        mgr = _FakeManager()
+        mgr.config.actor_clean_rules = []
+        assert load_clean_rules(mgr.config) == DEFAULT_CLEAN_RULES
+
+    def test_deleting_custom_rows_returns_to_builtin_defaults(self):
+        """把自定义规则删光再保存默认 = 回到内置出厂那六条(用户想回退的路径)。"""
+        from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES, save_default_clean_rules
+
+        assert save_default_clean_rules([], _FakeManager()) == DEFAULT_CLEAN_RULES
+
+    def test_invalid_input_still_normalizes(self):
+        """非法入参(None/非二元组/原始数值为空白)走清洗, 不炸。"""
+        from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES, save_default_clean_rules
+
+        assert save_default_clean_rules(None, _FakeManager()) == DEFAULT_CLEAN_RULES
+        assert save_default_clean_rules(["不是二元组", ("   ", "x")], _FakeManager()) == DEFAULT_CLEAN_RULES
+
+
+# 规则窗的按钮行为(保存默认/恢复默认)在 tests/test_actor_clean_rules_dialog.py:
+# 构造 QDialog 必须先有 QApplication, 与本文件的纯函数用例分开以免带进 Qt 依赖。

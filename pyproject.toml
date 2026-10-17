@@ -10,7 +10,7 @@ include = ["mdcx*", "scripts*"]
 
 [project]
 name = "mdcx"
-version = "2.5.3"
+version = "2.5.4"
 description = "mdcx"
 readme = "README.md"
 requires-python = ">=3.13.4" # we need os.path.ALLOW_MISSING and type parameter defaults
@@ -72,7 +72,7 @@ dev = [
     "pytest-cov>=6.2.1",
     "respx>=0.22.0",  # httpx 传输层 mock：替代手写 FakeAsyncClient（tests/test_emby_respx.py 示例）
     "rich>=14.1.0",
-    "ruff>=0.15.0,<0.16.0",
+    "ruff>=0.17.1,<0.18.0",
     "typer>=0.16.0",
     "types-lxml>=2025.3.30",
     "mypy>=1.17.0",

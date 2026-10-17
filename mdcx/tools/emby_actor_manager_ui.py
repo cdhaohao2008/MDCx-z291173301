@@ -252,20 +252,28 @@ class _FlushLogTextEdit(QPlainTextEdit):
 
 
 DEFAULT_CLEAN_RULES = clean_rules.DEFAULT_CLEAN_RULES
-"""数据清洗默认替换规则: 两条 minnano 占位文案(半角/全角逗号)替换为空,
-外加四条 wiki 源英文身份文案译为中文, 始终保留。"""
+"""内置**出厂**默认替换规则: 置顶两条 minnano 占位文案(半角/全角逗号)替换为空,
+外加四条 wiki 源英文身份文案译为中文, 始终保留。
+
+「恢复默认」按钮填的是 `load_default_clean_rules()` 的返回值——用户点过「保存默认」
+就填用户保存的那份, 没点过才等于这里这份。"""
+
+PINNED_CLEAN_RULES = clean_rules.PINNED_CLEAN_RULES
+"""永远置顶的两条 minnano 占位规则; 保存默认时即使用户删了也会补回并排到最前两条。"""
 
 
 def _ensure_default_clean_rules(
     cleaned: list[tuple[str, str]],
+    defaults: list[tuple[str, str]] | None = None,
 ) -> list[tuple[str, str]]:
     """补齐默认规则: 缺失的默认原始数值追加到末尾, 已有条目保持原顺序与替换值不变。
 
     保证「默认规则始终保留」——用户误删后下次加载/保存自动补回。已有条目即便
     用户改过替换值也原样保留, 只按「原始数值」判重, 故用户主动改写过的规则
-    不会被默认值覆盖回去。
+    不会被默认值覆盖回去。`defaults` 缺省用内置出厂, 由 load/save 两条路径传入
+    `load_default_clean_rules` 的结果(即用户保存过默认就是他那份)。
     """
-    return clean_rules._ensure_default_clean_rules(cleaned)
+    return clean_rules._ensure_default_clean_rules(cleaned, defaults)
 
 
 def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
@@ -275,6 +283,24 @@ def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
     (即删除原始数值)。供对话框回读与扫描口径共用。
     """
     return clean_rules._sanitize_clean_rules(rules)
+
+
+def load_default_clean_rules() -> list[tuple[str, str]]:
+    """「恢复默认」按钮该填的规则: 用户点过「保存默认」就是他保存的那份, 否则内置出厂。
+
+    结果恒含置顶两条 minnano 占位规则(排最前)与内置英文身份四条, 用户保存过的那份
+    即便把它们删了也会在保存时被补回。
+    """
+    return clean_rules.load_default_clean_rules(manager.config)
+
+
+def save_default_clean_rules(rules: object) -> list[tuple[str, str]]:
+    """把规则窗当前编辑的替换规则存成默认规则, 返回归一化后的结果。
+
+    只改默认(下次「恢复默认」生效), **不动当前生效的规则**——要不要用这套规则清洗
+    仍由「确定」决定。
+    """
+    return clean_rules.save_default_clean_rules(rules, manager)
 
 
 def load_clean_rules() -> list[tuple[str, str]]:
@@ -1012,6 +1038,10 @@ class ActorCleanRulesDialog(QDialog):
     (含无待清洗数据时), 打开时装载上次保存的规则; 用户可编辑单元格、添加行、
     删除选中行, 窗口可拉伸缩小; 点确定则保存规则并关闭, 调用方据此执行实际清洗,
     点取消则不做任何改动。
+
+    「恢复默认」填入默认规则(用户点过「保存默认」就是他保存的那份, 否则内置
+    出厂),「保存默认」把当前表格存成默认规则、只改下次恢复默认的底座而不改本次
+    生效的规则; 两条 minnano 占位规则在保存默认时即使用户删了也会补回并置顶。
     """
 
     def __init__(self, actors: list[ActorInfo] | None = None, parent=None):
@@ -1068,11 +1098,19 @@ class ActorCleanRulesDialog(QDialog):
         del_btn = QPushButton("删除选中")
         del_btn.clicked.connect(self._on_delete_selected)
         default_btn = QPushButton("恢复默认")
-        default_btn.setToolTip("填入内置默认规则(占位文案清理 + 英文身份译名)")
+        default_btn.setToolTip("填入默认规则: 内置的占位文案清理 + 英文身份译名; 点过「保存默认」则填你保存的那份")
         default_btn.clicked.connect(self._on_restore_default)
+        save_default_btn = QPushButton("保存默认")
+        save_default_btn.setToolTip(
+            "把当前表格里的规则存成默认规则, 下次点「恢复默认」即用这份。\n"
+            "两条 minnano 占位规则即使用户删了也会补回并置顶到最前两条, "
+            "内置英文身份译名缺失也会补齐"
+        )
+        save_default_btn.clicked.connect(self._on_save_default)
         row.addWidget(add_btn)
         row.addWidget(del_btn)
         row.addWidget(default_btn)
+        row.addWidget(save_default_btn)
         row.addStretch()
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         # QDialogButtonBox.button() 存根返回 QPushButton | None，但刚构造时必定带这两个
@@ -1132,7 +1170,19 @@ class ActorCleanRulesDialog(QDialog):
             self._resume_refresh()
 
     def _on_restore_default(self):
-        self.set_rules(list(DEFAULT_CLEAN_RULES))
+        """填入默认规则: 用户点过「保存默认」就是他保存的那份, 否则内置出厂。"""
+        self.set_rules(load_default_clean_rules())
+
+    def _on_save_default(self):
+        """把当前表格的规则存成默认规则, 下次「恢复默认」即用这份。
+
+        存的是归一化后的结果(两条 minnano 占位规则补回并置顶、内置英文身份译名
+        补齐), 故把归一化结果回填给用户看, 免得表格里看着没生效。只改默认, 不动
+        当前生效的规则——点「确定」才会拿它去清洗。
+        """
+        saved = save_default_clean_rules(self.rules())
+        self.set_rules(saved)
+        self._apply_status(f"已保存为默认规则({len(saved)} 条), 下次点「恢复默认」即用这份。")
 
     def set_rules(self, rules: object):
         cleaned = _sanitize_clean_rules(rules)
@@ -1162,11 +1212,17 @@ class ActorCleanRulesDialog(QDialog):
         return _sanitize_clean_rules(raw)
 
     def _refresh_status(self, *_args):
+        self._apply_status()
+
+    def _apply_status(self, prefix: str = ""):
+        """刷新底部状态行; `prefix` 用于在「保存默认」后补一句提示, 失败时静默。"""
+        text = ""
         try:
             count = len(scan_actor_data_noise(self._actors, self.rules()))
-            self.status_label.setText(f"按当前规则将清洗 {count} 个演员(共 {len(self._actors)} 个)")
+            text = f"按当前规则将清洗 {count} 个演员(共 {len(self._actors)} 个)"
         except Exception:
-            self.status_label.setText("")
+            text = ""
+        self.status_label.setText(f"{prefix}{text}" if prefix and text else (prefix or text))
 
     def _center_on_screen(self, avail=None, *, allow_defer: bool = True) -> None:
         """把窗口外框放到所在屏幕可用区的正中央(与演员详情窗同款口径)。"""

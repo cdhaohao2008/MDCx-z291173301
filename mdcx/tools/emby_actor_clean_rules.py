@@ -4,6 +4,11 @@
 默认值/归一化/持久化，详情列表格展示文本，以及「哪些演员的数据需要清洗」的判定。
 替换规则同时作用于简介(Overview)与标签(Taglines)，两条路径共用同一清洗口径。
 
+规则有三层，层层兜底：**生效规则**(用户点「确定」存下的 ``actor_clean_rules``)
+⊇ **用户默认**(规则窗点「保存默认」存下的 ``actor_clean_rules_default``，
+没存过就是内置出厂 ``DEFAULT_CLEAN_RULES``) ⊇ 内置出厂。任何一层都不会让下一层
+的规则丢失，用户保存过默认之后他自定义的规则也就跟着始终保留。
+
 UI 模块只保留同名薄壳并把自己的 ``manager`` 传进来，因此
 ``patch("mdcx.tools.emby_actor_manager_ui.manager", ...)`` 的既有约定不受影响。
 """
@@ -21,40 +26,82 @@ if TYPE_CHECKING:
     from ..config.manager import ConfigManager
     from ..config.models import Config
 
-DEFAULT_CLEAN_RULES: list[tuple[str, str]] = [
+PINNED_CLEAN_RULES: list[tuple[str, str]] = [
     ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
     ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
+]
+"""永远置顶的两条 minnano 占位文案规则(半角/全角逗号两种写法), 替换为空即删掉整段占位说明。
+
+这两条是「保存默认 / 恢复默认」结果里固定排在前两条的锚点: 用户在规则窗里把
+它们删掉也没用, 保存默认时会被补回并置顶。理由有二——占位文案是 minnano 源
+「查不到维基百科」的提示, 留着就是噪声; 而这两条是唯一能整段清空简介的规则
+(其余规则都只换词条), 埋在列表中间不好认, 故固定排最前。
+
+已在列表里的置顶条目保留用户改过的替换值(只挪位置不覆盖内容), 缺失的按上面的
+默认替换值补在前面; 见 `_pin_clean_rules_first`。
+"""
+
+DEFAULT_CLEAN_RULES: list[tuple[str, str]] = [
+    *PINNED_CLEAN_RULES,
     ("Japanese AV actress", "日本AV女优"),
     ("American pornographic actress", "美国色情女演员"),
     ("American pornographic performer", "美国色情演员"),
     ("Brazilian pornographic actress", "巴西色情女演员"),
 ]
-"""数据清洗默认替换规则: 两条 minnano 占位文案(半角/全角逗号)替换为空,
+"""**内置出厂**默认替换规则: 置顶两条 minnano 占位文案(半角/全角逗号)替换为空,
 外加四条 wiki 源英文身份文案译为中文, 始终保留。
 
 占位两条是删噪声(整段清空); 英文四条是**译名**而非删噪声——wiki 源的
 Overview/Taglines 会带 "Japanese AV actress" 这类英文身份短语, 中文界面读着
 别扭, 替换成对应中文词条。两条语义不同, 故合并在一份列表里由
 `_ensure_default_clean_rules` 统一兜底(用户删掉也会补回)。
+
+注意这是**出厂兜底**: 用户可在规则窗点「保存默认」覆盖成自己编辑的那一份
+(存 `Config.actor_clean_rules_default`), 本常量始终只作兜底底座, 见
+`load_default_clean_rules`。
 """
 
 
 def _ensure_default_clean_rules(
     cleaned: list[tuple[str, str]],
+    defaults: list[tuple[str, str]] | None = None,
 ) -> list[tuple[str, str]]:
     """补齐默认规则: 缺失的默认原始数值追加到末尾, 已有条目保持原顺序与替换值不变。
 
-    保证「默认规则始终保留」——用户误删后下次加载/保存自动补回(占位两条 +
-    英文身份四条)。已有条目即便用户改过替换值也原样保留, 只按「原始数值」
-    判重, 故用户主动改写过的规则不会被默认值覆盖回去。
+    保证「默认规则始终保留」——用户误删后下次加载/保存自动补回(内置占位两条 +
+    英文身份四条; 用户覆盖过默认则补的是他保存的那份, 故 `defaults` 传入
+    `load_default_clean_rules` 的结果)。已有条目即便用户改过替换值也原样保留,
+    只按「原始数值」判重, 故用户主动改写过的规则不会被默认值覆盖回去。
     """
+    baseline = DEFAULT_CLEAN_RULES if defaults is None else defaults
     existing = {original for original, _ in cleaned}
     result = list(cleaned)
-    for original, replacement in DEFAULT_CLEAN_RULES:
+    for original, replacement in baseline:
         if original not in existing:
             result.append((original, replacement))
             existing.add(original)
     return result
+
+
+def _pin_clean_rules_first(rules: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """把 `PINNED_CLEAN_RULES` 提到最前并按其既定顺序排列, 其余规则保持原相对顺序。
+
+    已在列表里的置顶条目保留用户改过的替换值(只挪位置, 不覆盖内容), 缺失的按
+    `PINNED_CLEAN_RULES` 的默认替换值补在最前面。原始数值重复的行会被合并成一条
+    (重复出现时取后一条的替换值, 与 `dict()` 语义一致), 故传进来的脏数据也不会把
+    同一条规则重复置顶。
+    """
+    replacements = dict(rules)
+    head: list[tuple[str, str]] = []
+    for original, fallback in PINNED_CLEAN_RULES:
+        head.append((original, replacements.pop(original, fallback)))
+    ordered: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for original, _ in rules:
+        if original in replacements and original not in seen:
+            seen.add(original)
+            ordered.append((original, replacements[original]))
+    return head + ordered
 
 
 def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
@@ -85,14 +132,60 @@ def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
     return cleaned
 
 
+def _normalize_default_clean_rules(rules: object) -> list[tuple[str, str]]:
+    """「保存默认」的归一化口径: 清洗入参 → 置顶两条 minnano 占位规则 → 补齐内置默认。
+
+    即用户存下的默认规则里, 两条占位规则永远存在且排最前(删了也补回), 内置
+    英文身份四条缺失也补齐(追加在用户自定义规则之后), 用户自建规则原样保留。
+    """
+    return _ensure_default_clean_rules(_pin_clean_rules_first(_sanitize_clean_rules(rules)))
+
+
+def load_default_clean_rules(config: Config) -> list[tuple[str, str]]:
+    """读出「恢复默认」该填的规则: 用户点过「保存默认」就用他保存的那份, 否则用内置出厂。
+
+    存盘形态同样走 `_normalize_default_clean_rules` 归一化, 保证旧/非法/空存盘
+    都能补齐置顶两条与内置英文四条; 读不到配置时兜底为 `DEFAULT_CLEAN_RULES`。
+    """
+    try:
+        saved = _sanitize_clean_rules(config.actor_clean_rules_default)
+    except Exception:
+        return list(DEFAULT_CLEAN_RULES)
+    if not saved:
+        return list(DEFAULT_CLEAN_RULES)
+    return _normalize_default_clean_rules(saved)
+
+
+def save_default_clean_rules(rules: object, manager: ConfigManager) -> list[tuple[str, str]]:
+    """把规则窗当前编辑的替换规则存成「默认规则」, 返回归一化后的结果。
+
+    只改默认(`Config.actor_clean_rules_default`), **不动当前生效的**
+    `actor_clean_rules`——要不要用这套规则清洗仍由规则窗的「确定」决定。失败时
+    静默返回归一化结果(与 `save_clean_rules` 同一口径)。
+    """
+    cleaned = _normalize_default_clean_rules(rules)
+    try:
+        cfg = manager.config.model_copy(deep=True)
+        cfg.actor_clean_rules_default = [[o, r] for o, r in cleaned]
+        manager._replace_config(cfg)
+        manager.save()
+    except Exception:
+        pass
+    return cleaned
+
+
 def load_clean_rules(config: Config) -> list[tuple[str, str]]:
     """读出上次保存的清洗替换规则; 无配置/非法时返回默认规则, 缺失的默认条目自动补齐。
 
     数据清洗窗口弹出时默认加载本函数返回值, 故首开即见全部默认规则(占位两条
     + 英文身份四条)。老配置存盘只有占位两条时, 英文四条自动补齐追加到末尾。
+    补齐的底座是 `load_default_clean_rules`(用户保存过默认就是他那份, 否则内置
+    出厂), 故「保存默认」定的规则集在生效规则里同样始终保留。
     """
     try:
-        return _ensure_default_clean_rules(_sanitize_clean_rules(config.actor_clean_rules))
+        return _ensure_default_clean_rules(
+            _sanitize_clean_rules(config.actor_clean_rules), load_default_clean_rules(config)
+        )
     except Exception:
         return list(DEFAULT_CLEAN_RULES)
 
@@ -100,9 +193,10 @@ def load_clean_rules(config: Config) -> list[tuple[str, str]]:
 def save_clean_rules(rules: object, manager: ConfigManager) -> list[tuple[str, str]]:
     """持久化用户确认的清洗替换规则, 返回归一化后的规则。失败时静默返回归一化结果。
 
-    保存时自动补齐缺失的默认规则, 保证默认规则(占位两条 + 英文身份四条)始终保留。
+    保存时自动补齐缺失的默认规则, 保证默认规则(用户保存过就是他那份, 否则内置
+    占位两条 + 英文身份四条)始终保留。
     """
-    cleaned = _ensure_default_clean_rules(_sanitize_clean_rules(rules))
+    cleaned = _ensure_default_clean_rules(_sanitize_clean_rules(rules), load_default_clean_rules(manager.config))
     try:
         cfg = manager.config.model_copy(deep=True)
         cfg.actor_clean_rules = [[o, r] for o, r in cleaned]

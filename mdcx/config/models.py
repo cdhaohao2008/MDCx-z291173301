@@ -750,6 +750,21 @@ class Config(BaseModel):
         ],
         title="演员数据清洗替换规则(原始数值/替换数值)",
     )
+    # 「恢复默认」按钮要填的规则集。用户在数据清洗规则窗点「保存默认」即覆盖成他
+    # 编辑的那份，之后生效规则(actor_clean_rules)也会以它为兜底底座，故下层规则不会丢。
+    # 初值与 actor_clean_rules 的出厂默认一致(此处内联而非 import 常量：tools 层反向
+    # 依赖 config 层，import 会成环；tests 里有断言锁住两份不漂移)。
+    actor_clean_rules_default: list[list[str]] = Field(
+        default_factory=lambda: [
+            ["无维基百科信息, 从 minnano-av 数据库补全女优信息", ""],
+            ["无维基百科信息，从 minnano-av 数据库补全女优信息", ""],
+            ["Japanese AV actress", "日本AV女优"],
+            ["American pornographic actress", "美国色情女演员"],
+            ["American pornographic performer", "美国色情演员"],
+            ["Brazilian pornographic actress", "巴西色情女演员"],
+        ],
+        title="演员数据清洗默认替换规则(恢复默认按钮用)",
+    )
     actor_photo_kodi_auto: bool = Field(default=False, title="演员照片Kodi自动")
     # endregion
 
