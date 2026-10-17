@@ -1,7 +1,9 @@
-"""「编辑网站」对话框：右键复制单个站点 / 整张站点列表。
+"""「编辑网站」对话框：右键复制单个站点 / 单个分组 / 整张站点列表。
 
-用户需求原文：
-    「鼠标右键点击时可以复制站点列表，单个站点鼠标右键点击也可以复制」
+用户需求原文（两轮）：
+    1.「鼠标右键点击时可以复制站点列表，单个站点鼠标右键点击也可以复制」
+    2.「有码、无码、素人、FC2、欧美、国产右键复制不是复制全部38个站点，
+        是复制它们各自包含的站点」
 
 复制出的文本必须是逗号分隔的站点名序列，且与设置页输入框里的格式一致——
 这是「复制」这件事真正有用的前提：粘回输入框（或粘给同事）能被 _parse_sites
@@ -22,6 +24,7 @@ from mdcx.controllers.main_window.site_priority_dialog import (  # noqa: E402
     FieldPriorityDialog,
     SiteListEditorDialog,
     SitePaletteList,
+    _group_sites_at,
     _list_sites,
     _parse_sites,
     _sites_text,
@@ -111,22 +114,60 @@ def test_copied_list_is_readable_back_by_the_parser(qt_app, monkeypatch):
         dlg.deleteLater()
 
 
-def test_right_click_group_title_copies_list_not_the_title(qt_app, monkeypatch):
-    """分组标题不是站点：点在它上面也只能复制整张列表，不能把分组标题复制出去。"""
+def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
+    """点在分组标题上：复制的是这一组自己的名单，不是整张 38 站列表。
+
+    这是「辛辛苦苦分类」的意义所在——六个类型是六份不同的名单，复制整张等于分类白做。
+    """
     app = qt_app
     app.clipboard().clear()
     dlg = SiteListEditorDialog("t", CUSTOM_ORDER, ALL_SITES, None)
     try:
-        title_row = next(
-            r for r in range(dlg.available_list.count()) if dlg.available_list.item(r).data(SITE_GROUP_ROLE)
-        )
-        title_item = dlg.available_list.item(title_row)
-        point = _center(dlg.available_list, title_item)
-        texts = _right_click(dlg.available_list, point, monkeypatch, "复制列表")
-        palette_sites = _list_sites(dlg.available_list)
-        assert texts == [f"复制列表（{len(palette_sites)} 个站点）"]
-        assert app.clipboard().text() == _sites_text(palette_sites)
-        assert "【" not in app.clipboard().text()
+        palette = dlg.available_list
+        title_row = next(r for r in range(palette.count()) if palette.item(r).data(SITE_GROUP_ROLE) == "有码")
+        point = _center(palette, palette.item(title_row))
+        texts = _right_click(palette, point, monkeypatch, "复制本组")
+        assert texts == ["复制本组「有码」（30 个站点）", "", "复制列表（38 个站点）"]
+        copied = app.clipboard().text().split(",")
+        assert copied[:3] == ["DMM", "DMM_API", "LibreDMM"]
+        assert len(copied) == 30 == len(set(copied))
+        # 别的组才有的站点不能混进来（MyWife 不属于任何一组）
+        assert "MyWife" not in copied and "Madouqu" not in copied
+        assert _parse_sites(app.clipboard().text()) == _group_sites_at(palette, title_row)
+    finally:
+        dlg.deleteLater()
+
+
+@pytest.mark.parametrize(
+    ("title", "count"),
+    [("有码", 30), ("无码", 18), ("素人", 28), ("FC2", 15), ("欧美", 14), ("国产", 14)],
+)
+def test_each_group_title_copies_its_own_list(qt_app, monkeypatch, title, count):
+    """六个标题各自复制各自那份名单，互不相等，也不会复制成 38 站。"""
+    app = qt_app
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        palette = dlg.available_list
+        title_row = next(r for r in range(palette.count()) if palette.item(r).data(SITE_GROUP_ROLE) == title)
+        texts = _right_click(palette, _center(palette, palette.item(title_row)), monkeypatch, "复制本组")
+        assert texts[0] == f"复制本组「{title}」（{count} 个站点）"
+        copied = app.clipboard().text().split(",")
+        assert len(copied) == count
+        assert len(copied) < len(_list_sites(palette))
+    finally:
+        dlg.deleteLater()
+
+
+def test_group_copy_is_readable_back_by_the_parser(qt_app, monkeypatch):
+    """复制某一组的名单同样要能粘回输入框。"""
+    app = qt_app
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        palette = dlg.available_list
+        title_row = next(r for r in range(palette.count()) if palette.item(r).data(SITE_GROUP_ROLE) == "FC2")
+        _right_click(palette, _center(palette, palette.item(title_row)), monkeypatch, "复制本组")
+        assert _parse_sites(app.clipboard().text()) == _group_sites_at(palette, title_row)
+        assert app.clipboard().text() == _sites_text(_group_sites_at(palette, title_row))
     finally:
         dlg.deleteLater()
 
@@ -140,7 +181,7 @@ def test_palette_copy_deduplicates_sites_seen_in_several_groups(qt_app, monkeypa
         _right_click(dlg.available_list, _blank_corner(dlg.available_list), monkeypatch, "复制列表")
         copied = app.clipboard().text().split(",")
         assert len(copied) == len(set(copied)) == len(_list_sites(dlg.available_list))
-        # 唯一没进任何一组的 MyWife 也得在（它收在「其他」下）
+        # 唯一没进任何一组的 MyWife 也得在（它接在六组之后，不另起「其他」标题）
         assert "MyWife" in copied
     finally:
         dlg.deleteLater()
