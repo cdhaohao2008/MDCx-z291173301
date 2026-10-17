@@ -58,7 +58,7 @@ class TipsMixin:
        <p>· 有码：DMM、DMM_API、TheJavDB_API、LibreDMM、R18.dev、AVBase、Xcity、Prestige、MGStage、Getchu、JavLibrary、FreeJavBT、Lulubar、AVMOO，以及 JavBus、JavDB、MissAV、Official（含 Dahlia/Faleno 厂牌与无码官网路由）、Airav.cc、AVSEX、JavDay、JavFree、IQQTV、7mmtv 等综合站；JavDB_API/JavDB_APP/MissAV_API/R18.dev/TheJavDB_API 是免 CF 直连通道</p>
        <p>· 无码：AVEntertainments、AVSOX，以及 JavBus、JavDB、MissAV、AVSEX、Official、JavDay、IQQTV、7mmtv 等综合站</p>
       <p>· 欧美：AVheat、ThepornDB</p>
-      <p>· 国产：AVSEX、IQQTV、JavDay、MADOU_CLUB、Madouqu</p>
+      <p>· 国产：AVSEX、IQQTV、JavDay、Madou.club、Madouqu</p>
       <p>· 动漫/里番：Getchu、JavDB、JavDB_API（锁定「动漫」用此三站；DLID 开头或路径含 getchu/里番/动漫自动用 Getchu 单站）</p>
       <p>· MyWife：MyWife </p>
       <p>· 素人：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、MissAV、MissAV_API、MyWife、Prestige </p>

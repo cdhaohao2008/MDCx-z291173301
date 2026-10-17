@@ -135,7 +135,7 @@ class ConfigV1:
     website_suren: str = r"mgstage,avsex,FreeJavBT,javbus,javdb"
     website_fc2: str = r"fc2,FreeJavBT,javdb,avsox,javfree"
     website_oumei: str = r"theporndb,avheat,javdb,javbus"
-    website_guochan: str = r"madouqu,madou_club,javday"
+    website_guochan: str = r"madouqu,Madou.club,javday"
     whole_fields: str = r"outline,actor,thumb,release,tag,"
     none_fields: str = r"wanted,"
     website_set: str = r"official,"

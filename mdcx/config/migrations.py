@@ -84,7 +84,9 @@ _SITE_RENAMES = {
     "libredmm": "LibreDMM",
     "lulubar": "Lulubar",
     "madouqu": "Madouqu",
-    "madou_club": "MADOU_CLUB",
+    # 大小写两代旧值都在：改名前的全小写 madou_club，以及中间版本写入的 MADOU_CLUB
+    "madou_club": "Madou.club",
+    "MADOU_CLUB": "Madou.club",
     "missav": "MissAV",
     "missav_api": "MissAV_API",
     "mgstage": "MGStage",

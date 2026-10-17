@@ -181,7 +181,7 @@ def test_is_proxy_host_direct_sites_priority():
         ("7mmtv", "www.7mmtv.sx"),
         ("7mmtv", "7mmtv.sx"),
         ("7mmtv", "7tv022.com"),
-        ("MADOU_CLUB", "madou.club"),
+        ("Madou.club", "madou.club"),
         ("JavLibrary", "www.f101w.com"),
         ("JavLibrary", "f101w.com"),
         # 原有命中路径不回退（WEB_DIC 映射与 TLD 兜底）

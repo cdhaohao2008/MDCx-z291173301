@@ -84,7 +84,7 @@ class MadouClubCrawler(BaseCrawler[MadouClubContext]):
     @classmethod
     @override
     def display_name(cls) -> str:
-        return "MADOU_CLUB"
+        return "Madou.club"
 
     @override
     def new_context(self, input: CrawlerInput) -> MadouClubContext:
