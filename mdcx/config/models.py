@@ -587,8 +587,8 @@ class Config(BaseModel):
             Website.AVSEX,
             Website.DAHLIA,
             Website.FALENO,
-            # MyWife No.1230
-            Website.MYWIFE,
+            # 注意：MyWife 不在本组。它由「网站偏好-指定网站」或路径含 MyWife 时
+            # 经 file_crawler 的 website= 覆盖单独指定，不走任何类型组名单。
         ],
         title="素人网站源",
     )

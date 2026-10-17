@@ -226,8 +226,10 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.AVSEX,
         Website.DAHLIA,
         Website.FALENO,
-        Website.MYWIFE,
     ]
+    # MyWife 由「指定网站」或路径含 MyWife 单独指定（file_crawler 走 website= 覆盖），
+    # 不进任何类型组名单，素人组里不该有它。
+    assert Website.MYWIFE not in config.website_suren
     assert config.website_fc2 == [
         Website.AVSOX,
         Website.FC2,
