@@ -41,7 +41,7 @@ def dlg(app):
 def _fake_info(**kw):
     from mdcx.models.emby import EMbyActressInfo
 
-    base = dict(name="测试演员", server_id="s", id="i")
+    base = {"name": "测试演员", "server_id": "s", "id": "i"}
     base.update(kw)
     return EMbyActressInfo(**base)
 

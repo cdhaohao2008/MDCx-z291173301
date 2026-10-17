@@ -63,7 +63,9 @@ def get_video_metadata_ffmpeg(p: Path) -> tuple[int, str]:
         return 0, ""
 
     # Find video stream
-    video_stream = next((stream for stream in streams if isinstance(stream, dict) and stream.get("codec_type") == "video"), None)
+    video_stream = next(
+        (stream for stream in streams if isinstance(stream, dict) and stream.get("codec_type") == "video"), None
+    )
 
     if video_stream:
         try:

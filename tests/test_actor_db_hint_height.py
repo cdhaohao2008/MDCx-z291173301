@@ -10,7 +10,6 @@ wrapped_label_height 通用函数的回归用例保留，不再对应任何界�
 """
 
 import os
-import sys
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 

@@ -520,9 +520,7 @@ def test_detail_dialog_preview_takes_third_of_column_height():
         lay = left.layout()
         m = lay.contentsMargins()
         used = m.top() + m.bottom() + lay.spacing() + label.height() + dlg.existing_info.height()
-        assert left.height() - used <= 40, (
-            f"左栏简介未吃满剩余高度，栏内空出 {left.height() - used}px"
-        )
+        assert left.height() - used <= 40, f"左栏简介未吃满剩余高度，栏内空出 {left.height() - used}px"
     finally:
         dlg.deleteLater()
 

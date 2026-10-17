@@ -8,6 +8,7 @@ import threading
 import time
 import traceback
 from pathlib import Path
+from typing import cast
 from uuid import uuid4
 
 import aiofiles
@@ -31,7 +32,7 @@ from ..config.resource_policy import resource_policy
 from ..config.resources import resources
 from ..log_console import log_console
 from ..models.enums import FileMode
-from ..models.flags import Flags
+from ..models.flags import FileDoneDict, Flags
 from ..models.log_buffer import LogBuffer
 from ..ui_hooks import ui_hooks
 from ..utils import executor, get_current_time, get_used_time
@@ -228,7 +229,7 @@ async def pic_some_deal(number: str, thumb_final_path: Path, fanart_final_path: 
         # 即 deal_old_files 未迁移到旧文件），该文件属于中间产物，用完即删，
         # 否则“不下载+保留”会在无旧文件时意外落盘 thumb.jpg。
         try:
-            local_thumb = Flags.file_done_dic.get(number, {}).get("local_thumb")
+            local_thumb = Flags.file_done_dic.get(number, cast(FileDoneDict, {})).get("local_thumb")
         except Exception:
             local_thumb = None
         if not local_thumb and await aiofiles.os.path.exists(thumb_final_path):

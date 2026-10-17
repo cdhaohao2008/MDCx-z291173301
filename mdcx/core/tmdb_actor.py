@@ -381,12 +381,10 @@ async def _tmdb_request(client: Any, method: str, url: str, **kwargs) -> _TmdbRe
                 return _TmdbResponse(status_code, text)
             if hasattr(client, method.lower()):
                 send = getattr(client, method.lower())
-                resp = await asyncio.wait_for(
-                    send(url, params=params, allow_redirects=follow_redirects), timeout=20
-                )
+                resp = await asyncio.wait_for(send(url, params=params, allow_redirects=follow_redirects), timeout=20)
                 status_code = int(resp.status)
                 return _TmdbResponse(status_code, await asyncio.wait_for(resp.text(), timeout=20))
-        except (asyncio.TimeoutError, TimeoutError):
+        except TimeoutError:
             return None
     finally:
         await _tmdb_rate_limiter.finish(status_code)

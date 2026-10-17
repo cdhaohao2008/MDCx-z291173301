@@ -114,10 +114,7 @@ def test_emby_actor_manager_table_has_birthday_and_location_columns(app):
             _birthday_w = dlg._measured_birthday_width()
             assert _birthday_w == int(
                 _math.ceil(
-                    max(
-                        table.fontMetrics().horizontalAdvance(s)
-                        for s in ("0000-00-00", "8888-88-88", "出生日期")
-                    )
+                    max(table.fontMetrics().horizontalAdvance(s) for s in ("0000-00-00", "8888-88-88", "出生日期"))
                 )
             ) + int(dlg._BIRTHDAY_CELL_PADDING)
             assert table.columnWidth(4) == _birthday_w

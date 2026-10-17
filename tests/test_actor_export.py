@@ -202,8 +202,10 @@ def test_write_xlsx_roundtrip(tmp_path):
     assert ws.column_dimensions["I"].width == stored(ex.EXPORT_MOVIE_COL_WIDTH) == pytest.approx(8.78)
     text_widths = {ws.column_dimensions[c].width for c in ("G", "H")}
     assert len(text_widths) == 1
-    assert text_widths.pop() == stored(ex.EXPORT_TEXT_COL_WIDTH) == pytest.approx(
-        ex.EXPORT_TEXT_COL_WIDTH + ex.WPS_COLUMN_WIDTH_OFFSET
+    assert (
+        text_widths.pop()
+        == stored(ex.EXPORT_TEXT_COL_WIDTH)
+        == pytest.approx(ex.EXPORT_TEXT_COL_WIDTH + ex.WPS_COLUMN_WIDTH_OFFSET)
     )
     # I 列之后的列（J:XFD）全部隐藏，表右侧无空白列。
     assert ws.column_dimensions["J"].hidden is True
@@ -327,8 +329,14 @@ def test_write_xlsx_custom_text_width(tmp_path):
     custom_widths = {ws.column_dimensions[c].width for c in ("G", "H")}
     assert custom_widths == {ex._wps_stored_column_width(30)}
     assert all(width == pytest.approx(30.78) for width in custom_widths)
-    assert ws.column_dimensions["B"].width == ex._wps_stored_column_width(ex.EXPORT_NAME_COL_WIDTH) == pytest.approx(18.78)
-    assert ws.column_dimensions["F"].width == ex._wps_stored_column_width(ex.EXPORT_BIRTHPLACE_COL_WIDTH) == pytest.approx(36.78)
+    assert (
+        ws.column_dimensions["B"].width == ex._wps_stored_column_width(ex.EXPORT_NAME_COL_WIDTH) == pytest.approx(18.78)
+    )
+    assert (
+        ws.column_dimensions["F"].width
+        == ex._wps_stored_column_width(ex.EXPORT_BIRTHPLACE_COL_WIDTH)
+        == pytest.approx(36.78)
+    )
     assert ws.freeze_panes == "A2"
 
 
@@ -385,9 +393,7 @@ def test_button_widths_narrow_and_wide(app):
         app.processEvents()
         assert dlg.btn_sync.width() >= sync_before
         assert [b.width() for b in text_btns if b is not dlg.btn_sync] == others_before
-        assert dlg.btn_sync.width() >= dlg.btn_sync.fontMetrics().horizontalAdvance(
-            dlg.btn_sync.text()
-        ) + 8
+        assert dlg.btn_sync.width() >= dlg.btn_sync.fontMetrics().horizontalAdvance(dlg.btn_sync.text()) + 8
         # 重复调用幂等。
         widths_before = tuple(b.width() for b in text_btns)
         dlg._apply_button_widths()
@@ -430,9 +436,7 @@ def test_button_row_compact_narrow_and_wide(app):
             for i in range(dlg._btn_layout.count())
             if dlg._btn_layout.itemAt(i).widget() is not None
         ]
-        row_gaps = [
-            items[i + 1].x() - (items[i].x() + items[i].width()) for i in range(len(items) - 1)
-        ]
+        row_gaps = [items[i + 1].x() - (items[i].x() + items[i].width()) for i in range(len(items) - 1)]
         assert set(row_gaps) == {0}, "窄态按钮之间不得有任何空隙"
         assert items[0].x() == 1, "窄态首个按钮应贴组左边框"
         # 窄态：组标题与服务器地址标签各自对齐到首按钮「连接Emby/Jellyfin」**内文字**的竖线
@@ -464,9 +468,7 @@ def test_button_row_compact_narrow_and_wide(app):
         # 宽态按钮行恢复填满整行（最大化逐像素不变）。
         assert dlg._btn_layout.alignment() == Qt.AlignmentFlag(0)
         margins = dlg._conn_grid.contentsMargins()
-        assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == tuple(
-            dlg.CONN_BASE_MARGINS
-        )
+        assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == tuple(dlg.CONN_BASE_MARGINS)
         # 切回窄态：再次收紧，幂等。
         dlg.isMaximized = real
         dlg._apply_button_widths()
@@ -544,9 +546,7 @@ def test_title_and_label_align_with_button_text(app):
         # 其它 dpr 因 Qt 亚像素定位量化到整数设备像素，放宽 1 个设备px。
         tol = 0 if abs(dpr - 1.0) < 0.05 else 1
         for name, got in (("组标题", title), ("服务器地址", lbl)):
-            assert abs(got - btn) <= tol, (
-                f"{state}{name} x={got} 应与按钮内文字 x={btn} 同线（容差 {tol} 设备px）"
-            )
+            assert abs(got - btn) <= tol, f"{state}{name} x={got} 应与按钮内文字 x={btn} 同线（容差 {tol} 设备px）"
 
     dlg = EmbyActorManagerDialog()
     real = dlg.isMaximized
@@ -774,9 +774,7 @@ def test_data_tool_guard_while_preview_running(app, monkeypatch):
 
         dlg._preview_thread = _Running()
         infos = []
-        monkeypatch.setattr(
-            "PyQt6.QtWidgets.QMessageBox.information", lambda *a, **k: infos.append(a[-1])
-        )
+        monkeypatch.setattr("PyQt6.QtWidgets.QMessageBox.information", lambda *a, **k: infos.append(a[-1]))
         dlg._on_export_data = lambda: calls.append("export")  # 不应被调用
         dlg._on_data_tool_chosen(0)  # 数据获取 → 停止开关
         assert calls == ["cancel"]
@@ -800,9 +798,7 @@ def test_do_export_uses_filtered_actors_and_dir(app, monkeypatch, tmp_path):
         cfg.actor_export_folder = str(tmp_path)
         monkeypatch.setattr(ui.manager, "config", cfg, raising=False)
         seen = {}
-        monkeypatch.setattr(
-            ui.manager, "_replace_config", lambda c: seen.update(cfg=c), raising=False
-        )
+        monkeypatch.setattr(ui.manager, "_replace_config", lambda c: seen.update(cfg=c), raising=False)
         monkeypatch.setattr(ui.manager, "save", lambda: seen.update(saved=True), raising=False)
         opened = {}
         target = tmp_path / "演员数据表2026-10-16 10-42-27.xlsx"
@@ -816,9 +812,7 @@ def test_do_export_uses_filtered_actors_and_dir(app, monkeypatch, tmp_path):
         dlg.txt_search.setText("可见")
         app.processEvents()
         infos = []
-        monkeypatch.setattr(
-            "PyQt6.QtWidgets.QMessageBox.information", lambda *a, **k: infos.append(a[-1])
-        )
+        monkeypatch.setattr("PyQt6.QtWidgets.QMessageBox.information", lambda *a, **k: infos.append(a[-1]))
         dlg._do_export_actors()
         # 保存框默认路径 = 配置目录 + 本次导出的文件名。
         default = opened["default"]
@@ -841,9 +835,7 @@ def test_do_export_uses_filtered_actors_and_dir(app, monkeypatch, tmp_path):
         assert ws.column_dimensions["G"].width == pytest.approx(
             ex._wps_stored_column_width(ex.text_col_width_for_screen_width(screen_px))
         )
-        assert ws.column_dimensions["B"].width == pytest.approx(
-            ex._wps_stored_column_width(ex.EXPORT_NAME_COL_WIDTH)
-        )
+        assert ws.column_dimensions["B"].width == pytest.approx(ex._wps_stored_column_width(ex.EXPORT_NAME_COL_WIDTH))
         assert "共导出 1 个演员" in infos[-1]
     finally:
         dlg.close()
@@ -860,9 +852,7 @@ def test_do_export_prompts_when_config_dir_invalid(app, monkeypatch, tmp_path):
         cfg.actor_export_folder = "Z:/不存在的目录-xyz"
         monkeypatch.setattr(ui.manager, "config", cfg, raising=False)
         seen = {}
-        monkeypatch.setattr(
-            ui.manager, "_replace_config", lambda c: seen.update(cfg=c), raising=False
-        )
+        monkeypatch.setattr(ui.manager, "_replace_config", lambda c: seen.update(cfg=c), raising=False)
         monkeypatch.setattr(ui.manager, "save", lambda: seen.update(saved=True), raising=False)
         opened = {}
         target = tmp_path / "演员数据表2026-10-16 10-42-27.xlsx"
@@ -872,9 +862,7 @@ def test_do_export_prompts_when_config_dir_invalid(app, monkeypatch, tmp_path):
             return (str(target), "Excel 工作簿 (*.xlsx)")
 
         monkeypatch.setattr(ui.QFileDialog, "getSaveFileName", _fake_save)
-        monkeypatch.setattr(
-            "PyQt6.QtWidgets.QMessageBox.information", lambda *a, **k: None
-        )
+        monkeypatch.setattr("PyQt6.QtWidgets.QMessageBox.information", lambda *a, **k: None)
         dlg._actors = [_actor(name="可见")]
         dlg._do_export_actors()
         assert Path(opened["default"]).name.startswith("演员数据表")

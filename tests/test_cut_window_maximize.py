@@ -172,9 +172,7 @@ def test_minimize_from_maximized_drops_maximized_bit(cut, app):
     app.processEvents()
 
     assert cut.isMinimized(), "没有进入最小化"
-    assert not cut.windowState() & Qt.WindowState.WindowMaximized, (
-        "最小化后仍带最大化位，窗口状态自相矛盾"
-    )
+    assert not cut.windowState() & Qt.WindowState.WindowMaximized, "最小化后仍带最大化位，窗口状态自相矛盾"
 
 
 def test_minimize_from_maximized_restores_normal_size(cut, app):

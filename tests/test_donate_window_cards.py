@@ -80,7 +80,7 @@ def test_cards_are_square_and_never_overlap(dialog):
     cards = _cards(dialog)
     for card in cards:
         assert card.width() == card.height() == dw._CARD_W == dw._CARD_H
-    for prev, cur in zip(cards, cards[1:]):
+    for prev, cur in zip(cards, cards[1:], strict=False):
         assert cur.x() - (prev.x() + prev.width()) == dw._CARD_GAP
 
 

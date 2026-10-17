@@ -222,9 +222,7 @@ def test_asset_version_segment_comes_from_version_name_without_v_prefix():
     assert 'echo "asset_version=$asset_version" >> "$GITHUB_OUTPUT"' in text, (
         "metadata 步骤应回输出 asset_version，四个 Create Release 步骤都靠它拼文件名"
     )
-    assert "asset_version=${asset_version:-$tag}" in text, (
-        "读不到 VERSION_NAME 时应退回 tag，保证资产文件名不会缺一段"
-    )
+    assert "asset_version=${asset_version:-$tag}" in text, "读不到 VERSION_NAME 时应退回 tag，保证资产文件名不会缺一段"
     assert text.count("steps.metadata.outputs.asset_version") == _RELEASE_STEP_COUNT, (
         f"四个 Create Release 步骤都应引用 asset_version（当前 {text.count('steps.metadata.outputs.asset_version')} 处）"
     )
@@ -233,7 +231,7 @@ def test_asset_version_segment_comes_from_version_name_without_v_prefix():
         "asset_version 不得覆盖 tag：tag 必须纯数字，否则 check_version 的 int(tag_name) 失效"
     )
     # build-app 的 Windows 预检步骤独立算了一遍展示版本号，日志里的文件名必须与真名一致
-    assert '$versionName.TrimStart(\'v\')' in text, (
+    assert "$versionName.TrimStart('v')" in text, (
         "Windows 预检步骤应按同一算法（去 v 前缀）算出计划发布文件名，否则日志与实际上传名对不上"
     )
 

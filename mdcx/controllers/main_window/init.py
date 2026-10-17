@@ -3,7 +3,7 @@ import traceback
 import webbrowser
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QObject, QEvent, QPoint, QRect, QSize, Qt
+from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QScreen
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -12,8 +12,8 @@ from PyQt6.QtWidgets import (
     QLabel,
     QListView,
     QMenu,
-    QStyledItemDelegate,
     QStyle,
+    QStyledItemDelegate,
     QStyleOptionViewItem,
     QSystemTrayIcon,
     QTreeWidgetItem,
@@ -160,13 +160,17 @@ def refresh_network_check_badges(self: "MyMAinWindow") -> None:
         self.Ui.comboBox_no_proxy_sites,
     ):
         for i in range(combo.count()):
-            value = combo.itemData(i, Qt.ItemDataRole.UserRole) or combo.itemText(i).split(" ")[0].split("（")[0].strip()
+            value = (
+                combo.itemData(i, Qt.ItemDataRole.UserRole) or combo.itemText(i).split(" ")[0].split("（")[0].strip()
+            )
             if not value:
                 continue
             entry = _load_check_cache().get(value)
             combo.setItemIcon(i, _site_status_icon(entry["status"], combo) if entry else QIcon())
             # 显式网址行（official 子站）：保留手工地址，只刷新图标与 tooltip
-            url = combo.itemData(i, _SITE_URL_EXPLICIT_ROLE) or _resolve_site_url(value)  # 自定义网址保存后此处同步最新值
+            url = combo.itemData(i, _SITE_URL_EXPLICIT_ROLE) or _resolve_site_url(
+                value
+            )  # 自定义网址保存后此处同步最新值
             combo.setItemData(i, url, _SITE_URL_ROLE)
             combo.setItemData(i, _site_combo_item_tooltip(value), Qt.ItemDataRole.ToolTipRole)
         _fit_site_url_popup(combo)
@@ -311,9 +315,7 @@ class _SiteUrlItemDelegate(QStyledItemDelegate):
             else:
                 painter.setPen(QColor(_SITE_URL_LINK_COLOR))
             text = view.fontMetrics().elidedText(url, Qt.TextElideMode.ElideRight, rect.width())
-            painter.drawText(
-                rect, int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter), text
-            )
+            painter.drawText(rect, int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter), text)
         finally:
             painter.restore()
 
@@ -358,9 +360,7 @@ class _SiteUrlClickFilter(QObject):
                 view = self._combo.view()
                 if view is not None:
                     over = self._url_index_at(event.position().toPoint()) is not None
-                    view.viewport().setCursor(
-                        Qt.CursorShape.PointingHandCursor if over else Qt.CursorShape.ArrowCursor
-                    )
+                    view.viewport().setCursor(Qt.CursorShape.PointingHandCursor if over else Qt.CursorShape.ArrowCursor)
         except Exception:
             pass
         return super().eventFilter(obj, event)

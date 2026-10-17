@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
-from typing import override
+from collections.abc import Iterable
+from typing import Any, cast, override
 
 from ..base.web import get_aio_domain
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException, get_year
@@ -81,7 +82,9 @@ class AioSiteCrawler(BaseCrawler):
             jar = resp.cookies
             if hasattr(jar, "get_dict"):
                 return dict(jar.get_dict())
-            return {c.name: c.value for c in jar}
+            # 兜底分支: httpx 以外的 cookie jar。运行时迭代出的是带 name/value 的
+            # Cookie 对象, 但 httpx 存根把 Cookies 的元素类型标错成 str, 故 cast。
+            return {c.name: c.value for c in cast("Iterable[Any]", jar)}
         except Exception as e:
             ctx.debug(f"预热 Cookie 提取失败: {e}")
             return {}

@@ -90,6 +90,7 @@ def _wps_stored_column_width(display_width: float) -> float:
     """把 WPS 显示列宽换算成 xlsx 里实际要写入的列宽。"""
     return display_width + WPS_COLUMN_WIDTH_OFFSET
 
+
 EXPORT_TABLE_WIDTH = 260
 """导出表总宽（WPS 显示列宽单位）。详情/标签两列按 1:1 平分扣除出生日期列、
 状态/头像/简介三列、姓名列、出生地列与影片数列后的剩余宽度，
@@ -186,17 +187,21 @@ def effective_screen_width_px(screen: object) -> float:
     此时改走 Win32 系统 DPI 取真实缩放比。统一按“物理宽 / 缩放比”换算——
     物理宽 = 逻辑宽 × ``devicePixelRatio``，缩放比取 Qt 侧与 Win32 侧的较大者，
     各模式都收敛到同一逻辑宽度。取不到时兜底 1536。
+
+    屏幕对象刻意标注为 object: 调用方可能传入 None 或非 Qt 对象（测试里对 _fake_screen/None
+    都有兜底覆盖），下面的 try/except 负责在运行时降级，因此这里按 attr-defined 压制静态
+    检查，而非收紧签名把兜底路径改成不可达。
     """
     try:
-        raw = float(screen.availableGeometry().width())  # type: ignore[union-attr]
+        raw = float(screen.availableGeometry().width())  # type: ignore[attr-defined]
     except (TypeError, ValueError, AttributeError, RuntimeError):
         return EXPORT_FALLBACK_SCREEN_PX
     try:
-        dpr = float(screen.devicePixelRatio()) or 1.0  # type: ignore[union-attr]
+        dpr = float(screen.devicePixelRatio()) or 1.0  # type: ignore[attr-defined]
     except (TypeError, ValueError, AttributeError, RuntimeError):
         dpr = 1.0
     try:
-        dpi_scale = float(screen.logicalDotsPerInchX()) / 96.0  # type: ignore[union-attr]
+        dpi_scale = float(screen.logicalDotsPerInchX()) / 96.0  # type: ignore[attr-defined]
     except (TypeError, ValueError, AttributeError, RuntimeError, ZeroDivisionError):
         dpi_scale = 1.0
     win_scale = _windows_system_scale() or 0.0
@@ -214,7 +219,9 @@ def text_col_width_for_screen_width(screen_px: object) -> float:
     三列、姓名列、出生地列与影片数列固定列宽，剩余均分给两列。非法输入/小屏时兜底为最小列宽。
     """
     try:
-        width_px = float(screen_px)
+        # 签名刻意放宽为 object: 上层可能传入 None/异常值(测试覆盖了这些兜底路径),
+        # 非法输入统一由下面的 except 收敛到最小列宽, 故此处压制 arg-type。
+        width_px = float(screen_px)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return EXPORT_MIN_TEXT_COL_WIDTH
     content_px = width_px - SCREEN_ROW_HEADER_PX - SCREEN_VSCROLL_PX - EXPORT_TABLE_MARGIN_PX
@@ -228,6 +235,7 @@ def text_col_width_for_screen_width(screen_px: object) -> float:
         - EXPORT_MOVIE_COL_WIDTH
     ) / 2
     return max(EXPORT_MIN_TEXT_COL_WIDTH, text_width)
+
 
 # 新列顺序下居中：状态/姓名/头像/简介/出生日期/影片数居中，出生地/详情/标签居左。
 _EXPORT_CENTER_COLS = frozenset((0, 1, 2, 3, 4, 8))
@@ -340,9 +348,7 @@ def build_export_rows(actors: list) -> list[tuple]:
     return [actor_export_row(a) for a in (actors or [])]
 
 
-def write_actor_export_xlsx(
-    file_path: str | Path, actors: list, text_col_width: float | None = None
-) -> Path:
+def write_actor_export_xlsx(file_path: str | Path, actors: list, text_col_width: float | None = None) -> Path:
     """写出演员数据 xlsx，返回落盘路径。样式对齐用户样例文件。
 
     Args:

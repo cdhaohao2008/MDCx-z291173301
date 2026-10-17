@@ -349,8 +349,7 @@ def _run_elevated(cmd: list[str], cwd: str, timeout: float) -> tuple[int, bytes,
             timeout=timeout,
             startupinfo=startupinfo,
             shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
         )
         # 实际 stdout/stderr 通过重定向文件捕获
         exit_code = proc.returncode
@@ -454,7 +453,7 @@ def _image_gray_stats(path: Path) -> tuple[float, float, int] | None:
             try:
                 thumb = gray.resize((64, 64), Image.Resampling.BILINEAR)
             except AttributeError:  # Pillow < 9.1 兼容
-                thumb = gray.resize((64, 64), Image.BILINEAR)
+                thumb = gray.resize((64, 64), Image.BILINEAR)  # type: ignore[attr-defined]
             pixels = list(thumb.getdata())
             if not pixels:
                 return None
@@ -478,7 +477,7 @@ def _bilinear() -> int:
     try:
         return Image.Resampling.BILINEAR  # type: ignore[attr-defined]
     except AttributeError:  # Pillow < 9.1 兼容
-        return Image.BILINEAR
+        return Image.BILINEAR  # type: ignore[attr-defined]
 
 
 def _similarity(src: Path, dst: Path) -> float | None:

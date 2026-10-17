@@ -1,6 +1,8 @@
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Any, cast
 
 # 议题 #145: 宽松匹配各种合法生日写法（1990-1-2 / 1990/1/2 / 1990.1.2 / 1990年1月2日 / 19900102）。
 # 允许非零填充，月/日交给 date() 做真实日历校验；不锚定结尾，忽略尾部时间等多余内容。
@@ -73,7 +75,10 @@ def _apply_text_clean_rules(text: str, rules: object = None) -> str:
     if not isinstance(text, str) or not text or not rules:
         return text
     try:
-        items = list(rules)
+        # rules 的静态类型刻意放宽为 object（config 存盘形态不可信，可能传标量/None）；
+        # 可迭代性由下面的 TypeError 兜底在运行时判定，这里 cast 只是让类型检查
+        # 接受 list() 调用，不改变任何运行时行为。
+        items = list(cast("Iterable[Any]", rules))
     except TypeError:
         return text
     for item in items:

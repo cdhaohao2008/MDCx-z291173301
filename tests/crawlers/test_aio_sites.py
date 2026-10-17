@@ -63,7 +63,9 @@ class FakeClient:
         return _FakeWarmupResp(), ""
 
     async def post_json(self, url, *, data=None, json_data=None, headers=None, **kwargs):
-        self.calls.append((url, {"data": data, "json_data": json_data, "headers": headers, "cookies": kwargs.get("cookies")}))
+        self.calls.append(
+            (url, {"data": data, "json_data": json_data, "headers": headers, "cookies": kwargs.get("cookies")})
+        )
         if url.endswith("/search"):
             return self.search, ""
         return self.detail, ""
@@ -199,7 +201,12 @@ async def test_mojibake_fields_fall_back_to_clean_language():
             "star": [{"starName_ja": "���g�ޤ���", "starName_en": "Maomi Nagasawa", "starName_cn": ""}],
             "genre": [
                 {"genreName_cn": "美人", "genreName_ja": "美女", "genreName_en": "美女", "genreName": "美女"},
-                {"genreName_cn": "美肌", "genreName_ja": "iPhone/iPad対応", "genreName_en": "Beautiful Skin", "genreName": "iPhone/iPad対応"},
+                {
+                    "genreName_cn": "美肌",
+                    "genreName_ja": "iPhone/iPad対応",
+                    "genreName_en": "Beautiful Skin",
+                    "genreName": "iPhone/iPad対応",
+                },
                 {"genreName_cn": "潮吹", "genreName_ja": "潮吹�?", "genreName_en": "Squirt", "genreName": "潮吹�?"},
             ],
         },

@@ -7,6 +7,7 @@ import re
 import threading
 import weakref
 from pathlib import Path
+from typing import cast
 
 from pydantic import HttpUrl
 from PyQt6.QtCore import QEvent, Qt, QThread, QTimer
@@ -33,6 +34,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollBar,
     QSizePolicy,
     QSplitter,
     QStatusBar,
@@ -48,6 +50,7 @@ from ..config.enums import Switch
 from ..config.manager import manager
 from ..config.resources import resources
 from ..models.emby import (
+    EMbyActressInfo,
     normalize_premiere_date,
     normalize_production_year,
 )
@@ -158,13 +161,16 @@ class _FlushLogTextEdit(QPlainTextEdit):
         self._flush_busy = False
         self._flush_queued = False
         self._inset_bottom = self._INSET  # 当前下侧视口边距（余量吸收后会大于 _INSET）
-        self.document().setDocumentMargin(0.0)
+        # 以下 document()/viewport()/verticalScrollBar() 在 PyQt6 存根里被标成
+        # X | None，但 QPlainTextEdit 这三个访问器运行时恒返回实例（不会返回 None），
+        # 故统一按 union-attr 压制，不改调用形态。
+        self.document().setDocumentMargin(0.0)  # type: ignore[union-attr]
         self.setViewportMargins(self._INSET, self._INSET, self._INSET, self._inset_bottom)
         # 三类变化都要重算贴底档：内容增删（含 maximumBlockCount 淘汰旧块）改内容底、
         # 视口几何改每档能滚多远、Qt 自己重算滚动范围会把上限放回「多一行」那档。
-        self.document().contentsChange.connect(self._schedule_flush)
-        self.verticalScrollBar().rangeChanged.connect(self._schedule_flush)
-        self.viewport().installEventFilter(self)
+        self.document().contentsChange.connect(self._schedule_flush)  # type: ignore[union-attr]
+        self.verticalScrollBar().rangeChanged.connect(self._schedule_flush)  # type: ignore[union-attr]
+        self.viewport().installEventFilter(self)  # type: ignore[union-attr]
 
     def eventFilter(self, a0, a1):
         # 竖向滚动条显隐会只改视口高度而不改控件高度（不经过 resizeEvent），须另行接住
@@ -200,7 +206,7 @@ class _FlushLogTextEdit(QPlainTextEdit):
         高度的单值函数，一轮即收敛、不会来回摆：视口缩进余量后正是行距整数倍，
         `vp0` 仍不变，下一轮算出同一个目标即空操作。
         """
-        vp = self.viewport().height()
+        vp = self.viewport().height()  # type: ignore[union-attr]
         if vp <= 0:
             return False
         vp0 = vp + self._inset_bottom - self._INSET
@@ -217,16 +223,16 @@ class _FlushLogTextEdit(QPlainTextEdit):
             return
         try:
             line_h = self.fontMetrics().lineSpacing()
-            vp = self.viewport().height()
+            vp = self.viewport().height()  # type: ignore[union-attr]
             if line_h <= 0 or vp <= 0:
                 return
             if self._absorb_viewport_residue(line_h):
                 return  # 视口高度已变，贴底档留到下一轮（视口 resize 会再排一次）
-            bar = self.verticalScrollBar()
+            bar = cast("QScrollBar", self.verticalScrollBar())
             if bar.maximum() <= 0:
                 return  # 空文档 / 内容不满视口：没有「滚到底」可言
             bottom = 0.0
-            block = self.document().begin()
+            block = self.document().begin()  # type: ignore[union-attr]
             while block.isValid():
                 bottom += self.blockBoundingRect(block).height()
                 block = block.next()
@@ -314,7 +320,11 @@ def _split_list_text(text: str) -> list[str]:
     """出生地/标签编辑文本按半角逗号/全角逗号/顿号切分，去空去重保序。"""
     parts = [p.strip() for p in _SPLIT_RE.split(text or "")]
     seen: set[str] = set()
-    result = [p for p in parts if p and p not in seen and not seen.add(p)]
+    result: list[str] = []
+    for p in parts:
+        if p and p not in seen:
+            seen.add(p)
+            result.append(p)
     return result
 
 
@@ -1035,7 +1045,9 @@ class ActorCleanRulesDialog(QDialog):
 
         self.table = QTableWidget(0, 2)
         self.table.setHorizontalHeaderLabels(["原始数值", "替换数值"])
-        header = self.table.horizontalHeader()
+        # QTableWidget 的 horizontalHeader() 在 PyQt6 存根里标成 QHeaderView | None，
+        # 但 QTableWidget 恒有水平表头，运行时不会返回 None，故 cast 一次供下方复用。
+        header = cast("QHeaderView", self.table.horizontalHeader())
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1044,7 +1056,7 @@ class ActorCleanRulesDialog(QDialog):
             | QAbstractItemView.EditTrigger.EditKeyPressed
             | QAbstractItemView.EditTrigger.AnyKeyPressed
         )
-        self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setVisible(False)  # type: ignore[union-attr]
         layout.addWidget(self.table, 1)
 
         self.status_label = QLabel("")
@@ -1063,8 +1075,10 @@ class ActorCleanRulesDialog(QDialog):
         row.addWidget(default_btn)
         row.addStretch()
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("确定")
-        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("取消")
+        # QDialogButtonBox.button() 存根返回 QPushButton | None，但刚构造时必定带这两个
+        # 标准按钮，运行时不返回 None，故 cast 后再设文案。
+        cast("QPushButton", buttons.button(QDialogButtonBox.StandardButton.Ok)).setText("确定")
+        cast("QPushButton", buttons.button(QDialogButtonBox.StandardButton.Cancel)).setText("取消")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         row.addWidget(buttons)
@@ -1254,7 +1268,8 @@ class EmbyActorManagerDialog(QDialog):
         self._preview_thread = None
         self._sync_thread = None
         self._clean_thread = None
-        self._clean_items: dict[str, tuple[str, bool]] = {}
+        # 议题 #162 / 标签清洗: (清洗后简介, 清洗后 Taglines 列表, 是否重置生日)
+        self._clean_items: dict[str, tuple[str, list[str], bool]] = {}
         self._clean_failed: list[tuple[str, str]] = []  # 议题 #162: (actor_id, 失败消息)
         self._clean_rules: list[tuple[str, str]] = []
         self._fetch_thread = None
@@ -2241,7 +2256,9 @@ class EmbyActorManagerDialog(QDialog):
             for r in sorted(rows):
                 cols = rows[r]
                 lines.append("\t".join(cols[c] for c in sorted(cols)))
-            QGuiApplication.clipboard().setText("\n".join(lines))
+            # QGuiApplication.clipboard() 的 None 分支是存根保守标注：GUI 事件回调运行时
+            # 必然已存在 QApplication，取剪贴板不会返回 None。
+            QGuiApplication.clipboard().setText("\n".join(lines))  # type: ignore[union-attr]
             return True
         except (RuntimeError, AttributeError):
             return False
@@ -2808,7 +2825,11 @@ class EmbyActorManagerDialog(QDialog):
             self._set_status("连接失败")
             self.log(f"❌ 连接失败: {e}")
             return False
-        future.add_done_callback(lambda fut: self._connect_result.emit(_future_result_or(fut, (False, "连接失败"))))
+        # 上一行 except 分支已 return False，future 此处必为真实 Future；
+        # mypy 因该名字在 try/except 两处都被赋值而保留了 None 分支，故压制。
+        future.add_done_callback(  # type: ignore[union-attr]
+            lambda fut: self._connect_result.emit(_future_result_or(fut, (False, "连接失败")))
+        )
         return True
 
     def _on_connect(self):
@@ -3739,7 +3760,7 @@ class EmbyActorManagerDialog(QDialog):
             item = table.itemAt(pos)
             if item is None or int(item.column()) not in _EDITABLE_COLUMNS:
                 return
-            QGuiApplication.clipboard().setText(item.text())
+            QGuiApplication.clipboard().setText(item.text())  # type: ignore[union-attr]
             self.log(f"📋 已复制: {item.text()[:60]}")
         except (RuntimeError, AttributeError, ValueError, TypeError):
             pass
@@ -4301,7 +4322,10 @@ class _SourceQuickSettingsPanel(QGroupBox):
             if self._lists_expanded == expanded:
                 return
             self._lists_expanded = expanded
-            _layout = self.layout()
+            # 对话框自身布局是 QVBoxLayout（本类构造时即 QVBoxLayout(self)），
+            # 而 setStretchFactor 是 QBoxLayout 专有方法，故按 QBoxLayout 取用；
+            # cast 不改变运行时对象，下面仍保留 None 兜底。
+            _layout = cast("QBoxLayout", self.layout())
             if _layout is not None:
                 _layout.setStretchFactor(self.image_list, 1 if expanded else 0)
                 _layout.setStretchFactor(self.info_list, 1 if expanded else 0)
@@ -4506,10 +4530,13 @@ async def _actor_source_test_execute(
     need_image: bool,
     need_info: bool,
     progress_callback=None,
-) -> tuple[list[str], str | None, object]:
+) -> tuple[list[str], str | None, EMbyActressInfo | None]:
     """纯数据版本：不操作 UI，返回 (logs, avatar_path, info)。
 
     progress_callback(msg): 逐源开始前回调，由调用方经 Signal 转发到主线程做实时状态显示。
+
+    info 取 EMbyActressInfo | None：need_info 为假、或所有信息源都没产出时为 None，
+    否则恒为 EMbyActressInfo（各信息源失败也返回同一个 info 实例，只是字段没填）。
     """
 
     def _report(msg: str) -> None:
@@ -4526,7 +4553,7 @@ async def _actor_source_test_execute(
 
     logs: list[str] = []
     avatar_path: str | None = None
-    info: object = None
+    info: EMbyActressInfo | None = None
     actor = ActorInfo(name=name, actor_id="", server_id="")
 
     if need_image:
@@ -5456,7 +5483,7 @@ class ActorSourceTestDialog(QDialog):
                 _w = self.info_table.cellWidget(4, 1)
                 _data = (_w.toPlainText() if _w is not None else "").strip()
             if _data:
-                QApplication.clipboard().setText(_data)
+                QApplication.clipboard().setText(_data)  # type: ignore[union-attr]
         except Exception:
             pass
 
@@ -5983,7 +6010,9 @@ class ActorDetailDialog(QDialog):
                     if col_h <= 0:
                         continue
                     target = col_h // _AVATAR_PREVIEW_COL_RATIO
-                    rest_h = _layout_min_h_excluding(box.layout(), label)
+                    # 上一行已保证 box 与其布局非 None；中栏「简介/信息」栏由 QVBoxLayout
+                    # 装配，故按 QBoxLayout 取用（_layout_min_h_excluding 需要该类型）。
+                    rest_h = _layout_min_h_excluding(cast("QBoxLayout", box.layout()), label)
                     if col_h - target < rest_h:
                         target = col_h - rest_h
                     target = max(1, target)

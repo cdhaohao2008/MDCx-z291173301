@@ -84,7 +84,7 @@ def test_wildcard_without_bare_domain_is_error():
     """
     report = validate_cf_bypass_hosts("*.javdb.com", known_domains=_KNOWN)
     assert report.level == LEVEL_ERROR
-    assert "不含 javdb.com 本身" in _messages(report), _messages(report)
+    assert "不含javdb.com本身" in _messages(report), _messages(report)
 
 
 def test_old_placeholder_example_is_now_rejected():

@@ -1191,7 +1191,11 @@ async def run_network_check_item(
                 else:
                     base_error = str(error or "").split(" body=", 1)[0].rstrip()
                     clean_bypass = (
-                        str(bypass_error or "").split(" body=", 1)[0].strip().replace("; GET ", "、").replace("; ", "、")
+                        str(bypass_error or "")
+                        .split(" body=", 1)[0]
+                        .strip()
+                        .replace("; GET ", "、")
+                        .replace("; ", "、")
                     )
                     if clean_bypass:
                         error = f"{base_error} CloudFlare Bypass失败：{clean_bypass}"
@@ -1210,24 +1214,21 @@ async def run_network_check_item(
             ):
                 try:
                     from mdcx.base.web import (
-                        get_javlibrary_domain,
                         get_aio_domain,
+                        get_javlibrary_domain,
                         get_madouqu_domains,
                     )
+
                     new_url: str | None = None
                     if spec.site == Website.JAVLIBRARY:
-                        new_url = await asyncio.wait_for(
-                            get_javlibrary_domain(), timeout=DYNAMIC_DOMAIN_TIMEOUT
-                        )
+                        new_url = await asyncio.wait_for(get_javlibrary_domain(), timeout=DYNAMIC_DOMAIN_TIMEOUT)
                     elif spec.site in (Website.AVMOO, Website.AVSOX, Website.AVHEAT):
                         new_url = await asyncio.wait_for(
                             get_aio_domain(spec.site.value.lower()),
                             timeout=DYNAMIC_DOMAIN_TIMEOUT,
                         )
                     elif spec.site == Website.MADOUQU:
-                        domains = await asyncio.wait_for(
-                            get_madouqu_domains(), timeout=DYNAMIC_DOMAIN_TIMEOUT
-                        )
+                        domains = await asyncio.wait_for(get_madouqu_domains(), timeout=DYNAMIC_DOMAIN_TIMEOUT)
                         if domains:
                             new_url = domains[0]
                     if new_url and new_url != spec.url:
@@ -1239,8 +1240,7 @@ async def run_network_check_item(
                             json_data=spec.json_data,
                             use_proxy=spec.use_proxy,
                             timeout=_diagnostic_timeout(),
-                            enable_cf_bypass=spec.enable_cf_bypass
-                            and _bypass_available(_manager().config),
+                            enable_cf_bypass=spec.enable_cf_bypass and _bypass_available(_manager().config),
                         )
                         if retry_response is not None:
                             response = retry_response
@@ -1636,9 +1636,7 @@ async def run_network_check(
                     display_result = result
                     if proxy_down and result.status == NetworkCheckStatus.FAILED and _is_proxy_error(result.error):
                         # 与并发路径一致：results 保留原始错误，打印行简化提示
-                        display_result = replace(
-                            result, message="代理不可用（详见下方检测结果汇总区的提示）", error=""
-                        )
+                        display_result = replace(result, message="代理不可用（详见下方检测结果汇总区的提示）", error="")
                     progress(format_result_line(display_result))
                 continue
             # task → spec 映射：单项逃逸异常时定位所属站点（议题 #73）

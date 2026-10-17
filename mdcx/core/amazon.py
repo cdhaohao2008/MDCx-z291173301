@@ -667,7 +667,9 @@ def _detect_amazon_barcode_candidates_from_image_bytes_with_reason(image_bytes: 
                             )
                         try:
                             image_array = cv2.cvtColor(np.array(processed), cv2.COLOR_RGB2BGR)
-                            retval, decoded_info, decoded_type, detected_points = detector.detectAndDecodeWithType(image_array)
+                            retval, decoded_info, decoded_type, detected_points = detector.detectAndDecodeWithType(
+                                image_array
+                            )
                         except Exception:
                             continue
                         if not retval:
@@ -688,7 +690,9 @@ def _detect_amazon_barcode_candidates_from_image_bytes_with_reason(image_bytes: 
                         if detected_points is None:
                             continue
                         ocr_fallback_attempted = True
-                        if barcodes := _try_extract_amazon_barcode_candidates_via_digit_ocr(image_array, detected_points):
+                        if barcodes := _try_extract_amazon_barcode_candidates_via_digit_ocr(
+                            image_array, detected_points
+                        ):
                             return barcodes, "ocr_digits"
                     finally:
                         # 大图/大数组及时释放：并发扫码时避免 10 套全分辨率常驻 OOM（返回/continue 均执行）

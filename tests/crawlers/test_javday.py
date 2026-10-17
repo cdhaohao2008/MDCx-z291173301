@@ -11,7 +11,6 @@ from mdcx.crawlers.javday import (
 )
 from mdcx.models.model_types import CrawlerInput
 
-
 DETAIL_HTML = """
 <html>
   <head><meta property="og:image" content="https://cdn.example.test/cover.jpg" /></head>

@@ -55,6 +55,7 @@ def _natural_sort_key(text: str) -> list[tuple[int, object]]:
             key.append((1, part.lower()))
     return key
 
+
 # diff 对比的字段：(属性名, 显示名, 是否列表类型)
 _DIFF_FIELDS: list[tuple[str, str, bool]] = [
     ("number", "番号", False),
@@ -322,9 +323,7 @@ def on_nfo_lib_data_loaded(self: MyMAinWindow, nfo_path_str: str) -> None:
     self.Ui.lineEdit_nfo_lib_score.setText(data.score or "")
     self.Ui.lineEdit_nfo_lib_score.setCursorPosition(0)
     self.Ui.plainTextEdit_nfo_lib_outline.setPlainText(data.outline or "")
-    self.Ui.plainTextEdit_nfo_lib_outline.setTextCursor(
-        QTextCursor(self.Ui.plainTextEdit_nfo_lib_outline.document())
-    )
+    self.Ui.plainTextEdit_nfo_lib_outline.setTextCursor(QTextCursor(self.Ui.plainTextEdit_nfo_lib_outline.document()))
     self.Ui.plainTextEdit_nfo_lib_tag.setPlainText(data.tag or "")
     self.Ui.plainTextEdit_nfo_lib_tag.setTextCursor(QTextCursor(self.Ui.plainTextEdit_nfo_lib_tag.document()))
     self.Ui.lineEdit_nfo_lib_cover_url.setText(data.thumb or "")

@@ -143,9 +143,23 @@ exclude = [
     "tests/",
 ]
 
-# 主窗口已按职责拆成 28 个 mixin 模块（与 init.py / load_config.py 同属纯 GUI 装配代码）。
-# 每个 mixin 被 mypy 单独分析时看不到兄弟 mixin 与 __init__ 上定义的属性，
+# 上面 exclude 里的这些模块，exclude 规则本身管不到：mypy 的 exclude 只作用于
+# 「递归发现」这条路径，模块一旦被别的模块 import 进来就会被重新检查。
+# 它们在被引用时同样看不到兄弟 mixin / 动态挂载的属性，刷出来的全是 GUI 装配噪音，
+# 与 exclude 的意图一致，这里补 ignore_errors 让排除在两条路径下都真正生效
+# （CI 用的是同一份 pyproject.toml，无平台差异）。
+[[tool.mypy.overrides]]
+ignore_errors = true
+module = [
+    "mdcx.views.*",
+    "mdcx.controllers.main_window.init",
+    "mdcx.core.network_check",
+]
+
+# 主窗口已按职责拆成 29 个 mixin/helper 模块（与 init.py / load_config.py 同属纯 GUI 装配代码）。
+# 每个模块被 mypy 单独分析时看不到兄弟 mixin 与 __init__ 上定义的属性，
 # 只会刷出 self.xxx 的 attr-defined 噪音，因此整组忽略其内部报错。
+# nfo_library 是同一族的 helper 模块（以 self: MyMAinWindow 形式访问懒建属性）。
 [[tool.mypy.overrides]]
 ignore_errors = true
 module = [
@@ -167,6 +181,7 @@ module = [
     "mdcx.controllers.main_window.net_check",
     "mdcx.controllers.main_window.nfo_editor",
     "mdcx.controllers.main_window.nfo_lib_layout",
+    "mdcx.controllers.main_window.nfo_library",
     "mdcx.controllers.main_window.nfo_library_handlers",
     "mdcx.controllers.main_window.result_actions",
     "mdcx.controllers.main_window.result_tree",

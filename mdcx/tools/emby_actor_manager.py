@@ -511,7 +511,6 @@ async def fetch_all_actors(
     persons = await get_emby_actor_list(filter_actor_only=filter_actor_only)
     if not persons:
         return [], 0
-    seen_names = set()
     person_counts, person_titles, lib_person_names = await fetch_person_item_stats(
         parent_ids=parent_ids, filter_actor_only=filter_actor_only
     )
@@ -1095,10 +1094,11 @@ def build_local_avatar_index(local_avatar_dir: str) -> dict[str, str]:
     return index
 
 
-async def fetch_actor_info_from_source(actor: ActorInfo, source: str) -> tuple[bool, str, object]:
+async def fetch_actor_info_from_source(actor: ActorInfo, source: str) -> tuple[bool, str, EMbyActressInfo]:
     """按指定信息源获取演员信息，返回 (是否命中, 描述, EMbyActressInfo)。
 
-    供数据源测试窗口逐源展示。
+    供数据源测试窗口逐源展示。第三返回值恒为 EMbyActressInfo（各分支都返回
+    同一个 info 实例，失败分支亦然，只是字段可能没填上），故类型标注不取 object。
     """
     info = EMbyActressInfo(name=actor.name, server_id=actor.server_id, id=actor.actor_id)
     if source == "local":

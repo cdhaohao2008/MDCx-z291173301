@@ -109,7 +109,7 @@ def test_maximized_gap_matches_restored_gap(win, maxed):
     win.resize(DESIGN_WINDOW_W, 700)
     win._sync_page_layouts()
     base_x = ui.pushButton_tree_clear.x()
-    base_gap = _succ_gap(win)
+    _succ_gap(win)
 
     win.resize(1900, 1000)
     win._sync_page_layouts()

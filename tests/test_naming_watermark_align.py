@@ -362,7 +362,10 @@ def test_watermark_shift_aligns_to_corners_when_wide(win, app, monkeypatch):
             got = _abs_wm(ui, getattr(ui, target))
             exp = _abs_wm(ui, getattr(ui, anchor))
             assert got == exp, f"{width} 宽下 {target} 未对齐到 {anchor}: x={got} 期望={exp}"
-        take_anchors = lambda: {n: (_abs_wm(ui, getattr(ui, n)), getattr(ui, n).width()) for n in anchors}
+
+        def take_anchors():
+            return {n: (_abs_wm(ui, getattr(ui, n)), getattr(ui, n).width()) for n in anchors}
+
         new_anchors = take_anchors()
         base_anchors = _baseline_without(
             win, app, monkeypatch, take_anchors, "_sync_watermark_colon_align", win._clear_watermark_colon_align
@@ -389,7 +392,10 @@ def test_watermark_type_shift_aligns_when_wide(win, app):
     slim_rows = tuple(r for r in full_rows if r[0] != "horizontalLayout_14")
     assert len(slim_rows) + 5 == len(full_rows), "水印类型行右移项缺失"
     watched = _WM_TYPE_STAY + _WM_TYPE_ANCHORS
-    take = lambda: {n: (_abs_wm(ui, getattr(ui, n)), getattr(ui, n).width()) for n in watched}
+
+    def take():
+        return {n: (_abs_wm(ui, getattr(ui, n)), getattr(ui, n).width()) for n in watched}
+
     try:
         for width, height in _WIDE_SIZES:
             cls._WATERMARK_SHIFT_ROWS = full_rows
@@ -424,7 +430,10 @@ def test_watermark_midpoint_shift_when_wide(win, app):
     full_rows = cls._WATERMARK_SHIFT_ROWS
     slim_rows = tuple(r for r in full_rows if r[0] != "horizontalLayout_14")
     watched = _WM_TYPE_STAY + _WM_MID_ANCHORS
-    take = lambda: {n: (_abs_wm(ui, getattr(ui, n)), getattr(ui, n).width()) for n in watched}
+
+    def take():
+        return {n: (_abs_wm(ui, getattr(ui, n)), getattr(ui, n).width()) for n in watched}
+
     try:
         for width, height in _WIDE_SIZES:
             cls._WATERMARK_SHIFT_ROWS = full_rows

@@ -3,7 +3,7 @@ import contextlib
 import time
 import traceback
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import aiofiles.os
 
@@ -1316,17 +1316,23 @@ class Scraper:
                 meta_folder = mirror_meta_folder(folder_new_path, success_folder, meta_root)
             else:
                 meta_folder = meta_root / folder_old_path.name
-            meta_paths = remap_meta_paths(
-                {
-                    "nfo": nfo_new_path,
-                    "poster": poster_new_path_with_filename,
-                    "thumb": thumb_new_path_with_filename,
-                    "fanart": fanart_new_path_with_filename,
-                    "poster_final": poster_final_path,
-                    "thumb_final": thumb_final_path,
-                    "fanart_final": fanart_final_path,
-                },
-                meta_folder,
+            # remap_meta_paths 的签名是 dict[str, Path | None]（它忠实保留 None），
+            # 但这里传入的 7 个路径均由 success_folder / folder_old_path 拼接而来，
+            # 恒非 None，因此返回值也恒非 None。cast 仅用于向类型检查器表达该不变量。
+            meta_paths = cast(
+                "dict[str, Path]",
+                remap_meta_paths(
+                    {
+                        "nfo": nfo_new_path,
+                        "poster": poster_new_path_with_filename,
+                        "thumb": thumb_new_path_with_filename,
+                        "fanart": fanart_new_path_with_filename,
+                        "poster_final": poster_final_path,
+                        "thumb_final": thumb_final_path,
+                        "fanart_final": fanart_final_path,
+                    },
+                    meta_folder,
+                ),
             )
             nfo_new_path = meta_paths["nfo"]
             poster_new_path_with_filename = meta_paths["poster"]

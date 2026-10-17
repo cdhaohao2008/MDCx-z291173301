@@ -136,7 +136,10 @@ class CutWindow(QDialog):
         # 否则主窗口最小化/隐藏时 Windows 会连带把本窗口一起收走。
         flags = self.windowFlags() & ~(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.setWindowFlags(
-            flags | Qt.WindowType.Window | Qt.WindowType.WindowMinimizeButtonHint | Qt.WindowType.WindowMaximizeButtonHint
+            flags
+            | Qt.WindowType.Window
+            | Qt.WindowType.WindowMinimizeButtonHint
+            | Qt.WindowType.WindowMaximizeButtonHint
         )
         self.setModal(False)
         # 独立窗口后本窗口就成了"最后一扇可见主窗口"，默认的 WA_QuitOnClose 会让
@@ -560,7 +563,9 @@ class CutWindow(QDialog):
         if self.pic_h_w_ratio <= 1.5:  # 高宽比小时，固定高度，水平移动
             self.keep_side = "height"
             self.rect_h = self.pic_new_h  # 裁剪框的高度 = 图片缩放显示的高度
-            self.rect_w = int(self.rect_h / self.rect_h_w_ratio) if self.rect_h_w_ratio > 0 else self.rect_h  # 计算裁剪框的宽度
+            self.rect_w = (
+                int(self.rect_h / self.rect_h_w_ratio) if self.rect_h_w_ratio > 0 else self.rect_h
+            )  # 计算裁剪框的宽度
             self.rect_x = self.pic_new_w - self.rect_w  # 裁剪框左上角位置的x值
             self.rect_y = 0  # 裁剪框左上角位置的y值
         else:  # 高宽比大时，固定宽度，竖向移动
@@ -818,9 +823,7 @@ class CutWindow(QDialog):
             # Minimized|Maximized 这种矛盾状态，Windows 无法还原，表现为最小化按钮点了没反应。
             # 这里补一次纠正：最小化时把最大化位摘掉（纠正后条件不再成立，不会递归）。
             if state & Qt.WindowState.WindowMinimized and state & Qt.WindowState.WindowMaximized:
-                self.setWindowState(
-                    (state & ~Qt.WindowState.WindowMaximized) | Qt.WindowState.WindowMinimized
-                )
+                self.setWindowState((state & ~Qt.WindowState.WindowMaximized) | Qt.WindowState.WindowMinimized)
             self._relayout()
 
     def closeEvent(self, event):

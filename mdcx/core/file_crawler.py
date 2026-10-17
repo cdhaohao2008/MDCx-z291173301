@@ -476,8 +476,7 @@ class FileScraper:
                 continue
 
             reduced.field_log += (
-                f"\n\n    📌 {field} \n    {'=' * 108}\n"
-                f"    🌐 优先级设置: {' -> '.join(s.value for s in f_sites)}"
+                f"\n\n    📌 {field} \n    {'=' * 108}\n    🌐 优先级设置: {' -> '.join(s.value for s in f_sites)}"
             )
 
             # 按优先级依次尝试获取字段值

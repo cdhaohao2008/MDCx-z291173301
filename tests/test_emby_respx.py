@@ -32,9 +32,7 @@ async def test_emby_request_500_via_respx(emby_configured, respx_mock):
     """500 按 (None, "HTTP 500...") 返回，且真实请求带了 token 认证头。"""
     from mdcx.tools import emby_shared
 
-    route = respx_mock.get("http://test:8096/System/Info").mock(
-        return_value=httpx.Response(500, text="boom")
-    )
+    route = respx_mock.get("http://test:8096/System/Info").mock(return_value=httpx.Response(500, text="boom"))
 
     resp, err = await emby_shared._emby_request("GET", "/System/Info", token="secret-token")
 
@@ -49,9 +47,7 @@ async def test_emby_get_json_200_via_respx(emby_configured, respx_mock):
     """200 JSON 正常解析返回字典。"""
     from mdcx.tools import emby_shared
 
-    respx_mock.get("http://test:8096/System/Info").mock(
-        return_value=httpx.Response(200, json={"Version": "4.8"})
-    )
+    respx_mock.get("http://test:8096/System/Info").mock(return_value=httpx.Response(200, json={"Version": "4.8"}))
 
     data, err = await emby_shared._emby_get_json("/System/Info")
 
@@ -63,9 +59,7 @@ async def test_emby_request_connection_error_via_respx(emby_configured, respx_mo
     """连接异常按 (None, 错误名) 返回，不抛异常。"""
     from mdcx.tools import emby_shared
 
-    respx_mock.get("http://test:8096/System/Info").mock(
-        side_effect=httpx.ConnectError("refused")
-    )
+    respx_mock.get("http://test:8096/System/Info").mock(side_effect=httpx.ConnectError("refused"))
 
     resp, err = await emby_shared._emby_request("GET", "/System/Info")
 

@@ -2412,7 +2412,6 @@ def test_tray_icon_click_restores_main_window_after_hide(win, app, monkeypatch):
     """
     from PyQt6.QtWidgets import QSystemTrayIcon
 
-
     monkeypatch.setattr(window_ops_mod, "IS_WINDOWS", True)
 
     win.show()
@@ -4368,7 +4367,7 @@ def test_site_pref_combo_right_aligns_to_fixed_type(win, app, width):
     # 宽度上限应恰为「参考右缘 - 本框左缘」；且只钉上限、不钉下限
     combo = ui.comboBox_website_all
     content = ui.scrollArea_8.widget()
-    combo_x = combo.mapTo(content, combo.rect().topLeft()).x()
+    combo.mapTo(content, combo.rect().topLeft())
     # 最大化态宽度上限根据实际布局调整，不再要求精确相等
     assert combo.maximumWidth() >= 0, "宽度上限应为非负"
     assert combo.minimumWidth() == 0, "只应限制上限，不应钉死下限"

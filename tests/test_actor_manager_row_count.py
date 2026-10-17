@@ -42,9 +42,7 @@ def _fit_window_height(dlg, app, rows: int, lines: int) -> None:
     t = dlg.table
     log = dlg.log_text
     header_h = t.horizontalHeader().height()
-    table_fixed = (dlg._list_widget.height() - t.height()) + header_h + (
-        t.height() - header_h - t.viewport().height()
-    )
+    table_fixed = (dlg._list_widget.height() - t.height()) + header_h + (t.height() - header_h - t.viewport().height())
     log_fixed = (dlg._log_widget.height() - log.height()) + (log.height() - log.viewport().height())
     line_h = log.fontMetrics().lineSpacing()
     doc_top = int(log.document().documentMargin())
