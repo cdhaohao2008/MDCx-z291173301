@@ -210,8 +210,6 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         # 镜像站排在原站前面：原站对大陆 IP 有 CF 墙，镜像没有，可达性优先
         Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
-        Website.AVSEX,
-        Website.GETCHU,
     ),
     FixedScrapingType.WUMA: (
         # 官网 / 厂牌 / 官方接口
@@ -232,8 +230,6 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         Website.LULUBAR,
         Website.MISSAV,
         Website.MISSAV_API,
-        Website.AVSEX,
-        Website.GETCHU,
     ),
     FixedScrapingType.SUREN: (
         # 官网 / 厂牌 / 官方接口
@@ -266,8 +262,6 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         # 镜像站排在原站前面：原站对大陆 IP 有 CF 墙，镜像没有，可达性优先
         Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
-        Website.AVSEX,
-        Website.GETCHU,
     ),
     FixedScrapingType.FC2: (
         # 官网 / 厂牌 / 官方接口
@@ -285,8 +279,6 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         Website.IQQTV,
         Website.MISSAV,
         Website.MISSAV_API,
-        Website.AVSEX,
-        Website.GETCHU,
     ),
     FixedScrapingType.OUMEI: (
         # 官网 / 厂牌 / 官方接口
@@ -303,15 +295,12 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         Website.MISSAV_API,
         Website.IQQTV,
         Website.JAVFREE,
-        Website.AVSEX,
-        Website.GETCHU,
     ),
     FixedScrapingType.GUOCHAN: (
         # 官网 / 厂牌 / 官方接口
         Website.MADOUQU,
         Website.MADOUCLUB,
         # 第三方 / 聚合站
-        Website.AVSEX,
         Website.JAVDB,
         Website.JAVDB_API,
         Website.JAVDB_APP,
@@ -322,7 +311,6 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         Website.IQQTV,
         Website.MISSAV,
         Website.MISSAV_API,
-        Website.GETCHU,
     ),
 }
 
@@ -398,6 +386,12 @@ SITE_GROUPS: tuple[tuple[Website, ...], ...] = (
     (
         Website.MADOUQU,
         Website.MADOUCLUB,
+    ),
+    (
+        # 原站对大陆 IP 有 CF 墙、镜像没有，两条路是同一份数据：只勾一个不如两条都留着，
+        # 加入其一时自动带上另一条，刮削时哪条通走哪条。
+        Website.JAVLIBRARY,
+        Website.JAVLIBRARY_MIRROR,
     ),
 )
 

@@ -21,6 +21,7 @@ import pytest
 pytest.importorskip("PyQt6.QtWidgets")
 
 from PyQt6.QtCore import QPoint, Qt  # noqa: E402
+from PyQt6.QtTest import QTest  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QListWidget, QMenu  # noqa: E402
 
 from mdcx.config.enums import Website  # noqa: E402
@@ -91,6 +92,23 @@ def _row_of(list_widget, site_value: str) -> int:
     )
 
 
+def _right_press(list_widget, point) -> None:
+    """真的按一次右键（按下+松开），而不是手工发 contextMenuRequested 信号。
+
+    信号那一条路跳过了 `QAbstractItemView` 的按下处理——正是它会在右键时顺手选中
+    被点的格子，于是格子被套上 `:selected` 的内部方框（用户截图里那个）。
+    """
+    QTest.mousePress(list_widget.viewport(), Qt.MouseButton.RightButton, Qt.KeyboardModifier.NoModifier, point)
+    QTest.mouseRelease(list_widget.viewport(), Qt.MouseButton.RightButton, Qt.KeyboardModifier.NoModifier, point)
+    QApplication.processEvents()
+
+
+def _fill_at(list_widget, point) -> str:
+    """某一点所在格子的填充色（选中态与常态差得很明显，用它验证有没有被选中）。"""
+    color = list_widget.viewport().grab().toImage().pixelColor(point)
+    return f"#{color.red():02x}{color.green():02x}{color.blue():02x}"
+
+
 def _title_rows(palette) -> dict[str, int]:
     """{标题: 行号}；候选区应当恰好六个标题。"""
     rows = {str(palette.item(row).text()): row for row in range(palette.count()) if _is_group_item(palette.item(row))}
@@ -120,7 +138,7 @@ def test_right_click_site_copies_only_that_site(qt_app, monkeypatch):
     try:
         item = dlg.selected_list.item(1)  # CUSTOM_ORDER[1] = MGStage
         texts = _right_click(dlg.selected_list, _center(dlg.selected_list, item), monkeypatch, "复制站点")
-        assert texts == ["复制站点：MGStage", "", "复制列表（4 个站点）"]
+        assert texts == ["复制站点：MGStage", "", "复制列表：4个站点"]
         assert app.clipboard().text() == "MGStage"
     finally:
         dlg.deleteLater()
@@ -133,7 +151,7 @@ def test_right_click_blank_area_copies_the_whole_list(qt_app, monkeypatch):
     dlg = SiteListEditorDialog("t", CUSTOM_ORDER, ALL_SITES, None)
     try:
         texts = _right_click(dlg.selected_list, _blank_corner(dlg.selected_list), monkeypatch, "复制列表")
-        assert texts == ["复制列表（4 个站点）"]
+        assert texts == ["复制列表：4个站点"]
         assert app.clipboard().text() == "Xcity,MGStage,Getchu,DMM"
     finally:
         dlg.deleteLater()
@@ -163,10 +181,10 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
         _shown(dlg)
         palette = dlg.available_list
         texts = _right_click(palette, _title_center(palette, "有码"), monkeypatch, "复制本组")
-        assert texts == ["复制本组「有码」（31 个站点）", "", "复制列表（39 个站点）"]
+        assert texts == ["复制本组：29 个站点", "", "复制列表：39个站点"]
         copied = app.clipboard().text().split(",")
         assert copied[:3] == ["DMM", "DMM_API", "LibreDMM"]
-        assert len(copied) == 31 == len(set(copied))
+        assert len(copied) == 29 == len(set(copied))
         # 别的组才有的站点不能混进来（MyWife 不属于任何一组）
         assert "MyWife" not in copied and "Madouqu" not in copied
         assert _parse_sites(app.clipboard().text()) == _group_at(palette, "有码")
@@ -176,7 +194,7 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
 
 @pytest.mark.parametrize(
     ("title", "count"),
-    [("有码", 31), ("无码", 18), ("素人", 29), ("FC2", 15), ("欧美", 14), ("国产", 14)],
+    [("有码", 29), ("无码", 16), ("素人", 27), ("FC2", 13), ("欧美", 12), ("国产", 12)],
 )
 def test_each_group_title_copies_its_own_list(qt_app, monkeypatch, title, count):
     """六个标题各自复制各自那份名单，互不相等，也不会复制成 39 站。"""
@@ -186,7 +204,7 @@ def test_each_group_title_copies_its_own_list(qt_app, monkeypatch, title, count)
         _shown(dlg)
         palette = dlg.available_list
         texts = _right_click(palette, _title_center(palette, title), monkeypatch, "复制本组")
-        assert texts[0] == f"复制本组「{title}」（{count} 个站点）"
+        assert texts[0] == f"复制本组：{count} 个站点"
         copied = app.clipboard().text().split(",")
         assert len(copied) == count
         assert len(copied) < len(_list_sites(palette))
@@ -226,13 +244,13 @@ def test_right_click_gap_between_titles_copies_the_whole_list(qt_app, monkeypatc
         )
         assert blank is not None, "首行末尾没有空白处可测"
         texts = _right_click(palette, QPoint(blank, top), monkeypatch, "复制列表")
-        assert texts == ["复制列表（39 个站点）"]
+        assert texts == ["复制列表：39个站点"]
     finally:
         dlg.deleteLater()
 
 
 def test_palette_copy_covers_every_site_once(qt_app, monkeypatch):
-    """候选区每个站只出现一行，复制出的列表既不重复也不漏（含 MyWife）。"""
+    """候选区每个站只出现一行、且是 A-Z 序，复制出的列表既不重复也不漏。"""
     app = qt_app
     app.clipboard().clear()
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
@@ -240,9 +258,10 @@ def test_palette_copy_covers_every_site_once(qt_app, monkeypatch):
         _right_click(dlg.available_list, _blank_corner(dlg.available_list), monkeypatch, "复制列表")
         copied = app.clipboard().text().split(",")
         assert len(copied) == len(set(copied)) == len(_list_sites(dlg.available_list))
-        assert copied[:2] == ["DMM", "DMM_API"]
-        # 唯一没进任何一组的 MyWife 也得在（它接在站点区末尾，不另起「其他」标题）
-        assert copied[-1] == "MyWife"
+        assert copied == sorted(copied, key=str.casefold), "候选区复制出来的不是 A-Z 序"
+        assert copied[:2] == ["7mmtv", "Airav.cc"]
+        # 不属任何一组的 MyWife 也在里面（它只是没有自己的标题，不是不能选）
+        assert "MyWife" in copied and copied[-1] == "Xcity"
     finally:
         dlg.deleteLater()
 
@@ -280,5 +299,78 @@ def test_field_priority_palette_also_copies(qt_app, monkeypatch):
         assert [row for row in range(palette.count()) if _is_group_item(palette.item(row))] == []
         _right_click(palette, _blank_corner(palette), monkeypatch, "复制列表")
         assert app.clipboard().text() == "Xcity,MGStage,Getchu,DMM"
+    finally:
+        dlg.deleteLater()
+
+
+def _right_click_leaves_the_lists_untouched(qt_app, which: str) -> None:
+    """右键只弹菜单：选中态与当前项都保持原样，被点的那格也不该多出内部方框。
+
+    QAbstractItemView 默认会在右键按下时顺手「选中」被点的格子，于是那一格被套上
+    QSS 的 `:selected`（比常态深一档、还带边框）——用户截图里就是这个内部方框。
+    右键是「看一眼/复制一下」，不该改变列表的选中状态；单击选中仍然是原样行为。
+    """
+    dlg = SiteListEditorDialog("t", CUSTOM_ORDER, ALL_SITES, None)
+    try:
+        _shown(dlg)
+        list_widget = dlg.available_list if which == "palette" else dlg.selected_list
+        # Getchu / DMM 两个候选区与「启用网站」列表里都有，才能两边共用同一组断言
+        point = _center(list_widget, list_widget.item(_row_of(list_widget, "DMM")))
+        # 基准是「鼠标悬停但没选中」的填充色：悬停本来就会浅一档，跟选中态不是一回事，
+        # 直接拿没悬停的格子当基准会把悬停误判成选中。
+        QTest.mouseMove(list_widget.viewport(), point)
+        QApplication.processEvents()
+        hover_fill = _fill_at(list_widget, point)
+        before = sorted(list_widget.row(item) for item in list_widget.selectedItems())
+        current_before = list_widget.currentRow()
+
+        _right_press(list_widget, point)
+
+        after = sorted(list_widget.row(item) for item in list_widget.selectedItems())
+        assert after == before, f"右键把选中项改了：{before} → {after}"
+        assert list_widget.currentRow() == current_before, "右键把当前项改了"
+        assert _fill_at(list_widget, point) == hover_fill, "被右键的那格多了内部方框（被当成选中了）"
+    finally:
+        dlg.deleteLater()
+
+
+@pytest.mark.parametrize("which", ["palette", "enabled"])
+def test_right_click_does_not_select_the_pressed_cell(qt_app, which):
+    _right_click_leaves_the_lists_untouched(qt_app, which)
+
+
+@pytest.mark.parametrize("which", ["palette", "enabled"])
+def test_left_click_still_selects(qt_app, which):
+    """别把右键那套「恢复现场」误伤到左键：单击选中是这两个列表的基本操作。"""
+    dlg = SiteListEditorDialog("t", CUSTOM_ORDER, ALL_SITES, None)
+    try:
+        _shown(dlg)
+        list_widget = dlg.available_list if which == "palette" else dlg.selected_list
+        row = _row_of(list_widget, "DMM")
+        QTest.mouseClick(
+            list_widget.viewport(),
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            _center(list_widget, list_widget.item(row)),
+        )
+        QApplication.processEvents()
+        assert [list_widget.row(item) for item in list_widget.selectedItems()] == [row]
+    finally:
+        dlg.deleteLater()
+
+
+def test_right_click_still_copies_the_pressed_site(qt_app, monkeypatch):
+    """不选中 ≠ 不能复制：菜单读的是按下的那一格（`itemAt(pos)`），不是选中项。"""
+    app = qt_app
+    app.clipboard().clear()
+    dlg = SiteListEditorDialog("t", CUSTOM_ORDER, ALL_SITES, None)
+    try:
+        _shown(dlg)
+        point = _center(dlg.selected_list, dlg.selected_list.item(_row_of(dlg.selected_list, "MGStage")))
+        _right_press(dlg.selected_list, point)
+        assert dlg.selected_list.item(_row_of(dlg.selected_list, "MGStage")).isSelected() is False, "右键选中了"
+        texts = _right_click(dlg.selected_list, point, monkeypatch, "复制站点")
+        assert texts[0] == "复制站点：MGStage"
+        assert app.clipboard().text() == "MGStage"
     finally:
         dlg.deleteLater()

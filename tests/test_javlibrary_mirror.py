@@ -219,11 +219,15 @@ def test_mirror_crawler_reuses_the_javlibrary_parsing():
 
 
 def test_mirror_crawler_identity():
-    """站点值、展示名、说明都要是镜像自己的，不能串到原站上。"""
+    """站点值、展示名、说明都要是镜像自己的，不能串到原站上。
+
+    说明与原站同为「有码：仅能有码」——定位说明只说它能刮什么类型，不夹带「镜像站」
+    「无 CF 墙」这类额外措辞（用户明确要求过不要在说明里加戏）。
+    """
     crawler = _crawler()
     assert crawler.site() == Website.JAVLIBRARY_MIRROR
     assert crawler.display_name() == "Javlibrary\u00b7\u955c\u50cf"
-    assert "CF" in crawler.description
+    assert crawler.description == "有码：仅能有码"
 
 
 def test_mirror_crawler_default_base_url_is_the_chinese_page():

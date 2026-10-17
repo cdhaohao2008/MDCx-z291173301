@@ -32,7 +32,7 @@ def mirror_root(url: str) -> str:
 
 
 class JavLibraryMirrorCrawler(JavLibraryCrawler):
-    description = "有码：仅能有码（镜像站，无 CF 墙，默认中文页）"
+    description = "有码：仅能有码"
 
     @classmethod
     @override

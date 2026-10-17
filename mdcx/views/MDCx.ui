@@ -25400,12 +25400,12 @@ p,li{white-space:pre-wrap;}
 &lt;h4&gt;四、网站选择&lt;/h4&gt;
 &lt;p&gt;网站下拉框由已注册的爬虫自动生成，当前53个，可按需选用全部网站或指定网站；下列六组即「软件设置→刮削网站」里各类型的默认名单（组内顺序即优先级，从高到低），可在设置中自行增删与调序：&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;b&gt;有码&lt;/b&gt;：DMM、DMM_API、LibreDMM、AVEntertainments、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、Javlibrary·镜像、JavLibrary、AVSEX、Getchu&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;无码&lt;/b&gt;：AVEntertainments、AVSOX、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、AVSEX、Getchu&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;素人&lt;/b&gt;：DMM、DMM_API、LibreDMM、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、Javlibrary·镜像、JavLibrary、AVSEX、Getchu&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;FC2 ：&lt;/b&gt;FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API、AVSEX、Getchu&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;国产&lt;/b&gt;：Madouqu、Madou.club、AVSEX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API、Getchu&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;欧美&lt;/b&gt;：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、MissAV、MissAV_API、IQQTV、JavFree、AVSEX、Getchu&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;有码&lt;/b&gt;：DMM、DMM_API、LibreDMM、AVEntertainments、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、Javlibrary·镜像、JavLibrary&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;无码&lt;/b&gt;：AVEntertainments、AVSOX、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;素人&lt;/b&gt;：DMM、DMM_API、LibreDMM、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、Javlibrary·镜像、JavLibrary&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;FC2 ：&lt;/b&gt;FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;国产&lt;/b&gt;：Madouqu、Madou.club、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;欧美&lt;/b&gt;：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、MissAV、MissAV_API、IQQTV、JavFree&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;MyWife&lt;/b&gt;：不属于任何类型组的默认名单，需在「网站偏好」-「指定网站」勾选MyWife或让文件路径含MyWife才会启用&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;官网&lt;/b&gt;：Dahlia、Faleno、MGStage、Prestige、Official——已在所有网站源中单列，命中对应前缀时自动锁定该站&lt;/li&gt;
 &lt;/ul&gt;

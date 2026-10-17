@@ -178,21 +178,13 @@ def grouped_palette_groups(sites: Iterable[Website]) -> list[tuple[str, list[Web
 
 
 def palette_site_order(sites: Iterable[Website]) -> list[Website]:
-    """候选区里站点的铺放次序：顶部标题之下按组铺站，一个站只出现一次。
+    """候选区里站点的铺放次序：标题之下是一份去重后的 A-Z 名单。
 
-    六个标题整体移到候选区顶部、横排成一行之后（见 _make_group_header_item），组与组的
-    界线在视觉上消失了；站点若还「同属几组就重复几次」，同一个站名会在列表里出现两三
-    次、看不出第二份是哪一组的。故按组序去重：一个站取它第一次出现的组的位置，组内次序
-    仍是该组默认名单的优先级序；六组之外的站点（如 MyWife）按传入次序接在最后。
+    分组只留在开头那六个标题上（单击整组加入、右键复制本组），站点本身不再按组分段，
+    也不再按各组默认名单的优先级排——用户要的就是从 DMM 到 MyWife 一路 A-Z 看下去，
+    找站靠字母而不是靠记忆分组；同一个站也只出现一次。
     """
-    order: list[Website] = []
-    placed: set[Website] = set()
-    for _, group in grouped_palette_groups(sites):
-        for site in group:
-            if site not in placed:
-                placed.add(site)
-                order.append(site)
-    return order
+    return sorted(dict.fromkeys(sites), key=lambda site: site.value.casefold())
 
 
 def _site_priority_colors(dark: bool) -> dict[str, str]:
@@ -347,9 +339,11 @@ def _setup_site_list(list_widget: QListWidget, sites: Iterable[Website], *, grou
     for title, group in grouped_palette_groups(sites):
         if title:  # 无标题的末组（MyWife 等）不另起标题，站点照样铺出来
             list_widget.addItem(_make_group_item(title, group))
-    # 站点按组序去重铺放：标题与站点已不再按段分隔，同一个站铺两三次会让人以为有两份
     for site in palette_site_order(sites):
         list_widget.addItem(_make_site_item(site))
+    # 填完清掉当前项：Qt 会把第一行设成当前项，于是第一个标题被套上聚焦框、比别的
+    # 站点多一圈边框（用户不要「标题被圈起来」）。清掉之后所有格子长得一模一样。
+    list_widget.setCurrentRow(-1)
 
 
 def _set_site_summary(line_edit: QLineEdit) -> None:
@@ -457,12 +451,12 @@ def _site_list_context_menu(list_widget: QListWidget, pos) -> None:
         primary_text = f"复制站点：{site_value}"
         primary_message = f"站点「{site_value}」"
     elif group_sites:
-        primary_text = f"复制本组「{group_title}」（{len(group_sites)} 个站点）"
+        primary_text = f"复制本组：{len(group_sites)} 个站点"
         primary_message = f"「{group_title}」组的 {len(group_sites)} 个站点"
     if primary_text:
         primary = menu.addAction(primary_text)
         menu.addSeparator()
-    list_action = menu.addAction(f"复制列表（{len(sites)} 个站点）")
+    list_action = menu.addAction(f"复制列表：{len(sites)}个站点")
 
     if (chosen := menu.exec(list_widget.viewport().mapToGlobal(pos))) is None:
         return
@@ -498,7 +492,30 @@ def _localize_dialog_buttons(buttons: QDialogButtonBox) -> None:
         cancel_button.setText("取消")
 
 
-class SitePaletteList(QListWidget):
+class _SiteListBase(QListWidget):
+    """站点列表的共用行为：右键只弹菜单，不改选中态。
+
+    Qt 默认在右键按下时会顺手选中那一格，于是被右键的格子套上 `:selected` 的深色底，
+    看着像「多了一个内部方框」，菜单关掉后那格还留着高亮。右键的动作只是复制，
+    不该改变选中状态：按下前后把「选中的行 + 当前行」原样保留，菜单读的是按下的
+    位置，不依赖选中态，所以恢复不影响复制。
+    """
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.RightButton:
+            selected = [self.row(item) for item in self.selectedItems()]
+            current = self.currentRow()
+            super().mousePressEvent(event)
+            if self.selectedItems() or self.currentRow() >= 0:
+                self.clearSelection()
+                for row in selected:
+                    self.item(row).setSelected(True)
+                self.setCurrentRow(current)
+            return
+        super().mousePressEvent(event)
+
+
+class SitePaletteList(_SiteListBase):
     def __init__(
         self,
         sites: list[Website],
@@ -525,6 +542,20 @@ class SitePaletteList(QListWidget):
         # 标志，否则刷新一次分组就没了，故存成公开属性给调用方原样传回去。
         self.grouped = grouped
         _setup_site_list(self, sites, grouped=grouped)
+
+    def mousePressEvent(self, event) -> None:
+        super().mousePressEvent(event)  # 右键不改选中态由 _SiteListBase 负责
+        # 点分组标题只是「整组加入」，不需要它成为当前项——当前项会被套上聚焦框，
+        # 标题就会比旁边的站点多一圈边框。松开当前项后所有格子观感一致。
+        if _is_group_item(self.itemAt(_event_pos(event))):
+            self.setCurrentRow(-1)
+
+    def focusInEvent(self, event) -> None:
+        super().focusInEvent(event)
+        # 光标进入时若当前项为空，Qt 会把当前项设成第一行——那正好是第一个分组标题，
+        # 于是它一开窗就被圈起来。候选区不需要「当前项」这个状态（点站点照样选中、
+        # 拖拽照样拖），所以这里清掉，让开窗后的观感与别的格子一致。
+        self.setCurrentRow(-1)
 
     def _removable_drop_source(self, source) -> QListWidget | None:
         if self._removable_source is not None:
@@ -577,7 +608,7 @@ class SitePaletteList(QListWidget):
             self.on_removed()
 
 
-class PrioritySiteList(QListWidget):
+class PrioritySiteList(_SiteListBase):
     def __init__(
         self,
         allowed_sites: list[Website],
@@ -722,7 +753,7 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
 
         copy_hint = QLabel(
             "开头的六个加粗标题是有码、无码、素人、FC2、欧美、国产，单击一个标题即加入该组全部网站，"
-            "后面紧跟全部可用网站（按分组顺序铺放、每个站只出现一次）。"
+            "后面紧跟全部可用网站（按名称 A-Z 排序、每个站只出现一次）。"
             "右键：站点上复制该站点、标题上复制本组名单、空白处复制整张列表"
         )
         copy_hint.setWordWrap(True)

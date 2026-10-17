@@ -9,19 +9,24 @@
     4.「有码、无码、素人、FC2、欧美、国产、DMM、DMM_API按照这样排序」
     5.「有码、无码、素人、FC2、欧美、国产后面不要标深色，和其他站点一样纯白背景就行，
         不要空着啊，继续排列DMM、DMM_API、LibreDMM等站点」
+    6.「有码：仅能有码（镜像站，无 CF 墙，默认中文页）改成 有码：仅能有码」「有码又圈起来了」
+        「DMM到MyWife从A-Z排序啊」
 
 第 3、4 条曾被实现成「六个标题占满候选区最上面一整行」（accent 底色 + 边框 + 自绘 chip，
 站点从第二行才开始），第 5 条把这条路否掉了：标题就是普通的一格，与其它站点同底色、
-只有文字加粗，且**后面不留空白**——首行就是
-`有码 无码 素人 FC2 欧美 国产 DMM DMM_API LibreDMM …`。所以这里逐条锁住：
+只有文字加粗，且**后面不留空白**。第 6 条再修三处：镜像站的说明不得夹带额外措辞；
+第一个标题**不能被聚焦框圈起来**；标题之下的站点是一份去重后的 **A-Z** 名单。
+所以这里逐条锁住：
     1. 六个分组标题按用户给的次序排在候选区最前面，且每组是用户给的名单与顺序；
     2. 标题不可选中、不可拖、不带 UserRole，不会被当成站点混进启用列表或复制结果；
     3. 标题与站点同一个流式排布，**标题右边立刻接着站点**（没有单独一行，也没有空隙），
        标题只加粗、底色仍是普通站点那一套（没有自定义 delegate 绘制深色块）；
-    4. 站点按组序去重铺放、每个站只出现一次，DMM、DMM_API 排在最前，六组之外的 MyWife 收尾；
-    5. 单击某个标题 = 把这一组整组加入启用列表；标题只有这六个，不存在「其他」；
-    6. 站点行的单击仍旧只是选中（加入靠双击或「添加选中」），双击标题无副作用；
-    7. 启用列表的顺序仍旧完全由用户决定（分组只作用于候选区的展示）。
+    4. 站点按名称 A-Z 去重铺放、每个站只出现一次（7mmtv … Xcity）；
+    5. 候选区任何时刻都没有当前项——Qt 默认会把第一行设成当前项并给它套聚焦框，
+       于是第一个标题「被圈起来」；
+    6. 单击某个标题 = 把这一组整组加入启用列表；标题只有这六个，不存在「其他」；
+    7. 站点行的单击仍旧只是选中（加入靠双击或「添加选中」），双击标题无副作用；
+    8. 启用列表的顺序仍旧完全由用户决定（分组只作用于候选区的展示）。
 
 另外还锁了一条「候选区分组 == 配置默认名单」的不变量：两者同源于
 models.TYPE_DEFAULT_SITES，一旦各改各的，用户看到的分组就会和实际默认行为对不上，
@@ -86,8 +91,6 @@ USER_SITE_LISTS = {
         "TheJavDB_API",
         "Javlibrary\u00b7\u955c\u50cf",
         "JavLibrary",
-        "AVSEX",
-        "Getchu",
     ],
     FixedScrapingType.WUMA: [
         "AVEntertainments",
@@ -106,8 +109,6 @@ USER_SITE_LISTS = {
         "Lulubar",
         "MissAV",
         "MissAV_API",
-        "AVSEX",
-        "Getchu",
     ],
     FixedScrapingType.SUREN: [
         "DMM",
@@ -137,8 +138,6 @@ USER_SITE_LISTS = {
         "TheJavDB_API",
         "Javlibrary\u00b7\u955c\u50cf",
         "JavLibrary",
-        "AVSEX",
-        "Getchu",
     ],
     FixedScrapingType.FC2: [
         # FC2 自己家的站排在第三方聚合站前面（提交 e30bdbb 定的序）
@@ -155,8 +154,6 @@ USER_SITE_LISTS = {
         "IQQTV",
         "MissAV",
         "MissAV_API",
-        "AVSEX",
-        "Getchu",
     ],
     FixedScrapingType.OUMEI: [
         "ThepornDB",
@@ -171,13 +168,10 @@ USER_SITE_LISTS = {
         "MissAV_API",
         "IQQTV",
         "JavFree",
-        "AVSEX",
-        "Getchu",
     ],
     FixedScrapingType.GUOCHAN: [
         "Madouqu",
         "Madou.club",
-        "AVSEX",
         "JavDB",
         "JavDB_API",
         "JavDB_APP",
@@ -188,7 +182,6 @@ USER_SITE_LISTS = {
         "IQQTV",
         "MissAV",
         "MissAV_API",
-        "Getchu",
     ],
 }
 
@@ -205,11 +198,21 @@ USER_TITLES_INV = {title: key for key, title in USER_TITLES.items()}
 UNTITLED_GROUP = ""
 EXPECTED_GROUPS = {
     **{title: USER_SITE_LISTS[key] for key, title in USER_TITLES.items()},
-    UNTITLED_GROUP: ["MyWife"],
+    # AVSEX 与 Getchu 已从六组默认名单移除（对大陆 IP 过不了 CF 墙，2.5.6 起）：
+    # 两者现在和 MyWife 一起落到这个无标题的末组里，仍然出现在候选区里可选，
+    # 只是没有任何一组会默认勾选它们。
+    UNTITLED_GROUP: ["AVSEX", "Getchu", "MyWife"],
 }
 
 # 非分组的原始顺序：按此断言「全部添加」未被候选区排序污染
-UNGROUPED_ORDER = [Website.DMM, Website.AVBASE, Website.XCITY, Website.GETCHU]
+UNGROUPED_ORDER = [
+    Website.DMM,
+    Website.AVBASE,
+    Website.XCITY,
+    Website.AVSOX,
+    Website.MADOUQU,
+    Website.THEPORNDB,
+]
 
 # 六组各自的 Config 字段名，用于锁「候选区分组 == 配置默认名单」
 TYPE_CONFIG_FIELDS = {
@@ -396,23 +399,26 @@ def test_does_not_mutate_input():
     assert source == UNGROUPED_ORDER
 
 
-def test_palette_site_order_dedupes_by_first_group():
-    """标题与站点同一个流之后，组与组的界线没了，同一个站不能因此铺两三次。
+def test_palette_site_order_is_alphabetical_without_duplicates():
+    """候选区的站点是一份去重后的 A-Z 名单（用户要「从 DMM 到 MyWife 一路 A-Z 看下去」）。
 
-    取它第一次出现的组的位置：有码组最全，DMM、DMM_API、LibreDMM 都先落在有码，
-    无码/素人/FC2/欧美/国产再依次补上各自独有的站，六组之外的 MyWife 收尾。
+    分组只留在开头那六个标题上；站点本身既不按组分段、也不按各组默认名单的优先级排。
     """
     order = palette_site_order(ALL_SITES)
+    values = [site.value for site in order]
     assert order == list(dict.fromkeys(order)), "候选区里同一个站出现了多次"
+    assert values == sorted(values, key=str.casefold), "候选区没有按 A-Z 排序"
     assert set(order) == set(ALL_SITES), "有站点在铺放时丢了"
-    assert [site.value for site in order[:2]] == ["DMM", "DMM_API"], "前两个站必须是 DMM、DMM_API"
-    assert order[-1] == Website.MYWIFE, "六组之外的 MyWife 应接在最后"
+    assert values[0] == "7mmtv" and values[-1] == "Xcity", "A-Z 的首尾应当是 7mmtv、Xcity"
 
 
-def test_palette_site_order_is_group_order_then_leftovers():
-    """铺放次序 = 六个组依次铺、组内即默认名单序，未分组的按传入次序收尾。"""
-    order = palette_site_order([Website.MYWIFE, Website.DMM, Website.AVSOX])
-    assert [site.value for site in order] == ["DMM", "AVSOX", "MyWife"]
+def test_palette_site_order_ignores_input_order():
+    """传入次序不影响 A-Z 结果（候选区只是展示，默认名单的原序在启用列表里另行保存）。"""
+    assert [site.value for site in palette_site_order([Website.MYWIFE, Website.DMM, Website.AVSOX])] == [
+        "AVSOX",
+        "DMM",
+        "MyWife",
+    ]
 
 
 # --------------------------------------------------------------------------- 对话框运行期
@@ -424,29 +430,64 @@ def test_palette_shows_the_requested_groups(dialog):
 
 
 def test_sites_lie_after_the_titles_once_each(dialog):
-    """标题之下铺全部站点：每个站只出现一次，行序即 palette_site_order。"""
+    """标题之下铺全部站点：每个站只出现一次，且是一份 A-Z 名单。"""
     assert _site_row_values(dialog) == [site.value for site in palette_site_order(ALL_SITES)]
-    assert _site_row_values(dialog)[:2] == ["DMM", "DMM_API"]
-    assert _site_row_values(dialog)[-1] == "MyWife"
+    assert _site_row_values(dialog)[:2] == ["7mmtv", "Airav.cc"]
+    assert _site_row_values(dialog)[-1] == "Xcity"
     assert len(_list_sites(dialog.available_list)) == len(ALL_SITES)
 
 
 def test_titles_come_first_and_sites_continue_right_after(qt_app):
-    """第 5 条需求的正面：标题排最前面，**后面立刻接着 DMM、DMM_API，不留空隙**。
+    """第 5 条需求的正面：标题排最前面，**后面立刻接着站点，不留空隙**。
 
-    这是本轮的核心改动。此前六个标题被做成占满整行的一行（accent 底色 + 自绘 chip），
-    站点从第二行才开始；用户要的是「和别的站点一样纯白背景，标题右边直接排站点」。
+    此前六个标题曾被做成占满整行的一行（accent 底色 + 自绘 chip），站点从第二行才
+    开始；用户要的是「和别的站点一样纯白背景，标题右边直接排站点」。
     """
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         palette = _laid_out(dlg, qt_app)
         order = _visual_order(palette)
         assert order[:6] == EXPECTED_GROUP_ORDER, f"标题不在最前面：{order[:8]}"
-        assert order[6:8] == ["DMM", "DMM_API"], f"标题后面没有紧接 DMM、DMM_API：{order[6:10]}"
-        # 「不留空」= 同一行：六个标题与 DMM、DMM_API 的行矩形 top 相同
-        title_top = palette.visualItemRect(palette.item(_title_rows(dlg)["有码"])).top()
-        for value in ("DMM", "DMM_API"):
-            assert palette.visualItemRect(palette.item(_row_of(dlg, value))).top() == title_top
+        assert order[6] == "7mmtv", f"标题后面没有紧接站点：{order[6:10]}"
+        # 「不留空」= 同一行：第一个标题与第一个站点行的行矩形 top 相同
+        title_rect = palette.visualItemRect(palette.item(_title_rows(dlg)["有码"]))
+        site_rect = palette.visualItemRect(palette.item(_row_of(dlg, "7mmtv")))
+        assert site_rect.top() == title_rect.top(), "站点被挤到了下一行，标题右边空了一块"
+    finally:
+        dlg.deleteLater()
+
+
+def test_no_item_carries_a_focus_ring(qt_app):
+    """第一个分组标题不能被圈起来（用户截图里就是它多了��圈边框）。
+
+    根因是 Qt 的两条默认行为：填列表时第一行会被设成当前项；且光标进入列表时若当前项
+    为空又会重新选中第一行。当前项带着聚焦框，于是第一个标题总比旁边的站点多一圈。
+    候选区不需要「当前项」，所以填完、聚焦后、点标题后都要保持没有当前项。
+    """
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        palette = _laid_out(dlg, qt_app)
+        assert palette.currentRow() == -1, f"开窗就有当前项：{palette.currentItem().text()}"
+        palette.setFocus()
+        qt_app.processEvents()
+        assert palette.currentRow() == -1, "一聚焦 Qt 就把当前项设成了第一行（那是第一个标题）"
+        _click_title(dlg, "有码")
+        assert palette.currentRow() == -1, "点了标题后它成了当前项，被套上聚焦框"
+        assert dlg.selected_sites(), "点标题本该整组加入（清当前项不该把功能一起清掉）"
+    finally:
+        dlg.deleteLater()
+
+
+def test_site_click_still_selects_while_no_current_item(qt_app):
+    """清掉当前项之后，站点行的单击照样能选中（用的是「选中」而不是「当前项」）。"""
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        palette = _laid_out(dlg, qt_app)
+        point = _visible_center(palette, _row_of(dlg, "7mmtv"))
+        QTest.mouseClick(palette.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
+        assert [palette.row(item) for item in palette.selectedItems()] == [_row_of(dlg, "7mmtv")]
+        dlg._add_selected()
+        assert dlg.selected_sites() == [Website.MMTV]
     finally:
         dlg.deleteLater()
 
@@ -545,13 +586,13 @@ def test_clicking_the_last_group_does_not_swallow_untitled_sites(qt_app):
 
 def test_clicking_group_title_appends_and_keeps_existing_order(qt_app):
     """已启用的站点留在原位不动，新组接在后面。"""
-    dlg = SiteListEditorDialog("t", [Website.GETCHU], ALL_SITES, None)
+    dlg = SiteListEditorDialog("t", [Website.XCITY], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
         _click_title(dlg, "FC2")
         values = [site.value for site in dlg.selected_sites()]
-        assert values[0] == "Getchu"
-        assert values[1:] == [v for v in USER_SITE_LISTS[FixedScrapingType.FC2] if v != "Getchu"]
+        assert values[0] == "Xcity"
+        assert values[1:] == USER_SITE_LISTS[FixedScrapingType.FC2]
     finally:
         dlg.deleteLater()
 
@@ -625,12 +666,12 @@ def test_add_selected_appends_in_selection_order(qt_app):
     """
     dlg = SiteListEditorDialog("t", [Website.XCITY, Website.DMM], ALL_SITES, None)
     try:
-        for value in ("Getchu", "7mmtv"):
+        for value in ("IQQTV", "7mmtv"):
             dlg.available_list.item(_row_of(dlg, value)).setSelected(True)
         dlg._add_selected()
         values = [site.value for site in dlg.selected_sites()]
         assert values[:2] == ["Xcity", "DMM"]
-        assert values[2:] == ["Getchu", "7mmtv"]
+        assert values[2:] == ["IQQTV", "7mmtv"]
     finally:
         dlg.deleteLater()
 
@@ -640,17 +681,24 @@ def test_add_all_uses_original_order_while_palette_stays_grouped(qt_app):
     dlg = SiteListEditorDialog("t", [], UNGROUPED_ORDER, None)
     try:
         dlg._add_all()
-        assert [site.value for site in dlg.selected_sites()] == ["DMM", "AVBase", "Xcity", "Getchu"]
+        assert [site.value for site in dlg.selected_sites()] == [
+            "DMM",
+            "AVBase",
+            "Xcity",
+            "AVSOX",
+            "Madouqu",
+            "ThepornDB",
+        ]
         # 候选区仍按各组自己的优先级序铺：四个站都属有码，故有码标题带的就是这四个的原序
         assert _groups_from_widget(dlg) == {
-            "有码": ["DMM", "AVBase", "Xcity", "Getchu"],
-            "无码": ["Getchu"],
-            "素人": ["DMM", "AVBase", "Xcity", "Getchu"],
-            "FC2": ["Getchu"],
-            "欧美": ["Getchu"],
-            "国产": ["Getchu"],
+            "有码": ["DMM", "AVBase", "Xcity"],
+            "无码": ["AVSOX"],
+            "素人": ["DMM", "AVBase", "Xcity"],
+            "FC2": ["AVSOX"],
+            "欧美": ["ThepornDB"],
+            "国产": ["Madouqu"],
         }
-        assert _site_row_values(dlg) == ["DMM", "AVBase", "Xcity", "Getchu"]
+        assert _site_row_values(dlg) == ["AVBase", "AVSOX", "DMM", "Madouqu", "ThepornDB", "Xcity"]
     finally:
         dlg.deleteLater()
 

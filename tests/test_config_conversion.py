@@ -174,8 +174,6 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.THEJAVDB_API,
         Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
-        Website.AVSEX,
-        Website.GETCHU,
     ]
     assert config.website_wuma == [
         Website.AVENTERTAINMENTS,
@@ -194,8 +192,6 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.LULUBAR,
         Website.MISSAV,
         Website.MISSAV_API,
-        Website.AVSEX,
-        Website.GETCHU,
     ]
     assert config.website_suren == [
         Website.DMM,
@@ -225,8 +221,6 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.THEJAVDB_API,
         Website.JAVLIBRARY_MIRROR,
         Website.JAVLIBRARY,
-        Website.AVSEX,
-        Website.GETCHU,
     ]
     # MyWife 由「指定网站」或路径含 MyWife 单独指定（file_crawler 走 website= 覆盖），
     # 不进任何类型组名单，素人组里不该有它。
@@ -245,8 +239,6 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.IQQTV,
         Website.MISSAV,
         Website.MISSAV_API,
-        Website.AVSEX,
-        Website.GETCHU,
     ]
     assert config.website_oumei == [
         Website.THEPORNDB,
@@ -261,13 +253,10 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.MISSAV_API,
         Website.IQQTV,
         Website.JAVFREE,
-        Website.AVSEX,
-        Website.GETCHU,
     ]
     assert config.website_guochan == [
         Website.MADOUQU,
         Website.MADOUCLUB,
-        Website.AVSEX,
         Website.JAVDB,
         Website.JAVDB_API,
         Website.JAVDB_APP,
@@ -278,7 +267,6 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.IQQTV,
         Website.MISSAV,
         Website.MISSAV_API,
-        Website.GETCHU,
     ]
     # Official 按番号前缀路由到片商官网，对国产/欧美/FC2 番号没有收录，
     # 加进这三组只会给每条影片白挂一次无效请求，故三组一律不含 Official。

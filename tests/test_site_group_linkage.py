@@ -84,7 +84,7 @@ def _drop_back(dialog, site):
 # --------------------------------------------------------------------- 组定义本身
 
 
-def test_site_groups_are_exactly_the_six_requested():
+def test_site_groups_are_exactly_the_requested_seven():
     assert [tuple(s.value for s in group) for group in SITE_GROUPS] == [
         ("DMM", "DMM_API", "LibreDMM"),
         ("MissAV", "MissAV_API"),
@@ -92,6 +92,8 @@ def test_site_groups_are_exactly_the_six_requested():
         ("ThepornDB", "AVheat"),
         ("JavDB", "JavDB_API", "JavDB_APP"),
         ("Madouqu", "Madou.club"),
+        # 原站与镜像站是同一份数据的两条通道，只勾一条不如两条都留（用户要求）
+        ("JavLibrary", "Javlibrary\u00b7\u955c\u50cf"),
     ]
 
 
@@ -134,6 +136,37 @@ def test_reselecting_an_enabled_site_does_not_pull_the_group(qt_app):
     values = _values(dlg.selected_list)
     assert values == ["DMM"]
     assert values.count("DMM") == 1
+
+
+@pytest.mark.parametrize(
+    "trigger", [Website.JAVLIBRARY, Website.JAVLIBRARY_MIRROR], ids=["JavLibrary", "Javlibrary-mirror"]
+)
+def test_javlibrary_and_its_mirror_pull_in_each_other(qt_app, trigger):
+    """原站与镜像站互为联动：加入其一时自动带上另一条（用户要求）。
+
+    两条通道指向同一份数据，只勾一条等于把另一条可达的路堵上；且原站对大陆 IP 有
+    CF 墙、镜像没有，两条都留着刮削时哪条通走哪条。
+    """
+    dlg, _ = _editor(qt_app, [])
+    row = next(
+        r
+        for r in range(dlg.available_list.count())
+        if dlg.available_list.item(r).data(Qt.ItemDataRole.UserRole) == trigger.value
+    )
+    dlg.available_list.item(row).setSelected(True)
+    dlg._add_selected()
+    assert set(dlg.selected_sites()) == {Website.JAVLIBRARY, Website.JAVLIBRARY_MIRROR}
+    # 反向：只留原站时，加镜像不会把已启用的原站再加一遍
+    dlg2, _ = _editor(qt_app, [Website.JAVLIBRARY])
+    row2 = next(
+        r
+        for r in range(dlg2.available_list.count())
+        if dlg2.available_list.item(r).data(Qt.ItemDataRole.UserRole) == Website.JAVLIBRARY_MIRROR.value
+    )
+    dlg2.available_list.item(row2).setSelected(True)
+    dlg2._add_selected()
+    values = _values(dlg2.selected_list)
+    assert values.count("JavLibrary") == 1 and Website.JAVLIBRARY_MIRROR.value in values
 
 
 # -------------------------------------------------------------------- 移动整组同行
