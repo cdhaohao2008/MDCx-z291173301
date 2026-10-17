@@ -133,6 +133,10 @@
   - 各站探测番号与收录依据见爬虫类注释；javdb 仅搜 FC2 需要 Cookie。
   - 站点 API 坑：missav_api Recombee 仅 POST；DMM Affiliate v3 必需 site/service/floor 且 keyword 用 content_id 形态；madouqu 域名动态维护（24h 缓存）；madou_club 番号无横杠；parsel Selector.get() 纯 JSON 返回 dict，解析兼容 str/dict/Selector 三态。
   - 站点增删史：2026-08 删 15 站（48→33），后增 javfree/aventertainments/madou_club、getchu_dmm 并入 getchu、7mmtv 回归；**当前注册爬虫 36**（Features.md 同步）。数字开头模块名（7mmtv.py）用 `importlib.import_module` 加载。
+  - **站点收录边界**（默认名单只收「该站确实能查到该类型条目」的站，加错了只会给每条影片白挂一次请求）：
+    `AVEntertainments` 只有无码番号（正規無修正 DVD 販売/配信商城），2.5.6 起只留在无码组；
+    `Getchu` / `AVSEX` 对大陆 IP 过不了 CF 墙，第三方工具也过不了，2.5.6 起从六组全部移除；
+    `Official` 只在有码/无码/素人（按番号前缀路由到片商官网，国产/欧美/FC2 没有收录）。
   - 无码官网五站由 official_uncensored.py 统一路由，均需代理；1pondo/pacopacomama/10musume 的 dyn/phpauto JSON API 直通。
   - 被墙站测试：`uv run python -m scripts.dev_proxy start|status|test <url>|stop`；日本 IP 限制站 `--port 7891 --regions "jp|日本"`。devbox 限制：超时≠站点死亡；连通性验证必须 curl_cffi impersonate；批量探测校验 data.title 防假阳性。
   - **HTTP 4xx/5xx 错误串必须携带截断响应体**（#88：Emby 400 根因在 body JSON），保留 `"HTTP {status}"` 前缀不破坏匹配；定位顺序先看客户端实际发了什么。

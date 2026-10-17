@@ -181,10 +181,10 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
         _shown(dlg)
         palette = dlg.available_list
         texts = _right_click(palette, _title_center(palette, "有码"), monkeypatch, "复制本组")
-        assert texts == ["复制本组：29个站点", "", "复制列表：39个站点"]
+        assert texts == ["复制本组：28个站点", "", "复制列表：39个站点"]
         copied = app.clipboard().text().split(",")
         assert copied[:3] == ["DMM", "DMM_API", "LibreDMM"]
-        assert len(copied) == 29 == len(set(copied))
+        assert len(copied) == 28 == len(set(copied))
         # 别的组才有的站点不能混进来（MyWife 不属于任何一组）
         assert "MyWife" not in copied and "Madouqu" not in copied
         assert _parse_sites(app.clipboard().text()) == _group_at(palette, "有码")
@@ -194,7 +194,7 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
 
 @pytest.mark.parametrize(
     ("title", "count"),
-    [("有码", 29), ("无码", 16), ("素人", 27), ("FC2", 13), ("欧美", 12), ("国产", 12)],
+    [("有码", 28), ("无码", 16), ("素人", 26), ("FC2", 13), ("欧美", 12), ("国产", 12)],
 )
 def test_each_group_title_copies_its_own_list(qt_app, monkeypatch, title, count):
     """六个标题各自复制各自那份名单，互不相等，也不会复制成 39 站。"""

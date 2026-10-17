@@ -12,11 +12,10 @@ MDCx 刮削网站类型汇总表
 ################################################################################################################
 
 ================================================================================================================
-【有码（含码 / 马赛克）】  合计 29 站   （官网 12 + 第三方 17）
+【有码（含码 / 马赛克）】  合计 28 站   （官网 12 + 第三方 16）
 ================================================================================================================
   ── 官网 / 厂牌 / 官方接口 (12) ──
     AVBase            https://www.avbase.net            FANZA/MGS/DUGA 50 万+ 作品名寄せ库，纯日系，无欧美/FC2/国产
-    AVEntertainments  https://www.aventertainments.com  AV 安态。「正規無修正」DVD 販売 / 配信
     Dahlia            https://dahlia-av.jp              DAHLIA 厂牌官网。番号前缀 DLDSS 自动锁定本站
     DMM                                                 FANZA/DMM 本体。有码主体，站内含「素人」品牌区（SOD はめちゃん 等）
     DMM_API           https://api.dmm.com               FANZA 官方 Web API（api.dmm.com）
@@ -27,7 +26,7 @@ MDCx 刮削网站类型汇总表
     Prestige          https://www.prestige-av.com       PRESTIGE 厂牌官网。MDCx 站点描述「有码+素人」
     Xcity             https://tc.xcity.jp               XCITY 日系有码综合会员站（JS 渲染，导航不可读）
 
-  ── 第三方 / 聚合站 (17) ──
+  ── 第三方 / 聚合站 (16) ──
     7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     Airav.cc          https://airav.io                  airav.io。分类磁贴含 素人 / 無碼，按分类切换有码/无码
     AVMOO             https://avmoo.shop                「AVMOO - 你的线上日本成人影片情报站」，纯日系有码
@@ -71,11 +70,10 @@ MDCx 刮削网站类型汇总表
     Missav_API        https://missav.ws                 Missav 接口实现（fourhoi.com）
 
 ================================================================================================================
-【素人（amateur / 人妻熟女）】  合计 27 站   （官网 10 + 第三方 17）
+【素人（amateur / 人妻熟女）】  合计 26 站   （官网 10 + 第三方 16）
 ================================================================================================================
   ── 官网 / 厂牌 / 官方接口 (10) ──
     AVBase            https://www.avbase.net            FANZA/MGS/DUGA 50 万+ 作品名寄せ库，纯日系，无欧美/FC2/国产
-    AVEntertainments  https://www.aventertainments.com  AV 安态。「正規無修正」DVD 販売 / 配信
     DMM                                                 FANZA/DMM 本体。有码主体，站内含「素人」品牌区（SOD はめちゃん 等）
     DMM_API           https://api.dmm.com               FANZA 官方 Web API（api.dmm.com）
     LibreDMM          https://www.libredmm.com          LibreFanza，DMM/FANZA 开源镜像
@@ -84,7 +82,7 @@ MDCx 刮削网站类型汇总表
     Prestige          https://www.prestige-av.com       PRESTIGE 厂牌官网。MDCx 站点描述「有码+素人」
     Xcity             https://tc.xcity.jp               XCITY 日系有码综合会员站（JS 渲染，导航不可读）
 
-  ── 第三方 / 聚合站 (17) ──
+  ── 第三方 / 聚合站 (16) ──
     7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     Airav.cc          https://airav.io                  airav.io。分类磁贴含 素人 / 無碼，按分类切换有码/无码
     AVMOO             https://avmoo.shop                「AVMOO - 你的线上日本成人影片情报站」，纯日系有码
