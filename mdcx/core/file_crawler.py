@@ -453,18 +453,12 @@ class FileScraper:
 
         # 按字段分别处理，每个字段按优先级尝试获取
         #
-        # 站点级失败【不在此永久放弃】：一次失败不等于次次失败——超时、被拦截、
-        # 响应解析失败、请求异常都可能是瞬时的（网络抖动、站点限流、CDN 抖动），
-        # 旧实现把 failed 的站点在所有后续字段里一律 continue，导致某一字段偶发失败
-        # 就让该站对【所有】字段彻底失声。故改为：命中 failed 的站点在本字段重试，
-        # 重试成功即写入 all_res，后续字段全部命中缓存、不再产生任何请求。
-        # 只重试一次的代价远小于把整站字段全部丢失。
-        #
-        # 失败行仍站点级去重（议题 #55）：逐字段重试若每次都打一行，会把当初消掉的
-        # 噪声重新炸开（同一文件内 20+ 行重复标记）。每站点上限 3 行——首败 1 行
-        # （带原因与重试声明）、「重试仍失败」1 行、更深的重试静默计数。
-        failed_notified: set[Website] = set()
-        retry_failed_notified: set[Website] = set()
+        # 失败不否定整个站点：一次失败不等于次次失败——超时、被拦截、响应解析失败、
+        # 请求异常都可能是瞬时的（网络抖动、站点限流、CDN 抖动），一次抖动就让该站对
+        # 【所有】字段永久失声是错的。故命中 failed 的站点在本字段照常重试，重试成功
+        # 即写入 all_res，后续字段全部命中缓存、不再产生任何请求（重试代价只付一次）。
+        # 同理，每次重试都如实记一行——重试本身就是需要被看见的行为，静默只会在用户
+        # 排查「这站怎么一直没数据」时把人引向错误结论。
         retry_attempts: dict[Website, int] = {}
 
         def _failure_reason_text(site: Website) -> str:
@@ -480,19 +474,14 @@ class FileScraper:
             }
             return f"，原因: {reason_map.get(fr[0], '请求异常')}"
 
-        def _note_retry_outcome(site: Website, is_retry: bool, failure_detail: str = "") -> None:
-            """记录本次尝试的结果；重试行同样站点级去重（见上方说明）。"""
+        def _note_attempt_failed(site: Website, is_retry: bool, first_try_detail: str) -> None:
+            """记录本次尝试的失败。首次请求打原始细节，重试打第 N 次 + 归类原因。"""
             if not is_retry:
-                reduced.field_log += f"\n    🔴 {site:<15} ({failure_detail})"
-                # 首次在字段循环里失败即登记，后续字段改用「本字段起逐字段重试」口径
-                failed_notified.add(site)
+                reduced.field_log += f"\n    🔴 {site:<15} ({first_try_detail})"
                 return
             retry_attempts[site] = retry_attempts.get(site, 0) + 1
-            if site in retry_failed_notified:
-                return  # 更深的重试静默，只计数
-            retry_failed_notified.add(site)
             reduced.field_log += (
-                f"\n    🔴 {site:<15} (重试仍失败: {failure_detail}, 继续重试，已重试 {retry_attempts[site]} 次)"
+                f"\n    🔴 {site:<15} (重试第 {retry_attempts[site]} 次仍失败{_failure_reason_text(site)})"
             )
 
         for field in ManualConfig.REDUCED_FIELDS:
@@ -533,11 +522,6 @@ class FileScraper:
                     # 命中 failed 不再直接放弃：改走下方同一段请求逻辑重试。
                     # 预取批已把该站标记为失败，这里是第 1 次重试。
                     is_retry = key in failed
-                    if is_retry and site not in failed_notified:
-                        failed_notified.add(site)
-                        reduced.field_log += (
-                            f"\n    🔴 {site:<15} (已失败{_failure_reason_text(site)}, 本字段起逐字段重试)"
-                        )
                     # 如果网站数据尚未请求，则进行请求（首次请求或失败重试，同一段逻辑）
                     try:
                         ti = _dc_replace(task_input, language=f_lang, org_language=f_lang)
@@ -568,12 +552,12 @@ class FileScraper:
                                 f"\n    🟢 {site:<15} (第 {retry_attempts[site]} 次重试成功，已恢复供后续字段使用)"
                             )
                     except TimeoutError:
-                        _note_retry_outcome(site, is_retry, "请求超时")
+                        _note_attempt_failed(site, is_retry, "请求超时")
                         failure_reasons.setdefault(site, (FailureReason.TIMEOUT, "请求超时"))
                         failed.add(key)
                         continue
                     except Exception as e:
-                        _note_retry_outcome(site, is_retry, f"失败: {e!s}")
+                        _note_attempt_failed(site, is_retry, f"失败: {e!s}")
                         failure_reasons.setdefault(
                             site, (FailureReason.classify(e), str(e).strip() or e.__class__.__name__)
                         )

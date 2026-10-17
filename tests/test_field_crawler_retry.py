@@ -1,13 +1,13 @@
-"""同番号失败级联的日志降噪回归测试（field_log 站点级去重）。
+"""失败站点逐字段重试的回归测试。
 
-背景（议题 #55 报告人日志实证，2026-08-29）：字段循环里对每个已失败
-站点按【字段×站点】重复追加 "(已失败, 跳过)"——66 个失败文件的会话
-产生 9400 行重复标记（每文件平均 142 行，"dmm 已失败"在同一文件内
-重复 20+ 次，信息量趋近零），单次会话 5.5 万行日志中约 1.7 万行是
-此类噪声 + 优先级装饰行。
+核心主张：**失败不否定整个站点**。一次请求失败（超时/被拦截/响应解析失败/
+请求异常）只说明【那一次】请求失败，不说明该站对后续字段也不可用——超时、
+限流、CDN 抖动都是瞬时的。故命中 failed 的站点在每个字段照常重试，重试成功
+即恢复供后续字段使用；每次重试也如实记一行，静默只会把用户引向错误结论。
 
-修复：file_crawler 字段循环里失败站点标记改为站点级去重——每站点
-的失败信息只记一次，后续字段静默跳过。
+历史背景（保留以说明为何曾有过相反设计）：2026-08 曾把失败标记做成站点级
+去重 + 后续字段静默跳过，理由是「同一文件内 140+ 行重复标记」。该权衡现已
+被用户明确否决——日志冗余的代价远小于整站字段被一次抖动打掉。
 """
 
 import pytest
@@ -93,8 +93,8 @@ class _FlakyCrawlerProvider:
         return self._crawler
 
 
-async def test_failed_site_marked_once_across_fields(monkeypatch: pytest.MonkeyPatch):
-    """核心断言：javbus 失败后，4 个字段的循环里失败标记只出现 1 次。"""
+async def test_failed_site_retried_and_logged_for_every_field(monkeypatch: pytest.MonkeyPatch):
+    """核心断言：javbus 失败后 4 个字段各重试一次，且每次都如实记一行（不再静默跳过）。"""
     monkeypatch.setattr(
         ManualConfig,
         "REDUCED_FIELDS",
@@ -106,33 +106,34 @@ async def test_failed_site_marked_once_across_fields(monkeypatch: pytest.MonkeyP
         ),
     )
 
-    # javdb 只有 title/outline；series/studio 无值——这两个字段会轮询到
-    # javbus 并触发"已失败跳过"路径（这正是噪声场景：字段轮到失败站点）
-    javdb_data = CrawlerResult.empty()
-    javdb_data.source = "JavDB"
-    javdb_data.title = "标题"
-    javdb_data.outline = "简介"
+    calls: list[Website] = []
+    ok_data = _build_result(Website.AVBASE, "存活站的标题")
 
-    provider = _FakeCrawlerProvider(
-        {
-            Website.JAVDB: javdb_data,
-            Website.JAVBUS: (None, RuntimeError("搜索结果: 未匹配到番号！")),
-        }
-    )
-    scraper = FileScraper(_MixedFieldConfig(), provider)
+    class _OneFlakyOneAlive:
+        """JAVBUS 持续超时；AVBASE 正常返回（让整体结果非 None，才能检查 field_log）。"""
+
+        async def get(self, site: Website):
+            if site is Website.AVBASE:
+                return _StaticCrawler(ok_data)
+            return _FlakyCrawler(Website.JAVBUS, calls, None, fail_times=999)
+
+    scraper = FileScraper(_RetryConfig([Website.JAVBUS, Website.AVBASE]), _OneFlakyOneAlive())
     task_input = CrawlerInput.empty()
     task_input.number = "TEST-55"
 
-    result = await scraper._call_crawlers(task_input, {Website.JAVDB, Website.JAVBUS})
+    result = await scraper._call_crawlers(task_input, {Website.JAVBUS, Website.AVBASE})
 
-    assert result is not None, "javdb 成功提供 4 字段，应部分成功"
-    # 数失败标记行（"(已失败" 行），非字符串总出现——优先级行也含站名
-    marks = result.field_log.count("(已失败")
-    assert marks == 1, f"javbus 的失败标记应只记 1 次（站点级去重），实际 {marks} 次。\nfield_log:\n{result.field_log}"
+    assert result is not None, "存活站应让整体结果非 None，才能检查 field_log"
+    # 预取 1 次 + 4 个字段各 1 次 = 5 次，证明每个字段都重试了（未被永久跳过）
+    assert len(calls) == 5, f"应逐字段重试（预取1+字段4），实际 {len(calls)} 次。\ncalls: {calls}"
+    # 每次重试都记一行，序号递增——重试是被要求看见的行为
+    for n in range(1, 5):
+        assert f"重试第 {n} 次仍失败" in result.field_log, f"第 {n} 次重试未记日志。\n{result.field_log}"
+    assert result.field_log.count("重试第") == 4, result.field_log
 
 
-async def test_failed_site_dedup_still_names_every_site(monkeypatch: pytest.MonkeyPatch):
-    """去重不丢信息：两个失败站点各记一次，且新文案点明『本字段起逐字段重试』。"""
+async def test_every_failed_site_is_retried_and_named(monkeypatch: pytest.MonkeyPatch):
+    """两个失败站点都被重试、都被点名，且旧的『后续字段将跳过该站』文案已消失。"""
     monkeypatch.setattr(
         ManualConfig,
         "REDUCED_FIELDS",
@@ -160,10 +161,9 @@ async def test_failed_site_dedup_still_names_every_site(monkeypatch: pytest.Monk
     result = await scraper._call_crawlers(task_input, {Website.JAVDB, Website.JAVBUS, Website.AVBASE})
 
     assert result is not None
-    # 每个失败站点恰好各 1 行，且带重试说明
-    assert result.field_log.count("(已失败") == 2
+    # TITLE 由 JAVDB 命中即 break；OUTLINE 时 JAVDB 无值，才轮到两个失败站各重试一次
+    assert result.field_log.count("重试第") == 2, result.field_log
     assert "JavBus" in result.field_log and "AVBase" in result.field_log
-    assert "本字段起逐字段重试" in result.field_log
     # 旧文案「后续字段将跳过该站」必须彻底消失，否则用户会以为站点被永久拉黑
     assert "后续字段将跳过" not in result.field_log
 
@@ -203,51 +203,11 @@ async def test_retried_site_recovered_after_transient_failure(monkeypatch: pytes
     assert "重试成功" in result.field_log
 
 
-async def test_persistently_failing_site_retried_each_field_but_log_stays_bounded(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    """持续失败的站仍逐字段重试（不静默拉黑），但日志每站最多 2 行（议题 #55 不反弹）。"""
-    monkeypatch.setattr(
-        ManualConfig,
-        "REDUCED_FIELDS",
-        (
-            CrawlerResultFields.TITLE,
-            CrawlerResultFields.OUTLINE,
-            CrawlerResultFields.SERIES,
-            CrawlerResultFields.STUDIO,
-        ),
-    )
-
-    calls: list[Website] = []
-    ok_data = _build_result(Website.AVBASE, "存活站的标题")
-
-    class _OneFlakyOneAlive:
-        """JAVBUS 持续超时；AVBASE 正常返回（让整体结果非 None，才能检查 field_log）。"""
-
-        async def get(self, site: Website):
-            if site is Website.AVBASE:
-                return _StaticCrawler(ok_data)
-            return _FlakyCrawler(Website.JAVBUS, calls, None, fail_times=999)
-
-    scraper = FileScraper(_RetryConfig([Website.JAVBUS, Website.AVBASE]), _OneFlakyOneAlive())
-    task_input = CrawlerInput.empty()
-    task_input.number = "TEST-RETRY-2"
-
-    result = await scraper._call_crawlers(task_input, {Website.JAVBUS, Website.AVBASE})
-
-    assert result is not None, "存活站应让整体结果非 None，才能检查 field_log"
-    # 预取 1 次 + 4 个字段各 1 次 = 5 次，证明每个字段都重试了
-    assert len(calls) == 5, f"应逐字段重试（预取1+字段4），实际 {len(calls)} 次"
-    # 日志有界：首败 1 行 + 「重试仍失败」1 行 = 2 行，不随字段数线性膨胀
-    assert result.field_log.count("(已失败") == 1, result.field_log
-    assert result.field_log.count("(重试仍失败") == 1, result.field_log
-
-
 async def test_failed_site_mark_includes_cause(monkeypatch: pytest.MonkeyPatch):
     """议题 #101：失败标记必须区分失败类因——「请求超时/被拦截/解析失败/请求异常」。
 
-    用户把「AVBase/TheJavDB_API/javdb_app 已失败，后续字段将跳过该站」误解为
-    逻辑 bug，实际是这些站在其网络下请求级失败。标注原因后一眼可分辨。
+    用户曾把「AVBase/TheJavDB_API/javdb_app 已失败」误解为逻辑 bug，实际是这些站
+    在其网络下请求级失败。标注原因后一眼可分辨，且重试行也必须带上原因。
     """
     monkeypatch.setattr(
         ManualConfig,
@@ -276,7 +236,8 @@ async def test_failed_site_mark_includes_cause(monkeypatch: pytest.MonkeyPatch):
 
     result = await scraper._call_crawlers(task_input, {Website.AVBASE, Website.JAVDB, Website.JAVBUS})
     assert result is not None
-    assert result.field_log.count("(已失败") == 2
+    # AVBASE 排在最前且 TITLE 命中即 break，故只有 OUTLINE 字段会轮到两个失败站重试
+    assert result.field_log.count("重试第") == 2, result.field_log
     # 两个失败的类因明确标注
     assert "原因: 请求超时" in result.field_log
     assert "原因: 被站点拦截" in result.field_log
