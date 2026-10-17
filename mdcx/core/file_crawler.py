@@ -452,11 +452,49 @@ class FileScraper:
                         task.exception()
 
         # 按字段分别处理，每个字段按优先级尝试获取
-        # 站点级失败去重：同一站点的失败信息在 field_log 只记一次。
-        # 旧实现每字段重复一行 "(已失败, 跳过)"，实测单文件可累积
-        # 140+ 行重复标记（66 个失败文件的会话产生 9400 行噪声，
-        # 议题 #55 报告日志实证），信息量趋近于零。
+        #
+        # 站点级失败【不在此永久放弃】：一次失败不等于次次失败——超时、被拦截、
+        # 响应解析失败、请求异常都可能是瞬时的（网络抖动、站点限流、CDN 抖动），
+        # 旧实现把 failed 的站点在所有后续字段里一律 continue，导致某一字段偶发失败
+        # 就让该站对【所有】字段彻底失声。故改为：命中 failed 的站点在本字段重试，
+        # 重试成功即写入 all_res，后续字段全部命中缓存、不再产生任何请求。
+        # 只重试一次的代价远小于把整站字段全部丢失。
+        #
+        # 失败行仍站点级去重（议题 #55）：逐字段重试若每次都打一行，会把当初消掉的
+        # 噪声重新炸开（同一文件内 20+ 行重复标记）。每站点上限 3 行——首败 1 行
+        # （带原因与重试声明）、「重试仍失败」1 行、更深的重试静默计数。
         failed_notified: set[Website] = set()
+        retry_failed_notified: set[Website] = set()
+        retry_attempts: dict[Website, int] = {}
+
+        def _failure_reason_text(site: Website) -> str:
+            """议题 #101：标注失败类因，让用户分辨"站点连不上/被拦截"与"逻辑问题"。"""
+            if (fr := failure_reasons.get(site)) is None:
+                return ""
+            reason_map = {
+                FailureReason.TIMEOUT: "请求超时",
+                FailureReason.BLOCKED: "被站点拦截",
+                FailureReason.NOT_FOUND: "未收录该番号",
+                FailureReason.PARSE_ERROR: "响应解析失败",
+                FailureReason.UNKNOWN: "请求异常",
+            }
+            return f"，原因: {reason_map.get(fr[0], '请求异常')}"
+
+        def _note_retry_outcome(site: Website, is_retry: bool, failure_detail: str = "") -> None:
+            """记录本次尝试的结果；重试行同样站点级去重（见上方说明）。"""
+            if not is_retry:
+                reduced.field_log += f"\n    🔴 {site:<15} ({failure_detail})"
+                # 首次在字段循环里失败即登记，后续字段改用「本字段起逐字段重试」口径
+                failed_notified.add(site)
+                return
+            retry_attempts[site] = retry_attempts.get(site, 0) + 1
+            if site in retry_failed_notified:
+                return  # 更深的重试静默，只计数
+            retry_failed_notified.add(site)
+            reduced.field_log += (
+                f"\n    🔴 {site:<15} (重试仍失败: {failure_detail}, 继续重试，已重试 {retry_attempts[site]} 次)"
+            )
+
         for field in ManualConfig.REDUCED_FIELDS:
             # 获取该字段的优先级列表
             f_config = self.config.get_field_config(field)
@@ -488,28 +526,19 @@ class FileScraper:
                 if site not in MULTI_LANGUAGE_WEBSITES:
                     key = (site, Language.UNDEFINED)
 
-                # 如果已有该网站数据，直接使用
+                # 如果已有该网站数据，直接使用；否则发起请求（含对已失败站点的重试）
                 if key in all_res:
                     site_data = all_res[key]
-                elif key in failed:
-                    # 不再请求已失败的网站；失败信息站点级去重（见 failed_notified 说明）
-                    if site not in failed_notified:
-                        failed_notified.add(site)
-                        # 议题 #101：标注失败类因，让用户分辨"站点连不上/被拦截"与"逻辑问题"
-                        reason_text = ""
-                        if (fr := failure_reasons.get(site)) is not None:
-                            reason_map = {
-                                FailureReason.TIMEOUT: "请求超时",
-                                FailureReason.BLOCKED: "被站点拦截",
-                                FailureReason.NOT_FOUND: "未收录该番号",
-                                FailureReason.PARSE_ERROR: "响应解析失败",
-                                FailureReason.UNKNOWN: "请求异常",
-                            }
-                            reason_text = f"，原因: {reason_map.get(fr[0], '请求异常')}"
-                        reduced.field_log += f"\n    🔴 {site:<15} (已失败{reason_text}, 后续字段将跳过该站)"
-                    continue
                 else:
-                    # 如果网站数据尚未请求，则进行请求
+                    # 命中 failed 不再直接放弃：改走下方同一段请求逻辑重试。
+                    # 预取批已把该站标记为失败，这里是第 1 次重试。
+                    is_retry = key in failed
+                    if is_retry and site not in failed_notified:
+                        failed_notified.add(site)
+                        reduced.field_log += (
+                            f"\n    🔴 {site:<15} (已失败{_failure_reason_text(site)}, 本字段起逐字段重试)"
+                        )
+                    # 如果网站数据尚未请求，则进行请求（首次请求或失败重试，同一段逻辑）
                     try:
                         ti = _dc_replace(task_input, language=f_lang, org_language=f_lang)
                         if site in MULTI_LANGUAGE_WEBSITES and key[1] == Language.UNDEFINED:
@@ -520,7 +549,7 @@ class FileScraper:
                             if e := web_data.debug_info.error:
                                 raise e
                             # 议题 #90：请求成功但未收录该条目 ≠ 站点不可用。不加入 failed，
-                            # 该站点后续字段仍可重试；仅站点级失败（超时/请求异常）才跳过。
+                            # 该站点后续字段仍可重试；仅站点级失败（超时/请求异常）也照常重试。
                             reduced.field_log += f"\n    🔴 {site:<15} (未收录该条目, 保留供后续字段重试)"
                             continue
                         site_data = web_data.data
@@ -529,13 +558,22 @@ class FileScraper:
                         # 多语言网站, 如果 undefined 尚不存在, 也使用当前语言数据
                         if site in MULTI_LANGUAGE_WEBSITES and (site, Language.UNDEFINED) not in all_res:
                             all_res[(site, Language.UNDEFINED)] = web_data.data
+                        if is_retry:
+                            # 重试成功：摘掉失败标记，后续字段直接命中 all_res 缓存
+                            failed.discard(key)
+                            failed.discard((site, Language.UNDEFINED))
+                            failure_reasons.pop(site, None)
+                            retry_attempts[site] = retry_attempts.get(site, 0) + 1
+                            reduced.field_log += (
+                                f"\n    🟢 {site:<15} (第 {retry_attempts[site]} 次重试成功，已恢复供后续字段使用)"
+                            )
                     except TimeoutError:
-                        reduced.field_log += f"\n    🔴 {site:<15} (请求超时)"
+                        _note_retry_outcome(site, is_retry, "请求超时")
                         failure_reasons.setdefault(site, (FailureReason.TIMEOUT, "请求超时"))
                         failed.add(key)
                         continue
                     except Exception as e:
-                        reduced.field_log += f"\n    🔴 {site:<15} (失败: {e!s})"
+                        _note_retry_outcome(site, is_retry, f"失败: {e!s}")
                         failure_reasons.setdefault(
                             site, (FailureReason.classify(e), str(e).strip() or e.__class__.__name__)
                         )

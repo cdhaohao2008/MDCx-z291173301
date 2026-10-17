@@ -18,7 +18,9 @@ from mdcx.core.file_crawler import FileScraper
 from mdcx.gen.field_enums import CrawlerResultFields
 from mdcx.manual import ManualConfig
 from mdcx.models.model_types import (
+    CrawlerDebugInfo,
     CrawlerInput,
+    CrawlerResponse,
     CrawlerResult,
 )
 from tests.test_file_crawler_runtime import (
@@ -42,6 +44,53 @@ class _MixedFieldConfig(_FakeConfig):
         ):
             return FieldConfig(site_prority=[Website.JAVDB, Website.JAVBUS])
         return FieldConfig(site_prority=[])
+
+
+class _RetryConfig(_FakeConfig):
+    """四字段都用同一站，考察该站失败后的逐字段重试行为。"""
+
+    def __init__(self, sites: list[Website] | None = None):
+        self._sites = sites or [Website.JAVBUS]
+
+    def get_field_config(self, field: CrawlerResultFields) -> FieldConfig:
+        return FieldConfig(site_prority=list(self._sites))
+
+
+class _FlakyCrawler:
+    """前 fail_times 次抛瞬时异常，之后返回 data（用于验证重试可恢复）。"""
+
+    def __init__(self, site: Website, records: list[Website], data, fail_times: int):
+        self._site = site
+        self._records = records
+        self._data = data
+        self._fail_times = fail_times
+
+    async def run(self, task_input):
+        self._records.append(self._site)
+        if len(self._records) <= self._fail_times:
+            raise TimeoutError("read timed out")
+        return CrawlerResponse(
+            debug_info=CrawlerDebugInfo(execution_time=0.01),
+            data=self._data,
+        )
+
+
+class _StaticCrawler:
+    """恒定返回同一份数据、不记录调用。"""
+
+    def __init__(self, data):
+        self._data = data
+
+    async def run(self, task_input):
+        return CrawlerResponse(debug_info=CrawlerDebugInfo(execution_time=0.01), data=self._data)
+
+
+class _FlakyCrawlerProvider:
+    def __init__(self, site: Website, records: list[Website], data, fail_times: int):
+        self._crawler = _FlakyCrawler(site, records, data, fail_times)
+
+    async def get(self, site: Website):
+        return self._crawler
 
 
 async def test_failed_site_marked_once_across_fields(monkeypatch: pytest.MonkeyPatch):
@@ -83,7 +132,7 @@ async def test_failed_site_marked_once_across_fields(monkeypatch: pytest.MonkeyP
 
 
 async def test_failed_site_dedup_still_names_every_site(monkeypatch: pytest.MonkeyPatch):
-    """去重不丢信息：两个失败站点各记一次，且新文案点明『后续字段将跳过』。"""
+    """去重不丢信息：两个失败站点各记一次，且新文案点明『本字段起逐字段重试』。"""
     monkeypatch.setattr(
         ManualConfig,
         "REDUCED_FIELDS",
@@ -111,10 +160,87 @@ async def test_failed_site_dedup_still_names_every_site(monkeypatch: pytest.Monk
     result = await scraper._call_crawlers(task_input, {Website.JAVDB, Website.JAVBUS, Website.AVBASE})
 
     assert result is not None
-    # 每个失败站点恰好各 1 行，且带后续跳过说明
+    # 每个失败站点恰好各 1 行，且带重试说明
     assert result.field_log.count("(已失败") == 2
     assert "JavBus" in result.field_log and "AVBase" in result.field_log
-    assert "后续字段将跳过" in result.field_log
+    assert "本字段起逐字段重试" in result.field_log
+    # 旧文案「后续字段将跳过该站」必须彻底消失，否则用户会以为站点被永久拉黑
+    assert "后续字段将跳过" not in result.field_log
+
+
+async def test_retried_site_recovered_after_transient_failure(monkeypatch: pytest.MonkeyPatch):
+    """核心回归：站点首败后必须被重试，重试成功即恢复，不得因一次失败永久失声。
+
+    用户诉求（2026-10-17）：「一次失败又不是次次会失败」——超时/被拦截/解析失败
+    都是瞬时的，旧实现把 failed 站点在所有后续字段一律跳过，一字段偶发失败就让
+    该站对所有字段彻底失声。
+    """
+    monkeypatch.setattr(
+        ManualConfig,
+        "REDUCED_FIELDS",
+        (CrawlerResultFields.TITLE, CrawlerResultFields.ACTORS),
+    )
+
+    calls: list[Website] = []
+    # 第 1 次（预取并发批）失败，第 2 次（TITLE 字段重试）成功
+    flaky_data = CrawlerResult.empty()
+    flaky_data.title = "恢复后的标题"
+    flaky_data.actors = ["恢复后的演员"]
+
+    provider = _FlakyCrawlerProvider(Website.JAVBUS, calls, flaky_data, fail_times=1)
+    scraper = FileScraper(_RetryConfig(), provider)
+    task_input = CrawlerInput.empty()
+    task_input.number = "TEST-RETRY"
+
+    result = await scraper._call_crawlers(task_input, {Website.JAVBUS})
+
+    assert result is not None
+    # 预取失败后又请求了 1 次 = 该站没有被「一次失败即永久跳过」
+    assert len(calls) == 2, f"失败站点未按字段重试: {calls}"
+    # 重试成功后恢复：该站补上的 title 被采用，后续 ACTORS 字段命中缓存
+    assert result.title == "恢复后的标题"
+    assert result.actors == ["恢复后的演员"]
+    assert "重试成功" in result.field_log
+
+
+async def test_persistently_failing_site_retried_each_field_but_log_stays_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """持续失败的站仍逐字段重试（不静默拉黑），但日志每站最多 2 行（议题 #55 不反弹）。"""
+    monkeypatch.setattr(
+        ManualConfig,
+        "REDUCED_FIELDS",
+        (
+            CrawlerResultFields.TITLE,
+            CrawlerResultFields.OUTLINE,
+            CrawlerResultFields.SERIES,
+            CrawlerResultFields.STUDIO,
+        ),
+    )
+
+    calls: list[Website] = []
+    ok_data = _build_result(Website.AVBASE, "存活站的标题")
+
+    class _OneFlakyOneAlive:
+        """JAVBUS 持续超时；AVBASE 正常返回（让整体结果非 None，才能检查 field_log）。"""
+
+        async def get(self, site: Website):
+            if site is Website.AVBASE:
+                return _StaticCrawler(ok_data)
+            return _FlakyCrawler(Website.JAVBUS, calls, None, fail_times=999)
+
+    scraper = FileScraper(_RetryConfig([Website.JAVBUS, Website.AVBASE]), _OneFlakyOneAlive())
+    task_input = CrawlerInput.empty()
+    task_input.number = "TEST-RETRY-2"
+
+    result = await scraper._call_crawlers(task_input, {Website.JAVBUS, Website.AVBASE})
+
+    assert result is not None, "存活站应让整体结果非 None，才能检查 field_log"
+    # 预取 1 次 + 4 个字段各 1 次 = 5 次，证明每个字段都重试了
+    assert len(calls) == 5, f"应逐字段重试（预取1+字段4），实际 {len(calls)} 次"
+    # 日志有界：首败 1 行 + 「重试仍失败」1 行 = 2 行，不随字段数线性膨胀
+    assert result.field_log.count("(已失败") == 1, result.field_log
+    assert result.field_log.count("(重试仍失败") == 1, result.field_log
 
 
 async def test_failed_site_mark_includes_cause(monkeypatch: pytest.MonkeyPatch):
