@@ -230,9 +230,9 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
     # 不进任何类型组名单，素人组里不该有它。
     assert Website.MYWIFE not in config.website_suren
     assert config.website_fc2 == [
-        Website.AVSOX,
         Website.FC2,
         Website.FC2PPVDB,
+        Website.AVSOX,
         Website.JAVDB,
         Website.JAVDB_API,
         Website.JAVDB_APP,

@@ -267,9 +267,9 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
     ),
     FixedScrapingType.FC2: (
         # 官网 / 厂牌 / 官方接口
-        Website.AVSOX,
         Website.FC2,
         Website.FC2PPVDB,
+        Website.AVSOX,
         # 第三方 / 聚合站
         Website.JAVDB,
         Website.JAVDB_API,

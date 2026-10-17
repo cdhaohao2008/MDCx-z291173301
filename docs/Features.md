@@ -74,7 +74,7 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 | **有码**（30） | DMM、DMM_API、LibreDMM、AVEntertainments、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、JavLibrary、AVSEX、Getchu |
 | **无码**（18） | AVEntertainments、AVSOX、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、AVSEX、Getchu |
 | **素人**（28） | DMM、DMM_API、LibreDMM、AVEntertainments、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、MissAV、MissAV_API、R18.dev、Xcity、TheJavDB_API、JavLibrary、AVSEX、Getchu |
-| **FC2**（15） | AVSOX、FC2、FC2PPVDB、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API、AVSEX、Getchu |
+| **FC2**（15） | FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API、AVSEX、Getchu |
 | **国产**（14） | Madouqu、Madou.club、AVSEX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、MissAV、MissAV_API、Getchu |
 | **欧美**（14） | ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、MissAV、MissAV_API、IQQTV、JavFree、AVSEX、Getchu |
 

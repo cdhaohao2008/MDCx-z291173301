@@ -121,9 +121,9 @@ USER_SITE_LISTS = {
         "Getchu",
     ],
     FixedScrapingType.FC2: [
-        "AVSOX",
         "FC2",
         "FC2PPVDB",
+"AVSOX",
         "JavDB",
         "JavDB_API",
         "JavDB_APP",

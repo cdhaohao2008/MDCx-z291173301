@@ -1085,7 +1085,7 @@ _TYPE_SITE_GROUPS = (
 )
 
 # MyWife 不属任何类型组，默认名单里不该出现；它由「指定网站」或路径含 MyWife 单独指定。
-_MYWIFE_NOTE = "<li><b>MyWife</b>：不属于任何类型组的默认名单，需在「网站偏好」-「指定网站」勾选 MyWife"
+_MYWIFE_NOTE = "<li><b>MyWife</b>：不属于任何类型组的默认名单，需在「网站偏好」-「指定网站」勾选MyWife"
 
 
 def _about_site_section() -> str:
