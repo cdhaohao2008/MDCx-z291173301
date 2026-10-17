@@ -896,7 +896,7 @@ def test_site_editor_boxes_show_six_and_four_rows(qt_app):
         def row_pitch(widget) -> int:
             """行距 = 相邻两「视觉行」顶边之差（同一行里的站顶边相同，取最小正差）。"""
             tops = sorted({widget.visualItemRect(widget.item(r)).top() for r in range(widget.count())})
-            deltas = [b - a for a, b in zip(tops, tops[1:]) if b - a > 0]
+            deltas = [b - a for a, b in zip(tops, tops[1:], strict=False) if b - a > 0]
             assert deltas, "内容还没排开"
             return min(deltas)
 

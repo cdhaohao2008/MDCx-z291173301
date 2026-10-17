@@ -552,7 +552,7 @@ def _list_row_pitch(list_widget: QListWidget) -> int:
     if hint := list_widget.sizeHintForRow(0):
         return int(hint)
     tops = sorted({list_widget.visualItemRect(list_widget.item(row)).top() for row in range(list_widget.count())})
-    deltas = [b - a for a, b in zip(tops, tops[1:]) if b - a > 0]
+    deltas = [b - a for a, b in zip(tops, tops[1:], strict=False) if b - a > 0]
     return min(deltas) if deltas else 0
 
 
