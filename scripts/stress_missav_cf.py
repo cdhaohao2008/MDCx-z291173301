@@ -74,10 +74,10 @@ def build_urls(*, base_url: str, prefix: str, start: int, count: int, rounds: in
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="并发模拟 MissAV 访问并统计 Cloudflare bypass 效果")
+    parser = argparse.ArgumentParser(description="并发模拟 Missav 访问并统计 Cloudflare bypass 效果")
     parser.add_argument("--bypass-url", default="http://127.0.0.1:8000", help="bypass 服务地址")
     parser.add_argument("--proxy", default="", help="HTTP/SOCKS 代理地址，例如 http://127.0.0.1:7897")
-    parser.add_argument("--base-url", default="https://missav.ws", help="MissAV 基础地址")
+    parser.add_argument("--base-url", default="https://missav.ws", help="Missav 基础地址")
     parser.add_argument("--prefix", default="SNOS", help="番号前缀")
     parser.add_argument("--start", type=int, default=1, help="起始序号")
     parser.add_argument("--count", type=int, default=30, help="每轮请求数量")
@@ -219,7 +219,7 @@ def print_summary(args: argparse.Namespace, stats: StressStats, elapsed: float) 
     p99 = percentile(stats.latencies, 0.99)
 
     safe_print("=" * 72)
-    safe_print("MissAV 并发过盾模拟结果")
+    safe_print("Missav 并发过盾模拟结果")
     safe_print("=" * 72)
     safe_print(
         f"bypass={args.bypass_url}  proxy={args.proxy or 'none'}  use_proxy={effective_use_proxy}  concurrency={args.concurrency}  count={args.count}  rounds={args.rounds}  retry={args.retry}"

@@ -51,7 +51,7 @@ async def test_missav_api_run_maps_fields_and_images(monkeypatch):
 
     assert res.debug_info.error is None
     assert res.data is not None
-    assert res.data.source == "MissAV_API"
+    assert res.data.source == "Missav_API"
     assert res.data.number == "SSIS-001"
     assert res.data.title == "简中标题"
     assert res.data.actors == ["女优A"]

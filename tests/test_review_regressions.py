@@ -174,8 +174,8 @@ def test_is_proxy_host_direct_sites_priority():
     ("site_value", "host"),
     [
         # 议题附检测日志中的失配证据逐条锁定
-        ("MissAV", "missav.ai"),
-        ("MissAV", "missav.ws"),
+        ("Missav", "missav.ai"),
+        ("Missav", "missav.ws"),
         ("JavDay", "javday.app"),
         ("MyWife", "mywife.cc"),
         ("7mmtv", "www.7mmtv.sx"),

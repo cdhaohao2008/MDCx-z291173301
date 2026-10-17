@@ -87,7 +87,7 @@ def _drop_back(dialog, site):
 def test_site_groups_are_exactly_the_requested_seven():
     assert [tuple(s.value for s in group) for group in SITE_GROUPS] == [
         ("DMM", "DMM_API", "LibreDMM"),
-        ("MissAV", "MissAV_API"),
+        ("Missav", "Missav_API"),
         ("FC2", "FC2PPVDB"),
         ("ThepornDB", "AVheat"),
         ("JavDB", "JavDB_API", "JavDB_APP"),

@@ -91,8 +91,14 @@ _SITE_RENAMES = {
     # 大小写两代旧值都在：改名前的全小写 madou_club，以及中间版本写入的 MADOU_CLUB
     "madou_club": "Madou.club",
     "MADOU_CLUB": "Madou.club",
-    "missav": "MissAV",
-    "missav_api": "MissAV_API",
+    # 大小写两代旧值都在：改名前的全小写 missav，以及中间版本写入的品牌写法 MissAV，
+    # 均归一到 Missav。此处必须逐字列出——`_rename_site` 是精确匹配（无 `.lower()`
+    # 兜底），漏了 "MissAV" 会让存量配置里的该站被 `_is_valid_site()` 当成非法值
+    # 静默剔除（议题 #55 那条路径），等于升级即丢用户在用的 Missav 源。
+    "missav": "Missav",
+    "MissAV": "Missav",
+    "missav_api": "Missav_API",
+    "MissAV_API": "Missav_API",
     "mgstage": "MGStage",
     "mywife": "MyWife",
     "prestige": "Prestige",

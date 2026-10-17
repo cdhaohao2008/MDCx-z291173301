@@ -5,7 +5,7 @@ headless 模式渲染页面，通过真实浏览器引擎绕过 CF 挑战。
 
 经实测验证：Selenium+Edge headless 能稳定通过 JavLibrary 的 CF JS challenge
 （低级防护），但对 JavDB（managed challenge）、Lulubar（Turnstile）、
-MissAV（连接关闭）无效。
+Missav（连接关闭）无效。
 
 仅适用于 Windows 10/11 + Edge 浏览器环境。Selenium 包作为可选依赖，
 首次使用时自动安装。driver 由 Selenium Manager（4.6+）自动匹配，

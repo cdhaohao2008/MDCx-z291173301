@@ -15,7 +15,7 @@ from .base.base_types import NOT_SUPPORT, Context
 class MissavApiCrawler(BaseCrawler):
     description = "综合：有码+无码"
     """
-    MissAV 免 Cloudflare 数据源.
+    Missav 免 Cloudflare 数据源.
 
     不走 missav.ws 网页(会被 CF 挡死), 而是:
       - 元数据: 直接调 missav 后端 Recombee 推荐 API (client-rapi-missav.recombee.com),

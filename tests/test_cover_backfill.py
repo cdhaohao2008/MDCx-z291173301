@@ -63,7 +63,7 @@ def test_cover_candidate_sites_orders_priority_first(monkeypatch: pytest.MonkeyP
     assert cb._cover_candidate_sites(file_info, forced_site=None) == [
         "Official",
         "MGStage",
-        "MissAV",
+        "Missav",
         "R18.dev",
     ]
 

@@ -644,7 +644,7 @@ async def test_missav_api_spec_uses_post_search(monkeypatch: pytest.MonkeyPatch)
     assert missav_api.method == "POST"
     assert "/search/users/anonymous/items/" in missav_api.url
     assert missav_api.json_data is not None and missav_api.json_data["searchQuery"] == "ssni-647"
-    assert missav_api.validator == "MissAV_API"
+    assert missav_api.validator == "Missav_API"
 
 
 @pytest.mark.anyio
@@ -1622,7 +1622,7 @@ async def test_site_specs_merged_once_for_later_groups(monkeypatch: pytest.Monke
 
     根因：join_site_specs() 把 site_specs_task 置回 None，而「账号/API」「辅助服务」
     同样不是 STATIC_ONLY_GROUPS，原先只看 task is None 的话每进一组就重建并再并入
-    一份站点 specs —— DMM_API/MissAV_API/TheJavDB_API（账号/API 组的三项）于是各被
+    一份站点 specs —— DMM_API/Missav_API/TheJavDB_API（账号/API 组的三项）于是各被
     检测两次、报告里打印两行，进度分母也跟着虚高。
     """
     calls: list[int] = []
@@ -1740,7 +1740,7 @@ def test_merge_cache_includes_api_group_sites(monkeypatch, tmp_path):
     cache = load_site_check_cache()
     assert cache["DMM_API"]["status"] == "ok"
     assert cache["TheJavDB_API"]["status"] == "warn"
-    assert cache["MissAV_API"]["status"] == "fail"
+    assert cache["Missav_API"]["status"] == "fail"
     assert cache["ThepornDB"]["status"] == "ok"
     assert "通用 HTTPS" not in cache and all(v.get("status") for v in cache.values())
 

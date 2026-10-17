@@ -270,7 +270,7 @@ _MISSAV_DOMAINS = [
 ]
 
 
-class MissAVCrawler(BaseCrawler):
+class MissavCrawler(BaseCrawler):
     description = "综合：有码+无码"
     _domains: list[str] = _MISSAV_DOMAINS
     parser = Parser()
@@ -327,7 +327,7 @@ class MissAVCrawler(BaseCrawler):
 
     @staticmethod
     def _log(message: str) -> None:
-        log_console.add_log(f"🌐 [MissAV] {message}")
+        log_console.add_log(f"🌐 [Missav] {message}")
 
     @classmethod
     @override
@@ -342,7 +342,7 @@ class MissAVCrawler(BaseCrawler):
     @classmethod
     @override
     def display_name(cls) -> str:
-        return "MissAV"
+        return "Missav"
 
     @override
     def __init__(self, client, base_url: str = "", browser=None):
@@ -603,10 +603,10 @@ class MissAVCrawler(BaseCrawler):
         expected_keyword = self._normalize_uncensored_keyword(ctx.input.number)
         detail_url = self._extract_first_detail_url_from_search(html, expected_keyword)
         if detail_url:
-            ctx.debug(f"MissAV 无码搜索命中首个详情页 URL: {detail_url}")
+            ctx.debug(f"Missav 无码搜索命中首个详情页 URL: {detail_url}")
             return [detail_url]
 
-        ctx.debug("MissAV 无码搜索页未提取到有效详情页 URL")
+        ctx.debug("Missav 无码搜索页未提取到有效详情页 URL")
         return None
 
     @override
@@ -619,16 +619,16 @@ class MissAVCrawler(BaseCrawler):
             if detail_urls:
                 return detail_urls
             fallback_url = self._build_direct_detail_url(ctx.input.number)
-            ctx.debug(f"MissAV 无码搜索无结果，回退直达详情页 URL: {fallback_url}")
+            ctx.debug(f"Missav 无码搜索无结果，回退直达详情页 URL: {fallback_url}")
             return [fallback_url]
 
-        ctx.debug(f"MissAV 跳过搜索页，直接使用详情页 URL: {search_urls}")
+        ctx.debug(f"Missav 跳过搜索页，直接使用详情页 URL: {search_urls}")
         return search_urls
 
     @override
     async def _parse_detail_page(self, ctx, html: Selector, detail_url: str) -> CrawlerData | None:
         if self._is_soft_404_page(html):
-            raise CrawlerException(f"MissAV 详情页不存在或已下架: {detail_url}")
+            raise CrawlerException(f"Missav 详情页不存在或已下架: {detail_url}")
 
         canonical_url = extract_text(html, "//meta[@property='og:url']/@content")
         final_detail_url = canonical_url or detail_url

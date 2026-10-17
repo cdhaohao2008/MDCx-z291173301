@@ -1,7 +1,7 @@
 import pytest
 from parsel import Selector
 
-from mdcx.crawlers.missav import MissAVCrawler
+from mdcx.crawlers.missav import MissavCrawler
 
 
 @pytest.mark.parametrize(
@@ -19,7 +19,7 @@ from mdcx.crawlers.missav import MissAVCrawler
     ],
 )
 def test_ensure_cn_detail_url_uses_canonical_lang_prefix(raw_url: str, expected: str):
-    assert MissAVCrawler._ensure_cn_detail_url(raw_url) == expected
+    assert MissavCrawler._ensure_cn_detail_url(raw_url) == expected
 
 
 @pytest.mark.parametrize(
@@ -35,7 +35,7 @@ def test_ensure_cn_detail_url_uses_canonical_lang_prefix(raw_url: str, expected:
     ],
 )
 def test_normalize_number_for_uncensored_judge(number: str, expected: str):
-    assert MissAVCrawler._normalize_number_for_uncensored_judge(number) == expected
+    assert MissavCrawler._normalize_number_for_uncensored_judge(number) == expected
 
 
 @pytest.mark.parametrize(
@@ -52,7 +52,7 @@ def test_normalize_number_for_uncensored_judge(number: str, expected: str):
     ],
 )
 def test_should_use_uncensored_search_by_original_number(number: str, mosaic: str, expected: bool):
-    assert MissAVCrawler._should_use_uncensored_search(number, mosaic) is expected
+    assert MissavCrawler._should_use_uncensored_search(number, mosaic) is expected
 
 
 def test_is_soft_404_page_detects_not_found_template():
@@ -72,7 +72,7 @@ def test_is_soft_404_page_detects_not_found_template():
         """
     )
 
-    assert MissAVCrawler._is_soft_404_page(html) is True
+    assert MissavCrawler._is_soft_404_page(html) is True
 
 
 def test_is_soft_404_page_ignores_normal_detail_page():
@@ -92,7 +92,7 @@ def test_is_soft_404_page_ignores_normal_detail_page():
         """
     )
 
-    assert MissAVCrawler._is_soft_404_page(html) is False
+    assert MissavCrawler._is_soft_404_page(html) is False
 
 
 class _FakeMissavClient:
@@ -129,7 +129,7 @@ async def test_missav_run_maps_fields_and_thumb():
     from mdcx.config.enums import Language
     from mdcx.models.model_types import CrawlerInput
 
-    crawler = MissAVCrawler(client=_FakeMissavClient(), base_url="https://missav.ws")
+    crawler = MissavCrawler(client=_FakeMissavClient(), base_url="https://missav.ws")
     res = await crawler.run(
         CrawlerInput(
             appoint_number="",
@@ -145,7 +145,7 @@ async def test_missav_run_maps_fields_and_thumb():
 
     assert res.debug_info.error is None
     assert res.data is not None
-    assert res.data.source == "MissAV"
+    assert res.data.source == "Missav"
     assert res.data.number == "SSNI-647"
     assert res.data.title == "Sample Title"
     assert res.data.actors == ["演员A"]

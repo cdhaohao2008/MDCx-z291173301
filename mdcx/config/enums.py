@@ -471,8 +471,8 @@ class Website(Enum):
     LULUBAR = "Lulubar"
     MADOUQU = "Madouqu"
     MADOUCLUB = "Madou.club"
-    MISSAV = "MissAV"
-    MISSAV_API = "MissAV_API"
+    MISSAV = "Missav"
+    MISSAV_API = "Missav_API"
     MMTV = "7mmtv"
     MGSTAGE = "MGStage"
     MYWIFE = "MyWife"
@@ -525,8 +525,11 @@ class Website(Enum):
                 "lulubar": "Lulubar",
                 "madouqu": "Madouqu",
                 "madou_club": "Madou.club",
-                "missav": "MissAV",
-                "missav_api": "MissAV_API",
+                # 全小写键同时兜住旧的品牌写法 MissAV/MissAV_API（下面的
+                # `.lower()` 回查），故只需一条，无需像 faleno/madou_club 那样
+                # 把两代旧值逐字列出。
+                "missav": "Missav",
+                "missav_api": "Missav_API",
                 "mgstage": "MGStage",
                 "mywife": "MyWife",
                 "prestige": "Prestige",

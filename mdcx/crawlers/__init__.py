@@ -41,7 +41,7 @@ from .lulubar import LulubarCrawler
 from .madou_club import MadouClubCrawler
 from .madouqu import MadouquCrawler
 from .mgstage import MGStageCrawler
-from .missav import MissAVCrawler
+from .missav import MissavCrawler
 from .missav_api import MissavApiCrawler
 from .mywife import MyWifeCrawler
 from .official import OfficialCrawler
@@ -58,7 +58,7 @@ register_crawler(JavdbAppCrawler)
 register_crawler(dmm_api.DmmApiCrawler)
 register_crawler(TheJavDBAPICrawler)
 register_crawler(AVBaseCrawler)
-register_crawler(missav.MissAVCrawler)
+register_crawler(missav.MissavCrawler)
 register_crawler(MissavApiCrawler)
 register_crawler(MadouquCrawler)
 register_crawler(MadouClubCrawler)
