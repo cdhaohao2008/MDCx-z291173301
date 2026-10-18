@@ -203,16 +203,17 @@ USER_SITE_LISTS = {
     ],
 }
 
-# 分组次序：有码番号、无码番号、素人番号、个摄番号、欧美番号、国产番号、动漫里番
-EXPECTED_GROUP_ORDER = ["有码番号", "无码番号", "素人番号", "个摄番号", "欧美番号", "国产番号", "动漫里番"]
+# 分组次序：有码、无码、素人、个摄、欧美、国产、动漫
+EXPECTED_GROUP_ORDER = ["有码", "无码", "素人", "个摄", "欧美", "国产", "动漫"]
 
-# 候选区各组的标题（取自 TYPE_TITLES，与设置页各行标签、使用说明四节同名）
+# 候选区各组的标题（取自 PALETTE_GROUP_TITLES，即那七个短名 chip；
+# 设置页各行标签与两个弹窗标题用的是带「番号」的 TYPE_TITLES，两边不同源、也不同名）
 USER_TITLES = dict(zip(PALETTE_GROUP_TYPES, EXPECTED_GROUP_ORDER, strict=True))
 # 反查表：按标题取回它对应的类型，用来在断言里点名要比较的那份需求名单
 USER_TITLES_INV = {title: key for key, title in USER_TITLES.items()}
 
 # MyWife 不属于任何类型组：它是「人妻・熟女・3P」独立系列，走「指定网站」或路径含
-# mywife 单独指定。用户明确不要「其他」分组，所以它作为无标题的末组接在国产番号后面。
+# mywife 单独指定。用户明确不要「其他」分组，所以它作为无标题的末组接在国产后面。
 UNTITLED_GROUP = ""
 EXPECTED_GROUPS = {
     **{title: USER_SITE_LISTS[key] for key, title in USER_TITLES.items()},
@@ -411,13 +412,13 @@ def test_empty_candidate_list_produces_no_groups():
 
 def test_group_without_available_sites_leaves_no_empty_title():
     """某一组在本机没有候选站点时不留空标题，否则会多出几个点开没内容的标题。"""
-    assert _groups_of([Website.FALENO]) == {"有码番号": ["Faleno"]}
+    assert _groups_of([Website.FALENO]) == {"有码": ["Faleno"]}
 
 
 def test_sites_outside_every_group_are_appended_without_a_title():
     """落在七组之外的站点（如 MyWife）按传入次序接在末尾，但不另起「其他」标题。"""
     groups = grouped_palette_groups([Website.MYWIFE, Website.DMM, Website.AVSOX])
-    assert [title for title, _ in groups] == ["有码番号", "无码番号", "素人番号", "个摄番号", ""]
+    assert [title for title, _ in groups] == ["有码", "无码", "素人", "个摄", ""]
     assert [site.value for site in groups[-1][1]] == ["MyWife"]
 
 
@@ -491,7 +492,7 @@ def test_titles_come_first_and_sites_continue_right_after(qt_app):
         first_site = order[len(EXPECTED_GROUP_ORDER)]
         assert first_site == "7mmtv", f"标题后面没有紧接站点：{order[: len(EXPECTED_GROUP_ORDER) + 3]}"
         # 「不留空」= 同一行：第一个标题与第一个站点行的行矩形 top 相同
-        title_rect = palette.visualItemRect(palette.item(_title_rows(dlg)["有码番号"]))
+        title_rect = palette.visualItemRect(palette.item(_title_rows(dlg)["有码"]))
         site_rect = palette.visualItemRect(palette.item(_row_of(dlg, "7mmtv")))
         assert site_rect.top() == title_rect.top(), "站点被挤到了下一行，标题右边空了一块"
     finally:
@@ -512,7 +513,7 @@ def test_no_item_carries_a_focus_ring(qt_app):
         palette.setFocus()
         qt_app.processEvents()
         assert palette.currentRow() == -1, "一聚焦 Qt 就把当前项设成了第一行（那是第一个标题）"
-        _click_title(dlg, "有码番号")
+        _click_title(dlg, "有码")
         assert palette.currentRow() == -1, "点了标题后它成了当前项，被套上聚焦框"
         assert dlg.selected_sites(), "点标题本该整组加入（清当前项不该把功能一起清掉）"
     finally:
@@ -590,7 +591,7 @@ def test_group_sites_read_back_from_the_widget(dialog):
 def test_site_tooltip_says_which_types_it_serves():
     """候选区里每个站只出现一次，「它同时属于哪些类型」得靠悬停提示补上。"""
     dmm_lines = " ".join(_site_tooltip_lines(Website.DMM))
-    assert "适用类型：有码番号、素人番号" in dmm_lines
+    assert "适用类型：有码、素人" in dmm_lines
     # 不属于任何类型组的站点不该编出一个类型来
     assert "适用类型" not in " ".join(_site_tooltip_lines(Website.MYWIFE))
 
@@ -608,7 +609,7 @@ def test_clicking_group_title_adds_that_whole_group(qt_app, title):
 
 
 def test_clicking_the_last_group_does_not_swallow_untitled_sites(qt_app):
-    """七组之外零星站点（MyWife）没有标题、就接在末尾，点「国产番号」不该顺带加上它。
+    """七组之外零星站点（MyWife）没有标题、就接在末尾，点「国产」不该顺带加上它。
 
     这正是「没有其他分组」带来的坑：成员必须取自标题自带的名单，不能按行范围读，
     否则末尾这批零散站点会被算进上一组。
@@ -616,7 +617,7 @@ def test_clicking_the_last_group_does_not_swallow_untitled_sites(qt_app):
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _click_title(dlg, "国产番号")
+        _click_title(dlg, "国产")
         assert [site.value for site in dlg.selected_sites()] == USER_SITE_LISTS[FixedScrapingType.GUOCHAN]
         assert Website.MYWIFE not in dlg.selected_sites()
         # 它仍然出现在候选区里，只是不再有自己的标题
@@ -630,7 +631,7 @@ def test_clicking_group_title_appends_and_keeps_existing_order(qt_app):
     dlg = SiteListEditorDialog("t", [Website.XCITY], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _click_title(dlg, "个摄番号")
+        _click_title(dlg, "个摄")
         values = [site.value for site in dlg.selected_sites()]
         assert values[0] == "Xcity"
         assert values[1:] == USER_SITE_LISTS[FixedScrapingType.FC2]
@@ -643,9 +644,9 @@ def test_clicking_group_title_twice_does_not_duplicate(qt_app):
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _click_title(dlg, "国产番号")
+        _click_title(dlg, "国产")
         first = [site.value for site in dlg.selected_sites()]
-        _click_title(dlg, "国产番号")
+        _click_title(dlg, "国产")
         assert [site.value for site in dlg.selected_sites()] == first
     finally:
         dlg.deleteLater()
@@ -675,7 +676,7 @@ def test_double_clicking_a_group_title_adds_nothing_extra(qt_app):
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        dlg._on_available_double_clicked(dlg.available_list.item(_title_rows(dlg)["有码番号"]))
+        dlg._on_available_double_clicked(dlg.available_list.item(_title_rows(dlg)["有码"]))
         assert dlg.selected_sites() == []
 
         row = _row_of(dlg, "7mmtv")
@@ -731,15 +732,15 @@ def test_add_all_uses_original_order_while_palette_stays_grouped(qt_app):
             "ThepornDB",
             "Getchu",
         ]
-        # 候选区仍按各组自己的优先级序铺：四个站都属有码番号，故该标题带的就是这四个的原序
+        # 候选区仍按各组自己的优先级序铺：四个站都属有码，故该标题带的就是这四个的原序
         assert _groups_from_widget(dlg) == {
-            "有码番号": ["DMM", "AVBase", "Xcity"],
-            "无码番号": ["AVSOX"],
-            "素人番号": ["DMM", "AVBase", "Xcity"],
-            "个摄番号": ["AVSOX"],
-            "欧美番号": ["ThepornDB"],
-            "国产番号": ["Madouqu"],
-            "动漫里番": ["Getchu"],
+            "有码": ["DMM", "AVBase", "Xcity"],
+            "无码": ["AVSOX"],
+            "素人": ["DMM", "AVBase", "Xcity"],
+            "个摄": ["AVSOX"],
+            "欧美": ["ThepornDB"],
+            "国产": ["Madouqu"],
+            "动漫": ["Getchu"],
         }
         assert _site_row_values(dlg) == ["AVBase", "AVSOX", "DMM", "Getchu", "Madouqu", "ThepornDB", "Xcity"]
     finally:

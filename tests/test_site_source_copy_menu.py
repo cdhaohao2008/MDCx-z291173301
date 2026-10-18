@@ -44,8 +44,8 @@ ALL_SITES = [Website(site) for site in __import__("mdcx.crawlers", fromlist=["c"
 # 选中顺序即优先级，复制出来必须原样保持，不能被 A-Z 或分组重排
 CUSTOM_ORDER = [Website.XCITY, Website.MGSTAGE, Website.GETCHU, Website.DMM]
 
-# 顶部七个标题的次序（与 TYPE_TITLES 的声明序一致）
-CHIP_ORDER = ["有码番号", "无码番号", "素人番号", "个摄番号", "欧美番号", "国产番号", "动漫里番"]
+# 顶部七个短名 chip 的次序（与 PALETTE_GROUP_TITLES 的声明序一致）
+CHIP_ORDER = ["有码", "无码", "素人", "个摄", "欧美", "国产", "动漫"]
 
 
 @pytest.fixture(scope="module")
@@ -181,14 +181,14 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
     try:
         _shown(dlg)
         palette = dlg.available_list
-        texts = _right_click(palette, _title_center(palette, "有码番号"), monkeypatch, "复制本组")
+        texts = _right_click(palette, _title_center(palette, "有码"), monkeypatch, "复制本组")
         assert texts == ["复制本组：28个站点", "", "复制列表：39个站点"]
         copied = app.clipboard().text().split(",")
         assert copied[:3] == ["DMM", "DMM_API", "LibreDMM"]
         assert len(copied) == 28 == len(set(copied))
         # 别的组才有的站点不能混进来（MyWife 不属于任何一组）
         assert "MyWife" not in copied and "Madouqu" not in copied
-        assert _parse_sites(app.clipboard().text()) == _group_at(palette, "有码番号")
+        assert _parse_sites(app.clipboard().text()) == _group_at(palette, "有码")
     finally:
         dlg.deleteLater()
 
@@ -196,13 +196,13 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
 @pytest.mark.parametrize(
     ("title", "count"),
     [
-        ("有码番号", 28),
-        ("无码番号", 16),
-        ("素人番号", 26),
-        ("个摄番号", 13),
-        ("欧美番号", 12),
-        ("国产番号", 12),
-        ("动漫里番", 4),
+        ("有码", 28),
+        ("无码", 16),
+        ("素人", 26),
+        ("个摄", 13),
+        ("欧美", 12),
+        ("国产", 12),
+        ("动漫", 4),
     ],
 )
 def test_each_group_title_copies_its_own_list(qt_app, monkeypatch, title, count):
@@ -228,9 +228,9 @@ def test_group_copy_is_readable_back_by_the_parser(qt_app, monkeypatch):
     try:
         _shown(dlg)
         palette = dlg.available_list
-        _right_click(palette, _title_center(palette, "个摄番号"), monkeypatch, "复制本组")
-        assert _parse_sites(app.clipboard().text()) == _group_at(palette, "个摄番号")
-        assert app.clipboard().text() == _sites_text(_group_at(palette, "个摄番号"))
+        _right_click(palette, _title_center(palette, "个摄"), monkeypatch, "复制本组")
+        assert _parse_sites(app.clipboard().text()) == _group_at(palette, "个摄")
+        assert app.clipboard().text() == _sites_text(_group_at(palette, "个摄"))
     finally:
         dlg.deleteLater()
 
@@ -238,7 +238,7 @@ def test_group_copy_is_readable_back_by_the_parser(qt_app, monkeypatch):
 def test_right_click_gap_between_titles_copies_the_whole_list(qt_app, monkeypatch):
     """点在首行的空白处不该复制某一组，退回「复制整张列表」。
 
-    首行是 `有码番号 无码番号 … 国产番号 DMM …` 流式排布的一行，chip 之间与行尾的空白同样可能
+    首行是 `有码 无码 … 国产 DMM …` 流式排布的一行，chip 之间与行尾的空白同样可能
     误判成「点中标题」——误判就会给用户一份他根本没点的名单。
     """
     app = qt_app
@@ -247,7 +247,7 @@ def test_right_click_gap_between_titles_copies_the_whole_list(qt_app, monkeypatc
     try:
         _shown(dlg)
         palette = dlg.available_list
-        top = palette.visualItemRect(palette.item(_title_rows(palette)["有码番号"])).top()
+        top = palette.visualItemRect(palette.item(_title_rows(palette)["有码"])).top()
         blank = next(
             (x for x in range(1, palette.viewport().width() - 1) if palette.itemAt(QPoint(x, top)) is None), None
         )

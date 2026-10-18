@@ -69,6 +69,21 @@ TYPE_TITLES = {
 }
 
 
+# 「编辑网站」弹窗顶部「可用网站（按类型分组）」里那七个分组标题的**短名**，与设置页
+# 各行标签 / 两个弹窗标题（编辑XX网站源、XX字段优先级）用的 TYPE_TITLES 分开。
+# 七个 chip 必须挤在同一行里，带「番号」三字会顶到框宽、换行后标题与站点就分不清了，
+# 故这里只保留「有码」「个摄」这类一眼能认出来的短名（用户指定）。
+PALETTE_GROUP_TITLES = {
+    FixedScrapingType.YOUMA: "有码",
+    FixedScrapingType.WUMA: "无码",
+    FixedScrapingType.SUREN: "素人",
+    FixedScrapingType.FC2: "个摄",
+    FixedScrapingType.OUMEI: "欧美",
+    FixedScrapingType.GUOCHAN: "国产",
+    FixedScrapingType.DONGMAN: "动漫",
+}
+
+
 FIELD_TITLES = {
     CrawlerResultFields.TITLE: "标题",
     CrawlerResultFields.ORIGINALTITLE: "原标题",
@@ -182,8 +197,8 @@ def _sites_text(sites: list[Website]) -> str:
     return ",".join(site.value for site in sites)
 
 
-# 候选区的分组顺序：与 TYPE_TITLES 的声明序一致（含动漫里番——它同样是「类型刮削网站」
-# 下的一个类型，用户要在这里也能一眼看到它默认配了哪几个站）
+# 候选区的分组顺序：与 TYPE_TITLES / PALETTE_GROUP_TITLES 的声明序一致（含动漫里番——
+# 它同样是「类型刮削网站」下的一个类型，用户要在这里也能一眼看到它默认配了哪几个站）
 PALETTE_GROUP_TYPES: tuple[FixedScrapingType, ...] = (
     FixedScrapingType.YOUMA,
     FixedScrapingType.WUMA,
@@ -196,7 +211,7 @@ PALETTE_GROUP_TYPES: tuple[FixedScrapingType, ...] = (
 
 
 def grouped_palette_groups(sites: Iterable[Website]) -> list[tuple[str, list[Website]]]:
-    """把候选站点按有码番号/无码番号/素人番号/个摄番号/欧美番号/国产番号/动漫里番分成 [(标题, 组内站点)]。
+    """把候选站点按有码/无码/素人/个摄/欧美/国产/动漫分成 [(标题, 组内站点)]。
 
     组内顺序 = TYPE_DEFAULT_SITES 里该组的默认名单顺序（优先级从高到低），不重排。
     一个站点可同属多组，会在每个组里各出现一次——它确实是这几个类型的可用来源，
@@ -216,7 +231,7 @@ def grouped_palette_groups(sites: Iterable[Website]) -> list[tuple[str, list[Web
         if not group:
             # 该类型在本机没有已注册爬虫的站点时不留空标题，否则会出现一个没有内容的分组
             continue
-        groups.append((TYPE_TITLES[scraping_type], group))
+        groups.append((PALETTE_GROUP_TITLES[scraping_type], group))
         placed.update(group)
     rest = [site for site in available if site not in placed]
     if rest:
@@ -316,10 +331,9 @@ SITE_GROUP_SITES_ROLE = Qt.ItemDataRole.UserRole + 2
 def _make_group_item(title: str, sites: Sequence[Website]) -> QListWidgetItem:
     """候选区里的一个分组标题：文案就是类型名，成员名单挂在标题自己身上。
 
-    标题排在所有站点之前（用户要求「有码番号、无码番号、素人番号、个摄番号、欧美番号、
-    国产番号这样默认排在 DMM 左边」），后面紧跟着站点、与站点共用同一个换行流——所以
-    第一行看起来就是「有码番号 无码番号 素人番号 个摄番号 欧美番号 国产番号 DMM DMM_API
-    LibreDMM …」，右边不留空。
+    标题排在所有站点之前（用户要求「有码、无码、素人、个摄、欧美、国产这样默认排在 DMM
+    左边」），后面紧跟着站点、与站点共用同一个换行流——所以第一行看起来就是
+    「有码 无码 素人 个摄 欧美 国产 DMM DMM_API LibreDMM …」，右边不留空。
     标题只用加粗与站点区分，**不再另刷深色底**（用户明确要「和其他站点一样纯白背景」）。
     """
     item = QListWidgetItem(title)
@@ -353,12 +367,13 @@ def _site_tooltip_lines(site: Website) -> list[str]:
     """站点项的悬停提示：定位说明 + 适用类型 + 联动组成员（说明加入一个会带上哪些）。
 
     「适用类型」是候选区去重铺放后必须补上的一条：站点只在列表里出现一次，标题又都
-    提到了顶部，不写这一条就看不出它同时是有码番号站、也是无码番号站。
+    提到了顶部，不写这一条就看不出它同时是有码站、也是无码站。用的是候选区那套短名
+    （PALETTE_GROUP_TITLES），与标题对得上。
     """
     lines: list[str] = []
     if description := _site_description(site):
         lines.append(description)
-    if types := [TYPE_TITLES[key] for key in PALETTE_GROUP_TYPES if site in TYPE_DEFAULT_SITES.get(key, ())]:
+    if types := [PALETTE_GROUP_TITLES[key] for key in PALETTE_GROUP_TYPES if site in TYPE_DEFAULT_SITES.get(key, ())]:
         lines.append("适用类型：" + "、".join(types))
     if group := site_group_of(site):
         lines.append("联动组（加入其一即默认加入全组）：" + "、".join(member.value for member in group))
@@ -381,9 +396,8 @@ def _site_description(site: Website) -> str:
 def _setup_site_list(list_widget: QListWidget, sites: Iterable[Website], *, grouped: bool = False) -> None:
     """把 sites 铺进列表。grouped=True 时先放七个分组标题，紧跟着才是站点。
 
-    标题与站点在同一个换行流里顺排，所以第一行就是「有码番号 无码番号 素人番号
-    个摄番号 欧美番号 国产番号 DMM DMM_API LibreDMM …」，右边不留空白（用户要求
-    「不要空着，继续排列站点」），同时又满足「七个标题排在 DMM 之前」。
+    标题与站点在同一个换行流里顺排，所以第一行就是「有码 无码 素人 个摄 欧美 国产
+    DMM DMM_API LibreDMM …」，右边不留空白（用户要求「不要空着，继续排列站点」），同时又满足「七个标题排在 DMM 之前」。
 
     默认（grouped=False）保持传入的原序——「启用网站」和各字段名单的原序就是用户的
     优先级序列，任何排序都不能掺进来；候选区才用 grouped=True。
@@ -864,7 +878,7 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         layout.addWidget(group_hint)
 
         copy_hint = QLabel(
-            "开头的七个加粗标题是有码番号、无码番号、素人番号、个摄番号、欧美番号、国产番号、动漫里番，"
+            "开头的七个加粗标题是有码、无码、素人、个摄、欧美、国产、动漫，"
             "单击一个标题即加入该组全部网站，"
             "后面紧跟全部可用网站（按名称 A-Z 排序、每个站只出现一次）。"
             "右键：站点上复制该站点、标题上复制本组名单、空白处复制整张列表"
@@ -1218,7 +1232,7 @@ class FieldPriorityDialog(CenterOnFirstShowMixin, QDialog):
 def setup_site_priority_ui(window: "MyMAinWindow") -> None:
     ui = window.Ui
     window._type_website_ui = {
-        # title 取 TYPE_TITLES（即候选区那七个分组标题），与设置页各行标签、
+        # title 取 TYPE_TITLES（带「番号」的正式组名），与设置页各行标签、
         # 「编辑网站」对话框标题「编辑{type}网站源」三处保持同一个组名。
         FixedScrapingType.YOUMA: TypeWebsiteUi(
             FixedScrapingType.YOUMA, TYPE_TITLES[FixedScrapingType.YOUMA], ui.lineEdit_website_youma, 0
