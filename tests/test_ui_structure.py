@@ -598,6 +598,70 @@ def test_network_grid_top_aligned_and_no_forced_label_height() -> None:
     )
 
 
+def test_network_group_box_hugs_content_and_following_groups_close_up() -> None:
+    """绿：「状态：留空不校验（默认）」下方那片空白也堵死了（groupBox_28 收紧到贴住内容）。
+
+    前一条测试把富余纵向空间挪到了分组底部（AlignTop），空白于是整体下移到
+    「状态」行与「Cookie设置」分组之间——用户第二次报的就是这一片。根因是
+    `groupBox_28` 是设计期写死的固定尺寸（689 高），比 `gridLayout_9` 的内容高出
+    74px；而 `scrollAreaWidgetContents_wangluo` 没有布局管理器，分组框的尺寸与
+    位置一字不改地来自 .ui，AlignTop 只是让这 74px 换了个地方待着。
+
+    修法（纯几何，不动任何文案与控件属性）：
+      ① `gridLayoutWidget_9` 高 659 → 597、`groupBox_28` 高 689 → 627。597 =
+         参考字体（Windows 默认 Microsoft YaHei UI 9pt）下 gridLayout_9 内容实测
+         底边 585 + 12px 留白（够放下文字与分组框底边之间应有的呼吸，又不至于
+         重新攒出一片空白）；实测同一台机器上换 Segoe UI / Arial / SimSun，
+         内容底边落在 573~585，都装得下。分组框高出容器的高度仍为 0，空白全部
+         落在分组框之外。
+      ② 下面三个分组（Cookie设置 / API Token / 本站目录）整体上移同样的 62px，
+         组间距维持 16px 不变，空白不会在页面别处重新冒出来。
+      ③ 滚动内容高 1838 → 1776，仍大于最后一个分组底边，不裁内容。
+
+    为什么锁死 597/627 这对数而不是只断言「分组框不高出容器」：后者恒成立
+    （原来 689 = 30 + 659 也满足），是一道永远绿的假门禁。富余到底有多高只有
+    运行时量得出来，而运行时断言在测试环境不可靠——所有 Qt 测试模块都设了
+    `QT_QPA_PLATFORM=offscreen`，那里的 CJK 回退字体度量比 Windows 真字体宽，
+    同一份 .ui 量出的内容底边是 658 而非 585，拿它当基准等于用错的尺子量东西。
+    故这里钉设计值 + 下面两条关系（分组间距一致、内容不裁），三条合起来才是
+    「空白被消掉、且没有被挪到别处、且没有把字挤掉」的完整门禁。
+    """
+    root = _parse_ui()
+
+    gb = _find_widget_by_name(root, "groupBox_28")
+    grid_host = _find_widget_by_name(root, "gridLayoutWidget_9")
+    assert gb is not None, "未找到 groupBox_28（网络设置）"
+    assert grid_host is not None, "未找到 gridLayoutWidget_9"
+
+    gb_h = _widget_rect(gb)[3]
+    grid_y, grid_h = _widget_rect(grid_host)[1], _widget_rect(grid_host)[3]
+    assert (grid_h, gb_h) == (597, 627), (
+        f"网络设置分组应贴住内容：gridLayoutWidget_9 高 {grid_h}、groupBox_28 高 {gb_h}，"
+        "期望 597 / 627（内容实测 585 + 12 留白）。调高分组框会让"
+        "「状态：留空不校验（默认）」下方重新出现一片空白"
+    )
+    assert gb_h == grid_y + grid_h, (
+        f"groupBox_28 高 {gb_h} 应等于 gridLayoutWidget_9 的 y({grid_y})+高({grid_h})={grid_y + grid_h}："
+        "多出来的高度就落在分组框的边框里面"
+    )
+
+    boxes = _group_boxes_by_parent(root).get("scrollAreaWidgetContents_wangluo", [])
+    assert len(boxes) == 4, f"网络页分组数变了（实际 {len(boxes)}：{[b[0] for b in boxes]}）"
+    boxes.sort(key=lambda b: b[2])
+    gaps = [boxes[i + 1][2] - (boxes[i][2] + boxes[i][4]) for i in range(len(boxes) - 1)]
+    assert len(set(gaps)) == 1, (
+        f"网络页四个分组之间的间距应一致，实际 {gaps}（[{' -> '.join(b[0] for b in boxes)}]）："
+        "收紧 groupBox_28 时下面的分组没同步上移，空白只是挪了位置"
+    )
+
+    contents = _find_widget_by_name(root, "scrollAreaWidgetContents_wangluo")
+    contents_h = _widget_rect(contents)[3]
+    last_bottom = max(y + h for _, _, y, _, h in boxes)
+    assert contents_h >= last_bottom, (
+        f"滚动内容高 {contents_h} 小于最后一个分组底边 {last_bottom}：上移过头会把底下内容裁掉"
+    )
+
+
 def test_gfriends_select_button_green_in_global_style():
     """绿（成功）：Gfriends 选择目录按钮在全局药丸样式三态选择器中（浅色+深色共6处）。"""
     style_text = _STYLE_PATH.read_text(encoding="utf-8")

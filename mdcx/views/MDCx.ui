@@ -22185,14 +22185,14 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       <x>0</x>
                       <y>0</y>
                       <width>860</width>
-                      <height>1838</height>
+                      <height>1776</height>
                     </rect>
                   </property>
                   <widget class="QGroupBox" name="groupBox_10">
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>724</y>
+                        <y>662</y>
                         <width>701</width>
                         <height>601</height>
                       </rect>
@@ -22612,7 +22612,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         <x>30</x>
                         <y>20</y>
                         <width>701</width>
-                        <height>689</height>
+                        <height>627</height>
                       </rect>
                     </property>
                     <property name="styleSheet">
@@ -22627,7 +22627,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           <x>20</x>
                           <y>30</y>
                           <width>661</width>
-                          <height>659</height>
+                          <height>597</height>
                         </rect>
                       </property>
                       <layout class="QGridLayout" name="gridLayout_9">
@@ -23396,7 +23396,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1585</y>
+                        <y>1523</y>
                         <width>701</width>
                         <height>210</height>
                       </rect>
@@ -23568,7 +23568,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1340</y>
+                        <y>1278</y>
                         <width>701</width>
                         <height>230</height>
                       </rect>
