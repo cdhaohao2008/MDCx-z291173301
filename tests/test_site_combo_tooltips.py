@@ -49,7 +49,7 @@ _ROWS = (
     ("AVBase 有码：有码", "上次检测：2026-10-09 20:51✅可连通·走代理"),
     ("AVSOX 无码：无码", "上次检测：2026-10-09 20:53❌连不通·直连"),
     ("DMM 有码：有码", ""),
-    ("Missav 综合：有码/无码/欧美/国产", "上次检测：2026-10-09 20:55⚠️有需关注项·走代理"),
+    ("Missav 综合：有码/无码/欧美/传媒", "上次检测：2026-10-09 20:55⚠️有需关注项·走代理"),
 )
 
 
@@ -420,7 +420,7 @@ def test_tip_sits_five_px_below_anchor(tip):
 def test_populated_site_combo_shows_the_available_site_caption_and_only_check_result(monkeypatch):
     """下拉选项显示文本取「编辑网站」弹窗「可用网站」那一行，tooltip 按用户要求只留上次检测。
 
-    能力文案（7mmtv 的「综合：有码/无码/欧美/国产」，分隔符一律「/」）已经写进
+    能力文案（7mmtv 的「综合：有码/无码/欧美/传媒」，分隔符一律「/」）已经写进
     选项显示文本，悬停里再抄一遍就是同一句话出现两次，因此提示只剩「上次检测：…」；
     没检测过的站点没有提示，悬停不弹（也不硬凑）。
     """
@@ -446,9 +446,9 @@ def test_populated_site_combo_shows_the_available_site_caption_and_only_check_re
         assert "+" not in text, f"第 {i} 行显示文本还留着「+」：{text!r}"
         assert "、" not in text, f"第 {i} 行显示文本还留着顿号：{text!r}"
         assert "类型：" not in tip_text and "联动" not in tip_text, f"第 {i} 行提示又抄了一遍能力文案：{tip_text!r}"
-    assert "综合：有码/无码/欧美/国产" in combo.itemText(3)
-    # 「动漫」「FC2」不写进这一行文案（用户要求；「短剧」照常显示）
-    assert all(h not in combo.itemText(0) and h not in combo.itemText(3) for h in ("动漫", "FC2"))
+    assert "综合：有码/无码/欧美/传媒" in combo.itemText(3)
+    # 「动漫」「个摄」不写进这一行文案（用户要求；「短剧」照常显示）
+    assert all(h not in combo.itemText(0) and h not in combo.itemText(3) for h in ("动漫", "个摄"))
     # 不属任何类型组的站仍只有自己那行定位说明，且它进了显示文本
     assert "有码：MyWife" in combo.itemText(4)
 
@@ -466,6 +466,8 @@ def test_combo_caption_is_the_very_same_line_as_the_site_editor():
     for value in ("7mmtv", "AVSOX", "DMM", "Madou.club", "MyWife", "AVSEX"):
         assert init_mod._site_combo_caption(value) == _site_capability_caption(Website(value))
     # 「+」在共享的那份文案里也已归一成「/」（爬虫 description 原文仍保留自己的写法）
+    # AVSEX 不属任何类型组（2.5.6 起已从默认名单移除），这一行就是它爬虫自己的定位说明，
+    # 故冒号后仍是 description 里的「国产」，不受候选区短名改「传媒」影响
     assert init_mod._site_combo_caption("AVSEX") == "综合：有码/无码/国产"
     # 不认识的站点值不炸下拉，只是没有文案
     assert init_mod._site_combo_caption("NotASite") == ""

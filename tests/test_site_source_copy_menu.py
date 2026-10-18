@@ -51,8 +51,8 @@ ALL_SITES = [Website(site) for site in __import__("mdcx.crawlers", fromlist=["c"
 # 选中顺序即优先级，复制出来必须原样保持，不能被 A-Z 或分组重排
 CUSTOM_ORDER = [Website.XCITY, Website.MGSTAGE, Website.GETCHU, Website.DMM]
 
-# 顶部七个短名 chip 的次序（与 PALETTE_GROUP_TITLES 的声明序一致）
-CHIP_ORDER = ["有码", "无码", "短剧", "FC2", "欧美", "国产", "动漫"]
+# 顶部七个短名 chip 的次序（与 PALETTE_GROUP_TITLES / PALETTE_GROUP_TYPES 的组序一致）
+CHIP_ORDER = ["有码", "无码", "个摄", "欧美", "传媒", "短剧", "动漫"]
 
 
 @pytest.fixture(scope="module")
@@ -248,10 +248,10 @@ def test_add_action_appends_and_keeps_existing_order(qt_app, monkeypatch):
     try:
         _shown(dlg)
         palette = dlg.available_list
-        _right_click(palette, _title_center(palette, "国产"), monkeypatch, ADD_ACTION)
+        _right_click(palette, _title_center(palette, "传媒"), monkeypatch, ADD_ACTION)
         values = _values(dlg.selected_sites())
         assert values[0] == "Xcity"
-        assert values[1:] == _values(_group_at(palette, "国产"))
+        assert values[1:] == _values(_group_at(palette, "传媒"))
     finally:
         dlg.deleteLater()
 
@@ -359,10 +359,10 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
     [
         ("有码", 28),
         ("无码", 15),
-        ("短剧", 1),
-        ("FC2", 12),
+        ("个摄", 12),
         ("欧美", 10),
-        ("国产", 10),
+        ("传媒", 10),
+        ("短剧", 1),
         ("动漫", 4),
     ],
 )
@@ -389,9 +389,9 @@ def test_group_copy_is_readable_back_by_the_parser(qt_app, monkeypatch):
     try:
         _shown(dlg)
         palette = dlg.available_list
-        _right_click(palette, _title_center(palette, "FC2"), monkeypatch, "复制本组")
-        assert _parse_sites(app.clipboard().text()) == _group_at(palette, "FC2")
-        assert app.clipboard().text() == _sites_text(_group_at(palette, "FC2"))
+        _right_click(palette, _title_center(palette, "个摄"), monkeypatch, "复制本组")
+        assert _parse_sites(app.clipboard().text()) == _group_at(palette, "个摄")
+        assert app.clipboard().text() == _sites_text(_group_at(palette, "个摄"))
     finally:
         dlg.deleteLater()
 
@@ -399,7 +399,7 @@ def test_group_copy_is_readable_back_by_the_parser(qt_app, monkeypatch):
 def test_right_click_gap_between_titles_copies_the_whole_list(qt_app, monkeypatch):
     """点在首行的空白处不该复制某一组，退回「复制整张列表」。
 
-    首行是 `有码 无码 … 国产 DMM …` 流式排布的一行，chip 之间与行尾的空白同样可能
+    首行是 `有码 无码 … 传媒 DMM …` 流式排布的一行，chip 之间与行尾的空白同样可能
     误判成「点中标题」——误判就会给用户一份他根本没点的名单。
     """
     app = qt_app

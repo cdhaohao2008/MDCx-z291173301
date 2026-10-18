@@ -181,8 +181,9 @@ USER_SITE_LISTS = {
     ],
 }
 
-# 分组次序：有码、无码、短剧、FC2、欧美、国产、动漫（FC2 这一组在本弹窗内不再叫「个摄」）
-EXPECTED_GROUP_ORDER = ["有码", "无码", "短剧", "FC2", "欧美", "国产", "动漫"]
+# 分组次序：有码、无码、个摄、欧美、传媒、短剧、动漫（2.6.0 起与设置页各行 / 锁定类型下拉同序，
+# 且弹窗内一律用短名「个摄」「传媒」，不带「番号」）
+EXPECTED_GROUP_ORDER = ["有码", "无码", "个摄", "欧美", "传媒", "短剧", "动漫"]
 
 # 候选区各组的标题（取自 PALETTE_GROUP_TITLES，即那七个短名 chip；
 # 设置页各行标签与两个弹窗标题用的是带「番号」的 TYPE_TITLES，两边不同源、也不同名）
@@ -378,7 +379,7 @@ def _double_click_title(dialog, title: str) -> None:
 
 
 def test_group_titles_follow_the_requested_order():
-    """分组标题按需求给的次序：先有码，最后国产。"""
+    """分组标题按需求给的次序：有码 → 无码 → 个摄 → 欧美 → 传媒 → 短剧 → 动漫。"""
     titles = [title for title, group in grouped_palette_groups(ALL_SITES) if title]
     assert titles == EXPECTED_GROUP_ORDER
 
@@ -436,7 +437,7 @@ def test_group_without_available_sites_leaves_no_empty_title():
 def test_sites_outside_every_group_are_appended_without_a_title():
     """落在七组之外的站点（如 MyWife）按传入次序接在末尾，但不另起「其他」标题。"""
     groups = grouped_palette_groups([Website.MYWIFE, Website.DMM, Website.AVSOX])
-    assert [title for title, _ in groups] == ["有码", "无码", "FC2", ""]
+    assert [title for title, _ in groups] == ["有码", "无码", "个摄", ""]
     assert [site.value for site in groups[-1][1]] == ["MyWife"]
 
 
@@ -622,13 +623,14 @@ def test_site_tooltip_is_only_the_capability_line(dialog):
         if not caption:
             continue  # 没注册爬虫的历史枚举值（airav）本来就没有文案，界面退回显示站名
         assert "：" in caption, f"{site.value} 的文案没有「定位：名单」两段：{caption!r}"
-        # 「动漫」「FC2」不写进这一行（用户要求：动漫不必单列；FC2 同属有码那一类、只是没番号）。
+        # 「动漫」「个摄」不写进这一行（用户要求：动漫不必单列；个摄同属有码那一类、只是没番号。
+        # 个摄即原来的 FC2 组，2.6.0 起弹窗内一律用短名「个摄」）。
         # 「短剧」要照常显示（用户口径）——短剧组只有 JavDay 一站，但正因如此更需要看得见。
         # 只看冒号后的名单段——MyWife
         # 不属任何类型组、FC2 与 Getchu 各自只剩被隐去的那一类，三者那行都是爬虫自己的
         # 说明（MyWife 是「有码：MyWife」），前缀那句不在本次范围内
         types = caption.split("：", 1)[1].split("/")
-        for hidden in ("动漫", "FC2"):
+        for hidden in ("动漫", "个摄"):
             assert hidden not in types, f"{site.value} 的类型名单里还有「{hidden}」：{caption!r}"
     # 短剧组只挂 JavDay，所以这一行里应当看得见「短剧」
     assert _site_capability_caption(Website.JAVDAY) == "综合：有码/短剧"
@@ -647,10 +649,12 @@ def test_site_tooltip_keeps_each_site_own_leading_word():
     定位说明里自带的词，换掉就把它说错了。
     冒号后面不再取爬虫 description 里那句写死的名单（如「综合：有码+无码+FC2」），
     改为现算的类型名单，也就不再随 TYPE_DEFAULT_SITES 的增删而失真；名单里不写
-    「动漫」「FC2」（「短剧」照常显示）。
+    「动漫」「个摄」（「短剧」照常显示）。名单位置随 PALETTE_GROUP_TYPES 的组序走，
+    所以国产传媒组在候选区里的短名「传媒」也出现在这一行里（7mmtv 7 行 2.6.0 起为
+    「综合：有码/无码/欧美/传媒」）。
     """
-    assert _site_capability_caption(Website.MMTV) == "综合：有码/无码/欧美/国产"
-    assert _site_capability_caption(Website.JAVDB) == "综合：有码/无码/欧美/国产"
+    assert _site_capability_caption(Website.MMTV) == "综合：有码/无码/欧美/传媒"
+    assert _site_capability_caption(Website.JAVDB) == "综合：有码/无码/欧美/传媒"
     assert _site_capability_caption(Website.AVSOX) == "无码：无码"
     # Madou.club 原本是「麻豆：国产」——厂牌名当前缀把它说成了厂牌站。已把爬虫 description
     # 改成「国产：麻豆番号」（前缀是它所属的类型，与 madouqu 的「国产：仅限国产」同口径）；
@@ -722,7 +726,7 @@ def test_single_clicking_group_title_adds_nothing(qt_app):
 
 
 def test_double_clicking_the_last_group_does_not_swallow_untitled_sites(qt_app):
-    """七组之外零星站点（MyWife）没有标题、就接在末尾，双击「国产」不该顺带加上它。
+    """七组之外零星站点（MyWife）没有标题、就接在末尾，双击「传媒」不该顺带加上它。
 
     这正是「没有其他分组」带来的坑：成员必须取自标题自带的名单，不能按行范围读，
     否则末尾这批零散站点会被算进上一组。
@@ -730,7 +734,7 @@ def test_double_clicking_the_last_group_does_not_swallow_untitled_sites(qt_app):
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _double_click_title(dlg, "国产")
+        _double_click_title(dlg, "传媒")
         assert [site.value for site in dlg.selected_sites()] == USER_SITE_LISTS[FixedScrapingType.GUOCHAN]
         assert Website.MYWIFE not in dlg.selected_sites()
         # 它仍然出现在候选区里，只是不再有自己的标题
@@ -744,7 +748,7 @@ def test_double_clicking_group_title_appends_and_keeps_existing_order(qt_app):
     dlg = SiteListEditorDialog("t", [Website.XCITY], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _double_click_title(dlg, "FC2")
+        _double_click_title(dlg, "个摄")
         values = [site.value for site in dlg.selected_sites()]
         assert values[0] == "Xcity"
         assert values[1:] == USER_SITE_LISTS[FixedScrapingType.FC2]
@@ -757,9 +761,9 @@ def test_double_clicking_group_title_twice_does_not_duplicate(qt_app):
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _double_click_title(dlg, "国产")
+        _double_click_title(dlg, "传媒")
         first = [site.value for site in dlg.selected_sites()]
-        _double_click_title(dlg, "国产")
+        _double_click_title(dlg, "传媒")
         assert [site.value for site in dlg.selected_sites()] == first
     finally:
         dlg.deleteLater()
@@ -855,9 +859,9 @@ def test_add_all_uses_original_order_while_palette_stays_grouped(qt_app):
         assert _groups_from_widget(dlg) == {
             "有码": ["DMM", "AVBase", "Xcity"],
             "无码": ["AVSOX"],
-            "FC2": ["AVSOX"],
+            "个摄": ["AVSOX"],
             "欧美": ["ThepornDB"],
-            "国产": ["Madouqu"],
+            "传媒": ["Madouqu"],
             "动漫": ["Getchu"],
         }
         assert _site_row_values(dlg) == ["AVBase", "AVSOX", "DMM", "Getchu", "Madouqu", "ThepornDB", "Xcity"]
