@@ -650,6 +650,20 @@ def test_site_tooltip_says_which_sites_link_together():
     assert "联动：" not in " ".join(_site_tooltip_lines(Website.MYWIFE))
 
 
+def test_group_title_tooltip_says_how_many_sites_it_adds(dialog):
+    """分组标题的悬停提示按用户给的写法，把份数直接接在「全部」后面。
+
+    两处改动都按用户口径：开头那句「类型分组标题：」去掉——提示是给这一格自己看的，
+    鼠标就停在这一格上，不必先报一遍它是什么；份数原先用括号夹着（「全部网站（28 个）」），
+    括号里那三个字把一句提示拦腰截断，现改成「全部28个网站」。后半句一个字没动。
+    """
+    tip = dialog.available_list.item(_title_rows(dialog)["有码"]).toolTip()
+    assert tip == "双击即加入该组全部28个网站，右键可复制该组名单或整组加入「启用网站」"
+    # 旧写法不得残留：既不许再用括号夹住份数，也不许再顶着「类型分组标题：」这个前缀
+    assert "（" not in tip and "）" not in tip
+    assert not tip.startswith("类型分组标题")
+
+
 @pytest.mark.parametrize("title", EXPECTED_GROUP_ORDER)
 def test_double_clicking_group_title_adds_that_whole_group(qt_app, title):
     """双击分组标题 = 把该组全部网站按组内优先级次序加入启用列表。"""

@@ -343,9 +343,7 @@ def _make_group_item(title: str, sites: Sequence[Website]) -> QListWidgetItem:
     item.setFont(font)
     item.setData(SITE_GROUP_ROLE, title)
     item.setData(SITE_GROUP_SITES_ROLE, [site.value for site in sites])
-    item.setToolTip(
-        f"类型分组标题：双击即加入该组全部网站（{len(sites)} 个），右键可复制该组名单或整组加入「启用网站」"
-    )
+    item.setToolTip(f"双击即加入该组全部{len(sites)}个网站，右键可复制该组名单或整组加入「启用网站」")
     item.setFlags(Qt.ItemFlag.ItemIsEnabled)
     return item
 
