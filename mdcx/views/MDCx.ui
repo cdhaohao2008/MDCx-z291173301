@@ -22516,9 +22516,9 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <widget class="QLabel" name="label_75">
                       <property name="geometry">
                         <rect>
-                          <x>60</x>
+                          <x>156</x>
                           <y>435</y>
-                          <width>611</width>
+                          <width>515</width>
                           <height>121</height>
                         </rect>
                       </property>
@@ -22555,7 +22555,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <widget class="QLabel" name="label_get_cookie_url">
                       <property name="geometry">
                         <rect>
-                          <x>130</x>
+                          <x>226</x>
                           <y>560</y>
                           <width>430</width>
                           <height>21</height>
@@ -22592,7 +22592,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <widget class="QLabel" name="label_7">
                       <property name="geometry">
                         <rect>
-                          <x>60</x>
+                          <x>156</x>
                           <y>560</y>
                           <width>71</width>
                           <height>21</height>
