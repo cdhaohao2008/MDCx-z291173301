@@ -23225,7 +23225,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>Qt::RightToLeft</enum>
                             </property>
                             <property name="text">
-                              <string>Cloudfleare 校验服务：</string>
+                              <string>Bypass校验服务：</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -23369,7 +23369,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>QFrame::NoFrame</enum>
                             </property>
                             <property name="text">
-                              <string>HTTPS证书校验：</string>
+                              <string>HTTPS 证书校验：</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>

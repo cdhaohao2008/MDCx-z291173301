@@ -14452,7 +14452,7 @@ class Ui_MDCx(object):
         )
         self.comboBox_cf_bypass_backend.setItemText(0, _translate("MDCx", "TRAWL"))
         self.comboBox_cf_bypass_backend.setItemText(1, _translate("MDCx", "flaresolverr"))
-        self.label_cf_bypass_trusted_hosts.setText(_translate("MDCx", "Cloudfleare 校验服务："))
+        self.label_cf_bypass_trusted_hosts.setText(_translate("MDCx", "Bypass校验服务："))
         self.lineEdit_cf_bypass_trusted_hosts.setPlaceholderText(
             _translate("MDCx", "默认留空不校验逗号分隔，如javbus.com,*.javbus.com")
         )
@@ -14465,7 +14465,7 @@ class Ui_MDCx(object):
         self.label_cf_bypass_trusted_hosts_check.setText(_translate("MDCx", "状态：留空不校验（默认）"))
         self.label_65.setText(_translate("MDCx", "重试次数："))
         self.label_64.setText(_translate("MDCx", "代理地址："))
-        self.label_verify_ssl.setText(_translate("MDCx", "HTTPS证书校验："))
+        self.label_verify_ssl.setText(_translate("MDCx", "HTTPS 证书校验："))
         self.checkBox_verify_ssl.setText(_translate("MDCx", "启用HTTPS证书校验，自签名代理/MITM调试时关闭"))
         self.groupBox_44.setTitle(_translate("MDCx", "网站设置"))
         self.label_401.setText(_translate("MDCx", "当前网站："))
