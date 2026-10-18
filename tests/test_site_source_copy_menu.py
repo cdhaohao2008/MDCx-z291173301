@@ -1,15 +1,21 @@
-"""「编辑网站」对话框：右键复制单个站点 / 单个分组 / 整张站点列表。
+"""「编辑网站」对话框：右键复制单个站点 / 单个分组 / 整张站点列表，以及「加入列表：启用网站」。
 
-用户需求原文（三轮）：
+用户需求原文（四轮）：
     1.「鼠标右键点击时可以复制站点列表，单个站点鼠标右键点击也可以复制」
     2.「有码、无码、素人、FC2、欧美、国产右键复制不是复制全部39个站点，
         是复制它们各自包含的站点」
     3.「有码、无码、素人、FC2、欧美、国产后面不要标深色，和其他站点一样纯白背景就行，
         不要空着啊，继续排列DMM、DMM_API、LibreDMM等站点」
+    4.「有码、无码、素人、个摄、欧美、国产、动漫由鼠标单击加入启用网站列表改成由鼠标
+        双击时才加入启用网站列表，右键菜单里加上加入启用网站列表，排在在最下方」
 
 六个分组标题后来从「六个标题各占一行」改成「开头六个加粗标题、后面紧接站点」的普通
 流式排布（见 test_site_source_type_groups.py），「点在某个标题上复制它自己那一份」
-这条语义不变，只是命中判定回到「那一行项目的矩形」。
+这条语义不变，只是命中判定回到「那一行项目的矩形」。整组加入原先是**单击**，第 4 条
+改成**双击**（那条一并锁在 test_site_source_type_groups.py），右键菜单则多出最下方一项
+「加入列表：启用网站」（第 4 条原文写作「加入启用网站列表」，随后按用户要求改成
+「加入列表：启用网站」，与同菜单里的「复制列表：N个站点」对齐）——本文件锁的正是它的
+位置、出现范围与三种落点的语义。
 
 复制出的文本必须是逗号分隔的站点名序列，且与设置页输入框里的格式一致——
 这是「复制」这件事真正有用的前提：粘回输入框（或粘给同事）能被 _parse_sites
@@ -21,6 +27,7 @@ import pytest
 pytest.importorskip("PyQt6.QtWidgets")
 
 from PyQt6.QtCore import QPoint, Qt  # noqa: E402
+from PyQt6.QtGui import QAction  # noqa: E402
 from PyQt6.QtTest import QTest  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QListWidget, QMenu  # noqa: E402
 
@@ -87,6 +94,14 @@ def _right_click(list_widget, point, monkeypatch, pick: str) -> list[str]:
     return [action.text() for action in captured[-1].actions()]
 
 
+def _menu_actions(list_widget, point, monkeypatch) -> list[QAction]:
+    """只把菜单弹出来看一眼（选第一项即可），返回菜单里那一串 QAction。"""
+    captured: list[QMenu] = []
+    monkeypatch.setattr(QMenu, "exec", lambda self, *a, **k: captured.append(self) or self.actions()[0])
+    list_widget.customContextMenuRequested.emit(point)
+    return captured[-1].actions()
+
+
 def _row_of(list_widget, site_value: str) -> int:
     return next(
         row for row in range(list_widget.count()) if list_widget.item(row).data(Qt.ItemDataRole.UserRole) == site_value
@@ -125,10 +140,156 @@ def _title_center(palette, title: str) -> QPoint:
 
 
 def _group_at(palette, title: str) -> list[Website]:
-    """标题自带的成员名单（单击加入与右键复制都以它为唯一依据）。"""
+    """标题自带的成员名单（双击加入与右键复制都以它为唯一依据）。"""
     sites = _group_sites_at(palette, _title_rows(palette)[title])
     assert sites, f"标题「{title}」没有带成员名单"
     return list(sites)
+
+
+def _values(sites) -> list[str]:
+    return [site.value for site in sites]
+
+
+def _site_center(palette, site_value: str) -> QPoint:
+    return _center(palette, palette.item(_row_of(palette, site_value)))
+
+
+ADD_ACTION = "加入列表：启用网站"
+
+
+def test_add_action_sits_at_the_bottom_of_the_palette_menu(qt_app, monkeypatch):
+    """「加入列表：启用网站」排在菜单最下方（用户指定），且与两条「复制」隔开。
+
+    菜单顺序是有讲究的：右键绝大多数时候是为了复制，加入得是刻意滚到最后去点的那一项，
+    所以它既不在最上面、也不夹在两条复制项中间。
+    """
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        _shown(dlg)
+        palette = dlg.available_list
+        texts = _right_click(palette, _title_center(palette, "有码"), monkeypatch, "复制本组")
+        assert texts == ["复制本组：28个站点", "", "复制列表：39个站点", "", ADD_ACTION]
+        assert texts[-1] == ADD_ACTION, ADD_ACTION
+    finally:
+        dlg.deleteLater()
+
+
+def test_add_action_is_absent_from_the_other_lists(qt_app, monkeypatch):
+    """只有候选区有这一项：「启用网站」列表与「字段优先级」那几行没有「启用列表」可言。
+
+    没有「启用网站列表」的地方却摆一项同名动作，用户点了只会不知道加到哪儿去。
+    """
+    dlg = SiteListEditorDialog("t", CUSTOM_ORDER, ALL_SITES, None)
+    priority = FieldPriorityDialog(
+        "t",
+        CUSTOM_ORDER,
+        CUSTOM_ORDER,
+        {CrawlerResultFields.TITLE: FieldPriorityConfig(site_prority=CUSTOM_ORDER)},
+        None,
+    )
+    try:
+        _shown(dlg)
+        assert dlg.selected_list.on_add_to_enabled is None
+        enabled = _right_click(dlg.selected_list, _site_center(dlg.selected_list, "MGStage"), monkeypatch, "复制站点")
+        assert ADD_ACTION not in enabled, enabled
+
+        palette = next(w for w in priority.findChildren(QListWidget) if isinstance(w, SitePaletteList))
+        assert palette.on_add_to_enabled is None
+        field_list = next(iter(priority._field_lists.values()))
+        fields = _right_click(field_list, _center(field_list, field_list.item(0)), monkeypatch, "复制站点")
+        assert ADD_ACTION not in fields, fields
+    finally:
+        dlg.deleteLater()
+        priority.deleteLater()
+
+
+def test_add_action_on_a_group_title_adds_the_whole_group(qt_app, monkeypatch):
+    """右键点标题 → 整组加入（与双击同一套名单、同一套次序）。"""
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        _shown(dlg)
+        palette = dlg.available_list
+        _right_click(palette, _title_center(palette, "有码"), monkeypatch, ADD_ACTION)
+        assert _values(dlg.selected_sites()) == _values(_group_at(palette, "有码"))
+    finally:
+        dlg.deleteLater()
+
+
+def test_add_action_on_a_site_adds_only_that_site(qt_app, monkeypatch):
+    """右键点站点 → 只加那一个：右键不改选中态，不能顺手把选中的那批一起加进来。"""
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        _shown(dlg)
+        palette = dlg.available_list
+        palette.item(_row_of(palette, "IQQTV")).setSelected(True)
+        _right_click(palette, _site_center(palette, "Dahlia"), monkeypatch, ADD_ACTION)
+        assert dlg.selected_sites() == [Website.DAHLIA]
+    finally:
+        dlg.deleteLater()
+
+
+def test_add_action_on_blank_area_adds_the_selected_sites(qt_app, monkeypatch):
+    """右键点空白处 → 加当前选中的那些（等价于「添加选中」按钮）。"""
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        _shown(dlg)
+        palette = dlg.available_list
+        for value in ("Xcity", "IQQTV"):
+            palette.item(_row_of(palette, value)).setSelected(True)
+        _right_click(palette, _blank_corner(palette), monkeypatch, ADD_ACTION)
+        assert _values(dlg.selected_sites()) == ["Xcity", "IQQTV"]
+    finally:
+        dlg.deleteLater()
+
+
+def test_add_action_appends_and_keeps_existing_order(qt_app, monkeypatch):
+    """右键加入与双击同一套规矩：已启用的留在原位，新加的接在后面。"""
+    dlg = SiteListEditorDialog("t", [Website.XCITY], ALL_SITES, None)
+    try:
+        _shown(dlg)
+        palette = dlg.available_list
+        _right_click(palette, _title_center(palette, "国产"), monkeypatch, ADD_ACTION)
+        values = _values(dlg.selected_sites())
+        assert values[0] == "Xcity"
+        assert values[1:] == _values(_group_at(palette, "国产"))
+    finally:
+        dlg.deleteLater()
+
+
+def test_add_action_leaves_the_clipboard_alone(qt_app, monkeypatch):
+    """选「加入」不写剪贴板——它不是复制，别把用户的剪贴板内容顺手换掉。"""
+    app = qt_app
+    app.clipboard().setText("原有内容")
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        _shown(dlg)
+        _right_click(dlg.available_list, _site_center(dlg.available_list, "Dahlia"), monkeypatch, ADD_ACTION)
+        assert app.clipboard().text() == "原有内容"
+        assert dlg.selected_sites() == [Website.DAHLIA]
+    finally:
+        dlg.deleteLater()
+
+
+def test_add_action_is_disabled_only_when_there_is_nothing_to_add(qt_app, monkeypatch):
+    """点在空白处又没选中任何站点时它是灰的——否则点了列表纹丝不动，像坏了。
+
+    点了站点或点了标题都无站不可加，只有「空白处 + 无选中」这一种落点是空转。
+    """
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        _shown(dlg)
+        palette = dlg.available_list
+
+        def add_enabled_at(point) -> bool:
+            return next(a.isEnabled() for a in _menu_actions(palette, point, monkeypatch) if a.text() == ADD_ACTION)
+
+        assert add_enabled_at(_blank_corner(palette)) is False
+        assert add_enabled_at(_site_center(palette, "Dahlia")) is True
+        assert add_enabled_at(_title_center(palette, "有码")) is True
+        palette.item(_row_of(palette, "Dahlia")).setSelected(True)
+        assert add_enabled_at(_blank_corner(palette)) is True
+    finally:
+        dlg.deleteLater()
 
 
 def test_right_click_site_copies_only_that_site(qt_app, monkeypatch):
@@ -182,7 +343,7 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
         _shown(dlg)
         palette = dlg.available_list
         texts = _right_click(palette, _title_center(palette, "有码"), monkeypatch, "复制本组")
-        assert texts == ["复制本组：28个站点", "", "复制列表：39个站点"]
+        assert texts == ["复制本组：28个站点", "", "复制列表：39个站点", "", "加入列表：启用网站"]
         copied = app.clipboard().text().split(",")
         assert copied[:3] == ["DMM", "DMM_API", "LibreDMM"]
         assert len(copied) == 28 == len(set(copied))
@@ -253,7 +414,7 @@ def test_right_click_gap_between_titles_copies_the_whole_list(qt_app, monkeypatc
         )
         assert blank is not None, "首行末尾没有空白处可测"
         texts = _right_click(palette, QPoint(blank, top), monkeypatch, "复制列表")
-        assert texts == ["复制列表：39个站点"]
+        assert texts == ["复制列表：39个站点", "", "加入列表：启用网站"]
     finally:
         dlg.deleteLater()
 

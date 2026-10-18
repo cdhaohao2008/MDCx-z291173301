@@ -1,6 +1,6 @@
 """「编辑网站」对话框：可用网站（网址源）开头的七个加粗分组标题，其后紧接全部可用站点。
 
-用户需求原文（五轮累积）：
+用户需求原文（六轮累积）：
     1.「在所有网站前加上有码、无码、素人、FC2、欧美、国产这几个选项」
        ——逐组给出的站点清单，组内顺序即优先级递减，不得改动排序；
     2.「点击有码、无码、素人、FC2、欧美、国产要将包含的网站加入到启用网站列表里，
@@ -11,6 +11,10 @@
         不要空着啊，继续排列DMM、DMM_API、LibreDMM等站点」
     6.「有码：仅能有码（镜像站，无 CF 墙，默认中文页）改成 有码：仅能有码」「有码又圈起来了」
         「DMM到MyWife从A-Z排序啊」
+    7.「有码、无码、素人、个摄、欧美、国产、动漫由鼠标单击加入启用网站列表改成由鼠标
+        双击时才加入启用网站列表，右键菜单里加上加入启用网站列表，排在在最下方」
+       ——第 2 条那句「点击…要加入」后来细化成**双击**：七个标题挤在候选区第一行，
+        顺着扫一眼必然挨个碰过去，单击就整组塞进启用列表（且无从撤销）不是用户要的。
 
 第 3、4 条曾被实现成「六个标题占满候选区最上面一整行」（accent 底色 + 边框 + 自绘 chip，
 站点从第二行才开始），第 5 条把这条路否掉了：标题就是普通的一格，与其它站点同底色、
@@ -24,8 +28,10 @@
     4. 站点按名称 A-Z 去重铺放、每个站只出现一次（7mmtv … Xcity）；
     5. 候选区任何时刻都没有当前项——Qt 默认会把第一行设成当前项并给它套聚焦框，
        于是第一个标题「被圈起来」；
-    6. 单击某个标题 = 把这一组整组加入启用列表；标题只有这六个，不存在「其他」；
-    7. 站点行的单击仍旧只是选中（加入靠双击或「添加选中」），双击标题无副作用；
+    6. **双击**某个标题 = 把这一组整组加入启用列表（单击什么也不加）；标题只有这七个，
+       不存在「其他」；
+    7. 站点行的单击仍旧只是选中（加入靠双击或「添加选中」）；双击标题不会把「上一次
+       选中残留」顺带加进去；
     8. 启用列表的顺序仍旧完全由用户决定（分组只作用于候选区的展示）。
 
 另外还锁了一条「候选区分组 == 配置默认名单」的不变量：两者同源于
@@ -37,7 +43,8 @@ import pytest
 
 pytest.importorskip("PyQt6.QtWidgets")
 
-from PyQt6.QtCore import QPoint, Qt  # noqa: E402
+from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt  # noqa: E402
+from PyQt6.QtGui import QMouseEvent  # noqa: E402
 from PyQt6.QtTest import QTest  # noqa: E402
 from PyQt6.QtWidgets import (  # noqa: E402
     QApplication,
@@ -357,6 +364,38 @@ def _click_title(dialog, title: str) -> None:
     QTest.mouseClick(dialog.available_list.viewport(), Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, point)
 
 
+def _double_click(list_widget, point) -> None:
+    """真的双击一下某一点（走 `QAbstractItemView` 的按下→双击那条链路）。
+
+    **不能用 `QTest.mouseDClick`**：离屏平台下它发出的双击不会被 Qt 认成
+    `mouseDoubleClickEvent`，实测 `itemDoubleClicked` 一次都不触发，拿它做断言只会假绿。
+    照 Qt 的真实顺序手工发四个事件即可（`mouseDoubleClickEvent` 要求
+    `d->pressedIndex == index`，少了第一步「按下」它会退化成一次普通按下）。
+    """
+    for event_type, state in (
+        (QEvent.Type.MouseButtonPress, Qt.MouseButton.LeftButton),
+        (QEvent.Type.MouseButtonRelease, Qt.MouseButton.NoButton),
+        (QEvent.Type.MouseButtonDblClick, Qt.MouseButton.LeftButton),
+        (QEvent.Type.MouseButtonRelease, Qt.MouseButton.NoButton),
+    ):
+        QApplication.sendEvent(
+            list_widget.viewport(),
+            QMouseEvent(
+                event_type,
+                QPointF(point),
+                QPointF(point),
+                Qt.MouseButton.LeftButton,
+                state,
+                Qt.KeyboardModifier.NoModifier,
+            ),
+        )
+    QApplication.processEvents()
+
+
+def _double_click_title(dialog, title: str) -> None:
+    _double_click(dialog.available_list, _visible_center(dialog.available_list, _title_rows(dialog)[title]))
+
+
 # --------------------------------------------------------------------------- 纯函数层
 
 
@@ -513,9 +552,9 @@ def test_no_item_carries_a_focus_ring(qt_app):
         palette.setFocus()
         qt_app.processEvents()
         assert palette.currentRow() == -1, "一聚焦 Qt 就把当前项设成了第一行（那是第一个标题）"
-        _click_title(dlg, "有码")
-        assert palette.currentRow() == -1, "点了标题后它成了当前项，被套上聚焦框"
-        assert dlg.selected_sites(), "点标题本该整组加入（清当前项不该把功能一起清掉）"
+        _double_click_title(dlg, "有码")
+        assert palette.currentRow() == -1, "双击标题后它成了当前项，被套上聚焦框"
+        assert dlg.selected_sites(), "双击标题本该整组加入（清当前项不该把功能一起清掉）"
     finally:
         dlg.deleteLater()
 
@@ -597,19 +636,34 @@ def test_site_tooltip_says_which_types_it_serves():
 
 
 @pytest.mark.parametrize("title", EXPECTED_GROUP_ORDER)
-def test_clicking_group_title_adds_that_whole_group(qt_app, title):
-    """单击分组标题 = 把该组全部网站按组内优先级次序加入启用列表。"""
+def test_double_clicking_group_title_adds_that_whole_group(qt_app, title):
+    """双击分组标题 = 把该组全部网站按组内优先级次序加入启用列表。"""
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _click_title(dlg, title)
+        _double_click_title(dlg, title)
         assert [site.value for site in dlg.selected_sites()] == USER_SITE_LISTS[USER_TITLES_INV[title]]
     finally:
         dlg.deleteLater()
 
 
-def test_clicking_the_last_group_does_not_swallow_untitled_sites(qt_app):
-    """七组之外零星站点（MyWife）没有标题、就接在末尾，点「国产」不该顺带加上它。
+def test_single_clicking_group_title_adds_nothing(qt_app):
+    """单击标题什么也不加——它是「看一眼这是哪一组」，不是「加入这一组」。
+
+    七组标题就挤在列表第一行，顺着扫一眼必然挨个碰过去；单击就整组塞进启用列表的话，
+    用户只是碰了一下就把三十来个站加进去了（且没有撤销），所以整组加入必须落在双击上。
+    """
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        _laid_out(dlg, qt_app)
+        _click_title(dlg, "有码")
+        assert dlg.selected_sites() == [], "单击标题就整组加进了启用列表"
+    finally:
+        dlg.deleteLater()
+
+
+def test_double_clicking_the_last_group_does_not_swallow_untitled_sites(qt_app):
+    """七组之外零星站点（MyWife）没有标题、就接在末尾，双击「国产」不该顺带加上它。
 
     这正是「没有其他分组」带来的坑：成员必须取自标题自带的名单，不能按行范围读，
     否则末尾这批零散站点会被算进上一组。
@@ -617,7 +671,7 @@ def test_clicking_the_last_group_does_not_swallow_untitled_sites(qt_app):
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _click_title(dlg, "国产")
+        _double_click_title(dlg, "国产")
         assert [site.value for site in dlg.selected_sites()] == USER_SITE_LISTS[FixedScrapingType.GUOCHAN]
         assert Website.MYWIFE not in dlg.selected_sites()
         # 它仍然出现在候选区里，只是不再有自己的标题
@@ -626,12 +680,12 @@ def test_clicking_the_last_group_does_not_swallow_untitled_sites(qt_app):
         dlg.deleteLater()
 
 
-def test_clicking_group_title_appends_and_keeps_existing_order(qt_app):
+def test_double_clicking_group_title_appends_and_keeps_existing_order(qt_app):
     """已启用的站点留在原位不动，新组接在后面。"""
     dlg = SiteListEditorDialog("t", [Website.XCITY], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _click_title(dlg, "个摄")
+        _double_click_title(dlg, "个摄")
         values = [site.value for site in dlg.selected_sites()]
         assert values[0] == "Xcity"
         assert values[1:] == USER_SITE_LISTS[FixedScrapingType.FC2]
@@ -639,21 +693,21 @@ def test_clicking_group_title_appends_and_keeps_existing_order(qt_app):
         dlg.deleteLater()
 
 
-def test_clicking_group_title_twice_does_not_duplicate(qt_app):
-    """重复单击同一标题是幂等的，不会把同一批站点塞两遍。"""
+def test_double_clicking_group_title_twice_does_not_duplicate(qt_app):
+    """重复双击同一标题是幂等的，不会把同一批站点塞两遍。"""
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _click_title(dlg, "国产")
+        _double_click_title(dlg, "国产")
         first = [site.value for site in dlg.selected_sites()]
-        _click_title(dlg, "国产")
+        _double_click_title(dlg, "国产")
         assert [site.value for site in dlg.selected_sites()] == first
     finally:
         dlg.deleteLater()
 
 
 def test_clicking_a_site_row_does_not_add_it(qt_app):
-    """只有标题是「一点就整组进」；站点行的单击仍旧只是选中。"""
+    """站点行的单击仍旧只是选中（双击才加入）。"""
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         palette = _laid_out(dlg, qt_app)
@@ -666,23 +720,29 @@ def test_clicking_a_site_row_does_not_add_it(qt_app):
         dlg.deleteLater()
 
 
-def test_double_clicking_a_group_title_adds_nothing_extra(qt_app):
-    """双击标题不能把上次选中的残留站点顺带加进去；双击站点仍然正常加入。
+def test_double_clicking_a_site_row_adds_only_that_site(qt_app):
+    """双击站点行 = 加入该站，与双击标题一样走鼠标那条链路。"""
+    dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
+    try:
+        palette = _laid_out(dlg, qt_app)
+        _double_click(palette, _visible_center(palette, _row_of(dlg, "7mmtv")))
+        assert dlg.selected_sites() == [Website.MMTV]
+    finally:
+        dlg.deleteLater()
 
-    这里直接走 `itemDoubleClicked` 的处理函数而不是合成双击事件：离屏环境下
-    QTest.mouseDClick 发出的双击不会被 QListWidget 认成 `mouseDoubleClickEvent`
-    （实测 itemDoubleClicked 一次都不触发），拿它做断言只会假绿。
+
+def test_double_clicking_a_group_title_ignores_leftover_selection(qt_app):
+    """双击标题只加它自己那一组，不把「上一次选中残留」顺带加进去。
+
+    标题不可选中，双击它不会改变选中集——这正是「按标题自带的名单加入」而不是复用
+    `_add_selected` 的原因（后者读的是当前选中项）。这里先故意选中一个站再双击标题。
     """
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
-        _laid_out(dlg, qt_app)
-        dlg._on_available_double_clicked(dlg.available_list.item(_title_rows(dlg)["有码"]))
-        assert dlg.selected_sites() == []
-
-        row = _row_of(dlg, "7mmtv")
-        dlg.available_list.item(row).setSelected(True)
-        dlg._on_available_double_clicked(dlg.available_list.item(row))
-        assert dlg.selected_sites() == [Website.MMTV]
+        palette = _laid_out(dlg, qt_app)
+        palette.item(_row_of(dlg, "7mmtv")).setSelected(True)
+        _double_click(palette, _visible_center(palette, _title_rows(dlg)["无码"]))
+        assert [site.value for site in dlg.selected_sites()] == USER_SITE_LISTS[FixedScrapingType.WUMA]
     finally:
         dlg.deleteLater()
 

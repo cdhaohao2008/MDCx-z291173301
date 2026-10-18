@@ -322,8 +322,9 @@ def _make_site_item(site: Website) -> QListWidgetItem:
 
 # 分组标题与站点同样占一个条目、同样走默认委托（纯白背景、与站点 chip 同高、宽度按
 # 字体走），只是不带 UserRole、不可选中不可拖动——_list_sites / _selected_sites 靠
-# UserRole 过滤站点行，自然把标题排除在外。单���某个标题即加入该组全部网站、右键复制
-# 该组名单，都直接读这两个角色，不必按行范围去猜（换行位置、组数增减都不影响）。
+# UserRole 过滤站点行，自然把标题排除在外。双击某个标题即加入该组全部网站、右键
+# 「加入列表：启用网站」同样可整组加入、右键复制该组名单，都直接读这两个角色，不必按行
+# 范围去猜（换行位置、组数增减都不影响）。
 SITE_GROUP_ROLE = Qt.ItemDataRole.UserRole + 1
 SITE_GROUP_SITES_ROLE = Qt.ItemDataRole.UserRole + 2
 
@@ -342,7 +343,9 @@ def _make_group_item(title: str, sites: Sequence[Website]) -> QListWidgetItem:
     item.setFont(font)
     item.setData(SITE_GROUP_ROLE, title)
     item.setData(SITE_GROUP_SITES_ROLE, [site.value for site in sites])
-    item.setToolTip(f"类型分组标题：单击即加入该组全部网站（{len(sites)} 个），右键复制该组名单")
+    item.setToolTip(
+        f"类型分组标题：双击即加入该组全部网站（{len(sites)} 个），右键可复制该组名单或整组加入「启用网站」"
+    )
     item.setFlags(Qt.ItemFlag.ItemIsEnabled)
     return item
 
@@ -505,6 +508,12 @@ def _site_list_context_menu(list_widget: QListWidget, pos) -> None:
     复制的是「点到的那个东西」：点在站点上复制该站点，点在某个分组标题上复制该组
     自己的名单（不是整张列表——六个类型就是六份不同的名单，复制整张等于把分类白做了），
     点在空白处才复制整张列表。
+
+    最下方另有「加入列表：启用网站」：只有「编辑网站」对话框的候选区挂了
+    `on_add_to_enabled` 回调才出现（启用列表与字段优先级那几行没有「启用网站列表」可言），
+    它把「点的哪一格就加入哪一格」这条规则交给回调去做：点标题加入整组、点站点加入那一个、
+    点空白处加入当前选中的那些。排在最下方是为了不和上面两条「复制」混作一谈——用户
+    右键多半是为了复制，加入得是刻意选的那一项。
     """
     item = list_widget.itemAt(pos)
     site_value = item.data(Qt.ItemDataRole.UserRole) if _is_site_item(item) else None
@@ -528,8 +537,20 @@ def _site_list_context_menu(list_widget: QListWidget, pos) -> None:
         primary = menu.addAction(primary_text)
         menu.addSeparator()
     list_action = menu.addAction(f"复制列表：{len(sites)}个站点")
+    on_add_to_enabled = getattr(list_widget, "on_add_to_enabled", None)
+    add_action: QAction | None = None
+    if on_add_to_enabled is not None:
+        menu.addSeparator()
+        add_action = menu.addAction("加入列表：启用网站")
+        # 点在空白处又没选中任何站点时无站可加（`_selected_sites` 无选中项可读），
+        # 摆个灰项让人一眼看出点它没用，而不是点了之后列表纹丝不动
+        if item is None and not _selected_sites(list_widget):
+            add_action.setEnabled(False)
 
     if (chosen := menu.exec(list_widget.viewport().mapToGlobal(pos))) is None:
+        return
+    if add_action is not None and chosen is add_action:
+        on_add_to_enabled(item)
         return
     if primary is not None and chosen is primary:
         text = site_value if site_value is not None else _sites_text(group_sites)
@@ -635,6 +656,11 @@ class _SiteListBase(QListWidget):
         # 鼠标正好停在行内那条滚动条上时，滚轮由滚动条接手，它滚不动时同样 ignore 事件，
         # 递上来的第一站就是本控件，加了这个属性就不会再越过本控件去带动上层滚动区。
         self.setAttribute(Qt.WidgetAttribute.WA_NoMousePropagation, True)
+        # on_add_to_enabled：右键菜单最下方「加入列表：启用网站」的回调，签名是
+        # (item) -> None，item 是右键按下的那一格（点在空白处时为 None）。留空则菜单里
+        # 不出现这一项——「启用网站」列表和「字段优先级」那几行都没有「启用列表」可言，
+        # 只有「编辑网站」对话框的候选区会挂上它（见 SiteListEditorDialog._add_from_palette）。
+        self.on_add_to_enabled = None
 
     def wheelEvent(self, event) -> None:
         """滚轮只滚本列表；本行滚不动时也照样吃掉，不往上递给外层滚动区。"""
@@ -928,9 +954,10 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
 
         copy_hint = QLabel(
             "开头的七个加粗标题是有码、无码、素人、个摄、欧美、国产、动漫，"
-            "单击一个标题即加入该组全部网站，"
+            "双击一个标题即加入该组全部网站，"
             "后面紧跟全部可用网站（按名称 A-Z 排序、每个站只出现一次）。"
-            "右键：站点上复制该站点、标题上复制本组名单、空白处复制整张列表"
+            "右键：站点上复制该站点、标题上复制本组名单、空白处复制整张列表，"
+            "最下方另有「加入列表：启用网站」"
         )
         copy_hint.setWordWrap(True)
         copy_hint.setStyleSheet(f"color: {get_theme_tokens(self._dark)['text_muted']};")
@@ -958,8 +985,8 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         remove_button.clicked.connect(self._remove_selected)
         add_all_button.clicked.connect(self._add_all)
         clear_button.clicked.connect(self._clear_selected)
-        self.available_list.itemClicked.connect(self._on_available_clicked)
         self.available_list.itemDoubleClicked.connect(self._on_available_double_clicked)
+        self.available_list.on_add_to_enabled = self._add_from_palette
         self.selected_list.itemDoubleClicked.connect(lambda _item: self._remove_selected())
 
         buttons.accepted.connect(self.accept)
@@ -1010,20 +1037,32 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         layout.addWidget(list_widget)
         return panel
 
-    def _on_available_clicked(self, item) -> None:
-        """单击分组标题 = 整组加入；单击站点行只是选中（加入靠双击或「添加选中」）。
+    def _on_available_double_clicked(self, item) -> None:
+        """双击分组标题 = 整组加入；双击站点行 = 加入该站（与「添加选中」同一套）。
 
-        站点行的单击仍旧只是选中——用户按类型挑网站源时要的是标题那一下，
-        顺着列表扫一眼时不该一路把站点都加进去。
+        分组标题原来是**单击**整组加入的，本轮按用户口径改成**双击**：单击那一格
+        用户只是想看看它是哪一组，顺手扫过列表时不该一路把整组站点都塞进启用列表。
+        标题不可选中，所以双击它不会带上「上次选中的残留」——单击标题什么也没选中，
+        这里直接按标题自带的名单加入即可（`_add_sites` 里已启用的保持原位，重复双击幂等）。
         """
         if _is_group_item(item):
             self._add_sites(_group_sites_at(self.available_list, self.available_list.row(item)))
-
-    def _on_available_double_clicked(self, item) -> None:
-        # 双击分组标题不做任何事：单击标题已经加过整组，这里若照旧调
-        # _add_selected，会把「上一次选中残留」当成双击结果顺带加进去。
+            return
         if _is_site_item(item):
             self._add_selected()
+
+    def _add_from_palette(self, item) -> None:
+        """右键「加入列表：启用网站」：点的哪一格就加入哪一格。
+
+        点标题 = 整组加入（同双击）、点站点 = 只加那一个（右键不改选中态，所以不能靠
+        `_add_selected`）、点空白处 = 加当前选中的那些（等价于「添加选中」按钮）。
+        无论哪一种，最终都走 `_add_sites`：已启用的保持原位、联动组自动补齐。
+        """
+        if _is_group_item(item):
+            self._add_sites(_group_sites_at(self.available_list, self.available_list.row(item)))
+            return
+        sites = [Website(item.data(Qt.ItemDataRole.UserRole))] if _is_site_item(item) else []
+        self._add_sites(sites or _selected_sites(self.available_list))
 
     def _refresh_lists(self) -> None:
         _setup_site_list(self.available_list, self._palette_sites, grouped=self.available_list.grouped)
