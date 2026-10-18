@@ -224,14 +224,22 @@ def test_move_does_not_resurrect_manually_removed_members(qt_app):
     assert values == ["JavBus", "Getchu", "DMM"]
 
 
-def test_move_keeps_moved_items_selected_for_chained_drag(qt_app):
+def test_move_leaves_nothing_selected_so_qt_cannot_delete_them(qt_app):
+    """挪完之后**不能**留着选中态，否则 Qt 的收尾会把刚挪好的站点删掉。
+
+    `QAbstractItemView::startDrag` 收尾时是
+        if (drag->exec(...) == Qt::MoveAction && !d->dropEventMoved) d->clearOrRemove();
+    `dropEventMoved` 全 Qt 只有 startDrag 自己置 false，没有任何一处置 true，而 clearOrRemove()
+    删的正是「当前选中着的整行」。所以挪完必须自己把选中态清干净。
+    （早前这里断言的是「保留选中态便于连着拖下一次」——那条恰好就是站点凭空消失的成因。）
+    """
     _, lst = _editor(qt_app, SPLIT)
     for r in range(lst.count()):
         lst.item(r).setSelected(lst.item(r).data(Qt.ItemDataRole.UserRole) == "DMM")
     lst.mimeData([lst.currentItem()])
     lst._move_sites(5)
-    selected = {lst.item(r).data(Qt.ItemDataRole.UserRole) for r in range(lst.count()) if lst.item(r).isSelected()}
-    assert selected == {"DMM", "LibreDMM"}
+    assert lst.selectedItems() == [], "留了选中态，Qt 收尾时会把这些站点删掉"
+    assert _values(lst) == ["JavBus", "Getchu", "AVSOX", "DMM", "LibreDMM"]
 
 
 def test_moving_is_grouped_only_when_auto_group_enabled(qt_app):

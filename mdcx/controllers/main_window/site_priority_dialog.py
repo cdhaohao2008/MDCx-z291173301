@@ -608,13 +608,39 @@ def _localize_dialog_buttons(buttons: QDialogButtonBox) -> None:
 
 
 class _SiteListBase(QListWidget):
-    """站点列表的共用行为：右键只弹菜单，不改选中态。
+    """站点列表的共用行为：右键只弹菜单不改选中态；滚轮只滚自己，不外传。
 
-    Qt 默认在右键按下时会顺手选中那一格，于是被右键的格子套上 `:selected` 的深色底，
-    看着像「多了一个内部方框」，菜单关掉后那格还留着高亮。右键的动作只是复制，
-    不该改变选中状态：按下前后把「选中的行 + 当前行」原样保留，菜单读的是按下的
+    右键那条：Qt 默认在右键按下时会顺手选中那一格，于是被右键的格子套上 `:selected`
+    的深色底，看着像「多了一个内部方框」，菜单关掉后那格还留着高亮。右键的动作只是
+    复制，不该改变选中状态：按下前后把「选中的行 + 当前行」原样保留，菜单读的是按下的
     位置，不依赖选中态，所以恢复不影响复制。
+
+    滚轮那条（「字段优先级」窗口）：十九行字段挤在一个 QScrollArea 里，每行是一个
+    固定 58 高、左到右换行的站点列表。Qt 的滚轮是**自发事件**——派发方式为「从鼠标
+    底下的控件起，沿父控件一路往上递，直到某一层既处理了（event() 返回 true）又接受
+    了事件才停」（见 `QApplication::notify` 里 `case QEvent::Wheel` 那段 do-while）。
+    实测（离屏探针，同一版 PyQt6 6.11）：
+        - 本行还能滚  → wheelEvent 滚了滚动条并 accept，视口层 res=True → 传递在此终止；
+        - 本行已到底 / 这一行站点太少装得下 → Qt 把事件 ignore 掉 → 继续往上递 →
+          被外层 QScrollArea 接住 → **上下行与最右侧滚动条一起动**（用户实机截图标注
+          的正是这一处）。
+    所以「鼠标在标题里滚只影响标题」要靠两处收口：wheelEvent 里滚不动也照样 accept
+    （截住最常见的那条路径），以及 WA_NoMousePropagation（在列表这一层就把传递掐断，
+    兜住没走到 wheelEvent 的路径，例如鼠标正好停在行内那条滚动条上）。
     """
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        # 兜底：滚轮在列表这一层就把传递掐断。它管的是「没走到 wheelEvent 的那条路」——
+        # 鼠标正好停在行内那条滚动条上时，滚轮由滚动条接手，它滚不动时同样 ignore 事件，
+        # 递上来的第一站就是本控件，加了这个属性就不会再越过本控件去带动上层滚动区。
+        self.setAttribute(Qt.WidgetAttribute.WA_NoMousePropagation, True)
+
+    def wheelEvent(self, event) -> None:
+        """滚轮只滚本列表；本行滚不动时也照样吃掉，不往上递给外层滚动区。"""
+        super().wheelEvent(event)
+        if not event.isAccepted():
+            event.accept()
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.RightButton:
@@ -660,10 +686,28 @@ class SitePaletteList(_SiteListBase):
 
     def mousePressEvent(self, event) -> None:
         super().mousePressEvent(event)  # 右键不改选中态由 _SiteListBase 负责
-        # 点分组标题只是「整组加入」，不需要它成为当前项——当前项会被套上聚焦框，
-        # 标题就会比旁边的站点多一圈边框。松开当前项后所有格子观感一致。
-        if _is_group_item(self.itemAt(_event_pos(event))):
-            self.setCurrentRow(-1)
+        # 候选区不需要「当前项」这个状态：点分组标题是「整组加入」，点站点行只是「选中」，
+        # 谁都不是「当前位置」。留着当前项反而会被 Qt 套上一个内嵌的聚焦框——见
+        # _release_current_item 的说明。左键点哪一格都清，右键点标题也清（与旧行为一致）。
+        if _is_group_item(self.itemAt(_event_pos(event))) or event.button() == Qt.MouseButton.LeftButton:
+            self._release_current_item()
+
+    def _release_current_item(self) -> None:
+        """清掉当前项，但保住按下时已经选中的那几格。
+
+        为什么非得保住：`QAbstractItemView::setCurrentIndex` 对无效索引并不只清当前项——
+        它照样先问一句 `selectionCommand(无效索引, nullptr)`（无事件时是 ClearAndSelect），
+        再交给 `QItemSelectionModel::setCurrentIndex` → `select(无效索引, ClearAndSelect)`，
+        整个选中集跟着一起没了（实测：选中一行后 setCurrentRow(-1)，selectedItems 变空）。
+        所以先记下选中的行、清完再逐个还回去；`setSelected` 不碰当前项（实测），还回去之后
+        当前项仍是 -1、聚焦框也就没有了。右键那条（_SiteListBase.mousePressEvent）用的也是
+        同一套路。
+        """
+        selected = [self.row(item) for item in self.selectedItems()]
+        self.setCurrentRow(-1)
+        for row in selected:
+            if (item := self.item(row)) is not None:
+                item.setSelected(True)
 
     def focusInEvent(self, event) -> None:
         super().focusInEvent(event)
@@ -801,12 +845,17 @@ class PrioritySiteList(_SiteListBase):
         current = [site for site in original if site not in moved_set]
         row = max(0, min(row - dropped_before, len(current)))
         _setup_site_list(self, current[:row] + moved + current[row:])
-        # 保留被移动项的选中态，便于用户接着拖下一次（_setup_site_list 会重建列表）
+        # 挪完之后**不能**把被移动的站点重新选中，否则它们会被 Qt 当场删掉：
+        # QAbstractItemView::startDrag 的收尾是
+        #     if (drag->exec(...) == Qt::MoveAction && !d->dropEventMoved) d->clearOrRemove();
+        # 而 dropEventMoved 除了 startDrag 自己置 false 之外，全 Qt 没有任何一处置 true
+        # （基类 dropEvent 也没置，自实现的 dropEvent 自然更不会），所以只要这次拖拽以
+        # Move 收场（本列表的 defaultDropAction 正是 Move，我们又 acceptProposedAction），
+        # clearOrRemove() 必被调用——它删的是「当前选中着的那些整行」。顺序我们已经改好了，
+        # Qt 再删一次，表现就是「拖一下调顺序，站点直接消失」（用户实机反馈的正是这条）。
+        # 字段优先级那几行走的是基类 dropEvent（Qt 自己 moveRows），Qt 搬动时已经先把选中态
+        # 带走了，所以那边不受这条收尾影响；只有这条自实现路径要自己把选中态清干净。
         self.clearSelection()
-        for list_row in range(self.count()):
-            item = self.item(list_row)
-            if item is not None and item.data(Qt.ItemDataRole.UserRole) in moved_set:
-                item.setSelected(True)
 
     def mimeData(self, items: list[QListWidgetItem]):
         self.drag_sites = _selected_sites(self)
