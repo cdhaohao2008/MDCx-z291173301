@@ -19,6 +19,10 @@ class UncensoredOfficialSpec:
     studio: str
     json_base_url: str = ""
     sample_base_url: str = ""
+    # 网络检测用的探测番号：必须带本站前缀，route_uncensored_official 才能把它
+    # 精确路由回本站（否则 Official 爬虫会落到别家官网去实刮，检测项与被测站点
+    # 就对不上号了，议题 #133）。取值均已实测存在且能解析出标题。
+    probe_number: str = ""
 
 
 UNCENSORED_OFFICIAL_SITES: dict[UncensoredOfficialSite, UncensoredOfficialSpec] = {
@@ -27,11 +31,13 @@ UNCENSORED_OFFICIAL_SITES: dict[UncensoredOfficialSite, UncensoredOfficialSpec] 
         base_url="https://www.caribbeancom.com",
         studio="Caribbeancom",
         sample_base_url="https://smovie.caribbeancom.com",
+        probe_number="caribbeancom-082226-001",
     ),
     "heyzo": UncensoredOfficialSpec(
         source="heyzo",
         base_url="https://www.heyzo.com",
         studio="HEYZO",
+        probe_number="heyzo-3935",
     ),
     "1pondo": UncensoredOfficialSpec(
         source="1pondo",
@@ -39,6 +45,7 @@ UNCENSORED_OFFICIAL_SITES: dict[UncensoredOfficialSite, UncensoredOfficialSpec] 
         studio="1Pondo",
         json_base_url="https://www.1pondo.tv",
         sample_base_url="https://smovie.1pondo.tv",
+        probe_number="1pondo-072625_001",
     ),
     "pacopacomama": UncensoredOfficialSpec(
         source="pacopacomama",
@@ -46,6 +53,7 @@ UNCENSORED_OFFICIAL_SITES: dict[UncensoredOfficialSite, UncensoredOfficialSpec] 
         studio="Pacopacomama",
         json_base_url="https://www.pacopacomama.com",
         sample_base_url="https://smovie.pacopacomama.com",
+        probe_number="pacopacomama-072625_100",
     ),
     "10musume": UncensoredOfficialSpec(
         source="10musume",
@@ -53,6 +61,7 @@ UNCENSORED_OFFICIAL_SITES: dict[UncensoredOfficialSite, UncensoredOfficialSpec] 
         studio="10Musume",
         json_base_url="https://www.10musume.com",
         sample_base_url="https://smovie.10musume.com",
+        probe_number="10musume-072625_01",
     ),
 }
 

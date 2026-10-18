@@ -41,6 +41,10 @@ class NetworkCheckSpec:
     warning_if_missing: str = ""
     enable_cf_bypass: bool = False
     validator: str = ""
+    # 该检测项专用的刮削探测番号，优先于爬虫类的 probe_number 与全局
+    # SCRAPE_PROBE_NUMBER。Official 无码官网五站各用一个带站点前缀的真实番号，
+    # 避免五行检测项都拿同一个番号去实刮「别家」官网（见 _build_site_specs）。
+    probe_number: str = ""
 
 
 @dataclass(frozen=True)
@@ -450,6 +454,41 @@ def _compute_used_proxy(spec: NetworkCheckSpec) -> bool:
         return False
 
 
+def _probe_number_missing_reason(error_msg: str) -> str:
+    """把「探测番号在本站不存在」的确定性特征翻译成原因短语；不命中返回空串。
+
+    这些特征（详情页 404 / 番号形态不被官网前缀表识别 / 搜索无匹配 / 官网子
+    爬虫取不到）共同说明：站点本身是通的，只是这个探测番号用不了——绝不能
+    再按「站点无效·超时」上报（议题 #133：Official 五站原先一律拿 SSNI-647 去
+    实刮 s1s1s1.com，那个站被挡时五行一起报「均超时」，实际测的根本不是这五行
+    对应的官网）。它们同时也是确定性失败，重试没有意义。
+    """
+    if not error_msg:
+        return ""
+    if any(marker in error_msg for marker in ("HTTP 404", "404 Not Found")):
+        return "该番号页面已 404"
+    if "不在官网番号前缀列表中" in error_msg:
+        return "番号形态不在官网前缀列表中"
+    if "未匹配到番号" in error_msg:
+        return "搜索结果未匹配到该番号"
+    if "官网子爬虫未返回数据" in error_msg:
+        return "官网子爬虫取不到该番号"
+    return ""
+
+
+def _probe_missing_number_message(probe_number: str, reason: str) -> str:
+    """站点连通、但这个探测番号在本站不存在时的「另行提示」文案。
+
+    刻意与「站点无效 / 刮削探测均超时」区分开：这是探测番号用错或已下架，
+    不是站点故障，用户不需要为它反复点「重试失败项」。
+    """
+    detail = f"（{reason}）" if reason else ""
+    return (
+        f"站点可达，但探测番号 {probe_number} 未被该站点收录{detail}"
+        "——非站点故障，可忽略本提示，或手动换一个该站真实番号实测"
+    )
+
+
 async def _probe_crawler_by_run(
     crawler: Any,
     input_data: Any,
@@ -473,6 +512,10 @@ async def _probe_crawler_by_run(
             error_display = "页面解析失败（解析结果为空，无法执行节点提取/xpath）"
         else:
             error_display = error_msg
+        missing_reason = _probe_number_missing_reason(error_display)
+        if missing_reason:
+            # 站点连通、只是这个探测番号在本站不存在：另行提示，不按站点故障上报
+            return NetworkCheckStatus.WARNING, _probe_missing_number_message(probe_number, missing_reason)
         message = (
             f"站点可达但刮削探测失败: {error_display}"
             if error_display
@@ -518,7 +561,7 @@ async def _probe_crawler_capability(
         if special_path and crawler_base.endswith(special_path):
             crawler_base = crawler_base[: -len(special_path)].rstrip("/")
         crawler = crawler_cls(client=client, base_url=crawler_base, browser=None)
-        probe_number = getattr(crawler_cls, "probe_number", "") or SCRAPE_PROBE_NUMBER
+        probe_number = spec.probe_number or getattr(crawler_cls, "probe_number", "") or SCRAPE_PROBE_NUMBER
         input_data = CrawlerInput(
             appoint_number="",
             appoint_url="",
@@ -594,13 +637,26 @@ _TRANSIENT_PROBE_MARKERS = (
 # （同一节点重试仍是同一 IP）——为它们白等 45+60s 没有意义（议题 #118）。
 # 爬虫在 _parse_search_page 里主动抛出的 CrawlerException 也会走「刮削探测失败」分支，
 # 这里列出这些确定性特征，避免它们被误判成瞬时性而白白递进重试。
+# 下面一组是「响应已经拿到、失败点已确定」的特征（官网无码子站的 JSON/结构不匹配、
+# 搜索页空解析、番号形态不被识别等）：重试只是把原因改写成「均超时」，
+# 掩盖真正的失败点（议题 #133）。注意「official uncensored request failed」
+# 不在其中——那是连接/超时类瞬时错误，仍值得按阶梯重试。
 _DETERMINISTIC_PROBE_MARKERS = (
     "未被该站点收录",
     "被 Cloudflare 拦截",
     "返回 404",
+    "HTTP 404",
+    "404 Not Found",
     "人机验证",
     "无法自动探测刮削",
     "被 CloudFront 封锁",
+    "不在官网番号前缀列表中",
+    "未匹配到番号",
+    "官网子爬虫未返回数据",
+    "official uncensored json failed",
+    "official uncensored data failed",
+    "页面解析失败",
+    "没有获取到番号标题",
 )
 
 
@@ -619,16 +675,19 @@ async def _probe_crawler_capability_with_retry(
     """单站刮削探测：轮内按 30s → 45s 自动递进重试（议题 #118，两档）。
 
     任一次成功立即定论；只有瞬时性结果才继续下一档，确定性结果首次即定论。
-    阶梯全部走完仍未通过时给出终局说明（「站点无效：刮削探测N次…均超时」），
-    避免用户以为再等等就能过。重试过程静默，不再逐档打印进度行——检测页只需
-    看到每站一条最终结论，中间态噪音大且易被误读成独立检测项。
+    阶梯全部走完仍未通过时给出终局说明：两档都真超时才写「均超时」，否则如实
+    附上最后一次的真实原因（「均失败，最后一次原因：…」），避免把结构/番号类
+    的确定性失败谎报成超时（议题 #133）。重试过程静默，不再逐档打印进度行——
+    检测页只需看到每站一条最终结论，中间态噪音大且易被误读成独立检测项。
     """
     attempts = len(SCRAPE_PROBE_ATTEMPT_TIMEOUTS)
     all_timed_out = True
+    last_message = ""
 
     for attempt in range(attempts):
         timeout = scrape_probe_attempt_timeout(attempt)
         status, message = await _probe_crawler_capability(client, spec, timeout)
+        last_message = message
         if status is None or not _is_transient_probe_result(message):
             return status, message
         if "刮削探测超时" not in message:
@@ -642,9 +701,11 @@ async def _probe_crawler_capability_with_retry(
             NetworkCheckStatus.WARNING,
             f"站点无效：刮削探测{attempts}次{ladder}均超时",
         )
+    # 两档都不是超时却仍失败：如实报最后一次的真实原因，不能一律改写成「均超时」
+    # （否则用户只会去无意义地重试一个已经定论的问题，议题 #133）
     return (
         NetworkCheckStatus.WARNING,
-        f"站点无效：刮削探测{attempts}次{ladder}均超时",
+        f"站点无效：刮削探测{attempts}次{ladder}均失败，最后一次原因：{last_message}",
     )
 
 
@@ -784,6 +845,7 @@ def format_summary(
         "cf_unsolved": 0,
         "node_blocked": 0,
         "probe_timeout": 0,
+        "probe_failed": 0,
         "unreachable": 0,
         "not_found": 0,
         "other": 0,
@@ -805,6 +867,10 @@ def format_summary(
         elif ("站点探测" in message or "刮削探测" in message) and ("均超时" in message or "均未通过" in message):
             # 轮内自动重试（议题 #118）后仍失败的站点，与"连不上"是两回事，单独成组
             cause_counts["probe_timeout"] += 1
+        elif "站点探测" in message or "刮削探测" in message:
+            # 探测跑完了但结果是确定性失败（结构/番号不匹配等），重试无意义：
+            # 与「超时」分开成组，避免把可修与不可修混在一句话里（议题 #133）
+            cause_counts["probe_failed"] += 1
         elif "请求超时" in message or "连接超时" in message or "无法连接" in message or "DNS" in message:
             cause_counts["unreachable"] += 1
         elif "不存在" in message or "404" in message or "未匹配" in message or "未被" in message:
@@ -829,6 +895,11 @@ def format_summary(
             lines.append(
                 f"刮削探测多次超时×{cause_counts['probe_timeout']}：站点能连上但刮削响应过慢，"
                 f"已按{scrape_probe_ladder_text()}自动重试，多为代理节点质量或站点负载，可换节点/稍后再测"
+            )
+        if cause_counts["probe_failed"]:
+            lines.append(
+                f"刮削探测确定性失败×{cause_counts['probe_failed']}：站点能连上，但按真实番号实刮仍失败"
+                "（多为页面结构/番号形态不匹配），重试不会改变结果，请看该行「最后一次原因」"
             )
         if cause_counts["unreachable"]:
             lines.append(f"  • 站点暂时不可达 ×{cause_counts['unreachable']}：检查网络或稍后重试")
@@ -903,6 +974,14 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
                         url=official_spec.base_url,
                         site=Website.OFFICIAL,
                         use_proxy=True,
+                        # 五站官网同样过 CF/地区风控，连通性检测要和普通站点
+                        # 一样允许 CF Bypass 兜底（议题 #133）
+                        enable_cf_bypass=True,
+                        # 每行必须探测「自己那家」官网的真实番号：Official 爬虫
+                        # 按番号前缀路由，不给前缀就会落到 manager.computed
+                        # .official_websites 的别家官网（如 SSNI → s1s1s1.com），
+                        # 那家被挡时五行一起误报失败（议题 #133）
+                        probe_number=official_spec.probe_number,
                     )
                 )
             continue
