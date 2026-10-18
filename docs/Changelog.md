@@ -1,5 +1,27 @@
 
 # Changelog
+## v2.5.10 (2026-10-20)
+### 总结
+- **这一轮两件事，一件是修「卡住」，一件是修「搜不到」：①图片响应不带 `Content-Type` 时整轮刮削会一直挂着不动（来自 PR #4，评审通过后 squash 合并进 main）；②IBW 系列的电影在 AVBase 上搜不出来——软件按惯例把番号末尾的 `z` 剥掉（IBW-794z → IBW-794），而 AVBase 收录的恰恰是带 `z` 的那个形态。**
+  - **① 为什么会卡住**：每次下载图片前都要先判断「这次响应是不是 Cloudflare 的挑战页」，那段检测必须**先读一点响应体**才能判断，于是图片的 `content` 流被提前读掉了；真正的下载环节接着再读就只拿到空流，而等待本身并没有结束，表现就是日志停住、进度不动。原实现之所以在「缺 `Content-Type`」时最明显，是因为挑战页判定拿不到类型信息时仍会走预读这条路，而类型正常的响应会被直接放行、根本没被预读过。现改成**只预读开头 8192 字节并把这截数据回放给下载流程**，图片内容一处不少；同时给读图片本身（探测尺寸与整张读完）各加一层超时，卡住不再可能没有上限。
+  - **② 为什么只有 AVBase 找不到**：番号尾缀是 DMM 图床的形态，JavDB / JavBus 等站收录的是去掉尾缀的基础番号，软件全局按基础番号刮削本来没错；AVBase 是个例外，它照搬图床番号。实测：`?q=IBW-794z` 精确命中 1 条（`ibworks:IBW-794Z`），`?q=IBW-794` 返回 0 条。现对 **IBW 系列且只在 AVBase** 把带 `z` 的番号排在搜索候选的最前面，基础番号留作兜底；其余站点、其余系列一律不动。
+- **测试与门禁**：新增的 `tests/test_stream_body_replay.py`（24 项，含一个起本地 HTTP 服务器真跑「无 Content-Type 图片」的用例）与 `tests/crawlers/test_avbase.py`（新增 15 项）全绿；`pytest tests/crawlers tests/test_number_definition.py` → 650 passed / 4 skipped，仅 `tests/crawlers/test_aventertainments.py` 的两个**实网**用例失败（官网搜索页被 verifybot / reCAPTCHA 拦截，已 `git stash` 在改动前的干净树上复跑同样失败，与本轮无关）。`ruff format --check`、`ruff check`、`mypy mdcx`（194 个文件）、`python -m scripts.check_thread_safety` 全部无告警。
+- **版本号 2.5.9 -> 2.5.10**（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx` 三处同步，`LOCAL_VERSION` 仍为 `20261020`、本节日期不变）。
+- **changelog 归位**：PR #4 自己在 v2.5.5 那一节里插了一段 `### 修复`（那条提交写于 2.5.5 之前，合并后按时间顺序看是错位的）。已把那段从 v2.5.5 删除、改写进本节，两处不再重复。
+### 改进
+- **无 `Content-Type` 的图片响应不再被挑战页检测读空，预读数据回放给下载流程，图片读取全程有超时（`mdcx/web_async.py` + `mdcx/core/media_resource.py` + 新增 `tests/test_stream_body_replay.py`）**：本条来自 PR #4（fork `RAAMENN/MDCx` 的 `fix/preserve-image-stream-after-cf-check`，评审通过后 squash 合并为 `9f25007`），评审要点如下。
+  - **根因在「预读」与「下载」共用同一条流**：`_is_cf_challenge_response()` 为了判断挑战页会先取响应体的开头若干字节，而 curl_cffi 的响应体是**一次性流**——被预读过的流，下载环节再读就是空的；空流又不会报错，于是任务既不成功也不失败，只是停在那里等。
+  - **改法是「只读前缀 + 回放」而不是「不读」**：`web_async.py` 新增 `_peek_response_body()`，**只取前 8192 字节**（挑战页的特征都在开头），随后把 `response.aiter_content` 换成一个「先把这截前缀吐出来、之后接着原流」的可迭代对象。因为 curl_cffi 的 `Response.acontent()` 本身就是遍历 `aiter_content()` 拼出来的，所以**分块下载与整体取内容两条路都仍然拿得到完整内容**，不必为了判挑战页把整张图预读进内存。预读期间若超时或被取消，会把 response 关掉，连接不会泄漏。
+  - **超时照常抛出、不再被当成「不是挑战页」吞掉**：原实现在预读失败时把 `TimeoutError` / `RequestException` 一律当作「不是挑战页」返回，于是超时被静默降级成一次「判定通过」，真正的超时重试永远不会触发。现改为照常抛出——该调用点在 `request()` 的 try 之内，由既有的 `except TimeoutError` / `except RequestException` 分支接住并进入重试，与其它读超时的路径一致。
+  - **两处读都要有上限**：探测图片尺寸的 `_read_stream_size()` 与真正把内容读完的 `_read_stream_content()` 各自套一层 `asyncio.timeout()`，超时取 `manager.config.timeout`、取不到回落 30.0 秒（新增 `_image_read_timeout()`）。**只给其中一处加上限是不够的**：尺寸探测顺利通过之后，读取阶段照样可能一直挂着。仓库要求 Python ≥ 3.13.4，`asyncio.timeout()` 可直接用。
+  - **刻意没动**：分块大小、重试次数与退避策略、代理与超时配置项本身的语义一概不变；8192 字节是模块内常量、没有做成配置项——它是挑战页判定的长度边界，给成用户可调项只会让人调出一个「判不出来」的值。
+  - **测试钉的是「内容一处不少」而不是「调用过某个函数」**：新增的 `tests/test_stream_body_replay.py` 除纯单元用例外**起了一个本地 HTTP 服务器真跑一遍**——`acontent()` 拿到完整字节、分块遍历拼起来与整体一致（两者都要断，因为它们是两条不同的代码路径）、预读期间超时会关掉 response、挑战页检测不会把超时静默当成「不是挑战页」。回归另跑过 `tests/core/test_media_resource.py`、`tests/test_stream_close_aborts.py`、`tests/test_web_async_*.py`（4xx_body / attempt_errors / cf_bypass / download_max_bytes / filesize / limiter）、`tests/test_network_lifecycle.py`、`tests/test_image_compression.py`、`tests/test_image_host_cooldown.py`，全部通过。
+- **IBW 系列在 AVBase 上搜索时补上末尾的 `z`，基础番号留作兜底（`mdcx/crawlers/avbase.py` + `tests/crawlers/test_avbase.py`）**：用户反馈 IBW 系列在 AVBase 上搜不到。**这不是番号解析错了，而是站收录形态不同**——`z` 尾缀是 DMM 图床番号的形态（JavDB / JavBus 等站收录的是去掉尾缀的基础番号，`mdcx/core/utils.py` 里剥尾缀、`mdcx/number.py` 里按基础番号搜，都是对的），AVBase 则照搬图床番号。实测：`https://www.avbase.net/works?q=IBW-794z` → 1 条 `ibworks:IBW-794Z`；`?q=IBW-794` → **0 条**；`?q=MIDE-831` → 精确命中，故**只有 IBW 需要补尾缀**。
+  - **做法**：新增模块级 `IBW_NUMBER_PATTERN = re.compile(r"^IBW-?\d+$", re.IGNORECASE)` 与一个 classmethod `_search_candidates()`——命中 IBW 时把 `IBW-794z` 排在候选第一位，其余形态仍交给既有的 `number_search_variants()`（返回「原样 + 去尾缀」两种，顺序正好是带尾缀在前），最后用 `dict.fromkeys` 去重；`_generate_search_url()` 相应返回**一组**搜索地址而不是一条。
+  - **不是新造机制，只是 AVBase 第一次用上**：`mdcx/crawlers/base/base.py` 的 `_search()` 本来就接受 `str | list[str]`，按顺序逐个试、第一个有结果的用上、全失败才把失败原因汇总；`mdcx/core/network_check.py` 的连通性探测也是逐个请求。所以多一条候选不会带来新的分支逻辑，只是多一次请求。
+  - **带 `z` 的候选必须排在基础番号之前**：AVBase 的搜索**不是严格全等匹配**——实测 `?q=IBW-79` 会模糊命中另一部作品 `ibworks:IBW-079`。若把基础番号排在前面，一旦它返回了邻近作品就会被当成正确结果取走（AVBase 的搜索页取第一条结果、不做番号校验），等于用「搜到错的」换「搜不到」。
+  - **范围严格限定在 IBW + AVBase**：正则只认 `IBW` 前缀 + 纯数字（故 `IBWZZ-1`、`X-IBW-794` 不会误伤；输入本就带 `z` 的形态不会重复追加，交给 `number_search_variants()` 即可）；`javdb` / `javdb_api` / `javdb_app` / `javbus` / `thejavdb` 仍只用既有的两种形态，番号剥尾缀的规则**一个字没改**，`mdcx/number.py` 亦未改动。
+  - **测试**：`tests/crawlers/test_avbase.py` 新增 `test_search_candidates`（12 组参数化：IBW 的三种写法与两种已带 `z` 的写法 → 带 `z` 的在前；MIDE-831 / ABF-042 / SSIS-538 → 单候选；IBWZZ-1 / X-IBW-794 → 不误伤；空串 → 空列表）与三条 `_generate_search_url` 用例（IBW 产出两条地址且顺序正确、非 IBW 仍只有一条、番号为空仍抛 `CrawlerException`）。**顺序是被断言死的**：把两条地址调换一下，用例即红。
 ## v2.5.9 (2026-10-20)
 ### 总结
 - **这一轮只改界面上的话，一个字行为没动：把「站点悬停提示」和「站点下拉框」里那些啰嗦、重复、自我打架的地方收干净，让每一处都只说一件事、只说一遍**。用户前后给了六句话，全是文案口径的调整，没有一条涉及名单、勾选、排序或默认值：

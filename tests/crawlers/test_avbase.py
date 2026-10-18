@@ -6,6 +6,67 @@ from mdcx.models.model_types import CrawlerInput
 
 
 @pytest.mark.parametrize(
+    ("number", "expected"),
+    [
+        # IBW 系列：AVBase 收录带 z 尾缀的番号，带尾缀的候选必须排在基础番号之前
+        ("IBW-794", ["IBW-794z", "IBW-794"]),
+        ("ibw-794", ["ibw-794z", "ibw-794"]),
+        ("IBW794", ["IBW794z", "IBW794"]),
+        # 输入本就带 z 时不重复追加，形态顺序沿用 number_search_variants
+        ("IBW-794Z", ["IBW-794Z", "IBW-794"]),
+        ("IBW-794z", ["IBW-794z", "IBW-794"]),
+        # 其余系列逻辑不变：只有一个候选（AVBase 上基础番号即可精确命中）
+        ("MIDE-831", ["MIDE-831"]),
+        ("ABF-042", ["ABF-042"]),
+        ("SSIS-538", ["SSIS-538"]),
+        # 只认 IBW 前缀，不误伤含 IBW 字样的其它番号
+        ("IBWZZ-1", ["IBWZZ-1"]),
+        ("X-IBW-794", ["X-IBW-794"]),
+        ("", []),
+    ],
+)
+def test_search_candidates(number: str, expected: list[str]):
+    assert AVBaseCrawler._search_candidates(number) == expected
+
+
+@pytest.mark.asyncio
+async def test_generate_search_url_tries_the_z_variant_first_for_ibw():
+    """AVBase 只收录 IBW-794z，带 z 的搜索地址必须先于基础番号。"""
+    crawler = AVBaseCrawler(client=None)
+    ctx = crawler.new_context(CrawlerInput.empty())
+    ctx.input.number = "IBW-794"
+
+    urls = await crawler._generate_search_url(ctx)
+
+    assert urls == [
+        "https://www.avbase.net/works?q=IBW-794z",
+        "https://www.avbase.net/works?q=IBW-794",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_generate_search_url_keeps_single_url_for_other_series():
+    """非 IBW 系列仍只生成一条搜索地址，行为不变。"""
+    crawler = AVBaseCrawler(client=None)
+    ctx = crawler.new_context(CrawlerInput.empty())
+    ctx.input.number = "MIDE-831"
+
+    urls = await crawler._generate_search_url(ctx)
+
+    assert urls == ["https://www.avbase.net/works?q=MIDE-831"]
+
+
+@pytest.mark.asyncio
+async def test_generate_search_url_rejects_empty_number():
+    crawler = AVBaseCrawler(client=None)
+    ctx = crawler.new_context(CrawlerInput.empty())
+    ctx.input.number = "  "
+
+    with pytest.raises(avbase_module.CrawlerException):
+        await crawler._generate_search_url(ctx)
+
+
+@pytest.mark.parametrize(
     ("raw", "expected"),
     [
         ("55", "55"),

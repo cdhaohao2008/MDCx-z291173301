@@ -11,9 +11,14 @@ from ..config.enums import DownloadableFile
 from ..config.manager import manager
 from ..config.models import Website
 from ..log_console import log_console
+from ..number import number_search_variants
 from .base import BaseCrawler, CrawlerData, CrawlerException
 
 SEARCH_FIRST_RESULT_ID_XPATH = "/html/body/div/div/main/div/div[2]/div[2]/div/div/div[1]/div[1]/div[1]/div"
+
+# 只有 IBW 系列在 AVBase 上收录的是带 `z` 尾缀的番号（IBW-794z），其余系列
+# （如 MIDE-831）实测基础番号即可精确命中，故这一条只认 IBW 前缀。
+IBW_NUMBER_PATTERN = re.compile(r"^IBW-?\d+$", re.IGNORECASE)
 
 
 class AVBaseCrawler(BaseCrawler):
@@ -38,12 +43,35 @@ class AVBaseCrawler(BaseCrawler):
     def display_name(cls) -> str:
         return "AVBase"
 
+    @classmethod
+    def _search_candidates(cls, number: str) -> list[str]:
+        """AVBase 搜索候选番号：IBW 系列把带 `z` 尾缀的番号排在前面。
+
+        AVBase 收录的是 DMM 图床番号（IBW-794z），而软件按惯例默认剥掉尾缀、
+        统一按基础番号（IBW-794）搜索——实测 `?q=IBW-794` 在 AVBase 返回 0 条，
+        `?q=IBW-794z` 精确命中 1 条（`ibworks:IBW-794Z`）。而 AVBase 的搜索并非
+        严格全等匹配（`?q=IBW-79` 会模糊命中 `IBW-079`），故基础番号必须排在带
+        尾缀的候选之后，否则可能取到邻近作品的错误数据。
+
+        范围只限 IBW + AVBase：javdb/javbus 等站收录的是基础番号，不加尾缀；
+        其它系列（如 MIDE-831）在 AVBase 用基础番号即可精确命中，也不加。
+
+        `IBW_NUMBER_PATTERN` 只匹配纯数字番号（`IBW-794`），输入本就带 `z` 的
+        形态由 `number_search_variants` 处理——带尾缀的排最前、基础番号排其后。
+        """
+        cleaned = str(number or "").strip()
+        candidates: list[str] = []
+        if IBW_NUMBER_PATTERN.match(cleaned):
+            candidates.append(f"{cleaned}z")
+        candidates.extend(number_search_variants(cleaned))
+        return list(dict.fromkeys(candidates))
+
     @override
     async def _generate_search_url(self, ctx) -> list[str] | str | None:
         number = ctx.input.number.strip()
         if not number:
             raise CrawlerException("番号为空")
-        return f"{self.base_url}/works?q={quote(number)}"
+        return [f"{self.base_url}/works?q={quote(candidate)}" for candidate in self._search_candidates(number)]
 
     @override
     async def _parse_search_page(self, ctx, html: Selector, search_url: str) -> list[str] | str | None:
