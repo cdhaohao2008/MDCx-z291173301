@@ -14581,7 +14581,7 @@ class Ui_MDCx(object):
                 "<li><b>国产番号</b>：Madouqu、Madou.club、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
                 "<li><b>欧美番号</b>：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、Missav、Missav_API、IQQTV、JavFree</li>\n"
                 "              <li><b>动漫里番</b>：Getchu、JavDB、JavDB_API、JavDB_APP</li>\n"
-                "<li><b>MyWifes</b>：不属于任何类型组的默认名单列表中，需在「网站偏好」-「指定网站」勾选MyWife或让文件名称路径包含MyWife时才会启用</li>\n"
+                "<li><b>MyWifes</b>：不属于任何类型组的默认名单列表，需在「网站偏好」-「指定网站」勾选MyWife或让文件名称路径包含MyWife时才会启用</li>\n"
                 "<li><b>官方网站</b>：Dahlia、Faleno、MGStage、Prestige、Official已在网站源列表中单列，番号视频命中对应前缀时将自动路由锁定该站</li>\n"
                 "</ul>\n"
                 "<p><b>Official综合：有码+无码，按番号前缀自动路由到各番号官网，全部走代理：有码片商官网30家：Attackers、AV Opera、BeeFree、Bi-AV、Bibian、Dasdas、E-Body、Fitch、HHH-AV、Hajime Kikaku、Honnaka、IdeaPocket、Kawaii、Kirakira、Madonna、Miman、MKO Labo、Moodyz、Muku.tv、MVG、Nanpa Japan、Oppai、Premium Beauty、Prestige、Rookie、S1S1S1、Tamei kegoro、To-Satsu、V-AV、Wanz Factory<br/>\n"
