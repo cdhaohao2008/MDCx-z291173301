@@ -10,7 +10,13 @@ from itertools import chain
 from typing import TYPE_CHECKING
 
 from ..config.enums import FixedScrapingType
-from ..config.models import FieldConfig, FieldPriorityConfig, Language, Website
+from ..config.models import (
+    SCRAPING_TYPE_SITE_FIELDS,
+    FieldConfig,
+    FieldPriorityConfig,
+    Language,
+    Website,
+)
 from ..gen.field_enums import CrawlerResultFields
 from ..manual import ManualConfig
 from ..models.enums import FileMode
@@ -146,19 +152,18 @@ def classify_scrape_task(task_input: CrawlTask, config: "Config", use_fixed_type
 
     fixed_type = config.fixed_scraping_type
     if use_fixed_type and fixed_type != FixedScrapingType.AUTO:
+        # 站点字段表统一取 SCRAPING_TYPE_SITE_FIELDS，不再在本函数硬编码第二份映射：
+        # 下拉序调整（2.6.0 曾把 SUREN 从 YOUMA 后移到 GUOCHAN 后）或新增类型时，
+        # 只改 models 一处即可，杜绝「配置里加了类型、锁定分支查不到字段」而空名单报错。
+        _fixed_field = SCRAPING_TYPE_SITE_FIELDS.get(fixed_type)
         # 惰性取值：旧配置/测试桩可能缺 website_dongman 等属性，
         # eager dict 会在分类任何文件时直接 AttributeError，先取值再查表可避免。
-        _fixed_field = {
-            FixedScrapingType.YOUMA: "website_youma",
-            FixedScrapingType.WUMA: "website_wuma",
-            FixedScrapingType.SUREN: "website_suren",
-            FixedScrapingType.FC2: "website_fc2",
-            FixedScrapingType.OUMEI: "website_oumei",
-            FixedScrapingType.GUOCHAN: "website_guochan",
-            FixedScrapingType.DONGMAN: "website_dongman",
-        }.get(fixed_type)
         _sites = getattr(config, _fixed_field, None) if _fixed_field else None
-        return ScrapeClassification(fixed_type, "fixed", sites=_sites)
+        # 锁定类型时沿用自动分支同一套马赛克口径：国产番号（MD-/MKY- 等）既不像有码也不像无码，
+        # 不给 mosaic 的话 _crawl 会按 is_uncensored 兜底写成「有码」，与同番号自动模式的
+        # 「国产」不一致，NFO/削刮整理结果因此分叉。
+        _mosaic = "国产" if fixed_type is FixedScrapingType.GUOCHAN else ""
+        return ScrapeClassification(fixed_type, "fixed", sites=_sites, mosaic=_mosaic)
 
     if (
         is_guochan_mosaic(mosaic)

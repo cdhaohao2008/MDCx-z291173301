@@ -1175,7 +1175,15 @@ class Config(BaseModel):
         scraping_type: FixedScrapingType,
         current: dict[CrawlerResultFields, FieldPriorityConfig],
     ) -> dict[CrawlerResultFields, FieldPriorityConfig]:
-        type_site_set = set(self.get_type_sites(scraping_type))
+        # 注意：回退必须用有序的 type_sites，不能用 list(type_site_set)。
+        # set 的迭代序源自 Website 枚举 str 的 hash，而 Python 默认按进程随机化字符串
+        # hash（PYTHONHASHSEED），实测同一份配置连续三次启动得到三种不同顺序：
+        #   ['ThepornDB','Madouqu','JavDB_API','Madou.club'] / [...,'Madou.club','Madouqu']
+        #   / ['Madou.club','Madouqu','JavDB_API','ThepornDB']
+        # 字段 site_prority 决定实际请求顺序（速度优先模式尤其如此），
+        # 顺序随机等于让同一批文件每次重启命中不同站点，结果不可复现。
+        type_sites = self.get_type_sites(scraping_type)
+        type_site_set = set(type_sites)
         default = self.build_type_field_configs(scraping_type)
         normalized: dict[CrawlerResultFields, FieldPriorityConfig] = {}
         for crawler_field in ManualConfig.REDUCED_FIELDS:
@@ -1187,8 +1195,9 @@ class Config(BaseModel):
                 if not sites:
                     # 与 build_type_field_configs 一致：交集为空时回退到类型名单，
                     # 否则该字段被永久静默跳过（_call_crawlers 中 f_sites 为空直接 continue）。
+                    # 回退取有序的 type_sites（同上，set 序不可复现）。
                     # 海报回退时同样排除有水印站点；用户已手动保留的水印站点（sites 非空）原样保留。
-                    sites = list(type_site_set)
+                    sites = list(type_sites)
                     if crawler_field == CrawlerResultFields.POSTER:
                         sites = filter_poster_default_sites(sites)
                 normalized[crawler_field] = FieldPriorityConfig(site_prority=sites)

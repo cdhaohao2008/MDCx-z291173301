@@ -154,6 +154,48 @@ def test_config_normalize_preserves_skip():
     assert score_config.site_prority == []
 
 
+def test_config_normalize_fallback_keeps_type_site_order():
+    """_normalize_type_field_config 交集为空时回退到类型名单，且必须保序。
+
+    回归 2.6.2：回退曾用 list(type_site_set)，set 迭代序源自 Website 枚举 str 的
+    hash，而 Python 默认按进程随机化字符串 hash，于是同一份配置每次重启得到的
+    字段请求顺序都不同（实测三次启动三种顺序）。字段 site_prority 直接决定实际
+    请求先后（速度优先模式尤其敏感），顺序随机即结果不可复现。
+    """
+    config = Config()
+    config.website_guochan = [Website.MADOUCLUB, Website.MADOUQU, Website.JAVDB_API, Website.THEPORNDB]
+    # 故意让字段优先级与类型名单完全无交集，触发回退分支
+    config.field_configs[CrawlerResultFields.TITLE].site_prority = [Website.GETCHU]
+
+    config.ensure_type_field_configs()
+
+    title_config = config.get_type_field_config(FixedScrapingType.GUOCHAN, CrawlerResultFields.TITLE)
+    assert title_config.site_prority == config.website_guochan
+
+
+def test_config_normalize_fallback_is_repeatable():
+    """重复归一化结果稳定，且与 build_type_field_configs 的回退写法一致。"""
+    config = Config()
+    config.website_guochan = [Website.MADOUCLUB, Website.MADOUQU, Website.JAVDB_API, Website.THEPORNDB]
+    config.field_configs[CrawlerResultFields.TITLE].site_prority = [Website.GETCHU]
+
+    orders = []
+    for _ in range(5):
+        fresh = Config.model_validate(config.model_dump())
+        fresh.ensure_type_field_configs()
+        orders.append(
+            tuple(
+                site.value
+                for site in fresh.get_type_field_config(
+                    FixedScrapingType.GUOCHAN, CrawlerResultFields.TITLE
+                ).site_prority
+            )
+        )
+
+    assert len(set(orders)) == 1
+    assert orders[0] == tuple(site.value for site in config.website_guochan)
+
+
 def test_config_set_field_skip():
     """set_field_skip 可以设置字段 skip。"""
     config = Config()

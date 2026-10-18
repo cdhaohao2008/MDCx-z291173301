@@ -3,7 +3,13 @@ from pathlib import Path
 import pytest
 
 from mdcx.config.enums import FixedScrapingType, Language, Website
-from mdcx.config.models import Config, FieldConfig, FieldPriorityConfig
+from mdcx.config.models import (
+    CONFIGURABLE_SCRAPING_TYPES,
+    SCRAPING_TYPE_SITE_FIELDS,
+    Config,
+    FieldConfig,
+    FieldPriorityConfig,
+)
 from mdcx.core.file_crawler import (
     FileScraper,
     _deal_res,
@@ -427,6 +433,88 @@ def test_classify_invalid_fc2_number_in_fixed_fc2_mode_uses_fc2_sites():
     assert classification.scraping_type == FixedScrapingType.FC2
     assert classification.scraping_type_source == "fixed"
     assert classification.sites == {Website.FC2}
+
+
+@pytest.mark.parametrize(
+    ("scraping_type", "expected_field"),
+    [
+        (FixedScrapingType.YOUMA, "website_youma"),
+        (FixedScrapingType.WUMA, "website_wuma"),
+        (FixedScrapingType.SUREN, "website_suren"),
+        (FixedScrapingType.FC2, "website_fc2"),
+        (FixedScrapingType.OUMEI, "website_oumei"),
+        (FixedScrapingType.GUOCHAN, "website_guochan"),
+        (FixedScrapingType.DONGMAN, "website_dongman"),
+    ],
+)
+def test_classify_scrape_task_fixed_every_type_uses_its_own_site_list(scraping_type, expected_field):
+    """下拉七档逐一锁定都必须路由到自己的网站名单（不看番号格式）。"""
+
+    class _Fixed(_ClassificationConfig):
+        fixed_scraping_type = scraping_type
+
+    task = CrawlTask.empty()
+    task.number = "ABP-123"
+
+    classification = classify_scrape_task(task, _Fixed())
+
+    assert classification.scraping_type == scraping_type
+    assert classification.scraping_type_source == "fixed"
+    assert classification.sites == getattr(_ClassificationConfig, expected_field)
+
+
+@pytest.mark.parametrize(
+    "scraping_type",
+    [
+        FixedScrapingType.YOUMA,
+        FixedScrapingType.WUMA,
+        FixedScrapingType.SUREN,
+        FixedScrapingType.FC2,
+        FixedScrapingType.OUMEI,
+        FixedScrapingType.GUOCHAN,
+        FixedScrapingType.DONGMAN,
+    ],
+)
+def test_locked_types_cover_every_configurable_type(scraping_type):
+    """锁定分支查表必须覆盖 CONFIGURABLE_SCRAPING_TYPES 全集。
+
+    回归 2.6.2：classify_scrape_task 曾自带一份硬编码的「类型→website_* 字段」映射，
+    与 models.SCRAPING_TYPE_SITE_FIELDS 是两份同源真相。以后新增类型只改 models 时，
+    锁定分支会静默拿到 sites=None，最终报「站点名单为空」。改为共用同一张表后，
+    本用例即可拦住这类漏改。
+    """
+    assert set(SCRAPING_TYPE_SITE_FIELDS) == set(CONFIGURABLE_SCRAPING_TYPES)
+    assert scraping_type in SCRAPING_TYPE_SITE_FIELDS
+
+
+def test_classify_scrape_task_fixed_guochan_keeps_guochan_mosaic():
+    """锁定国产传媒时马赛克口径必须与自动模式一致（MD- 番号两种模式都是「国产」）。"""
+
+    class FixedGuochanConfig(_ClassificationConfig):
+        fixed_scraping_type = FixedScrapingType.GUOCHAN
+
+    task = CrawlTask.empty()
+    task.number = "MD-1234"
+
+    fixed = classify_scrape_task(task, FixedGuochanConfig())
+    auto = classify_scrape_task(task, _ClassificationConfig())
+
+    assert fixed.scraping_type == FixedScrapingType.GUOCHAN
+    assert fixed.scraping_type_source == "fixed"
+    assert fixed.mosaic == "国产"
+    assert fixed.mosaic == auto.mosaic
+
+
+def test_classify_scrape_task_fixed_non_guochan_has_no_forced_mosaic():
+    """除国产外，锁定分支不硬塞马赛克：无码/有码仍由番号与文件信息判定，避免误伤。"""
+
+    class FixedWumaConfig(_ClassificationConfig):
+        fixed_scraping_type = FixedScrapingType.WUMA
+
+    task = CrawlTask.empty()
+    task.number = "ABP-123"
+
+    assert classify_scrape_task(task, FixedWumaConfig()).mosaic == ""
 
 
 def test_avwiki_uses_unified_scraping_types():
