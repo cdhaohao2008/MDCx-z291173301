@@ -9,6 +9,7 @@ import sys
 import threading
 from pathlib import Path
 from types import TracebackType
+from typing import Any
 
 from ..consts import IS_PYINSTALLER, MAIN_PATH, MARK_FILE
 from ..utils import executor
@@ -112,6 +113,14 @@ class ConfigManager:
             errors = Config.update(d)
             config = Config.model_validate(d)
             self._replace_config(config)
+            # 旧配置升级后立即写回磁盘：迁移补齐的键只有落盘才会在下次启动继续生效，
+            # 否则每次启动都要重跑一遍迁移，且用户手工打开 config.json 看到的仍是旧结构。
+            # 写盘失败只记录日志、不影响本次运行（内存里已是升级后的配置）。
+            if self._needs_upgrade_persist(d):
+                try:
+                    self.save()
+                except Exception as e:
+                    logger.error("旧配置升级后写回失败（不影响本次运行）: %s", e)
             return errors
         except json.JSONDecodeError as e:
             # JSON 语法错误（用户手工编辑丢逗号/引号）单独提示：
@@ -139,6 +148,19 @@ class ConfigManager:
                 logger.error("配置文件 %s 验证失败, 继续使用旧配置: %s", self._path, e)
             msg = f" 配置文件 {self._path} 验证失败. 错误信息: \n{e!s}"
             return msg.splitlines()
+
+    def _needs_upgrade_persist(self, migrated: dict[str, Any]) -> bool:
+        """迁移是否改动了配置内容（改动过才值得写回磁盘）。
+
+        Config.update 会就地修改传入的 dict，因此这里拿它与磁盘上的原始
+        文本重新解析出的副本比对，逐键判断有无新增/变更，避免每次启动都
+        无谓重写配置文件（重写会触发杀软扫描、改变文件时间戳）。
+        """
+        try:
+            original = json.loads(self._path.read_text(encoding="UTF-8"))
+        except (OSError, ValueError):
+            return True  # 读不出来就写一次，用迁移后的内容覆盖
+        return original != migrated
 
     def handle_v1(self):
         v2path = self.path.with_suffix(".v2.json")

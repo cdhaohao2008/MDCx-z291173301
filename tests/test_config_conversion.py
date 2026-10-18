@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from mdcx.config.enums import DownloadableFile, FixedScrapingType, HDPicSource, KeepableFile, Website
+from mdcx.config.migrations import CURRENT_CONFIG_VERSION
 from mdcx.config.models import DEFAULT_FIELD_SITE_PRIORITY, Config
 from mdcx.config.resource_policy import resource_policy
 from mdcx.config.v1 import ConfigV1
@@ -287,7 +288,7 @@ def test_removed_hd_pic_sources_are_filtered_from_old_config():
     config = Config.model_validate(data)
 
     assert config.download_hd_pics == [HDPicSource.AMAZON]
-    assert config.config_version == 3
+    assert config.config_version == CURRENT_CONFIG_VERSION
     assert "google_used" not in data
     assert "google_exclude" not in data
 
@@ -384,5 +385,5 @@ def test_main_mode_renumbered_on_v2_config():
         Config.update(data)
 
         assert data["main_mode"] == new
-        assert data["config_version"] == 3
+        assert data["config_version"] == CURRENT_CONFIG_VERSION
         assert Config.model_validate(data).main_mode == new

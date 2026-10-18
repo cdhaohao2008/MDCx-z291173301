@@ -5,8 +5,9 @@ from datetime import timedelta
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter, field_validator
 from pydantic.fields import FieldInfo
+from pydantic_core import PydanticUndefined
 
 from ..crawler_registry import registered_site_values
 from ..gen.field_enums import CrawlerResultFields
@@ -33,7 +34,7 @@ from .enums import (
     Translator,
     Website,
 )
-from .migrations import _rename_site, migrate_config_data
+from .migrations import _rename_site, backfill_missing_keys, migrate_config_data
 
 
 def str_to_list(v: str | list[Any] | None, sep: Literal[",", "|"] = ",", unique: bool = True) -> list[str]:
@@ -1256,7 +1257,41 @@ class Config(BaseModel):
         if "field_configs" not in d:
             Config._convert_field_configs(d)
 
+        # 旧配置自动升级：缺失的顶层键按出厂默认补齐，必须放在最后一步。
+        # 上面的 separate_* 继承与旧版 field_configs 转换都以「键不存在」为判据抢先填充，
+        # 先补齐会让这两条失效（分离模式左右开关失去联动、旧版字段设置走不到转换分支）。
+        # 出厂默认由 Config() 现场构造而非读 default_config.json：打包环境下模板不在
+        # 可写目录，而 Config() 的默认值与模板同源，且已是 pydantic 校验过的形态。
+        if added_keys := backfill_missing_keys(d, Config.factory_defaults()):
+            warnings.append(f"[迁移] 已按出厂默认补齐 {len(added_keys)} 个新增配置项：{'、'.join(added_keys[:8])}")
+
         return warnings
+
+    @staticmethod
+    def factory_defaults() -> dict[str, Any]:
+        """字段声明层的出厂默认（未经 model_post_init 等派生逻辑改写的原值）。
+
+        不可直接用 Config().model_dump()：model_post_init 会 ensure_type_field_configs()，
+        把默认的空 type_field_configs 填成七组类型的完整名单。拿它去补齐旧配置，
+        会用出厂名单盖掉用户从 field_configs 派生的按类型优先级（Config.update 的
+        旧版转换分支正是为此存在）。
+        """
+        defaults: dict[str, Any] = {}
+        for name, spec in Config.model_fields.items():
+            if spec.default_factory is not None:
+                # pydantic 把 default_factory 标成 无参 / 带 validated_data 两种签名，
+                # 实际这里只会是无参的那一种，故显式 cast 掉多出来的重载分支。
+                factory = cast("Callable[[], Any]", spec.default_factory)
+                try:
+                    defaults[name] = TypeAdapter(spec.annotation).dump_python(factory(), mode="json")
+                except Exception:
+                    continue
+            elif spec.default is not PydanticUndefined:
+                try:
+                    defaults[name] = TypeAdapter(spec.annotation).dump_python(spec.default, mode="json")
+                except Exception:
+                    continue
+        return defaults
 
     @staticmethod
     def _convert_field_configs(d):

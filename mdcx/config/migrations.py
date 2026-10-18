@@ -1,9 +1,23 @@
 import re
+from copy import deepcopy
 from typing import Any
 
 from .enums import DownloadableFile, HDPicSource, Website
 
+# 配置版本号只在「大配置框架」（整体结构语义）变更时才升。
+# 新增配置项、新增列表枚举值、给旧配置补缺键都**不要**改它——旧配置升级
+# 靠下面的 NEW_LIST_ITEMS 与 Config.update() 末尾的缺失键补齐，与版本号无关。
+# 本值与 resources/config/default_config.json 的 config_version 及
+# Config.config_version 的默认值必须三者一致。
 CURRENT_CONFIG_VERSION = 3
+
+
+def _config_version(data: dict[str, Any]) -> int:
+    """读取配置版本号；缺失或类型异常（含 bool）一律按 0 处理。"""
+    version = data.get("config_version")
+    if isinstance(version, bool) or not isinstance(version, int):
+        return 0
+    return version
 
 
 def _str_to_list(v: str | list[Any] | None, sep: str = ",", unique: bool = True) -> list[str]:
@@ -29,10 +43,7 @@ _MAIN_MODE_REMAP_V3 = {2: 3, 3: 4, 4: 5}
 
 def _migrate_main_mode(data: dict[str, Any]) -> str | None:
     """旧编号（v2 及更早，或缺版本号的 legacy 配置）→ 新编号，返回迁移提示或 None。"""
-    version = data.get("config_version")
-    if isinstance(version, bool) or not isinstance(version, int):
-        version = 0
-    if version >= 3:
+    if _config_version(data) >= 3:
         return None
     mode = data.get("main_mode")
     if isinstance(mode, str) and mode.strip().isdigit():
@@ -270,6 +281,69 @@ def _ensure_switch(data: dict[str, Any], value: str) -> None:
     # switch_on 缺失（全新默认配置）时不动：走 pydantic default_factory，本身已默认勾选
 
 
+# 新增列表型配置项时在此登记：{配置键: 出厂默认即勾选/入选的新增值}。
+# 老配置升级时逐项幂等补齐，使升级后的状态与「重置配置」后的出厂状态一致。
+# 这些新增项不动配置的大框架，故不随它们升 CURRENT_CONFIG_VERSION，
+# 补齐逻辑本身幂等，重复运行不会重复追加。
+NEW_LIST_ITEMS: dict[str, tuple[str, ...]] = {
+    # 2.6.1 新增短剧/动漫「封面不裁剪，直接复制缩略图」，出厂默认即勾选。
+    # 老配置的 download_files 本就有值，default_factory 不会补进去，
+    # 导致升级后这两个开关仍显示未勾选——必须由迁移显式补齐。
+    "download_files": (
+        DownloadableFile.IGNORE_SUREN.value,
+        DownloadableFile.IGNORE_DONGMAN.value,
+    ),
+}
+
+
+def _ensure_list_items(data: dict[str, Any], key: str, values: tuple[str, ...]) -> bool:
+    """把 values 中缺失的项补进 data[key]（已存在则保持原位与顺序），返回是否发生补齐。"""
+    current = data.get(key)
+    if isinstance(current, str):
+        items = _str_to_list(current, ",")
+    elif isinstance(current, list | set | tuple):
+        items = list(current)
+    else:
+        return False  # 键缺失：由 pydantic default_factory 提供出厂默认，不在此覆盖
+    existing = {str(_enum_value(item)) for item in items}
+    missing = [value for value in values if value not in existing]
+    if not missing:
+        return False
+    data[key] = [*items, *missing]
+    return True
+
+
+def _migrate_new_list_items(data: dict[str, Any]) -> list[str]:
+    """按 NEW_LIST_ITEMS 登记补齐新增列表项（download_files / switch_on 等）。"""
+    added: list[str] = []
+    for key, values in NEW_LIST_ITEMS.items():
+        if _ensure_list_items(data, key, values):
+            added.extend(values)
+    return added
+
+
+def _migrate_missing_keys(data: dict[str, Any], defaults: dict[str, Any]) -> list[str]:
+    """把旧配置缺失的顶层键按出厂默认补齐。
+
+    pydantic 缺键时会用 default/default_factory 兜底，运行时行为本就正确；
+    这里补齐只是让磁盘上的 config.json 与出厂配置对齐，日后读文件、比对、
+    人工编辑时看到的都是完整配置，不会因某个键缺失产生歧义。
+    只补顶层键，不动已有键的值，也不递归进嵌套结构（避免覆盖用户选择）。
+
+    必须放在 Config.update() 的最后一步：早期步骤（separate_* 继承左侧开关、
+    旧版 field_configs 转换）都以「键不存在」为判据抢先填充，先补齐会让它们失效。
+    """
+    added = [key for key in defaults if key not in data]
+    for key in added:
+        data[key] = deepcopy(defaults[key])
+    return added
+
+
+def backfill_missing_keys(data: dict[str, Any], defaults: dict[str, Any]) -> list[str]:
+    """旧配置自动升级入口：补齐缺失的顶层键，返回补齐的键名列表。"""
+    return _migrate_missing_keys(data, defaults)
+
+
 def migrate_config_data(data: dict[str, Any]) -> list[str]:
     """
     统一处理配置结构变更.
@@ -384,6 +458,11 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     # 无限次刮削开关（高级 → 保留任务右侧）：默认勾选，老配置缺键时自动补上
     # 不带 [迁移] 前缀即会被视为致命错误触发 _failed.json 保护分支，故此处静默补齐不告警
     _ensure_switch(data, "infinite_scrape")
+
+    # 新增列表项（download_files 等）：老配置按键存在但缺新项时补齐，
+    # 使升级后的配置与「重置配置」后的出厂状态一致
+    if added_items := _migrate_new_list_items(data):
+        warnings.append(f"[迁移] 已按出厂默认勾选新增选项：{'、'.join(added_items)}")
 
     data["config_version"] = CURRENT_CONFIG_VERSION
     return warnings
