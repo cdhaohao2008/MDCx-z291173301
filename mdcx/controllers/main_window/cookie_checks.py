@@ -1,7 +1,9 @@
 """FC2PPVDB / JavBus 的 Cookie 登录态检测。
 
-从 `main_window.py` 按集群切出，逻辑与文案逐字不变。"""
+从 `main_window.py` 按集群切出。FC2PPVDB 部分逻辑与文案逐字不变；
+JavBus 部分按 2026-10-18 的实网实测重做了登录态判定（见下方 `classify_javbus_login_state`）。"""
 
+import re
 import threading
 import traceback
 
@@ -16,6 +18,76 @@ from mdcx.crawlers.fc2ppvdb import (
 )
 from mdcx.signals import signal_qt
 from mdcx.utils import executor
+
+# ── JavBus 登录态判定 ────────────────────────────────────────────────────────
+# 实测（2026-10-18，`javbus.py::_JAVBUS_DOMAINS` 全部 7 个镜像 × 空/垃圾/伪造 uid 五种 Cookie，
+# 共 35 次真实请求）：未登录时导航栏头像恒为 `avatar.php?uid=0`，并带「登入」+ `action=login`；
+# `/logout`、`/favorite`、`/history` 在这批部署上一律 404（两个镜像群已不实现这些路由），
+# 故它们**不能**当登录态信号——原先只判 `lostpasswd` 的写法因此永远命中不了，
+# 任何 Cookie 都会落到「✅ 连接正常」甚至被自动写盘。以头像 uid 为准、登出文案为辅。
+_JAVBUS_AVATAR_UID = re.compile(r"avatar\.php\?uid=(-?\d+)")
+_JAVBUS_LOGGED_IN_MARKERS = ("登出", "action=logout", "/logout")
+_JAVBUS_LOGGED_OUT_MARKERS = ("登入", "action=login", "lostpasswd")
+# CloudFlare 挑战页 / 年龄验证闸门 / 浏览器验证页：拿到它们既证明不了有效也证明不了无效
+_JAVBUS_BLOCKED_MARKERS = (
+    "just a moment",
+    "cf-chl-",
+    "checking your browser",
+    "cf-browser-verification",
+    "driver-verify",
+    "ageverify",
+    "我已經成年",
+    "我已经成年",
+)
+
+
+def _has_marker(html: str, markers: tuple[str, ...]) -> bool:
+    lowered = html.lower()
+    return any(marker.lower() in lowered for marker in markers)
+
+
+def classify_javbus_login_state(html: str | None) -> str:
+    """把 JavBus 页面归类为 logged_in / logged_out / blocked / unknown。"""
+    if not html:
+        return "unknown"
+    if _has_marker(html, _JAVBUS_BLOCKED_MARKERS):
+        return "blocked"
+    uids = [uid.strip() for uid in _JAVBUS_AVATAR_UID.findall(html)]
+    if any(uid and int(uid) != 0 for uid in uids):
+        return "logged_in"  # 头像带真实 uid，最硬的登录态证据
+    logged_in = _has_marker(html, _JAVBUS_LOGGED_IN_MARKERS)
+    logged_out = _has_marker(html, _JAVBUS_LOGGED_OUT_MARKERS)
+    if logged_in and not logged_out:
+        return "logged_in"
+    if logged_out and not logged_in:
+        return "logged_out"
+    if uids:
+        return "logged_out"  # uid 全为 0，同样是确凿的未登录
+    return "unknown"
+
+
+def javbus_cookie_verdict(input_cookie: str, html: str | None, error: str | None) -> tuple[str, str]:
+    """判定 JavBus Cookie，返回 (状态, 提示文案)。
+
+    状态：valid / invalid / not_needed / needed / blocked / unreachable / unknown。
+    只有 valid 允许写盘，其余一律只告警并保留用户填的 Cookie（沿用议题 #130 的口径）。
+    """
+    cookie = (input_cookie or "").strip()
+    if not html:
+        return "unreachable", f"❌ 连接失败！请检查网络或代理设置！ {error or ''}".rstrip()
+    state = classify_javbus_login_state(html)
+    if state == "blocked":
+        return "blocked", "⚠️ 被 CloudFlare 或年龄验证拦截，无法判定 Cookie（已保留，可稍后重试）"
+    if not cookie:
+        # 没填 Cookie 时只回答「这个节点要不要 Cookie」，不报「无效」
+        if "lostpasswd" in html.lower():
+            return "needed", "❌ 当前节点需要 Cookie 才能刮削！请填写 Cookie 或更换节点！"
+        return "not_needed", "✅ 当前节点无需 Cookie 即可刮削，可留空！"
+    if state == "logged_in":
+        return "valid", "✅ 连接正常，Cookie 有效！"
+    if state == "logged_out":
+        return "invalid", "❌ Cookie 无效或已过期！（已保留原值，可手动替换）"
+    return "unknown", "⚠️ 未识别页面结构，无法判定 Cookie（已保留，可手动替换）"
 
 
 class CookieChecksMixin:
@@ -85,26 +157,21 @@ class CookieChecksMixin:
 
     def _check_javbus_cookie(self, input_cookie: str):
         # self.Ui.pushButton_check_javbus_cookie.setEnabled(False)
-        tips = "✅ 连接正常！"
+        input_cookie = (input_cookie or "").strip()
         headers = {"Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,ja;q=0.6", "cookie": input_cookie}
         javbus_url = manager.config.get_site_url(Website.JAVBUS, "https://javbus.com") + "/FSDSS-660"
 
         try:
             response, error = get_text_sync(javbus_url, headers=headers)
-
-            if response is None:
-                tips = f"❌ 连接失败！请检查网络或代理设置！ {error}"
-            elif "lostpasswd" in response:
-                if input_cookie:
-                    tips = "❌ Cookie 无效！"
-                else:
-                    tips = "❌ 当前节点需要 Cookie 才能刮削！请填写 Cookie 或更换节点！"
-            elif manager.config.javbus != input_cookie:
-                self.exec_save_config.emit()
-                tips = "✅ 连接正常！Cookie 已保存！  "
-
         except Exception as e:
-            tips = f"❌ 连接失败！请检查网络或代理设置！ {e}"
+            signal_qt.show_traceback_log(traceback.format_exc())
+            response, error = None, str(e)
+
+        state, tips = javbus_cookie_verdict(input_cookie, response, error)
+        # 只有真正验证到登录态才写盘：无效 / 被拦截 / 判定不了时一律只告警并保留用户填的 Cookie
+        if state == "valid" and manager.config.javbus != input_cookie:
+            self.exec_save_config.emit()
+            tips = "✅ 连接正常，Cookie 已保存！"
 
         self.show_log_text(tips.replace("❌", " ❌ JavBus").replace("✅", " ✅ JavBus"))
         self.set_javbus_status.emit(tips)

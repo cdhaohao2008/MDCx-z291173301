@@ -390,10 +390,22 @@ def _classify_http_result(spec: NetworkCheckSpec, status_code: int, text: str) -
 
     if spec.site == Website.JAVBUS:
         manager = _manager()
-        if "lostpasswd" in text and manager.config.javbus:
+        # 与「设置 → 网络」里的 JavBus Cookie 检查同源判定：原先只认 lostpasswd，而该批镜像
+        # 匿名访问详情页根本不含它，于是无论 Cookie 多离谱都报「连接正常」。这里改用头像 uid
+        # + 登出文案的登录态判定。延迟导入，避免 core 反向依赖 controllers。
+        from mdcx.controllers.main_window.cookie_checks import classify_javbus_login_state
+
+        state = classify_javbus_login_state(text)
+        if state == "logged_in":
+            return NetworkCheckStatus.OK, "连接正常，Cookie 有效"
+        if manager.config.javbus and state == "logged_out":
             return NetworkCheckStatus.WARNING, "访问正常，但Javbus网站Cookie可能无效"
-        if "lostpasswd" in text:
+        if state == "logged_out" and "lostpasswd" in text.lower():
             return NetworkCheckStatus.WARNING, "当前节点可能需要 JavBus Cookie"
+        if state == "unknown":
+            return NetworkCheckStatus.WARNING, "无法识别 JavBus 页面结构，未能判定 Cookie"
+        if state == "blocked":
+            return NetworkCheckStatus.WARNING, "被年龄验证/浏览器验证页拦截，未能判定 Cookie"
         return NetworkCheckStatus.OK, "连接正常"
 
     if spec.site == Website.DMM:
