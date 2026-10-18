@@ -14494,7 +14494,7 @@ class Ui_MDCx(object):
                 '                                href="https://theporndb.net/"><span style="\n'
                 "                                text-decoration: underline;\n"
                 '                                color:#094fd1;">https://theporndb.net/</span></a>\n'
-                "                                注册登录后，点击头像-API Tokens-CREATE，复制生成的API Token填入此处</p></body></html>",
+                "                                注册登录后，点击头像-API Tokens-CREATE，复制网站生成的API Token填入此处</p></body></html>",
             )
         )
         self.checkBox_theporndb_hash.setText(_translate("MDCx", "不使用Hash值匹配数据"))
