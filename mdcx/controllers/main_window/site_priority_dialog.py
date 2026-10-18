@@ -461,15 +461,7 @@ def _style_site_list(list_widget: QListWidget, min_height: int, dark: bool = Fal
             color: {colors["text"]};
             border: 1px solid {colors["border"]};
             border-radius: 7px;
-            /* 左内边距比右多 6px：Qt 画 QSS 列表项的文字时，文字矩形的右缘比
-               「条目宽 - 左右内边距」还往右多留约 6.4px，文字又是贴着左边画的，
-               于是每个 chip 里的站点名/分组标题都比正中偏左那 6px 左右。QSS 的
-               `text-align: center` 与条目的 Qt::TextAlignmentRole 都改不动它——
-               QStyleSheetStyle 在 PE_PanelItemViewItem 里取不到 alignment 规则就
-               硬编码 AlignLeft（见 Qt 6 qstylesheetstyle.cpp）。这 6px 在 1.25x /
-               2.5x 缩放下量出来都是同样的逻辑像素，故直接补进左内边距即可居中，
-               不必自己接管绘制（那会连 hover/选中的底色边框一起重写）。 */
-            padding: 5px 9px 5px 15px;
+            padding: 5px 9px;
             margin: 3px;
             background: {colors["surface_muted"]};
         }}
