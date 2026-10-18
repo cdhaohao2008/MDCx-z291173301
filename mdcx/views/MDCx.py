@@ -10543,7 +10543,7 @@ class Ui_MDCx(object):
         self.frame_7.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.frame_7.setObjectName("frame_7")
         self.layoutWidget_28 = QtWidgets.QWidget(parent=self.frame_7)
-        self.layoutWidget_28.setGeometry(QtCore.QRect(140, 10, 511, 32))
+        self.layoutWidget_28.setGeometry(QtCore.QRect(140, 13, 511, 32))
         self.layoutWidget_28.setObjectName("layoutWidget_28")
         self.horizontalLayout_148 = QtWidgets.QHBoxLayout(self.layoutWidget_28)
         self.horizontalLayout_148.setContentsMargins(0, 0, 0, 0)

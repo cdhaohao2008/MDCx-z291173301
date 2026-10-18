@@ -22050,7 +22050,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         <property name="geometry">
                           <rect>
                             <x>140</x>
-                            <y>10</y>
+                            <y>13</y>
                             <width>511</width>
                             <height>32</height>
                           </rect>
