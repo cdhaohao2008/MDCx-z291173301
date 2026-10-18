@@ -23824,7 +23824,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 </property>
                                 <property name="text">
                                   <string>
-                                    &lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;该网站的Hash值匹配结果有可能计算错误&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                                    &lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;该网站Hash值匹配结果有可能计算错误&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                                 </property>
                                 <property name="scaledContents">
                                   <bool>true</bool>

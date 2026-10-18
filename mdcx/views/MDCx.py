@@ -14508,7 +14508,7 @@ class Ui_MDCx(object):
             _translate(
                 "MDCx",
                 "\n"
-                "                                    <html><head/><body><p>该网站的Hash值匹配结果有可能计算错误</p></body></html>",
+                "                                    <html><head/><body><p>该网站Hash值匹配结果有可能计算错误</p></body></html>",
             )
         )
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab3), _translate("MDCx", " 网络 "))
