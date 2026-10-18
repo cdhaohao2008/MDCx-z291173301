@@ -363,7 +363,7 @@ SITE_GROUPS: tuple[tuple[Website, ...], ...] = (
         Website.JAVDB_APP,
     ),
     (
-        # 与 TYPE_DEFAULT_SITES[国产番号] 里的组内顺序一致：Madou.club 优先
+        # 与 TYPE_DEFAULT_SITES[国产传媒] 里的组内顺序一致：Madou.club 优先
         Website.MADOUCLUB,
         Website.MADOUQU,
     ),

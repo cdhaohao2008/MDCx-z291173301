@@ -167,7 +167,10 @@ def save_config(self: "MyMAinWindow"):
     manager.config.website_dongman = get_sites(self.Ui.lineEdit_website_dongman.text())
     # 动漫网站源保存（无独立输入框时保持默认值）
     # manager.config.website_dongman 保留当前配置
-    _type_values = ["auto", "youma", "wuma", "suren", "fc2", "oumei", "guochan", "dongman"]
+    # 锁定刮削类型：下标 → 配置值，与 load_config 读回时用同一份顺序
+    # （FixedScrapingType.dropdown_order()，即 .ui 里 comboBox 的排列），
+    # 不写死字面量——下拉框换序时按下标硬编码的值表会静默存错类型。
+    _type_values = FixedScrapingType.dropdown_values()
     _fixed_idx = self.Ui.comboBox_fixed_scraping_type.currentIndex()
     if 0 <= _fixed_idx < len(_type_values):
         manager.config.fixed_scraping_type = FixedScrapingType(_type_values[_fixed_idx])

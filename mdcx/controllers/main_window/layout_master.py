@@ -403,7 +403,7 @@ class LayoutMasterMixin:
         # 按钮 y，而上一步刚改写下拉框的宽度上限（进而影响所在行高与行位置）。
         self._sync_scrape_note_vertical()
 
-        # ============ page_setting / 刮削网站页: 宽态国产番号说明单行时收回空行 ============
+        # ============ page_setting / 刮削网站页: 宽态国产传媒说明单行时收回空行 ============
         # 排在通用拉伸之后：本方法量的是该说明的终态宽度与其折行数，只有宽幅同步
         # 按新视口改写完组框/网格列宽后量到的 need 才是终态（否则宽度还是上一视口
         # 的旧值，单行判定会迟一拍）。也不影响 _sync_scrape_note_vertical——它锚的是
@@ -1396,20 +1396,20 @@ class LayoutMasterMixin:
         if button.y() != target:
             button.move(button.x(), target)
 
-    # 设置-刮削网站：「类型刮削网站」组里国产番号说明（label_232）与「动漫里番」
+    # 设置-刮削网站：「类型刮削网站」组里国产传媒说明（label_232）与「动漫里番」
     _SITE_TYPE_GRID = "gridLayout_36"  # 类型刮削网站网格（layoutWidget_6 上的四列网格）
-    _SITE_TYPE_GUOCHAN_TIP = "label_232"  # 国产番号说明（row 11 col 1~3，wordWrap）
+    _SITE_TYPE_GUOCHAN_TIP = "label_232"  # 国产传媒说明（row 9 col 1~3，wordWrap）
     # 单行判定容差：heightForWidth 的返回值与 fontMetrics().height() 有零头差
     _SITE_TYPE_SINGLE_LINE_SLACK = 3
 
     def _sync_site_type_tip_single_line(self) -> None:
-        """设置-刮削网站：宽态国产番号说明单行时收回空行，「动漫里番」上移一行。
+        """设置-刮削网站：宽态国产传媒说明单行时收回空行，「动漫里番」上移一行。
 
         用户需求：「软件设置-刮削网站-类型刮削网站页最大化时将动漫里番向上移动一行，
         因为提示词已经在一行显示了，目前最大化时动漫里番离国产番号的间距太大了」，
         且「最小化时的界面、布局、组件、控件、提示词等等均保持不变」。
 
-        根因：label_232（国产番号说明）开了 wordWrap，.ui 里钉了 maximumSize 高 34
+        根因：label_232（国产传媒说明）开了 wordWrap，.ui 里钉了 maximumSize 高 34
         （=两行），而 QGridLayout 定行高走 sizeHint 受 maximumSize 夹取、**不走
         heightForWidth**（离屏实测：把上限放开后各宽度下都取 sizeHint 的 43~78px，
         从不按实际折行数收缩）。窗口最大化后该说明所在的三列可用宽度足够，提示词

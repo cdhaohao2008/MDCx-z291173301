@@ -1078,10 +1078,10 @@ _TYPE_LIST_LINE_RE = re.compile(r"<li><b>([^<]*)</b>([^<]*)</li>")
 _TYPE_SITE_GROUPS = (
     ("有码番号", "website_youma"),
     ("无码番号", "website_wuma"),
-    ("国产短剧", "website_suren"),
     ("个摄番号", "website_fc2"),
-    ("国产番号", "website_guochan"),
-    ("欧美番号", "website_oumei"),
+    ("欧美视频", "website_oumei"),
+    ("国产传媒", "website_guochan"),
+    ("国产短剧", "website_suren"),
     ("动漫里番", "website_dongman"),
 )
 
@@ -1148,5 +1148,5 @@ def test_about_type_site_lists_official_only_in_coded_types():
     about_lists = _about_type_site_lists()
     assert "Official" in about_lists["有码番号"]
     assert "Official" in about_lists["无码番号"]
-    for label in ("国产短剧", "个摄番号", "国产番号", "欧美番号"):
+    for label in ("国产短剧", "个摄番号", "国产传媒", "欧美视频"):
         assert "Official" not in about_lists[label], f"{label} 组不该含 Official"

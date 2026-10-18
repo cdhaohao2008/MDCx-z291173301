@@ -3765,7 +3765,7 @@ class Ui_MDCx(object):
             ""
         )
         self.lineEdit_website_oumei.setObjectName("lineEdit_website_oumei")
-        self.gridLayout_36.addWidget(self.lineEdit_website_oumei, 8, 1, 1, 1)
+        self.gridLayout_36.addWidget(self.lineEdit_website_oumei, 6, 1, 1, 1)
         self.label_151 = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -3796,7 +3796,7 @@ class Ui_MDCx(object):
             ""
         )
         self.lineEdit_website_fc2.setObjectName("lineEdit_website_fc2")
-        self.gridLayout_36.addWidget(self.lineEdit_website_fc2, 6, 1, 1, 1)
+        self.gridLayout_36.addWidget(self.lineEdit_website_fc2, 4, 1, 1, 1)
         self.label_322 = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -3826,7 +3826,7 @@ class Ui_MDCx(object):
         )
         self.label_232.setWordWrap(True)
         self.label_232.setObjectName("label_232")
-        self.gridLayout_36.addWidget(self.label_232, 11, 1, 1, 3)
+        self.gridLayout_36.addWidget(self.label_232, 9, 1, 1, 3)
         self.label_156 = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -3835,7 +3835,7 @@ class Ui_MDCx(object):
         self.label_156.setSizePolicy(sizePolicy)
         self.label_156.setStyleSheet("color: rgb(8, 128, 128);")
         self.label_156.setObjectName("label_156")
-        self.gridLayout_36.addWidget(self.label_156, 5, 1, 1, 1)
+        self.gridLayout_36.addWidget(self.label_156, 11, 1, 1, 1)
         self.label_157 = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -3844,7 +3844,7 @@ class Ui_MDCx(object):
         self.label_157.setSizePolicy(sizePolicy)
         self.label_157.setStyleSheet("color: rgb(8, 128, 128);")
         self.label_157.setObjectName("label_157")
-        self.gridLayout_36.addWidget(self.label_157, 7, 1, 1, 1)
+        self.gridLayout_36.addWidget(self.label_157, 5, 1, 1, 1)
         self.label_158 = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -3853,7 +3853,7 @@ class Ui_MDCx(object):
         self.label_158.setSizePolicy(sizePolicy)
         self.label_158.setStyleSheet("color: rgb(8, 128, 128);")
         self.label_158.setObjectName("label_158")
-        self.gridLayout_36.addWidget(self.label_158, 9, 1, 1, 1)
+        self.gridLayout_36.addWidget(self.label_158, 7, 1, 1, 1)
         self.lineEdit_website_wuma = QtWidgets.QLineEdit(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -3883,7 +3883,7 @@ class Ui_MDCx(object):
             ""
         )
         self.lineEdit_website_suren.setObjectName("lineEdit_website_suren")
-        self.gridLayout_36.addWidget(self.lineEdit_website_suren, 4, 1, 1, 1)
+        self.gridLayout_36.addWidget(self.lineEdit_website_suren, 10, 1, 1, 1)
         self.label_149 = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -3899,7 +3899,7 @@ class Ui_MDCx(object):
             | QtCore.Qt.AlignmentFlag.AlignVCenter
         )
         self.label_149.setObjectName("label_149")
-        self.gridLayout_36.addWidget(self.label_149, 8, 0, 1, 1)
+        self.gridLayout_36.addWidget(self.label_149, 6, 0, 1, 1)
         self.label_155 = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4006,7 +4006,7 @@ class Ui_MDCx(object):
             | QtCore.Qt.AlignmentFlag.AlignVCenter
         )
         self.label_152.setObjectName("label_152")
-        self.gridLayout_36.addWidget(self.label_152, 4, 0, 1, 1)
+        self.gridLayout_36.addWidget(self.label_152, 10, 0, 1, 1)
         self.lineEdit_website_youma = QtWidgets.QLineEdit(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4052,7 +4052,7 @@ class Ui_MDCx(object):
             | QtCore.Qt.AlignmentFlag.AlignVCenter
         )
         self.label_148.setObjectName("label_148")
-        self.gridLayout_36.addWidget(self.label_148, 6, 0, 1, 1)
+        self.gridLayout_36.addWidget(self.label_148, 4, 0, 1, 1)
         self.lineEdit_website_guochan = QtWidgets.QLineEdit(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4067,7 +4067,7 @@ class Ui_MDCx(object):
             ""
         )
         self.lineEdit_website_guochan.setObjectName("lineEdit_website_guochan")
-        self.gridLayout_36.addWidget(self.lineEdit_website_guochan, 10, 1, 1, 1)
+        self.gridLayout_36.addWidget(self.lineEdit_website_guochan, 8, 1, 1, 1)
         self.label_217 = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4083,7 +4083,7 @@ class Ui_MDCx(object):
             | QtCore.Qt.AlignmentFlag.AlignVCenter
         )
         self.label_217.setObjectName("label_217")
-        self.gridLayout_36.addWidget(self.label_217, 10, 0, 1, 1)
+        self.gridLayout_36.addWidget(self.label_217, 8, 0, 1, 1)
         self.comboBox_fixed_scraping_type = QtWidgets.QComboBox(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4172,7 +4172,7 @@ class Ui_MDCx(object):
         self.pushButton_edit_website_suren.setSizePolicy(sizePolicy)
         self.pushButton_edit_website_suren.setMinimumSize(QtCore.QSize(0, 28))
         self.pushButton_edit_website_suren.setObjectName("pushButton_edit_website_suren")
-        self.gridLayout_36.addWidget(self.pushButton_edit_website_suren, 4, 2, 1, 1)
+        self.gridLayout_36.addWidget(self.pushButton_edit_website_suren, 10, 2, 1, 1)
         self.pushButton_priority_website_suren = QtWidgets.QPushButton(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4181,7 +4181,7 @@ class Ui_MDCx(object):
         self.pushButton_priority_website_suren.setSizePolicy(sizePolicy)
         self.pushButton_priority_website_suren.setMinimumSize(QtCore.QSize(0, 28))
         self.pushButton_priority_website_suren.setObjectName("pushButton_priority_website_suren")
-        self.gridLayout_36.addWidget(self.pushButton_priority_website_suren, 4, 3, 1, 1)
+        self.gridLayout_36.addWidget(self.pushButton_priority_website_suren, 10, 3, 1, 1)
         self.pushButton_edit_website_fc2 = QtWidgets.QPushButton(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4190,7 +4190,7 @@ class Ui_MDCx(object):
         self.pushButton_edit_website_fc2.setSizePolicy(sizePolicy)
         self.pushButton_edit_website_fc2.setMinimumSize(QtCore.QSize(0, 28))
         self.pushButton_edit_website_fc2.setObjectName("pushButton_edit_website_fc2")
-        self.gridLayout_36.addWidget(self.pushButton_edit_website_fc2, 6, 2, 1, 1)
+        self.gridLayout_36.addWidget(self.pushButton_edit_website_fc2, 4, 2, 1, 1)
         self.pushButton_priority_website_fc2 = QtWidgets.QPushButton(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4199,7 +4199,7 @@ class Ui_MDCx(object):
         self.pushButton_priority_website_fc2.setSizePolicy(sizePolicy)
         self.pushButton_priority_website_fc2.setMinimumSize(QtCore.QSize(0, 28))
         self.pushButton_priority_website_fc2.setObjectName("pushButton_priority_website_fc2")
-        self.gridLayout_36.addWidget(self.pushButton_priority_website_fc2, 6, 3, 1, 1)
+        self.gridLayout_36.addWidget(self.pushButton_priority_website_fc2, 4, 3, 1, 1)
         self.pushButton_edit_website_oumei = QtWidgets.QPushButton(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4208,7 +4208,7 @@ class Ui_MDCx(object):
         self.pushButton_edit_website_oumei.setSizePolicy(sizePolicy)
         self.pushButton_edit_website_oumei.setMinimumSize(QtCore.QSize(0, 28))
         self.pushButton_edit_website_oumei.setObjectName("pushButton_edit_website_oumei")
-        self.gridLayout_36.addWidget(self.pushButton_edit_website_oumei, 8, 2, 1, 1)
+        self.gridLayout_36.addWidget(self.pushButton_edit_website_oumei, 6, 2, 1, 1)
         self.pushButton_priority_website_oumei = QtWidgets.QPushButton(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4217,7 +4217,7 @@ class Ui_MDCx(object):
         self.pushButton_priority_website_oumei.setSizePolicy(sizePolicy)
         self.pushButton_priority_website_oumei.setMinimumSize(QtCore.QSize(0, 28))
         self.pushButton_priority_website_oumei.setObjectName("pushButton_priority_website_oumei")
-        self.gridLayout_36.addWidget(self.pushButton_priority_website_oumei, 8, 3, 1, 1)
+        self.gridLayout_36.addWidget(self.pushButton_priority_website_oumei, 6, 3, 1, 1)
         self.pushButton_edit_website_guochan = QtWidgets.QPushButton(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4226,7 +4226,7 @@ class Ui_MDCx(object):
         self.pushButton_edit_website_guochan.setSizePolicy(sizePolicy)
         self.pushButton_edit_website_guochan.setMinimumSize(QtCore.QSize(0, 28))
         self.pushButton_edit_website_guochan.setObjectName("pushButton_edit_website_guochan")
-        self.gridLayout_36.addWidget(self.pushButton_edit_website_guochan, 10, 2, 1, 1)
+        self.gridLayout_36.addWidget(self.pushButton_edit_website_guochan, 8, 2, 1, 1)
         self.pushButton_priority_website_guochan = QtWidgets.QPushButton(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4235,7 +4235,7 @@ class Ui_MDCx(object):
         self.pushButton_priority_website_guochan.setSizePolicy(sizePolicy)
         self.pushButton_priority_website_guochan.setMinimumSize(QtCore.QSize(0, 28))
         self.pushButton_priority_website_guochan.setObjectName("pushButton_priority_website_guochan")
-        self.gridLayout_36.addWidget(self.pushButton_priority_website_guochan, 10, 3, 1, 1)
+        self.gridLayout_36.addWidget(self.pushButton_priority_website_guochan, 8, 3, 1, 1)
         self.groupBox_35 = QtWidgets.QGroupBox(parent=self.scrollAreaWidgetContents_guaxiaowangzhan)
         self.groupBox_35.setGeometry(QtCore.QRect(30, 1027, 701, 1000))
         self.groupBox_35.setMinimumSize(QtCore.QSize(200, 0))
@@ -13455,13 +13455,13 @@ class Ui_MDCx(object):
         self.label_232.setText(
             _translate(
                 "MDCx",
-                "<span>「网站偏好」-「指定网站」指定Madouqu、Madou.club或者文件路径里含有「国产」、「麻豆」时，将自动使用以上网站刮削国产番号</span>",
+                "<span>「网站偏好」-「指定网站」指定Madouqu、Madou.club或者文件路径里含有「国产」、「麻豆」时，将自动使用以上网站刮削国产传媒</span>",
             )
         )
         self.label_156.setText(_translate("MDCx", "比如：259LUXU-1111"))
         self.label_157.setText(_translate("MDCx", "比如：FC2-111111"))
         self.label_158.setText(_translate("MDCx", "比如：sexart.11.11.11"))
-        self.label_149.setText(_translate("MDCx", "欧美番号："))
+        self.label_149.setText(_translate("MDCx", "欧美视频："))
         self.label_155.setText(_translate("MDCx", "比如：111111-111，111111_111，n1111，HEYZO-1111，SMD-111"))
         self.label_323.setText(
             _translate(
@@ -13476,20 +13476,20 @@ class Ui_MDCx(object):
         self.label_152.setText(_translate("MDCx", "国产短剧："))
         self.label_153.setText(_translate("MDCx", "有码番号："))
         self.label_148.setText(_translate("MDCx", "个摄番号："))
-        self.label_217.setText(_translate("MDCx", "国产番号："))
+        self.label_217.setText(_translate("MDCx", "国产传媒："))
         self.comboBox_fixed_scraping_type.setToolTip(
             _translate(
                 "MDCx", "选择后跳过自动类型识别，所有番号直接使用指定类型的网站列表刮削。选择「自动判断」恢复默认行为。"
             )
         )
         self.comboBox_fixed_scraping_type.setItemText(0, _translate("MDCx", "自动判断"))
-        self.comboBox_fixed_scraping_type.setItemText(1, _translate("MDCx", "有码"))
-        self.comboBox_fixed_scraping_type.setItemText(2, _translate("MDCx", "无码"))
-        self.comboBox_fixed_scraping_type.setItemText(3, _translate("MDCx", "短剧"))
-        self.comboBox_fixed_scraping_type.setItemText(4, _translate("MDCx", "FC2"))
-        self.comboBox_fixed_scraping_type.setItemText(5, _translate("MDCx", "欧美"))
-        self.comboBox_fixed_scraping_type.setItemText(6, _translate("MDCx", "国产"))
-        self.comboBox_fixed_scraping_type.setItemText(7, _translate("MDCx", "动漫"))
+        self.comboBox_fixed_scraping_type.setItemText(1, _translate("MDCx", "有码番号"))
+        self.comboBox_fixed_scraping_type.setItemText(2, _translate("MDCx", "无码番号"))
+        self.comboBox_fixed_scraping_type.setItemText(3, _translate("MDCx", "个摄番号"))
+        self.comboBox_fixed_scraping_type.setItemText(4, _translate("MDCx", "欧美视频"))
+        self.comboBox_fixed_scraping_type.setItemText(5, _translate("MDCx", "国产传媒"))
+        self.comboBox_fixed_scraping_type.setItemText(6, _translate("MDCx", "国产短剧"))
+        self.comboBox_fixed_scraping_type.setItemText(7, _translate("MDCx", "动漫里番"))
         self.label_fixed_scraping_type.setText(_translate("MDCx", "锁定类型："))
         self.label_fixed_scraping_type_desc.setText(
             _translate("MDCx", "选择后将跳过自动类型识别，所有番号将直接使用指定类型的网站列表进行刮削和整理")
@@ -14550,7 +14550,7 @@ class Ui_MDCx(object):
                 "<h4>一、快速开始</h4>\n"
                 "<ol>\n"
                 "<li><b>媒体路径</b>：软件设置→刮削目录，配置「待刮削视频目录」「成功输出目录」和「失败输出目录」，也可以在软件界面点击「选择目录」临时选择待刮削目录</li>\n"
-                "<li><b>刮削网站</b>：软件设置→刮削网站，为不同类型，有码番号/无码番号/国产短剧/个摄番号/欧美番号/国产番号/动漫里番，分别选择数据源网站</li>\n"
+                "<li><b>刮削网站</b>：软件设置→刮削网站，为不同类型，有码番号/无码番号/个摄番号/欧美视频/国产传媒/国产短剧/动漫里番，分别选择数据源网站</li>\n"
                 "<li><b>下载选项</b>：软件设置→下载，勾选需要下载的元数据、图片与字幕</li>\n"
                 "<li><b>开始刮削</b>：软件界面点击「选择目录」选择待刮削目录，再点击「开始」按钮，建议先用1~3个文件测试效果</li>\n"
                 "</ol>\n"
@@ -14576,10 +14576,10 @@ class Ui_MDCx(object):
                 "<ul>\n"
                 "<li><b>有码番号</b>：DMM、DMM_API、LibreDMM、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像</li>\n"
                 "<li><b>无码番号</b>：AVSOX、AVEntertainments、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API</li>\n"
-                "<li><b>国产短剧</b>：JavDay</li>\n"
                 "<li><b>个摄番号：</b>FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
-                "<li><b>国产番号</b>：Madou.club、Madouqu、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、IQQTV、Missav、Missav_API</li>\n"
-                "<li><b>欧美番号</b>：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、Missav、Missav_API、IQQTV</li>\n"
+                "<li><b>欧美视频</b>：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、Missav、Missav_API、IQQTV</li>\n"
+                "<li><b>国产传媒</b>：Madou.club、Madouqu、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、IQQTV、Missav、Missav_API</li>\n"
+                "<li><b>国产短剧</b>：JavDay</li>\n"
                 "              <li><b>动漫里番</b>：Getchu、JavDB、JavDB_API、JavDB_APP</li>\n"
                 "<li><b>MyWifes</b>：不属于任何类型组的默认名单列表，需在「网站偏好」-「指定网站」勾选MyWife或让文件名称路径包含MyWife时才会启用</li>\n"
                 "<li><b>官方网站</b>：Dahlia、Faleno、MGStage、Prestige、Official已在网站源列表中单列，番号视频命中对应前缀时将自动路由锁定该站</li>\n"
@@ -14640,8 +14640,8 @@ class Ui_MDCx(object):
                 "<ul>\n"
                 "<li><b>标准有码</b>：JavDB/JavBus:SSNI-111；DMM:SSNI00111；素人系列（按有码刮削）：MGStage:259LUXU-1111、JavDB:LUXU-1111</li>\n"
                 "<li><b>标准无码</b>：JavDB/JavBus/Avsox:111111-1111、111111_111、HEYZO-1111、n1111</li>\n"
-                "<li><b>国产短剧</b>：无统一番号格式、也无法按文件名识别，只有锁定刮削类型选「短剧」时才走该组网站（当前 JavDay）；FC2:FC2-111111、FC2-PPV-111111</li>\n"
-                "<li><b>欧美番号</b>：JavDB/JavBus:sexart.11.11.11，系列.年.月.日</li>\n"
+                "<li><b>国产短剧</b>：无统一番号格式、也无法按文件名识别，只有锁定刮削类型选「国产短剧」时才走该组网站（当前 JavDay）；FC2:FC2-111111、FC2-PPV-111111</li>\n"
+                "<li><b>欧美视频</b>：JavDB/JavBus:sexart.11.11.11，系列.年.月.日</li>\n"
                 "<li><b>字幕影片</b>：SSNI-xxx-c.mp4/-C.mp4，字幕标记靠近扩展名</li>\n"
                 "<li><b>分集影片</b>：SSNI-xxx-cd1.mp4默认支持-cdN/-partN/-hdN/-1等形式；-A或-01分集可在设置→命名中勾选『允许识别分集』对应选项</li>\n"
                 "<li><b>外挂字幕</b>：字幕文件名需与影片一致方可随影片一起移动，支持srt/ass/sub等格式</li>\n"

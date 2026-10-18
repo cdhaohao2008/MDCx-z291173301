@@ -12,6 +12,7 @@ from mdcx.config.enums import (
     DownloadableFile,
     EmbyAction,
     FieldRule,
+    FixedScrapingType,
     HDPicSource,
     KeepableFile,
     MarkType,
@@ -196,15 +197,17 @@ def load_config(self: "MyMAinWindow"):
         self.Ui.lineEdit_website_suren.setText(",".join([site.value for site in manager.config.website_suren]))
         # FC2番号刮削网站
         self.Ui.lineEdit_website_fc2.setText(",".join([site.value for site in manager.config.website_fc2]))
-        # 欧美番号刮削网站
+        # 欧美视频刮削网站
         self.Ui.lineEdit_website_oumei.setText(",".join([site.value for site in manager.config.website_oumei]))
-        # 国产番号刮削网站
+        # 国产传媒刮削网站
         self.Ui.lineEdit_website_guochan.setText(",".join([site.value for site in manager.config.website_guochan]))
         # 动漫里番刮削网站
         self.Ui.lineEdit_website_dongman.setText(",".join([site.value for site in manager.config.website_dongman]))
-        # 锁定刮削类型
-        _type_labels = ["自动判断", "有码", "无码", "短剧", "FC2", "欧美", "国产", "动漫"]
-        _type_values = ["auto", "youma", "wuma", "suren", "fc2", "oumei", "guochan", "dongman"]
+        # 锁定刮削类型：下拉框八项的**排列顺序**读 FixedScrapingType.dropdown_order()
+        # （.ui 里 comboBox_fixed_scraping_type 与之一一对应），显示名读 names()。
+        # 两处同源，改名或换序不必再手工同步一份下标表——此前那份写死的 _type_values
+        # 恰好等于枚举声明序，「国产短剧」下移后就会按下标存错类型。
+        _type_values = FixedScrapingType.dropdown_values()
         _fixed_value = manager.config.fixed_scraping_type.value
         _idx = _type_values.index(_fixed_value) if _fixed_value in _type_values else 0
         self.Ui.comboBox_fixed_scraping_type.setCurrentIndex(_idx)

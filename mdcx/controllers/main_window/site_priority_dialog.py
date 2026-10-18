@@ -64,8 +64,9 @@ TYPE_TITLES = {
     # 素人番号已并入有码组按有码刮削，这里只留国产短剧专用站。
     FixedScrapingType.SUREN: "国产短剧",
     FixedScrapingType.FC2: "个摄番号",
-    FixedScrapingType.OUMEI: "欧美番号",
-    FixedScrapingType.GUOCHAN: "国产番号",
+    # 「欧美番号」「国产番号」2.6.0 起按用户口径改称「欧美视频」「国产传媒」（组名一字未改）
+    FixedScrapingType.OUMEI: "欧美视频",
+    FixedScrapingType.GUOCHAN: "国产传媒",
     FixedScrapingType.DONGMAN: "动漫里番",
 }
 
@@ -1389,8 +1390,11 @@ class FieldPriorityDialog(CenterOnFirstShowMixin, QDialog):
 
 def setup_site_priority_ui(window: "MyMAinWindow") -> None:
     ui = window.Ui
+    # 行号对应 layoutWidget_6 里 gridLayout_36 的行：每个「标签 + 输入框 + 两个按钮」
+    # 占一行、下一行是绿色说明。2.6.0 起「国产短剧」那一行按用户要求挪到「国产传媒」
+    # 之下（个摄番号 4、欧美视频 6、国产传媒 8、国产短剧 10），下方动漫里番 13 起不动。
     window._type_website_ui = {
-        # title 取 TYPE_TITLES（带「番号」的正式组名），与设置页各行标签、
+        # title 取 TYPE_TITLES（类型全称），与设置页各行标签、
         # 「编辑网站」对话框标题「编辑{type}网站源」三处保持同一个组名。
         FixedScrapingType.YOUMA: TypeWebsiteUi(
             FixedScrapingType.YOUMA, TYPE_TITLES[FixedScrapingType.YOUMA], ui.lineEdit_website_youma, 0
@@ -1398,22 +1402,22 @@ def setup_site_priority_ui(window: "MyMAinWindow") -> None:
         FixedScrapingType.WUMA: TypeWebsiteUi(
             FixedScrapingType.WUMA, TYPE_TITLES[FixedScrapingType.WUMA], ui.lineEdit_website_wuma, 2
         ),
-        FixedScrapingType.SUREN: TypeWebsiteUi(
-            FixedScrapingType.SUREN, TYPE_TITLES[FixedScrapingType.SUREN], ui.lineEdit_website_suren, 4
-        ),
         FixedScrapingType.FC2: TypeWebsiteUi(
-            FixedScrapingType.FC2, TYPE_TITLES[FixedScrapingType.FC2], ui.lineEdit_website_fc2, 6
+            FixedScrapingType.FC2, TYPE_TITLES[FixedScrapingType.FC2], ui.lineEdit_website_fc2, 4
         ),
         FixedScrapingType.OUMEI: TypeWebsiteUi(
-            FixedScrapingType.OUMEI, TYPE_TITLES[FixedScrapingType.OUMEI], ui.lineEdit_website_oumei, 8
+            FixedScrapingType.OUMEI, TYPE_TITLES[FixedScrapingType.OUMEI], ui.lineEdit_website_oumei, 6
         ),
         FixedScrapingType.GUOCHAN: TypeWebsiteUi(
-            FixedScrapingType.GUOCHAN, TYPE_TITLES[FixedScrapingType.GUOCHAN], ui.lineEdit_website_guochan, 10
+            FixedScrapingType.GUOCHAN, TYPE_TITLES[FixedScrapingType.GUOCHAN], ui.lineEdit_website_guochan, 8
         ),
-        # 动漫里番同样是「类型刮削网站」下的一类，排在国产番号下面一行（对应 layoutWidget_6 的 row 16）；
+        FixedScrapingType.SUREN: TypeWebsiteUi(
+            FixedScrapingType.SUREN, TYPE_TITLES[FixedScrapingType.SUREN], ui.lineEdit_website_suren, 10
+        ),
+        # 动漫里番同样是「类型刮削网站」下的一类，排在国产短剧下面一行（对应 layoutWidget_6 的 row 13）；
         # 两个按钮靠下面的 f"pushButton_edit_website_{key}" 按类型名拼出来，正好对得上 .ui 里的名字
         FixedScrapingType.DONGMAN: TypeWebsiteUi(
-            FixedScrapingType.DONGMAN, TYPE_TITLES[FixedScrapingType.DONGMAN], ui.lineEdit_website_dongman, 16
+            FixedScrapingType.DONGMAN, TYPE_TITLES[FixedScrapingType.DONGMAN], ui.lineEdit_website_dongman, 13
         ),
     }
     for info in window._type_website_ui.values():

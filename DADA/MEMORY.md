@@ -138,6 +138,7 @@
     `Getchu` / `AVSEX` 对大陆 IP 过不了 CF 墙，第三方工具也过不了，2.5.6 起从六组全部移除；
     `Official` 只在有码/无码两组（按番号前缀路由到片商官网，国产/欧美/FC2 没有收录）。
     **「素人番号」类型已改名「国产短剧」**（枚举值/配置字段名仍是 `SUREN`/`website_suren`），2.6.0 起该组默认名单只剩 JavDay，短剧无番号格式、无法自动识别，只有锁定刮削类型才走这一组；**原素人番号（LUXU/SIRO/259LUXU 等）一律按有码番号刮削**，`_is_suren_number()` 自动分支已删除。
+    **七组名与「锁定刮削类型」下拉文案已按用户口径统一（2.6.0）**：组名 有码番号/无码番号/个摄番号/欧美视频/国产传媒/国产短剧/动漫里番；下拉八项 自动判断/有码番号/无码番号/个摄番号/欧美视频/国产传媒/国产短剧/动漫里番，**设置页行序与下拉序都把国产短剧放在国产传媒之后、动漫里番之前**（候选区七个 chip 短名 有码/无码/短剧/FC2/欧美/国产/动漫 与 `PALETTE_GROUP_TYPES`、`CONFIGURABLE_SCRAPING_TYPES` 的组序**刻意不动**）。**下拉框顺序与枚举声明序不再相同**，`load_config.py`/`save_config.py` 的下标↔值映射改读 `FixedScrapingType.dropdown_values()`（顺序源 `dropdown_order()`，**不能写成类体里的常量**——Enum 会把它当成员报 `TypeError: too many arguments for str()`），换序时只要改这一处。
   - 无码官网五站由 official_uncensored.py 统一路由，均需代理；1pondo/pacopacomama/10musume 的 dyn/phpauto JSON API 直通。
   - 被墙站测试：`uv run python -m scripts.dev_proxy start|status|test <url>|stop`；日本 IP 限制站 `--port 7891 --regions "jp|日本"`。devbox 限制：超时≠站点死亡；连通性验证必须 curl_cffi impersonate；批量探测校验 data.title 防假阳性。
   - **HTTP 4xx/5xx 错误串必须携带截断响应体**（#88：Emby 400 根因在 body JSON），保留 `"HTTP {status}"` 前缀不破坏匹配；定位顺序先看客户端实际发了什么。

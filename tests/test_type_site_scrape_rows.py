@@ -36,6 +36,13 @@
 1.5 倍），而行高被钉在 34px，会截掉第三行——这是为了让默认宽度下的紧凑布局稳定；同样地，
 窗口很宽时三段说明只有一行，34px 的行高会在文字下方留下约 19px 死白，块间视觉间隙相应变大。
 宽态的死白已由运行期收敛处理（见文末「宽态单行收敛」一节）。
+
+2.6.0 追加一条：**「国产短剧」那一块（标签 + 输入框 + 编辑网站 + 字段优先级 + 绿色说明）
+   按用户要求挪到「国产传媒」之下**，即 个摄番号 4 / 欧美视频 6 / 国产传媒 8 / 国产短剧 10，
+   三个块间 spacer、动漫里番、MyWifes、锁定类型所在行号一字不动（仍是 12~18）。块的高矮
+   集合没有变化（只是四块换位），故 `layoutWidget_6` 的声明高 558 不受影响；变的是
+   「哪段说明紧贴哪一行」——「块 + spacer → 动漫」这一对的上一块从 label_232（国产传媒的
+   说明）换成了 label_156（国产短剧的说明），label_232 则改为紧贴 label_152。
 """
 
 import os
@@ -74,21 +81,23 @@ _TOL = 2  # 字体渲染取整容差
 _TOL_BLOCK = 4
 
 # gridLayout_36 的完整行号表：(行号, 该行的 (控件名 -> 列号))
+# 2.6.0 起「国产短剧」那一块按用户要求挪到「国产传媒」之下，故四块整体上移两行：
+# 个摄番号 4、欧美视频 6、国产传媒 8、国产短剧 10，下方三个 spacer 与动漫/MyWifes/锁定类型不动。
 _ROW_TABLE = {
     0: {"label_153": 0, "lineEdit_website_youma": 1},
     1: {"label_154": 1},
     2: {"label_151": 0, "lineEdit_website_wuma": 1},
     3: {"label_155": 1},
-    4: {"label_152": 0, "lineEdit_website_suren": 1},
-    5: {"label_156": 1},
-    6: {"label_148": 0, "lineEdit_website_fc2": 1},
-    7: {"label_157": 1},
-    8: {"label_149": 0, "lineEdit_website_oumei": 1},
-    9: {"label_158": 1},
-    10: {"label_217": 0, "lineEdit_website_guochan": 1},
-    11: {"label_232": 1},
+    4: {"label_148": 0, "lineEdit_website_fc2": 1},
+    5: {"label_157": 1},
+    6: {"label_149": 0, "lineEdit_website_oumei": 1},
+    7: {"label_158": 1},
+    8: {"label_217": 0, "lineEdit_website_guochan": 1},
+    9: {"label_232": 1},
+    10: {"label_152": 0, "lineEdit_website_suren": 1},
+    11: {"label_156": 1},
     12: {"verticalSpacer_guochan_gap": 0},
-    # 2.5.6 起动漫也有自己的输入行（与另外六类一样），排在国产番号下面、MyWifes 上面
+    # 2.5.6 起动漫也有自己的输入行（与另外六类一样），排在国产短剧下面、MyWifes 上面
     13: {
         "label_dongman_sites": 0,
         "lineEdit_website_dongman": 1,
@@ -106,26 +115,27 @@ _ROW_TABLE = {
 _DESC_UNDER_CONTROL = [
     ("lineEdit_website_youma", "label_154"),
     ("lineEdit_website_wuma", "label_155"),
-    ("lineEdit_website_suren", "label_156"),
     ("lineEdit_website_fc2", "label_157"),
     ("lineEdit_website_oumei", "label_158"),
     ("lineEdit_website_guochan", "label_232"),
+    ("lineEdit_website_suren", "label_156"),
 ]
 # 需求 1 —— 块与块之间（说明文字 ↔ 下一块首个控件）＝ 一行汉字高度
-# 动漫 2.5.6 起也有自己的输入框（与另外六类一样），所以它那块的结构变成
 # 动漫 2.5.6 起也有自己的输入框（与另外六类一样），结构是「块标签 label_dongman_sites
 # + 输入框」；下面的块是 MyWifes（块标签 label_322 + 说明 label_323），再往下才是锁定类型。
+# 2.6.0 起国产短剧那一块移到国产传媒之下，故「块 + spacer → 动漫」这一对的上一块
+# 是国产短剧的说明 label_156（原先是国产传媒的 label_232，它现在紧贴国产短剧的标签）。
 _DESC_TO_NEXT_BLOCK = [
-    ("label_232", "label_dongman_sites"),
+    ("label_156", "label_dongman_sites"),
     ("label_323", "comboBox_fixed_scraping_type"),
 ]
 # 说明文字下方的控件同步上移（说明底 → 下一控件顶）
 _DESC_TO_NEXT_CONTROL = [
     ("label_154", "lineEdit_website_wuma"),
-    ("label_155", "lineEdit_website_suren"),
-    ("label_156", "lineEdit_website_fc2"),
+    ("label_155", "lineEdit_website_fc2"),
     ("label_157", "lineEdit_website_oumei"),
     ("label_158", "lineEdit_website_guochan"),
+    ("label_232", "label_152"),
     ("comboBox_fixed_scraping_type", "label_fixed_scraping_type_desc"),
 ]
 # 动漫 / MyWifes 两块是「块标签 + 说明」同行（列 0 / 列 1），顶边必须基本齐平
@@ -345,7 +355,7 @@ def test_declared_geometry_is_compacted_and_followers_shifted():
 _WRAPPED_DESC_TEXTS = {
     "label_232": (
         "<span>「网站偏好」-「指定网站」指定Madouqu、Madou.club或者文件路径里含有「国产」、「麻豆」时，"
-        "将自动使用以上网站刮削国产番号</span>"
+        "将自动使用以上网站刮削国产传媒</span>"
     ),
     "label_323": (
         "<p>「网站偏好」-「指定网站」指定MyWife或文件路径里含有MyWife时，程序将自动使用MyWife刮削，"
@@ -372,16 +382,17 @@ def test_wrapped_desc_texts_regression():
 
 # 六条番号提示词文案（用户把「个摄番号：」改名为「FC2番号：」后又改为「个人番号：」，
 # 最后又改回「个摄番号：」一并锁死，防止日后无声改回谐音写法，或某一条被单独改成别的品牌名；
-# 「素人番号：」在 2.6.0 改叫「国产短剧：」，枚举值与配置字段名仍沿用 website_suren）。
+# 「素人番号：」在 2.6.0 改叫「国产短剧：」，「欧美番号：」「国产番号：」同批改叫
+# 「欧美视频：」「国产传媒：」，枚举值与配置字段名仍沿用 website_suren 等不动）。
 # 注意：2026-10-05 全站文案去空格统一后，FC2 后不再带空格，此处与 .ui 保持一致
 # （v2.2.5 改名历史里记的是带空格的旧写法，见 docs/Changelog.md）。
 _NUMBER_LABELS = {
     "label_153": "有码番号：",
     "label_151": "无码番号：",
-    "label_152": "国产短剧：",
     "label_148": "个摄番号：",
-    "label_149": "欧美番号：",
-    "label_217": "国产番号：",
+    "label_149": "欧美视频：",
+    "label_217": "国产传媒：",
+    "label_152": "国产短剧：",
 }
 
 
@@ -398,6 +409,43 @@ def test_number_label_texts_regression():
         if actual != expected:
             mismatches[name] = actual
     assert not mismatches, f"六条番号提示词文案与预期不符: {mismatches}"
+
+
+# 「锁定刮削类型」下拉框八项：.ui 文案 / FixedScrapingType.names() / TYPE_TITLES 三处必须同序同名。
+# 2.6.0 起「国产短剧」在三者里都排到「国产传媒」之下，而**枚举声明顺序仍在 FC2 之前**，
+# 于是下标与类型不再是同序的——load_config / save_config 两处按下标换算，必须读
+# FixedScrapingType.dropdown_order() 而不是枚举声明序（错用会把「国产短剧」存成「个摄番号」）。
+def _combo_item_texts(ui_src: str) -> list[str]:
+    idx = ui_src.index('name="comboBox_fixed_scraping_type"')
+    start = ui_src.rindex("<widget ", 0, idx)
+    block = ui_src[start : ui_src.index("</widget>", idx)]
+    return re.findall(r"<item>\s*<property name=\"text\">\s*<string>([^<]*)</string>", block)
+
+
+def test_fixed_type_dropdown_matches_enum_names_and_type_titles():
+    """下拉框八项 = names() = TYPE_TITLES（去自动判断），且顺序即 dropdown_order()。"""
+    from mdcx.config.enums import FixedScrapingType
+    from mdcx.controllers.main_window.site_priority_dialog import TYPE_TITLES
+
+    combo = _combo_item_texts(_ui_src())
+    assert combo == FixedScrapingType.names(), f"下拉框文案与 FixedScrapingType.names() 不一致：{combo}"
+    # 「自动判断」之外的七项就是七个类型组名（设置页行标签与弹窗标题用的同一份 TYPE_TITLES）
+    expected_group_titles = [
+        "自动判断",
+        *[TYPE_TITLES[scraping_type] for scraping_type in FixedScrapingType.dropdown_order()[1:]],
+    ]
+    assert combo == expected_group_titles, f"下拉框文案与 TYPE_TITLES 不一致：{combo} != {expected_group_titles}"
+    # 下标 ↔ 配置值：两处按下标换算（load_config 读回 / save_config 存回）用的就是这份顺序
+    assert FixedScrapingType.dropdown_values() == [
+        "auto",
+        "youma",
+        "wuma",
+        "fc2",
+        "oumei",
+        "guochan",
+        "suren",
+        "dongman",
+    ], "dropdown_order() 与下拉框的排列对不上，「国产短剧」会按下标存成别的类型"
 
 
 # --------------------------------------------------------------------------- #
@@ -533,6 +581,9 @@ def test_wrapped_desc_text_is_not_clipped(win, app, width):
 # ——否则网格自然高度 522→503 而容器仍是 558，QGridLayout 会把少掉的 19px 摊到 18
 # 个 verticalSpacing 上（每档 +1px），结果「动漫」只上移 6px 而不是一行（实测）。
 _GUOCHAN_TIP = "label_232"
+# 「国产短剧」那一块 2.6.0 起挪到 国产传媒 之下，故「块 + spacer → 动漫」这一对的上一块
+# 变成国产短剧的说明 label_156（label_232 现在紧贴国产短剧的行标签 label_152）。
+_DUANJU_TIP = "label_156"
 _DONGMAN_LABEL = "label_dongman_sites"  # 「动漫：」输入行，用户要求上移的那一行
 # 收敛只允许动这一行下方的东西；这三项必须在宽窄两态保持一致（间距不得变化）
 _STATE_INVARIANTS = ("lineEdit_website_youma", "label_154", "lineEdit_website_guochan")
@@ -656,7 +707,7 @@ def test_wide_state_moves_dongman_up_without_touching_gaps(win, app, monkeypatch
             {name: _rect(win, name) for name in names},
             {
                 "input→desc": _gap(win, _GUOCHAN_TIP, "lineEdit_website_guochan"),
-                "desc→dongman": _gap(win, _DONGMAN_LABEL, _GUOCHAN_TIP),
+                "desc→dongman": _gap(win, _DONGMAN_LABEL, _DUANJU_TIP),
                 "dongman→mywifes": _gap(win, "label_322", _DONGMAN_LABEL),
             },
         )
@@ -682,7 +733,7 @@ def test_wide_state_moves_dongman_up_without_touching_gaps(win, app, monkeypatch
     # 间距不变：省下的高度若没归还就会被摊进 verticalSpacing
     assert new_gaps == base_gaps, f"{width} 宽下间距变化: {base_gaps} -> {new_gaps}"
     assert abs(new_gaps["desc→dongman"] - _GAP_BLOCK) <= _TOL_BLOCK, (
-        f"{width} 宽下 国产说明 → 动漫 间隙 {new_gaps['desc→dongman']}px，应约 {_GAP_BLOCK}px"
+        f"{width} 宽下 国产短剧说明 → 动漫 间隙 {new_gaps['desc→dongman']}px，应约 {_GAP_BLOCK}px"
     )
 
 

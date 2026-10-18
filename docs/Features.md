@@ -75,15 +75,15 @@ MDCx 支持的功能全景。只想快速上手的话，先看 [QuickStart.md](Q
 |------|-----------|
 | **有码番号**（28） | DMM、DMM_API、LibreDMM、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像 |
 | **无码番号**（15） | AVSOX、AVEntertainments、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API |
-| **国产短剧**（1） | JavDay |
 | **个摄番号**（12） | FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavFree、7mmtv、IQQTV、Missav、Missav_API |
-| **国产番号**（10） | Madou.club、Madouqu、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、IQQTV、Missav、Missav_API |
-| **欧美番号**（10） | ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、Missav、Missav_API、IQQTV |
+| **欧美视频**（10） | ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、Missav、Missav_API、IQQTV |
+| **国产传媒**（10） | Madou.club、Madouqu、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、IQQTV、Missav、Missav_API |
+| **国产短剧**（1） | JavDay |
 | **动漫里番**（4） | Getchu、JavDB、JavDB_API、JavDB_APP |
 
 > 组内站点按「该类型专属站 → 有码+素人 → 综合站」排列，前面的站优先级更高。
-> **「国产短剧」组 2.6.0 起只挂 `JavDay` 一个站**（原「素人番号」组 28 站全部移除，配置字段名仍是 `website_suren`）：国产短剧条目**本身没有番号**，JavDay 只给站内随机 ID（`/videos/Gb5WuoJw/`），文件名也是千奇百怪没有统一格式，既**不能按路径或文件名自动识别**，别的站又全靠番号查——查不到就是查不到，留在组里只会给每条影片白挂一次请求。故这一组只在**「锁定刮削类型」选「短剧」**时才生效（走 JavDay 的站内搜索页按剧名找页面，或用户手动指定页面），程序不做任何 DUANJU 自动识别；**以前的素人番号（`SIRO-`、`LUXU-` 等）全部按有码刮削**，它们是有码厂牌的正规番号。
-> **Official 只出现在有码番号、无码番号两组**，国产番号、欧美番号、个摄番号、国产短剧四组都不含 Official——Official 按番号前缀路由到片商官网，对国产/欧美/个摄番号没有收录，短剧又没有番号可路由，加进去只会给每条影片白挂一次无效请求。Dahlia、Faleno 是从 Official 拆出的有码厂牌独立站，只随**有码番号**一组走（素人线作品现已并入有码组一并刮削）。
+> **「国产短剧」组 2.6.0 起只挂 `JavDay` 一个站**（原「素人番号」组 28 站全部移除，配置字段名仍是 `website_suren`）：国产短剧条目**本身没有番号**，JavDay 只给站内随机 ID（`/videos/Gb5WuoJw/`），文件名也是千奇百怪没有统一格式，既**不能按路径或文件名自动识别**，别的站又全靠番号查——查不到就是查不到，留在组里只会给每条影片白挂一次请求。故这一组只在**「锁定刮削类型」选「国产短剧」**时才生效（走 JavDay 的站内搜索页按剧名找页面，或用户手动指定页面），程序不做任何 DUANJU 自动识别；**以前的素人番号（`SIRO-`、`LUXU-` 等）全部按有码刮削**，它们是有码厂牌的正规番号。
+> **Official 只出现在有码番号、无码番号两组**，国产传媒、欧美视频、个摄番号、国产短剧四组都不含 Official——Official 按番号前缀路由到片商官网，对国产/欧美/个摄番号没有收录，短剧又没有番号可路由，加进去只会给每条影片白挂一次无效请求。Dahlia、Faleno 是从 Official 拆出的有码厂牌独立站，只随**有码番号**一组走（素人线作品现已并入有码组一并刮削）。
 > **AVEntertainments 只在无码番号一组**（2.5.6 起从有码番号、素人番号两组移除）：该站是正規無修正 DVD 販売/配信的商城，只收录无码番号，有码厂牌的番号查不到条目——放在有码番号、素人番号两组里只会给每条影片白挂一次请求，故只保留在无码番号组。爬虫本身不变（它仍在「编辑网站」候选区里可选，只是不被这两组默认勾选）。
 > **MyWife 是独立系列，既不属于「有码番号」也不属于「国产短剧」，七组名单里都没有它**：MyWife（舞ワイフ）是「人妻・熟女・3P」这一条独立系列线——它不是有码厂牌的片商编号、也不落无码／个摄／欧美／国产任何一类，所以**有码番号组（28 站）不含它、国产短剧组（1 站）同样不含它**，两个表里都查不到 MyWife。**它走的是「单独指定」而非类型组**：「网站偏好 → 指定网站」选了 MyWife、或文件路径里含 MyWife 时，`mdcx/core/file_crawler.py` 返回 `ScrapeClassification(FixedScrapingType.YOUMA, "auto", website=Website.MYWIFE)`——番号形如 `MyWife No.1230`，不属于任何已知前缀体系，故借用有码的类型判定，但用 `website=MyWife` **覆盖**掉组内名单、直接锁定 MyWife 单站刮削，压根不查七组名单。故 `tests/test_config_conversion.py` 用 `Website.MYWIFE not in config.website_suren` 钉死它不会被误塞回短剧组；`Config().website_youma` 里同样没有它（历史配置里若残留过，也只会因不在类型组而从不生效）。
 > **`Javlibrary·镜像` 排在 `JavLibrary` 后面（有码番号组里）**：原站 `javlibrary.com` 对中国大陆 IP 常年挂 Cloudflare 墙（要过 JS challenge，触发 Selenium 兜底），镜像站没有这层墙，故把它做成**独立站点**而不是「换个地址的原站」，并默认排在原站后面——同一条番号两条路都通时，先走原站，原站过不了墙再退到镜像。爬虫逻辑整体继承 `JavLibraryCrawler`（搜索、详情解析、封面升级都一样），差别只有三点：默认抓**中文页 `/cn`**、站点地址从 `https://zlibz.com/` 右上角公布的那张图里认（`mdcx/base/web.py` 的 `get_javlibrary_mirror_domain()`，带 24 小时缓存），以及有用户自定义网址时按用户填的走。**它与原站 `JavLibrary` 组成一个联动组**（`SITE_GROUPS` 第七组）：加入组内任意一个站点即自动带上另一个——两条路是同一份数据，原站撞上 CF 墙时镜像能顶上，只勾一条不如两条都留着；仍可在「启用网站」里单独移除其中一条。

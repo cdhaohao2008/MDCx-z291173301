@@ -571,11 +571,31 @@ class FixedScrapingType(Enum):
     DONGMAN = "dongman"
 
     @classmethod
+    def dropdown_order(cls) -> tuple["FixedScrapingType", ...]:
+        """「锁定刮削类型」下拉框八项的排列顺序，.ui 的 comboBox_fixed_scraping_type 与之一一对应。
+
+        **与枚举声明顺序不同**：2.6.0 起「国产短剧」按用户要求排在「国产传媒」之下，
+        而声明序里它仍在 FC2 之前（枚举值一动就牵动旧配置文件，故声明序不动）。
+        load_config / save_config 两处按下标与配置值互相换算，**必须读这份顺序**，
+        拿枚举声明顺序当下标会把「国产短剧」存成「个摄番号」、「动漫里番」存成「国产传媒」。
+        """
+        return (cls.AUTO, cls.YOUMA, cls.WUMA, cls.FC2, cls.OUMEI, cls.GUOCHAN, cls.SUREN, cls.DONGMAN)
+
+    @classmethod
     def names(cls):
+        # 「锁定刮削类型」下拉框里的显示名，顺序 = dropdown_order()（.ui 里 comboBox 的
+        # 八项文案是它的镜像，两处由 tests/test_type_site_scrape_rows.py 钉住逐项一致）。
         # 「短剧」这一档原先叫「素人」（枚举值仍是 suren、配置字段仍是 website_suren）：
         # 素人番号没有自己的稳定返回、番号也不成体系，已并入有码组按有码刮削；
         # 这一档改作国产短剧（DUANJU）专用，只在锁定刮削类型时生效，见 TYPE_DEFAULT_SITES。
-        return ["自动判断", "有码", "无码", "短剧", "FC2", "欧美", "国产", "动漫"]
+        # 2.6.0 起七档一律用类型全称（有码番号/无码番号/个摄番号/欧美视频/国产传媒/
+        # 国产短剧/动漫里番），与 TYPE_TITLES 的组名同口径。
+        return ["自动判断", "有码番号", "无码番号", "个摄番号", "欧美视频", "国产传媒", "国产短剧", "动漫里番"]
+
+    @classmethod
+    def dropdown_values(cls) -> list[str]:
+        """下拉框八项各自的配置值，顺序 = dropdown_order()（按下标换算时用它，别写死字面量）。"""
+        return [scraping_type.value for scraping_type in cls.dropdown_order()]
 
 
 class Language(Enum):
