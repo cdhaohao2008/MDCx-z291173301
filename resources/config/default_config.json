@@ -241,6 +241,12 @@
     "Missav",
     "Missav_API"
   ],
+  "website_dongman": [
+    "Getchu",
+    "JavDB",
+    "JavDB_API",
+    "JavDB_APP"
+  ],
   "actor_realname": false,
   "outline_format": [
     "show_from"
