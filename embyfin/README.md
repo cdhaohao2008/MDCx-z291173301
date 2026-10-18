@@ -51,19 +51,19 @@ Each audit checks a whole library for one thing that goes wrong. Each name links
 | [`audit_missing_metadata`](docs/audits.md#audit_missing_metadata) | Items with no match, no poster or no plot. Fix with `item_identify`, `item_artwork_set` or `item_refresh`. |
 | [`audit_file_path`](docs/audits.md#audit_file_path) | Files and folders named for another title, year or episode than the server holds. Fix with `item_identify` or `item_edit`, or rename the file. |
 | [`audit_duplicates`](docs/audits.md#audit_duplicates) | The same film or show held as two entries. `quality_compare` says which copy is better. |
-| [`audit_multiple_versions`](docs/audits.md#audit_multiple_versions) | One entry made of several files, such as a 4K and a 1080p copy. |
-| [`audit_runtime`](docs/audits.md#audit_runtime) | Runtimes nothing can have: under 2 minutes, or 12 hours and over. |
-| [`audit_quality`](docs/audits.md#audit_quality) | Copies worth replacing: low resolution, an old format or a low bitrate. |
+| [`audit_multiple_versions`](docs/audits.md#audit_multiple_versions) | One entry made of several files, such as a 4K and a 1080p copy. `quality_compare` says which is better. |
+| [`audit_runtime`](docs/audits.md#audit_runtime) | Runtimes nothing can have: under 2 minutes, or 12 hours and over. Replace the file, or remove it with `item_delete`. |
+| [`audit_quality`](docs/audits.md#audit_quality) | Copies worth replacing: low resolution, an old format or a low bitrate. `quality_compare` weighs two copies. |
 | [`audit_missing_episodes`](docs/audits.md#audit_missing_episodes) | Episodes and seasons a series is missing. `show_missing` checks one series. |
-| [`audit_duplicate_episodes`](docs/audits.md#audit_duplicate_episodes) | One episode filed under two numbers in a season. |
+| [`audit_duplicate_episodes`](docs/audits.md#audit_duplicate_episodes) | One episode filed under two numbers in a season. `item_delete` removes the copy to go. |
 | [`audit_spelling`](docs/audits.md#audit_spelling) | Genres, tags and studios spelled more than one way. Fix with `metadata_rename`. |
 | [`audit_whitespace`](docs/audits.md#audit_whitespace) | Stray spaces in names, tags and file names. Fix with `item_edit` or `metadata_rename`. |
-| [`audit_language`](docs/audits.md#audit_language) | What has, or lacks, audio or subtitles in a language. |
-| [`audit_unwatched`](docs/audits.md#audit_unwatched) | Films or series nobody has watched: what to archive or recommend. |
-| [`audit_disc_folders`](docs/audits.md#audit_disc_folders) | A disc copied in as loose files, which the server reads as many films. |
+| [`audit_language`](docs/audits.md#audit_language) | What has, or lacks, audio or subtitles in a language. `item_subtitle_download` fetches subtitles. |
+| [`audit_unwatched`](docs/audits.md#audit_unwatched) | Films or series nobody has watched: what to archive, remove with `item_delete`, or recommend with a playlist or collection. |
+| [`audit_disc_folders`](docs/audits.md#audit_disc_folders) | A disc copied in as loose files, which the server reads as many films. Remux the feature to one file, then `library_scan`. |
 | [`audit_previews`](docs/audits.md#audit_previews) | Missing or damaged preview thumbnails, on Emby. Fix with `item_previews_regenerate`. |
-| [`audit_anime_ids`](docs/audits.md#audit_anime_ids) | Anime whose ids disagree with the community Anime-Lists. |
-| [`audit_provider`](docs/audits.md#audit_provider) | Ids and runtimes that disagree with TMDB. Needs a TMDB key. |
+| [`audit_anime_ids`](docs/audits.md#audit_anime_ids) | Anime whose ids disagree with the community Anime-Lists. Fix a wrong match with `item_identify`. |
+| [`audit_provider`](docs/audits.md#audit_provider) | Ids and runtimes that disagree with TMDB. Fix a wrong match with `item_identify`. Needs a TMDB key. |
 | [`audit_orphans`](docs/audits.md#audit_orphans) | Items a removed library left behind. Fix with `item_orphans_delete`. |
 
 ## The tools
@@ -103,6 +103,6 @@ Three more settings matter early:
 
 - I set the design, the scope and the audit rules, and I decide what stays.
 - Every tool must have a live test against a real Emby and a real Jellyfin in Docker. CI fails if a tool has none.
-- The generated Go clients are checked another way. Every operation must have a method, a sweep calls every read against the live servers, and the calls the tools rely on have tests of their own.
+- The generated Go clients are checked another way. Every operation must have a method, and a sweep calls every read against the live servers. Every write embyfin's own code sends must be reached by a live test, and CI fails if one is not.
 - CI lints with golangci-lint, actionlint, yamllint, ShellCheck, typos and markdownlint.
 - For security it runs CodeQL, govulncheck, zizmor on the workflows, and a Trivy scan of the built binary.
