@@ -14421,7 +14421,7 @@ class Ui_MDCx(object):
         self.label_103.setText(
             _translate(
                 "MDCx",
-                '<p style=\'line-height:20px\'>支持http、https、socks5代理，示例：http://127.0.0.1:7897，用户名和密码格式为: schema://username:password@host:port，"使用代理"仅控制常规网络请求代理开关，不控制CF Bypass代理，"CF Bypass代理"选项仅作用于Bypass的服务请求(mirror/html)，勾选"全部走代理"后"使用代理"列表不再生效，分流交给代理软件，Cloudflare Bypass地址留空时，配置了"CloudFlare 绕过服务"自动启动适配层，两者均留空时关闭Cloudflare Bypass功能</p>',
+                '<p style=\'line-height:20px\'>支持http、https、socks5代理，示例：http://127.0.0.1:7897<br>用户名和密码格式为: schema://username:password@host:port<br>"使用代理"仅控制常规网络请求代理开关，不控制CF Bypass代理，"CF Bypass代理"选项仅作用于Bypass的服务请求(mirror/html)，勾选"全部走代理"后"使用代理"列表不再生效，分流交给代理软件，Cloudflare Bypass地址留空时，配置了"CloudFlare 绕过服务"自动启动适配层，两者均留空时关闭Cloudflare Bypass功能</p>',
             )
         )
         self.checkBox_use_proxy.setToolTip(_translate("MDCx", "仅控制常规网络请求代理开关，不控制CF Bypass代理"))
