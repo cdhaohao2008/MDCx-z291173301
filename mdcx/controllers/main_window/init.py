@@ -234,11 +234,22 @@ _OFFICIAL_STUDIO_DISPLAY: dict[str, str] = {
 }
 
 
-def _append_official_subsite_rows(combo: QComboBox) -> None:
-    """网站设置下拉：把 official 旗下 5 个无码官网拆成独立行（Official·Studio + 各自网址），Official 本行隐藏.
+def _append_official_subsite_rows(combo: QComboBox, *, remove_base_row: bool = True) -> None:
+    """站点下拉：把 official 旗下 5 个无码官网拆成独立行（Official·Studio + 各自网址），Official 本行按需保留或撤下.
 
-    行 UserRole 仍存 Official（选中走 official 爬虫，各消费端的 Website 防护不受影响）；
+    两个下拉都调它：网络页「当前网站」与刮削网站页「指定网站」——后者此前只有一行
+    笼统的 Official，五个无码官网站点一个都选不到（用户 2026-10-18 提出）。
+
+    行 UserRole 仍存 Official（选中走 official 爬虫，各消费端的 Website 防护不受影响）：
+    official 本身就是按番号前缀路由，这五行只是把那层路由显式摆到界面上，不改判定。
     真实网址存显式角色，刷新徽章时不被重算覆盖。
+
+    remove_base_row：是否撤掉 official 本行（只留五个子站行）。网络页「当前网站」传 True
+    ——那里选的是执行刮削的站点，五个子站行都落到 official 爬虫，藏起本行免得同一份
+    能力摆两遍；刮削网站页「指定网站」传 False——那里选的是「这批番号交给哪个站」，
+    official 本行（有码+无码自动按番号前缀路由）与其它综合站并列，是正常选项、必须能
+    选（用户 2026-10-18 提出）。本行保留时读回 website_single 取第一个 Official 即本行
+    （子站行都插在 anchor 之后），落在本行语义正确。
     """
     try:
         from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
@@ -259,8 +270,8 @@ def _append_official_subsite_rows(combo: QComboBox) -> None:
         combo.setItemData(row, url, _SITE_URL_ROLE)
         combo.setItemData(row, url, _SITE_URL_EXPLICIT_ROLE)
         combo.setItemData(row, _site_combo_item_tooltip("Official"), Qt.ItemDataRole.ToolTipRole)
-    # official 本行不显示：只留 5 个子站行（插入位置均在 anchor 之后，anchor 下标仍有效）
-    if anchor >= 0:
+    # 撤 official 本行（可选）：子站行都插在 anchor 之后，anchor 下标此时仍有效
+    if remove_base_row and anchor >= 0:
         combo.removeItem(anchor)
 
 
@@ -869,8 +880,12 @@ def Init_Ui(self: "MyMAinWindow"):
     self.Ui.comboBox_website_all.clear()
     self.Ui.comboBox_custom_website.clear()
     _populate_site_combo(self.Ui.comboBox_website_all, supported_websites)
+    _append_official_subsite_rows(
+        self.Ui.comboBox_website_all,
+        remove_base_row=False,  # 指定网站：official 本行（有码+无码总路由）是正常选项，与五个子站行并存
+    )
     _populate_site_combo(self.Ui.comboBox_custom_website, supported_websites)
-    _append_official_subsite_rows(self.Ui.comboBox_custom_website)  # official 拆 5 个无码官网子行
+    _append_official_subsite_rows(self.Ui.comboBox_custom_website)  # 当前网站：official 拆 5 个无码官网子行
     # 初始化使用代理网站下拉框
     self.Ui.comboBox_no_proxy_sites.clear()
     self.Ui.comboBox_no_proxy_sites.addItem("选择网站...", "")
