@@ -10746,7 +10746,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       <x>0</x>
                       <y>0</y>
                       <width>860</width>
-                      <height>1720</height>
+                      <height>1780</height>
                     </rect>
                   </property>
                   <widget class="QGroupBox" name="groupBox_24">
@@ -10755,7 +10755,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         <x>30</x>
                         <y>20</y>
                         <width>701</width>
-                        <height>511</height>
+                        <height>571</height>
                       </rect>
                     </property>
                     <property name="minimumSize">
@@ -10837,7 +10837,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           <x>60</x>
                           <y>210</y>
                           <width>621</width>
-                          <height>268</height>
+                          <height>328</height>
                         </rect>
                       </property>
                       <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -11115,6 +11115,84 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           </layout>
                         </item>
                         <item>
+                          <layout class="QHBoxLayout" name="horizontalLayout_ignore_duanju">
+                            <item>
+                              <widget class="QCheckBox" name="checkBox_ignore_duanju">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="minimumSize">
+                                  <size>
+                                    <width>30</width>
+                                    <height>0</height>
+                                  </size>
+                                </property>
+                                <property name="text">
+                                  <string>短剧封面不裁剪，直接复制缩略图</string>
+                                </property>
+                              </widget>
+                            </item>
+                            <item>
+                              <widget class="QLabel" name="label_ignore_duanju">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="styleSheet">
+                                  <string notr="true">color: rgb(8, 128, 128);</string>
+                                </property>
+                                <property name="text">
+                                  <string> 短剧封面人脸位置不固定，建议手动裁剪或直接复制</string>
+                                </property>
+                              </widget>
+                            </item>
+                          </layout>
+                        </item>
+                        <item>
+                          <layout class="QHBoxLayout" name="horizontalLayout_ignore_dongman">
+                            <item>
+                              <widget class="QCheckBox" name="checkBox_ignore_dongman">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="minimumSize">
+                                  <size>
+                                    <width>30</width>
+                                    <height>0</height>
+                                  </size>
+                                </property>
+                                <property name="text">
+                                  <string>动漫封面不裁剪，直接复制缩略图</string>
+                                </property>
+                              </widget>
+                            </item>
+                            <item>
+                              <widget class="QLabel" name="label_ignore_dongman">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="styleSheet">
+                                  <string notr="true">color: rgb(8, 128, 128);</string>
+                                </property>
+                                <property name="text">
+                                  <string> 动漫封面人脸位置不固定，建议手动裁剪或直接复制</string>
+                                </property>
+                              </widget>
+                            </item>
+                          </layout>
+                        </item>
+                        <item>
                           <layout class="QHBoxLayout" name="horizontalLayout_42">
                             <item>
                               <widget class="QCheckBox" name="checkBox_ignore_size">
@@ -11261,7 +11339,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       <property name="geometry">
                         <rect>
                           <x>60</x>
-                          <y>470</y>
+                          <y>530</y>
                           <width>621</width>
                           <height>41</height>
                         </rect>
@@ -11303,7 +11381,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>550</y>
+                        <y>610</y>
                         <width>701</width>
                         <height>131</height>
                       </rect>
@@ -11422,7 +11500,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1454</y>
+                        <y>1514</y>
                         <width>701</width>
                         <height>211</height>
                       </rect>
@@ -11517,7 +11595,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1174</y>
+                        <y>1234</y>
                         <width>701</width>
                         <height>261</height>
                       </rect>
@@ -11652,7 +11730,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>700</y>
+                        <y>760</y>
                         <width>701</width>
                         <height>235</height>
                       </rect>
@@ -11862,7 +11940,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>954</y>
+                        <y>1014</y>
                         <width>701</width>
                         <height>201</height>
                       </rect>
@@ -25433,7 +25511,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;可用变量&lt;/b&gt;：number番号、title标题、originaltitle原标题、actor演员、first_actor首位演员、all_actor全部演员、letters番号前缀、first_letter番号首字符、outline简介、director导演、definition清晰度、publisher发行商、series系列、studio片商、year年份、mosaic有码/无码、runtime时长、score评分、release发行日期、cnword字幕标识、wanted想看人数、four_k（4K标识）、filename原文件名、moword版本标识，支持Jinja2模板与自定义符号&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h4&gt;四、网站选择&lt;/h4&gt;
-&lt;p&gt;网站下拉框由已注册的爬虫自动生成，当前53个，可按需选用全部网站或指定网站；下列七组即「软件设置→刮削网站」里各类型的默认名单（组内顺序即优先级，从高到低），可在设置中自行增删与调序：&lt;/p&gt;
+&lt;p&gt;网站下拉框由已注册的爬虫自动生成，可按需选用全部网站或指定网站；下列八组即「软件设置→刮削网站」里各类型的默认名单，组内顺序即优先级，从高到低，可在设置中自行增删与调序：&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;b&gt;有码番号&lt;/b&gt;：DMM、DMM_API、LibreDMM、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;无码番号&lt;/b&gt;：AVSOX、AVEntertainments、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API&lt;/li&gt;

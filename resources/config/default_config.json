@@ -139,6 +139,8 @@
     "ignore_oumei",
     "ignore_fc2",
     "ignore_guochan",
+    "ignore_suren",
+    "ignore_dongman",
     "ignore_size"
   ],
   "compress_downloaded_images": false,

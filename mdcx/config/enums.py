@@ -216,6 +216,10 @@ class DownloadableFile(Enum):
     IGNORE_OUMEI = "ignore_oumei"
     IGNORE_FC2 = "ignore_fc2"
     IGNORE_GUOCHAN = "ignore_guochan"
+    # 2.6.1 起新增：短剧/动漫两种类型同样提供「不裁剪，直接复制缩略图」选项。
+    # 枚举值跟 FixedScrapingType 的枚举值同口径（suren/dongman），与已有五项一致。
+    IGNORE_SUREN = "ignore_suren"
+    IGNORE_DONGMAN = "ignore_dongman"
     IGNORE_SIZE = "ignore_size"
     POSTER_REPLACE_THUMB = "poster_replace_thumb"
 
@@ -238,6 +242,8 @@ class DownloadableFile(Enum):
             "忽略欧美",
             "忽略FC2",
             "忽略国产",
+            "忽略短剧",
+            "忽略动漫",
             "忽略大小",
             "封面替换缩略图",
         ]

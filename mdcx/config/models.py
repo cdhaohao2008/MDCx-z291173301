@@ -586,6 +586,10 @@ class Config(BaseModel):
             DownloadableFile.IGNORE_WUMA,
             DownloadableFile.IGNORE_FC2,
             DownloadableFile.IGNORE_GUOCHAN,
+            # 2.6.1：短剧/动漫两档的「封面不裁剪，直接复制缩略图」出厂即勾选
+            # （这两类封面人脸位置不固定，自动裁剪极易切到人脸），与出厂模板同口径。
+            DownloadableFile.IGNORE_SUREN,
+            DownloadableFile.IGNORE_DONGMAN,
             DownloadableFile.IGNORE_SIZE,
         ],
         title="下载文件类型",

@@ -60,6 +60,10 @@ POSTER_COPY_POLICY_MAP = {
     FixedScrapingType.FC2: DownloadableFile.IGNORE_FC2,
     FixedScrapingType.GUOCHAN: DownloadableFile.IGNORE_GUOCHAN,
     FixedScrapingType.OUMEI: DownloadableFile.IGNORE_OUMEI,
+    # 2.6.1 起补齐短剧/动漫两档（用户新增两个「不裁剪，直接复制缩略图」复选框）。
+    # 键是 FixedScrapingType，与「锁定刮削类型」下拉框选中的那一档严格对应。
+    FixedScrapingType.SUREN: DownloadableFile.IGNORE_SUREN,
+    FixedScrapingType.DONGMAN: DownloadableFile.IGNORE_DONGMAN,
 }
 POSTER_DIRECT_DOWNLOAD_TYPES = {
     FixedScrapingType.WUMA,

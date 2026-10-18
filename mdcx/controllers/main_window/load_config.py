@@ -641,6 +641,8 @@ def load_config(self: "MyMAinWindow"):
             (self.Ui.checkBox_ignore_oumei, DownloadableFile.IGNORE_OUMEI),
             (self.Ui.checkBox_ignore_fc2, DownloadableFile.IGNORE_FC2),
             (self.Ui.checkBox_ignore_guochan, DownloadableFile.IGNORE_GUOCHAN),
+            (self.Ui.checkBox_ignore_duanju, DownloadableFile.IGNORE_SUREN),
+            (self.Ui.checkBox_ignore_dongman, DownloadableFile.IGNORE_DONGMAN),
             (self.Ui.checkBox_ignore_size, DownloadableFile.IGNORE_SIZE),
             (self.Ui.checkBox_poster_replace_thumb, DownloadableFile.POSTER_REPLACE_THUMB),
         )
