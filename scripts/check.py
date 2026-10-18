@@ -6,22 +6,29 @@ try:
 except ModuleNotFoundError:
     from install_git_hooks import install_hooks
 
-ALWAYS = [
+FAST = [
     ["ruff", "format", "--check"],
     ["ruff", "check"],
     ["mypy", "mdcx/"],
-    [
-        sys.executable,
-        "-m",
-        "pytest",
-        "tests/",
-        "--tb=short",
-        "-m",
-        "not network",
-        "-x",
-    ],
     [sys.executable, "-m", "scripts.check_thread_safety"],
 ]
+
+TESTS = [
+    sys.executable,
+    "-m",
+    "pytest",
+    "tests/",
+    "--tb=short",
+    "-m",
+    "not network",
+    "-x",
+]
+
+# 默认不跑全量测试：一次完整 pytest 要好几分钟，推送时反复等待没有收益。
+# 需要全量门禁时显式跑 `uv run check --skip-hook-install --with-tests`，
+# 或者直接 `uv run pytest tests/ --tb=short -m "not network" -x`。
+ALWAYS = FAST
+ALL_WITH_TESTS = FAST + [TESTS]
 
 ACTOR_DB_PATHS = (
     "resources/userdata/actor_database.xlsx",
@@ -82,7 +89,10 @@ def main() -> int:
     if "--skip-hook-install" not in sys.argv:
         install_hooks()
 
-    commands = list(ALWAYS)
+    with_tests = "--with-tests" in sys.argv
+    commands = list(ALL_WITH_TESTS if with_tests else ALWAYS)
+    if not with_tests:
+        print("[check] 快速门禁（不含 pytest）；需要全量测试请加 --with-tests")
     changed = collect_changed_paths()
 
     if should_run_xlsx_check(ACTOR_DB_PATHS, changed):

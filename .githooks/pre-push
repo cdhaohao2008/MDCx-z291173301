@@ -1,6 +1,6 @@
 #!/bin/sh
 
-echo "[pre-push] 运行推送前自检..."
+echo "[pre-push] 运行推送前快速自检（ruff format/check + mypy + 线程安全，不含 pytest）..."
 if command -v uv >/dev/null 2>&1; then
   uv run check --skip-hook-install
 else

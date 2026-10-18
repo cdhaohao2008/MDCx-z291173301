@@ -2,7 +2,15 @@
 
 from pathlib import Path
 
-from scripts.check import ACTOR_DB_PATHS, ALWAYS, INFO_DB_PATHS, should_run_xlsx_check
+from scripts.check import (
+    ACTOR_DB_PATHS,
+    ALL_WITH_TESTS,
+    ALWAYS,
+    FAST,
+    INFO_DB_PATHS,
+    TESTS,
+    should_run_xlsx_check,
+)
 
 
 def test_xlsx_check_runs_when_git_unavailable():
@@ -34,6 +42,25 @@ def test_always_commands_drop_xlsx_and_ui_layout():
     assert all("check_actor_db" not in item for item in joined)
     assert all("check_info_db" not in item for item in joined)
     assert all("check_ui_layout" not in item for item in joined)
+
+
+def test_default_gate_skips_pytest():
+    joined = [" ".join(cmd) for cmd in ALWAYS]
+    assert all("pytest" not in item for item in joined)
+    assert all("pytest" not in " ".join(cmd) for cmd in FAST)
+
+
+def test_with_tests_runs_pytest_once():
+    joined = [" ".join(cmd) for cmd in ALL_WITH_TESTS]
+    assert sum("pytest" in item for item in joined) == 1
+    assert [cmd for cmd in ALL_WITH_TESTS if "pytest" in " ".join(cmd)] == [TESTS]
+    assert ALL_WITH_TESTS[: len(FAST)] == FAST
+
+
+def test_pre_push_hook_does_not_force_full_suite():
+    text = Path(".githooks/pre-push").read_text(encoding="utf-8")
+    assert "--with-tests" not in text
+    assert "check --skip-hook-install" in text
 
 
 def test_ci_xlsx_checks_gated_and_ui_layout_removed():

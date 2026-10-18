@@ -72,8 +72,9 @@ uv run python main.py
 
 推送前自检：
 ```bash
-git config core.hooksPath .githooks   # 一次性：启用 pre-push 自动全量自检
-uv run check --skip-hook-install      # 或手动跑
+git config core.hooksPath .githooks   # 一次性：启用 pre-push 自动快速自检
+uv run check --skip-hook-install              # 快速门禁，同 pre-push（ruff + mypy + 线程安全）
+uv run check --skip-hook-install --with-tests # 追加全量 pytest，想在推送前跑全量时用
 ```
 
 ## 贡献与提报
