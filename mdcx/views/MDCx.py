@@ -14408,11 +14408,11 @@ class Ui_MDCx(object):
             _translate(
                 "MDCx",
                 "<p style='line-height:20px'>Cookie获取方法：<br>\n"
-                "                          1，使用浏览器打开目标网站然后登录，在网站页面空白位置点击鼠标右键点击选择「检查」 ；<br>\n"
-                "                          2，右侧弹窗顶部选择：「网络」->「全部」，然后刷新当前页面，在标头里查找「Cookie」；<br>\n"
-                "                          3，点击「名称」栏新加载出来的第一个内容-> 「标头」->「请求表头」->填入「Cookie」；<br>\n"
-                "                          4，复制Cookie对应的全部值填入上面输入框，不要直接右键点击「复制值」填入「Cookie」；<br>\n"
-                "                          注意：Cookie一般存在有效期，当Cookie过期无效时需要登录网站重新获取填入「Cookie」；</p>",
+                "                          1、使用浏览器打开目标网站然后登录，在网站页面空白位置点击鼠标右键点击选择「检查」<br>\n"
+                "                          2、右侧弹窗顶部选择：「网络」->「全部」，然后刷新当前页面，在标头里查找「Cookie」<br>\n"
+                "                          3、点击「名称」栏新加载出来的第一个内容-> 「标头」->「请求表头」->填入「Cookie」<br>\n"
+                "                          4、复制Cookie对应的全部值填入上面输入框，不要直接右键点击「复制值」填入「Cookie」<br>\n"
+                "                          注意：Cookie一般存在有效期，当Cookie过期无效时需要登录网站重新获取填入「Cookie」</p>",
             )
         )
         self.label_get_cookie_url.setText(_translate("MDCx", "https://tieba.baidu.com/p/5492736764"))
