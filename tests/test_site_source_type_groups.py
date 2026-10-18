@@ -71,7 +71,7 @@ from mdcx.controllers.main_window.site_priority_dialog import (  # noqa: E402
     _group_sites_at,
     _is_group_item,
     _list_sites,
-    _site_tooltip_lines,
+    _site_capability_caption,
     grouped_palette_groups,
     palette_site_order,
 )
@@ -210,8 +210,8 @@ USER_SITE_LISTS = {
     ],
 }
 
-# 分组次序：有码、无码、素人、个摄、欧美、国产、动漫
-EXPECTED_GROUP_ORDER = ["有码", "无码", "素人", "个摄", "欧美", "国产", "动漫"]
+# 分组次序：有码、无码、素人、FC2、欧美、国产、动漫（FC2 这一组在本弹窗内不再叫「个摄」）
+EXPECTED_GROUP_ORDER = ["有码", "无码", "素人", "FC2", "欧美", "国产", "动漫"]
 
 # 候选区各组的标题（取自 PALETTE_GROUP_TITLES，即那七个短名 chip；
 # 设置页各行标签与两个弹窗标题用的是带「番号」的 TYPE_TITLES，两边不同源、也不同名）
@@ -457,7 +457,7 @@ def test_group_without_available_sites_leaves_no_empty_title():
 def test_sites_outside_every_group_are_appended_without_a_title():
     """落在七组之外的站点（如 MyWife）按传入次序接在末尾，但不另起「其他」标题。"""
     groups = grouped_palette_groups([Website.MYWIFE, Website.DMM, Website.AVSOX])
-    assert [title for title, _ in groups] == ["有码", "无码", "素人", "个摄", ""]
+    assert [title for title, _ in groups] == ["有码", "无码", "素人", "FC2", ""]
     assert [site.value for site in groups[-1][1]] == ["MyWife"]
 
 
@@ -627,27 +627,61 @@ def test_group_sites_read_back_from_the_widget(dialog):
         assert _groups_from_widget(dialog)[title] == USER_SITE_LISTS[USER_TITLES_INV[title]]
 
 
-def test_site_tooltip_says_which_types_it_serves():
-    """候选区里每个站只出现一次，「它同时属于哪些类型」得靠悬停提示补上。
+def test_site_tooltip_is_only_the_capability_line(dialog):
+    """候选区里每个站只出现一次，「它同时属于哪些类型」全靠悬停提示那唯一一行。
 
-    两行标签按用户要求只写「类型：」与「联动：」——原本是「适用类型：」和
-    「联动组（加入其一即默认加入全组）：」，后半句把悬停框挤到换行还容易被截断。
+    按用户要求，「类型：…」「联动：…」两行整行删掉：第一行已经现算出了类型名单
+    （有码/无码 这种「/」分隔，顿号版更占宽度），后两行是同一件事的重复，还把悬停框
+    撑成三行。联动组的成员名单属于配置细节，加进去之前另有测试盯着。
     """
-    dmm_lines = " ".join(_site_tooltip_lines(Website.DMM))
-    assert "类型：有码、素人" in dmm_lines
-    # 不属于任何类型组的站点不该编出一个类型来
-    assert "类型：" not in " ".join(_site_tooltip_lines(Website.MYWIFE))
+    assert _site_capability_caption(Website.DMM) == "有码：有码"
+    # 旧的写死文案不得残留：「+」分隔的能力清单、顿号分隔的名单
+    for site in Website:
+        caption = _site_capability_caption(site)
+        assert "+" not in caption
+        assert "、" not in caption
+        if not caption:
+            continue  # 没注册爬虫的历史枚举值（airav）本来就没有文案，界面退回显示站名
+        assert "：" in caption, f"{site.value} 的文案没有「定位：名单」两段：{caption!r}"
+        # 「素人」「动漫」「FC2」不写进这一行（用户要求：素人本质就是有码、用假名或根本没名
+        # 字；动漫不必单列；FC2 同属有码那一类、只是没番号）。只看冒号后的名单段——MyWife
+        # 不属任何类型组、FC2 与 Getchu 各自只剩被隐去的那一类，三者那行都是爬虫自己的
+        # 说明（MyWife 是「素人：MyWife系列」），前缀那句不在本次范围内
+        types = caption.split("：", 1)[1].split("/")
+        for hidden in ("素人", "动漫", "FC2"):
+            assert hidden not in types, f"{site.value} 的类型名单里还有「{hidden}」：{caption!r}"
+    # 摆进候选区之后，悬停提示也必须只有这一行（不加换行、不带「类型：」「联动：」标签）
+    for value in _site_row_values(dialog):
+        item = dialog.available_list.item(_row_of(dialog, value))
+        tip = item.toolTip()
+        assert "\n" not in tip, f"{value} 的悬停提示不止一行：{tip}"
+        assert tip == (_site_capability_caption(Website(value)) or value)
 
 
-def test_site_tooltip_says_which_sites_link_together():
-    """联动组那行按用户要求只写「联动：」，成员名单照旧列全。"""
-    dmm_lines = " ".join(_site_tooltip_lines(Website.DMM))
-    assert "联动：DMM、DMM_API、LibreDMM" in dmm_lines
-    # 「加入其一即默认加入全组」这半句解释已从标签里去掉
-    assert "联动组" not in dmm_lines
-    assert "加入其一" not in dmm_lines
-    # 不属于任何联动组的站点不该编出一个来
-    assert "联动：" not in " ".join(_site_tooltip_lines(Website.MYWIFE))
+def test_site_tooltip_keeps_each_site_own_leading_word():
+    """冒号前面的定性词沿用站点自己的说法，不一律改成「综合」。
+
+    7mmtv 的说法是「综合」（跨类型站），AVSOX 说的是「无码」、FC2 说的是「FC2」、
+    Madou.club 说的是「麻豆」——那是各站定位说明里自带的词，换掉就把它说错了。
+    冒号后面不再取爬虫 description 里那句写死的名单（「综合：有码+无码+素人+FC2」），
+    改为现算的类型名单，也就不再随 TYPE_DEFAULT_SITES 的增删而失真；名单里不写
+    「素人」「动漫」「FC2」。
+    """
+    assert _site_capability_caption(Website.MMTV) == "综合：有码/无码/欧美/国产"
+    assert _site_capability_caption(Website.JAVDB) == "综合：有码/无码/欧美/国产"
+    assert _site_capability_caption(Website.AVSOX) == "无码：无码"
+    assert _site_capability_caption(Website.MADOUCLUB) == "麻豆：国产"
+    # 名单被隐空或本来就没有名单的站（FC2、Getchu、MyWife），原样留它自己的说明
+    assert _site_capability_caption(Website.FC2) == "FC2：FC2官网"
+    assert _site_capability_caption(Website.MYWIFE) == "素人：MyWife系列"
+
+
+def test_site_tooltip_no_longer_repeats_the_type_and_linkage_rows():
+    """回归：「类型：」「联动：」两行已按用户要求整行删掉，提示里不许再冒出来。"""
+    for site in (Website.DMM, Website.MMTV, Website.MYWIFE, Website.OFFICIAL):
+        caption = _site_capability_caption(site)
+        assert "类型：" not in caption
+        assert "联动" not in caption
 
 
 def test_group_title_tooltip_says_how_many_sites_it_adds(dialog):
@@ -714,7 +748,7 @@ def test_double_clicking_group_title_appends_and_keeps_existing_order(qt_app):
     dlg = SiteListEditorDialog("t", [Website.XCITY], ALL_SITES, None)
     try:
         _laid_out(dlg, qt_app)
-        _double_click_title(dlg, "个摄")
+        _double_click_title(dlg, "FC2")
         values = [site.value for site in dlg.selected_sites()]
         assert values[0] == "Xcity"
         assert values[1:] == USER_SITE_LISTS[FixedScrapingType.FC2]
@@ -826,7 +860,7 @@ def test_add_all_uses_original_order_while_palette_stays_grouped(qt_app):
             "有码": ["DMM", "AVBase", "Xcity"],
             "无码": ["AVSOX"],
             "素人": ["DMM", "AVBase", "Xcity"],
-            "个摄": ["AVSOX"],
+            "FC2": ["AVSOX"],
             "欧美": ["ThepornDB"],
             "国产": ["Madouqu"],
             "动漫": ["Getchu"],

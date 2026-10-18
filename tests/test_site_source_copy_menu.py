@@ -52,7 +52,7 @@ ALL_SITES = [Website(site) for site in __import__("mdcx.crawlers", fromlist=["c"
 CUSTOM_ORDER = [Website.XCITY, Website.MGSTAGE, Website.GETCHU, Website.DMM]
 
 # 顶部七个短名 chip 的次序（与 PALETTE_GROUP_TITLES 的声明序一致）
-CHIP_ORDER = ["有码", "无码", "素人", "个摄", "欧美", "国产", "动漫"]
+CHIP_ORDER = ["有码", "无码", "素人", "FC2", "欧美", "国产", "动漫"]
 
 
 @pytest.fixture(scope="module")
@@ -360,7 +360,7 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
         ("有码", 28),
         ("无码", 16),
         ("素人", 26),
-        ("个摄", 13),
+        ("FC2", 13),
         ("欧美", 12),
         ("国产", 12),
         ("动漫", 4),
@@ -389,9 +389,9 @@ def test_group_copy_is_readable_back_by_the_parser(qt_app, monkeypatch):
     try:
         _shown(dlg)
         palette = dlg.available_list
-        _right_click(palette, _title_center(palette, "个摄"), monkeypatch, "复制本组")
-        assert _parse_sites(app.clipboard().text()) == _group_at(palette, "个摄")
-        assert app.clipboard().text() == _sites_text(_group_at(palette, "个摄"))
+        _right_click(palette, _title_center(palette, "FC2"), monkeypatch, "复制本组")
+        assert _parse_sites(app.clipboard().text()) == _group_at(palette, "FC2")
+        assert app.clipboard().text() == _sites_text(_group_at(palette, "FC2"))
     finally:
         dlg.deleteLater()
 

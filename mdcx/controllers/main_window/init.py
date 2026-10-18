@@ -83,11 +83,28 @@ def _site_status_icon(level: str, widget: "QWidget | None" = None) -> QIcon:
     return QIcon(pixmap)
 
 
+def _site_combo_caption(value: str) -> str:
+    """下拉选项显示文本里那段能力文案：与「编辑网站」弹窗「可用网站」候选区的悬停提示同源。
+
+    三个站点下拉（刮削网站页「指定网站」、网络页「当前网站」「不走代理的网站」）摆的是
+    与那个弹窗同一批站，同一句话必须从同一处算——例如 7mmtv 两处都是
+    「综合：有码/无码/欧美/国产」。站点值不合法时返回空串，不让一个脏值把整个
+    下拉炸掉。
+    """
+    from mdcx.config.enums import Website
+    from mdcx.controllers.main_window.site_priority_dialog import _site_capability_caption
+
+    try:
+        return _site_capability_caption(Website(value))
+    except ValueError:
+        return ""
+
+
 def _site_combo_item_tooltip(value: str) -> str:
     """下拉项 tooltip：只留上次检测结果。
 
-    定位说明（有码：有码+素人 / 无码：仅能无码 / 综合：…）已直接拼进选项显示文本，
-    按用户要求不再在提示里重复，提示只剩「上次检测：…」；没检测过的站点返回空串。
+    能力文案（有码：有码 / 无码：无码 / 综合：…）已直接拼进选项显示文本，
+    按用户要求不再在提示里重复，提示只剩「上次检测：…」；没检测过的站点返回空串、悬停不弹。
     """
     entry = _load_check_cache().get(value)
     if not entry:
@@ -121,27 +138,24 @@ def invalidate_check_cache() -> None:
 
 
 def _populate_site_combo(combo: QComboBox, site_values: list[str]) -> None:
-    """填充站点下拉框：区域标签与定位说明直接拼入显示文本，检测状态入图标，上次检测结果入 tooltip。"""
-    from mdcx.config.models import Website
-    from mdcx.crawlers import get_crawler
+    """填充站点下拉框：区域标签与能力概览直接拼入显示文本，检测状态入图标，tooltip 只留上次检测。
+
+    显示文本里的能力概览取自 `_site_combo_caption()`——即「编辑网站」弹窗「可用网站」候选区
+    站点项的悬停提示那一行，同一批站在两处说同一句话；而 tooltip 按用户要求只保留
+    「上次检测：…」，不再重复能力文案。
+    """
     from mdcx.manual import ManualConfig
 
     for value in site_values:
         tag = ManualConfig.SITE_REGION_TAGS.get(value, "")
         cache_entry = _load_check_cache().get(value)
         icon = _site_status_icon(cache_entry.get("status", ""), combo) if cache_entry else QIcon()
-        # UserRole 存纯站点值：显示文本=站点名+区域标签+定位说明（说明直接展示，不再只藏 tooltip），
+        # UserRole 存纯站点值：显示文本=站点名+区域标签+能力概览（与「可用网站」同源），
         # 消费方统一经 currentData()/itemData(UserRole) 取纯值
-        description = ""
-        try:
-            crawler_cls = get_crawler(Website(value))
-            if crawler_cls is not None and hasattr(crawler_cls, "site_description"):
-                description = crawler_cls.site_description() or ""
-        except Exception:
-            pass
+        caption = _site_combo_caption(value)
         name = f"{value}（{tag}）" if tag else value
-        if description:
-            name = f"{name} {description}"
+        if caption:
+            name = f"{name} {caption}"
         combo.addItem(icon, name, value)
         url = _resolve_site_url(value)
         combo.setItemData(combo.count() - 1, url, _SITE_URL_ROLE)  # 当前网址：右侧网址列显示+点击跳转

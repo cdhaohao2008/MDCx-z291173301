@@ -33,7 +33,6 @@ from mdcx.config.models import (
     FieldPriorityConfig,
     expand_site_groups,
     filter_poster_default_sites,
-    site_group_of,
     str_to_list,
 )
 from mdcx.crawlers import get_registered_crawler_site_values
@@ -72,16 +71,26 @@ TYPE_TITLES = {
 # 「编辑网站」弹窗顶部「可用网站（按类型分组）」里那七个分组标题的**短名**，与设置页
 # 各行标签 / 两个弹窗标题（编辑XX网站源、XX字段优先级）用的 TYPE_TITLES 分开。
 # 七个 chip 必须挤在同一行里，带「番号」三字会顶到框宽、换行后标题与站点就分不清了，
-# 故这里只保留「有码」「个摄」这类一眼能认出来的短名（用户指定）。
+# 故这里只保留「有码」「FC2」这类一眼能认出来的短名（用户指定）。FC2 这一组在本弹窗内
+# 一律写「FC2」：候选区标题、悬停提示的类型名单、底部提示语三处都读这份表，
+# 设置页的「个摄番号：」标签仍走 TYPE_TITLES，不在本次改动范围内。
 PALETTE_GROUP_TITLES = {
     FixedScrapingType.YOUMA: "有码",
     FixedScrapingType.WUMA: "无码",
     FixedScrapingType.SUREN: "素人",
-    FixedScrapingType.FC2: "个摄",
+    FixedScrapingType.FC2: "FC2",
     FixedScrapingType.OUMEI: "欧美",
     FixedScrapingType.GUOCHAN: "国产",
     FixedScrapingType.DONGMAN: "动漫",
 }
+
+# 不写进「<定位>：<类型名单>」这一行能力文案的类型（用户要求）：
+#  - 「素人」：本质就是有码，只不过用假名或根本没名字
+#  - 「动漫」：与其它类型的片子混在一起时不必单列，只列它独家收录的那些
+#  - 「FC2」：同属有码那一类，只是没番号
+# **只是不写进这一行**：候选区那七个 chip、设置页「个摄番号：」那一行与 TYPE_DEFAULT_SITES
+# 默认名单都照旧。
+_CAPTION_HIDDEN_TYPES = ("素人", "动漫", "FC2")
 
 
 FIELD_TITLES = {
@@ -211,7 +220,7 @@ PALETTE_GROUP_TYPES: tuple[FixedScrapingType, ...] = (
 
 
 def grouped_palette_groups(sites: Iterable[Website]) -> list[tuple[str, list[Website]]]:
-    """把候选站点按有码/无码/素人/个摄/欧美/国产/动漫分成 [(标题, 组内站点)]。
+    """把候选站点按有码/无码/素人/FC2/欧美/国产/动漫分成 [(标题, 组内站点)]。
 
     组内顺序 = TYPE_DEFAULT_SITES 里该组的默认名单顺序（优先级从高到低），不重排。
     一个站点可同属多组，会在每个组里各出现一次——它确实是这几个类型的可用来源，
@@ -313,7 +322,7 @@ def _selected_sites(list_widget: QListWidget) -> list[Website]:
 def _make_site_item(site: Website) -> QListWidgetItem:
     item = QListWidgetItem(site.value)
     item.setData(Qt.ItemDataRole.UserRole, site.value)
-    item.setToolTip("\n".join(_site_tooltip_lines(site)) or site.value)
+    item.setToolTip(_site_capability_caption(site) or site.value)
     item.setFlags(
         item.flags() | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
     )
@@ -332,9 +341,9 @@ SITE_GROUP_SITES_ROLE = Qt.ItemDataRole.UserRole + 2
 def _make_group_item(title: str, sites: Sequence[Website]) -> QListWidgetItem:
     """候选区里的一个分组标题：文案就是类型名，成员名单挂在标题自己身上。
 
-    标题排在所有站点之前（用户要求「有码、无码、素人、个摄、欧美、国产这样默认排在 DMM
+    标题排在所有站点之前（用户要求「有码、无码、素人、FC2、欧美、国产这样默认排在 DMM
     左边」），后面紧跟着站点、与站点共用同一个换行流——所以第一行看起来就是
-    「有码 无码 素人 个摄 欧美 国产 DMM DMM_API LibreDMM …」，右边不留空。
+    「有码 无码 素人 FC2 欧美 国产 DMM DMM_API LibreDMM …」，右边不留空。
     标题只用加粗与站点区分，**不再另刷深色底**（用户明确要「和其他站点一样纯白背景」）。
     """
     item = QListWidgetItem(title)
@@ -364,33 +373,67 @@ def _is_site_item(item: QListWidgetItem | None) -> bool:
     return item is not None and item.data(Qt.ItemDataRole.UserRole) in Website
 
 
-def _site_tooltip_lines(site: Website) -> list[str]:
-    """站点项的悬停提示：定位说明 + 类型 + 联动组成员（说明加入一个会带上哪些）。
+def _site_types(site: Website) -> list[str]:
+    """该站落在哪几个类型组里，按 PALETTE_GROUP_TYPES 的次序取候选区那套短名。"""
+    return [PALETTE_GROUP_TITLES[key] for key in PALETTE_GROUP_TYPES if site in TYPE_DEFAULT_SITES.get(key, ())]
 
-    「类型」这一行是候选区去重铺放后必须补上的：站点只在列表里出现一次，标题又都
-    提到了顶部，不写这一条就看不出它同时是有码站、也是无码站。用的是候选区那套短名
-    （PALETTE_GROUP_TITLES），与标题对得上。两行的标签只写「类型：」与「联动：」，
-    不再缀上「适用」「（加入其一即默认加入全组）」那半句解释——悬停框宽度有限，长标签
-    会把站点名单挤成两行还容易被截断，而这三个字本身已经说清了是什么。
+
+def _site_capability_prefix(description: str, types: Sequence[str]) -> str:
+    """第一行前缀：沿用这个站自己的定位说明里那个词（7mmtv 是「综合」、AVSOX 是「无码」）。
+
+    只把说明里「：」后面的能力换成现算的类型名单，前面的定性词留着——那是站点自己的
+    说法（综合站、单类型站、官方系列站各不一样），换成别的词会把它说错。说明为空或压根
+    没有「：」时按类型数兜底：只有一种类型就写它自己的名字，跨类型才写「综合」。
     """
-    lines: list[str] = []
-    if description := _site_description(site):
-        lines.append(description)
-    if types := [PALETTE_GROUP_TITLES[key] for key in PALETTE_GROUP_TYPES if site in TYPE_DEFAULT_SITES.get(key, ())]:
-        lines.append("类型：" + "、".join(types))
-    if group := site_group_of(site):
-        lines.append("联动：" + "、".join(member.value for member in group))
-    return lines
+    if "：" in description:
+        return description.split("：", 1)[0]
+    return types[0] if len(types) == 1 else "综合"
+
+
+def _site_capability_caption(site: Website) -> str:
+    """站点的一行能力概览：`<定位>：<类型名单>`（无文案时返回空串）。
+
+    这一行同时是**候选区站点项的悬停提示**与**三个站点下拉框的显示文本**里那段文案，
+    同一批站在两处界面必须说同一句话，故只在这里算一份。冒号后面的名单现算自
+    `TYPE_DEFAULT_SITES`、用的短名与候选区那七个 chip 同源（PALETTE_GROUP_TITLES），
+    不再取爬虫 description 里那句写死的文案（如「综合：有码+无码+素人+FC2」）——它与实际
+    默认名单对不上（7mmtv 明明也在欧美、国产名单里），一处说错就等于没说。
+
+    **悬停提示只剩这一行**：「类型：…」「联动：…」两行按用户要求整行删掉——第一行已经把
+    它属于哪几个类型说全了，后两行是同一件事的重复，还把悬停框撑高；候选区每个站只出现
+    一次，标题都提到了顶部，读者手上要的就是这一行。分隔符一律「/」（不用顿号，省宽度）。
+
+    名单里的**「素人」「动漫」「FC2」不写进这一行**（用户要求）：素人本质就是有码，只不过
+    用假名或根本没名字；动漫与其它类型的片子混在一站时不必单列；FC2 同属有码那一类、只是没
+    番号。DMM 由「有码：有码/素人」变「有码：有码」，7mmtv 由「综合：有码/无码/素人/FC2/欧美/国产」
+    变「综合：有码/无码/欧美/国产」，AVSOX 由「无码：无码/FC2」变「无码：无码」。**只隐去这一行
+    文案里的它们**，候选区那七个 chip、设置页「个摄番号：」那一行与 TYPE_DEFAULT_SITES 默认
+    名单一律照旧。名单被隐空时（Getchu、FC2 这类只属被隐去那一组的站）改用它自己的定位
+    说明，不留一个只剩前缀的空名单。
+    """
+    description = _site_description(site)
+    types = [name for name in _site_types(site) if name not in _CAPTION_HIDDEN_TYPES]
+    if types:
+        return f"{_site_capability_prefix(description, types)}：{'/'.join(types)}"
+    # 名单被隐去后空了、或本来就不属任何类型组（MyWife、AVSEX）：原样留它自己的说明，
+    # 不留一个只剩前缀的空名单
+    return description
 
 
 def _site_description(site: Website) -> str:
-    """获取站点定位说明（爬虫类 site_description），失败返回空串。"""
+    """获取站点定位说明（爬虫类 site_description），失败返回空串。
+
+    分隔符在这里一律归一成「/」：爬虫文案原先用「+」连写能力（「综合：有码+无码+素人+FC2」），
+    而候选区标题、悬停提示与三个站点下拉框（指定网站 / 当前网站 / 不走代理的网站）都已改用「/」，
+    同一句能力清单在两套界面里不该有两种写法。**只在这一处换**，爬虫自己那份文案不动——
+    它同时是抓取行为的说明，不该由界面文案的需求带着改。
+    """
     try:
         from mdcx.crawlers import get_crawler
 
         crawler_cls = get_crawler(site)
         if crawler_cls is not None and hasattr(crawler_cls, "site_description"):
-            return crawler_cls.site_description()
+            return (crawler_cls.site_description() or "").replace("+", "/")
     except Exception:
         pass
     return ""
@@ -399,7 +442,7 @@ def _site_description(site: Website) -> str:
 def _setup_site_list(list_widget: QListWidget, sites: Iterable[Website], *, grouped: bool = False) -> None:
     """把 sites 铺进列表。grouped=True 时先放七个分组标题，紧跟着才是站点。
 
-    标题与站点在同一个换行流里顺排，所以第一行就是「有码 无码 素人 个摄 欧美 国产
+    标题与站点在同一个换行流里顺排，所以第一行就是「有码 无码 素人 FC2 欧美 国产
     DMM DMM_API LibreDMM …」，右边不留空白（用户要求「不要空着，继续排列站点」），同时又满足「七个标题排在 DMM 之前」。
 
     默认（grouped=False）保持传入的原序——「启用网站」和各字段名单的原序就是用户的
@@ -963,7 +1006,7 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         layout.addWidget(group_hint)
 
         copy_hint = QLabel(
-            "开头的七个加粗标题是有码、无码、素人、个摄、欧美、国产、动漫，"
+            "开头的七个加粗标题是有码/无码/素人/FC2/欧美/国产/动漫，"
             "双击一个标题即加入该组全部网站，"
             "后面紧跟全部可用网站（按名称 A-Z 排序、每个站只出现一次）。"
             "右键：站点上复制该站点、标题上复制本组名单、空白处复制整张列表，"
