@@ -1,12 +1,13 @@
 
 # Changelog
-## v2.5.10 (2026-10-20)
+## v2.6.0 (2026-10-20)
 ### 总结
-- **这一轮两件事，一件是修「卡住」，一件是修「搜不到」：①图片响应不带 `Content-Type` 时整轮刮削会一直挂着不动（来自 PR #4，评审通过后 squash 合并进 main）；②IBW 系列的电影在 AVBase 上搜不出来——软件按惯例把番号末尾的 `z` 剥掉（IBW-794z → IBW-794），而 AVBase 收录的恰恰是带 `z` 的那个形态。**
+- **这一轮三件事，一件是修「卡住」，一件是修「搜不到」，一件是按用户重列的名单把两个站移出四组默认来源：①图片响应不带 `Content-Type` 时整轮刮削会一直挂着不动（来自 PR #4，评审通过后 squash 合并进 main）；②IBW 系列的电影在 AVBase 上搜不出来——软件按惯例把番号末尾的 `z` 剥掉（IBW-794z → IBW-794），而 AVBase 收录的恰恰是带 `z` 的那个形态；③`JavDay` 移出无码番号 / 个摄番号 / 国产番号 / 欧美番号四组、`JavFree` 再移出国产番号 / 欧美番号两组，`Dahlia` / `Faleno` 加进素人番号组（纯名单增删，爬虫不动，详见下方「改进」后两条）。**
   - **① 为什么会卡住**：每次下载图片前都要先判断「这次响应是不是 Cloudflare 的挑战页」，那段检测必须**先读一点响应体**才能判断，于是图片的 `content` 流被提前读掉了；真正的下载环节接着再读就只拿到空流，而等待本身并没有结束，表现就是日志停住、进度不动。原实现之所以在「缺 `Content-Type`」时最明显，是因为挑战页判定拿不到类型信息时仍会走预读这条路，而类型正常的响应会被直接放行、根本没被预读过。现改成**只预读开头 8192 字节并把这截数据回放给下载流程**，图片内容一处不少；同时给读图片本身（探测尺寸与整张读完）各加一层超时，卡住不再可能没有上限。
   - **② 为什么只有 AVBase 找不到**：番号尾缀是 DMM 图床的形态，JavDB / JavBus 等站收录的是去掉尾缀的基础番号，软件全局按基础番号刮削本来没错；AVBase 是个例外，它照搬图床番号。实测：`?q=IBW-794z` 精确命中 1 条（`ibworks:IBW-794Z`），`?q=IBW-794` 返回 0 条。现对 **IBW 系列且只在 AVBase** 把带 `z` 的番号排在搜索候选的最前面，基础番号留作兜底；其余站点、其余系列一律不动。
+- **③ 为什么值得单独说**：这不是修 bug，是用户按自己的取舍重列了七组名单——只删站点、不动爬虫，`JavDay` 仍然可以在「编辑网站」候选区里手动勾回。净变化只有五处删除，组内次序与字段抓取优先级都没动，所以除默认名单的四处镜像（出厂配置、使用说明、两份文档）之外无需连带修改。**④ 素人番号组随后单独加进 `Dahlia` / `Faleno`**（用户第二次给名单，素人 26 → 28，与有码番号组同形）：两站是有码厂牌官网、厂牌本身大量出素人企划作品，此前素人组只有 `Prestige` / `AVBase` / `MGStage` 能直连厂牌官网，加进组内即多一条直连官网的路。
 - **测试与门禁**：新增的 `tests/test_stream_body_replay.py`（24 项，含一个起本地 HTTP 服务器真跑「无 Content-Type 图片」的用例）与 `tests/crawlers/test_avbase.py`（新增 15 项）全绿；`pytest tests/crawlers tests/test_number_definition.py` → 650 passed / 4 skipped，仅 `tests/crawlers/test_aventertainments.py` 的两个**实网**用例失败（官网搜索页被 verifybot / reCAPTCHA 拦截，已 `git stash` 在改动前的干净树上复跑同样失败，与本轮无关）。`ruff format --check`、`ruff check`、`mypy mdcx`（194 个文件）、`python -m scripts.check_thread_safety` 全部无告警。
-- **版本号 2.5.9 -> 2.5.10**（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx` 三处同步，`LOCAL_VERSION` 仍为 `20261020`、本节日期不变）。
+- **版本号 2.5.9 -> 2.6.0**（`mdcx/consts.py` 的 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx` 三处同步，`LOCAL_VERSION` 仍为 `20261020`、本节日期不变；此前草拟的 2.5.10 尚未发版，本节内容整体以 2.6.0 发布，故取次版本号——本轮改了四组默认名单的站点增删，对已有配置的用户是可见变化）。
 - **changelog 归位**：PR #4 自己在 v2.5.5 那一节里插了一段 `### 修复`（那条提交写于 2.5.5 之前，合并后按时间顺序看是错位的）。已把那段从 v2.5.5 删除、改写进本节，两处不再重复。
 ### 改进
 - **无 `Content-Type` 的图片响应不再被挑战页检测读空，预读数据回放给下载流程，图片读取全程有超时（`mdcx/web_async.py` + `mdcx/core/media_resource.py` + 新增 `tests/test_stream_body_replay.py`）**：本条来自 PR #4（fork `RAAMENN/MDCx` 的 `fix/preserve-image-stream-after-cf-check`，评审通过后 squash 合并为 `9f25007`），评审要点如下。
@@ -22,6 +23,18 @@
   - **带 `z` 的候选必须排在基础番号之前**：AVBase 的搜索**不是严格全等匹配**——实测 `?q=IBW-79` 会模糊命中另一部作品 `ibworks:IBW-079`。若把基础番号排在前面，一旦它返回了邻近作品就会被当成正确结果取走（AVBase 的搜索页取第一条结果、不做番号校验），等于用「搜到错的」换「搜不到」。
   - **范围严格限定在 IBW + AVBase**：正则只认 `IBW` 前缀 + 纯数字（故 `IBWZZ-1`、`X-IBW-794` 不会误伤；输入本就带 `z` 的形态不会重复追加，交给 `number_search_variants()` 即可）；`javdb` / `javdb_api` / `javdb_app` / `javbus` / `thejavdb` 仍只用既有的两种形态，番号剥尾缀的规则**一个字没改**，`mdcx/number.py` 亦未改动。
   - **测试**：`tests/crawlers/test_avbase.py` 新增 `test_search_candidates`（12 组参数化：IBW 的三种写法与两种已带 `z` 的写法 → 带 `z` 的在前；MIDE-831 / ABF-042 / SSIS-538 → 单候选；IBWZZ-1 / X-IBW-794 → 不误伤；空串 → 空列表）与三条 `_generate_search_url` 用例（IBW 产出两条地址且顺序正确、非 IBW 仍只有一条、番号为空仍抛 `CrawlerException`）。**顺序是被断言死的**：把两条地址调换一下，用例即红。
+- **`JavDay` 移出四组默认名单、`JavFree` 再移出国产与欧美两组（`mdcx/config/models.py` + `resources/config/default_config.json` + `mdcx/views/MDCx.ui`（及重编译产物 `mdcx/views/MDCx.py`）+ `docs/Features.md`、`docs/Scraper.md` + `tests/test_config_conversion.py`、`tests/test_site_source_type_groups.py`、`tests/test_site_source_copy_menu.py`）**：用户把七组名单重列了一遍，**四组各减一站或两站**。净变化只有五处删除——`JavDay` 退出**无码番号、个摄番号、国产番号、欧美番号**四组（仍留在有码番号、素人番号两组），`JavFree` 再退出**国产番号、欧美番号**两组（无码番号组保留）。组内相对次序一字未调、只做删除（素人番号组随下一条加进 `Dahlia` / `Faleno` 后为 28 站，最终规模 **有码 28 / 无码 15 / 素人 28 / 个摄 12 / 欧美 10 / 国产 10 / 动漫 4**）。
+  - **改的只有默认名单，爬虫与站点一个字没动**：`Website.JAVDAY` / `Website.JAVFREE` 仍在枚举里、`javday.py` / `javfree.py` 仍正常注册、仍出现在「编辑网站」候选区的 A-Z 名单里可供勾选。沿用的正是既有边界（`docs/Development.md`「站点收录边界」一节）：**移除站点只动默认名单，不动爬虫注册与 `Website` 枚举**。唯一一处「看起来变了」的地方是悬停提示里两站的类型名单——它由 `TYPE_DEFAULT_SITES` 现算，`JavDay` 随之收成「综合：有码」、`JavFree` 收成「综合：有码/无码」，属名单现算的自然结果，不是另写的文案。
+  - **字段优先级不受影响**：`DEFAULT_FIELD_SITE_PRIORITY`（17 站）里本来就没有这两站，各类型的字段优先级是它按组内成员过滤生成的，故**七组的字段抓取顺序一处未变**，`tests/test_config_conversion.py` 里那几处 `site_prority` 断言无需改动。
+  - **同源镜像四处同步**：出厂默认配置 `resources/config/default_config.json` 的 `website_wuma` / `website_fc2` / `website_oumei` / `website_guochan`、使用说明「四、网站选择」那四行（`MDCx.py` 按仓库口径 `pyuic6` + `scripts/fix_qt_enums.py` + `ruff format` 重编译，diff 仅这四行）、`docs/Features.md` 的七组默认名单表与「点『FC2』得 N 站」那句、`docs/Scraper.md` 的四段清单与「合计 N 站（官网 X + 第三方 Y）」计数。顺带修正了三处**早已对不上的计数**：`docs/Scraper.md` 国产段原写「官网 3」而段内只列了 `Madou.club` / `Madouqu` 两个官网站（改为 2，第三方随之 9→8）、同文件「右键」一条里的「有码 31 站、FC2 15 站」（实际 28 / 12，2.5.6 起多轮调整后忘了跟）。
+  - **刻意没动**：`tips.py` 帮助弹窗里按类型列举站点的那几行（说的是各站**能力**、不是默认名单）、爬虫 `description` 里的定位说明、`docs/Features.md`「各爬虫适用类型」的能力分类小节——都描述站点实际收录什么，与「哪一组默认勾它」是两件事。
+  - **门禁**：`python -m pytest tests -q` → **3356 passed / 7 skipped / 2 failed**，两个失败是 `tests/crawlers/test_aventertainments.py` 的**实网**用例（官网搜索页被 verifybot/reCAPTCHA 拦截，改动前的干净树上复跑同样失败，与本条无关）。`tests/test_config_conversion.py`、`tests/test_site_source_type_groups.py`、`tests/test_site_source_copy_menu.py`、`tests/test_type_site_scrape_rows.py`、`tests/test_ui_structure.py`（含逐项连顺序比对使用说明与 `Config` 默认值的 `test_about_type_site_lists_match_config_defaults`、以及 pyuic6 重编译逐字节比对的 `test_mdcx_py_in_sync_with_ui`）全绿。
+- **`Dahlia`、`Faleno` 加进素人番号组默认名单，排在 `LibreDMM` 之后、`MGStage` 之前（`mdcx/config/models.py` + `resources/config/default_config.json` + `mdcx/views/MDCx.ui`（及重编译产物 `mdcx/views/MDCx.py`）+ `docs/Features.md`、`docs/Scraper.md` + `tests/test_config_conversion.py`、`tests/test_site_source_type_groups.py`、`tests/test_site_source_copy_menu.py`）**：用户随后单独要求素人番号组改成与有码番号组同形的那份清单（**素人 26 → 28**）。**为什么这两站该在素人组**：它们虽是有码厂牌官网（DLDSS / FNS / FLN / JIMMY 前缀自动路由），但厂牌本身大量出素人企划作品，此前素人组只有 `Prestige` / `AVBase` / `MGStage` 这几个厂牌站能直连官网，Dahlia、Faleno 的素人线作品只能靠第三方聚合站兜；加进组内即多一条直连官网的路。
+  - **加的是默认名单，不是类型判定**：两站仍只在「番号前缀命中即锁定单站」那一条路上被自动路由（`file_crawler.py` 的 `BRAND_PREFIX_SITES`），素人番号的**类型判定**一个字没改。
+  - **组内次序照用户清单落**：有码番号组里两站的位置是「`LibreDMM` 之后、`MGStage` 之前」（官网段），素人番号组按同一口径落同一位置。
+  - **一处断言必须跟着改**：`tests/test_site_source_type_groups.py::test_group_without_available_sites_leaves_no_empty_title` 断言「候选区只剩 Faleno 时只出 `有码` 一个标题」，两站同属两组后该标题变成 `{"有码": [...], "素人": [...]}`——这是分组逻辑的正确输出，已按新事实更新断言并补注说明。
+  - **文档口径**：`docs/Features.md` 里那句「`Dahlia`、`Faleno` 只随有码番号一组走」已改为「随有码番号、素人番号两组走」；同文件 MyWife 注释里早已对不上的组规模（`29 站` / `27 站`）一并校正为 `28 / 28`；`docs/Scraper.md` 素人段「合计 26 站（官网 10 + 第三方 16）」改为「合计 28 站（官网 12 + 第三方 16）」并在官网段补两行。
+  - **字段优先级仍不受影响**：`DEFAULT_FIELD_SITE_PRIORITY`（17 站）里没有 `Dahlia` / `Faleno`，两站进组不改变任何字段的默认抓取顺序。
 ## v2.5.9 (2026-10-20)
 ### 总结
 - **这一轮只改界面上的话，一个字行为没动：把「站点悬停提示」和「站点下拉框」里那些啰嗦、重复、自我打架的地方收干净，让每一处都只说一件事、只说一遍**。用户前后给了六句话，全是文案口径的调整，没有一条涉及名单、勾选、排序或默认值：

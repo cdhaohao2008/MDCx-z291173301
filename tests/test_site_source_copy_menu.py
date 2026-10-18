@@ -358,11 +358,11 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
     ("title", "count"),
     [
         ("有码", 28),
-        ("无码", 16),
-        ("素人", 26),
-        ("FC2", 13),
-        ("欧美", 12),
-        ("国产", 12),
+        ("无码", 15),
+        ("素人", 28),
+        ("FC2", 12),
+        ("欧美", 10),
+        ("国产", 10),
         ("动漫", 4),
     ],
 )

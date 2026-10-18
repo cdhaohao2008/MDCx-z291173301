@@ -47,12 +47,12 @@ MDCx 刮削网站类型汇总表
     TheJavDB          https://thejavdb.net              thejavdb.net 网页版，取数走它自己的免 CF 接口
 
 ================================================================================================================
-【无码番号（无修正 / 流出）】  合计 16 站   （官网 2 + 第三方 14）
+【无码番号（无修正 / 流出）】  合计 15 站   （官网 2 + 第三方 13）
 ================================================================================================================
   ── 官网 / 厂牌 / 官方接口 (2) ──
     Official                                            官网聚合入口。30 家有码片商官网 + 5 家无码官网 JSON 直连；按番号前缀路由
 
-  ── 第三方 / 聚合站 (14) ──
+  ── 第三方 / 聚合站 (13) ──
     7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     Airav.cc          https://airav.io                  airav.io。分类磁贴含 素人 / 無碼，按分类切换有码/无码
     AVSOX             https://avsox.click               avsox.click。与 avmoo/avheat 同 tellme.pw AIO 平台，纯无码
@@ -60,7 +60,6 @@ MDCx 刮削网站类型汇总表
     FreeJavBT         https://freejavbt22.cc            导航 有碼 / 無碼 / 歐美 / FC2 + 系列 LUXU / ARA / SIRO / AV Bro
     IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
     JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
-    JavDay            https://javday.app                「JAVDAY | 免費高清AV在線看| 麻豆 SWAG 看到飽」
     JavDB             https://javdb.com                 Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
     JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
@@ -70,12 +69,14 @@ MDCx 刮削网站类型汇总表
     Missav_API        https://missav.ws                 Missav 接口实现（fourhoi.com）
 
 ================================================================================================================
-【素人番号（amateur / 人妻熟女）】  合计 26 站   （官网 10 + 第三方 16）
+【素人番号（amateur / 人妻熟女）】  合计 28 站   （官网 12 + 第三方 16）
 ================================================================================================================
-  ── 官网 / 厂牌 / 官方接口 (10) ──
+  ── 官网 / 厂牌 / 官方接口 (12) ──
     AVBase            https://www.avbase.net            FANZA/MGS/DUGA 50 万+ 作品名寄せ库，纯日系，无欧美/FC2/国产
     DMM                                                 FANZA/DMM 本体。有码主体，站内含「素人」品牌区（SOD はめちゃん 等）
     DMM_API           https://api.dmm.com               FANZA 官方 Web API（api.dmm.com）
+    Dahlia            https://dahlia-av.jp                DLDSS 前缀自动路由本站
+    Faleno            https://faleno.jp                   FNS/FLN/JIMMY 前缀自动路由本站
     LibreDMM          https://www.libredmm.com          LibreFanza，DMM/FANZA 开源镜像
     MGStage           https://www.mgstage.com           MGS 厂牌官网。菜单含 素人ホイホイ / はめちゃん。/ SODクリエイト
     Official                                            官网聚合入口。30 家有码片商官网 + 5 家无码官网 JSON 直连；按番号前缀路由
@@ -103,18 +104,17 @@ MDCx 刮削网站类型汇总表
     TheJavDB          https://thejavdb.net              thejavdb.net 网页版，取数走它自己的免 CF 接口
 
 ================================================================================================================
-【个摄番号】  合计 13 站   （官网 2 + 第三方 11）
+【个摄番号】  合计 12 站   （官网 2 + 第三方 10）
 ================================================================================================================
   ── 官网 / 厂牌 / 官方接口 (2) ──
     FC2               https://adult.contents.fc2.com    FC2 电子市场官网。导航含 素人 / 无码 / 个人拍摄
 
-  ── 第三方 / 聚合站 (11) ──
+  ── 第三方 / 聚合站 (10) ──
     7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     AVSOX             https://avsox.click               avsox.click。与 avmoo/avheat 同 tellme.pw AIO 平台，纯无码
     FC2PPVDB          https://fc2cmadb.com              fc2cmadb.com。FC2 目录站，卖家名多为素人（マスクde本物素人 等）
     IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
     JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
-    JavDay            https://javday.app                「JAVDAY | 免費高清AV在線看| 麻豆 SWAG 看到飽」
     JavDB             https://javdb.com                 Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
     JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
@@ -123,40 +123,36 @@ MDCx 刮削网站类型汇总表
     Missav_API        https://missav.ws                 Missav 接口实现（fourhoi.com）
 
 ================================================================================================================
-【欧美番号】  合计 12 站   （官网 1 + 第三方 11）
+【欧美番号】  合计 10 站   （官网 1 + 第三方 9）
 ================================================================================================================
   ── 官网 / 厂牌 / 官方接口 (1) ──
 
-  ── 第三方 / 聚合站 (11) ──
+  ── 第三方 / 聚合站 (9) ──
     7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     AVheat            https://avheat.shop               「AVHEAT - 你的线上欧美成人影片情报站」
     IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
     JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
-    JavDay            https://javday.app                「JAVDAY | 免費高清AV在線看| 麻豆 SWAG 看到飽」
     JavDB             https://javdb.com                 Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
     JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
-    JavFree           https://javfree.me                菜单 Censored…Uncensored / FC2 / Caribbeancom / 1pondo / Heyzo / 10musume
     Missav            https://missav.ws                 混合：有码 + 无码 + 素人（IPBZ-023 / INMR-029 等 IP 女優流出）
     Missav_API        https://missav.ws                 Missav 接口实现（fourhoi.com）
     ThepornDB         https://api.theporndb.net         api.theporndb.net。欧美 scenes/movies 库（登录墙）
 
 ================================================================================================================
-【国产番号】  合计 12 站   （官网 3 + 第三方 9）
+【国产番号】  合计 10 站   （官网 2 + 第三方 8）
 ================================================================================================================
-  ── 官网 / 厂牌 / 官方接口 (3) ──
+  ── 官网 / 厂牌 / 官方接口 (2) ──
     Madou.club        https://madou.club                「麻豆社-专注国产剧情中文对白小电影」
     Madouqu           https://madouqu.shop              madouqu.com/shop「麻豆区 - 麻豆传媒等国产传媒视频」
 
-  ── 第三方 / 聚合站 (9) ──
+  ── 第三方 / 聚合站 (8) ──
     7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
     JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
-    JavDay            https://javday.app                「JAVDAY | 免費高清AV在線看| 麻豆 SWAG 看到飽」
     JavDB             https://javdb.com                 Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
     JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
-    JavFree           https://javfree.me                菜单 Censored…Uncensored / FC2 / Caribbeancom / 1pondo / Heyzo / 10musume
     Missav            https://missav.ws                 混合：有码 + 无码 + 素人（IPBZ-023 / INMR-029 等 IP 女優流出）
     Missav_API        https://missav.ws                 Missav 接口实现（fourhoi.com）
 
@@ -310,7 +306,7 @@ Xcity             有码：仅限有码            有码                       
                     （SITE_GROUP_ROLE 记标题、SITE_GROUP_SITES_ROLE 记该组成员），所以点
                     哪个标题就是哪一份名单，不会把末尾零散站点算进上一组。
                     站点行的单击只是选中，加入靠双击站点或「添加选中」。
-    右键            点站点 → 复制该站名；点标题 → 复制该组名单（如「有码」31 站、「FC2」15 站，
+    右键            点站点 → 复制该站名；点标题 → 复制该组名单（如「有码」28 站、「FC2」12 站，
                     互不相等）；点空白处 → 复制整张列表（逗号分隔，与对话框上方输入框同格式，
                     可直接粘回）。候选区的右键菜单**最下方**另有「加入列表：启用网站」：
                     点标题加入整组、点站点加入那一个、点空白处加入当前选中的那些

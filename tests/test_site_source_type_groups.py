@@ -120,7 +120,6 @@ USER_SITE_LISTS = {
         "JavDB_API",
         "JavDB_APP",
         "JavBus",
-        "JavDay",
         "JavFree",
         "7mmtv",
         "Airav.cc",
@@ -134,6 +133,8 @@ USER_SITE_LISTS = {
         "DMM",
         "DMM_API",
         "LibreDMM",
+        "Dahlia",
+        "Faleno",
         "MGStage",
         "Prestige",
         "Official",
@@ -167,7 +168,6 @@ USER_SITE_LISTS = {
         "JavDB_API",
         "JavDB_APP",
         "JavBus",
-        "JavDay",
         "JavFree",
         "7mmtv",
         "IQQTV",
@@ -181,12 +181,10 @@ USER_SITE_LISTS = {
         "JavDB_API",
         "JavDB_APP",
         "JavBus",
-        "JavDay",
         "7mmtv",
         "Missav",
         "Missav_API",
         "IQQTV",
-        "JavFree",
     ],
     FixedScrapingType.GUOCHAN: [
         "Madou.club",
@@ -195,8 +193,6 @@ USER_SITE_LISTS = {
         "JavDB_API",
         "JavDB_APP",
         "JavBus",
-        "JavDay",
-        "JavFree",
         "7mmtv",
         "IQQTV",
         "Missav",
@@ -451,7 +447,8 @@ def test_empty_candidate_list_produces_no_groups():
 
 def test_group_without_available_sites_leaves_no_empty_title():
     """某一组在本机没有候选站点时不留空标题，否则会多出几个点开没内容的标题。"""
-    assert _groups_of([Website.FALENO]) == {"有码": ["Faleno"]}
+    # Faleno 2.6.0 起同时在有码番号、素人番号两组，故候选区出现两个标题
+    assert _groups_of([Website.FALENO]) == {"有码": ["Faleno"], "素人": ["Faleno"]}
 
 
 def test_sites_outside_every_group_are_appended_without_a_title():
