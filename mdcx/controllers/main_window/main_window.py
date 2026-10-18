@@ -396,6 +396,14 @@ class MyMAinWindow(
                 # 否则会看到「先在右边、再向左跳」（同 _sync_advanced_page_wide_hook）。
                 _sa._post_wide_sync_hook = self._sync_xiazai_row_align
                 self._xiazai_scroll = _sa
+            elif _content is not None and _content.objectName() == "scrollAreaWidgetContents_wangluo":
+                # 网络页：内容 widget 无布局、四个分组高度写死，而通用拉伸只改宽，
+                # 宽态下换行说明变矮、省下的高度全堆在网格底部 → 「状态：留空不校验
+                # （默认）」下方出现大片空白（离屏实测视口 972/1272/1672 →
+                # 空白 30/64/84px，越宽越大）。挂钩子同拍把「网络设置」分组收紧到贴住
+                # 内容、后续分组同步上移；窄态逐像素回设计几何（见 _sync_wangluo_net_box_hug）。
+                _sa._post_wide_sync_hook = self._sync_wangluo_net_box_hug
+                self._wangluo_scroll = _sa
         # QStackedWidget 只会把当前可见页 resize 到自身尺寸，休眠页永远停留在设计尺寸；
         # 切页后必须重新同步一次内部几何，否则"先改窗口尺寸再切页"时页面内容全部按陈旧尺寸布局
         self.Ui.stackedWidget.currentChanged.connect(self._sync_page_layouts)

@@ -1,4 +1,4 @@
-"""设置页的刮削目录 / 命名 / 水印三块布局。纯 Qt, 不依赖任何业务模块。"""
+"""设置页的刮削目录 / 命名 / 水印 / 网络四块布局。纯 Qt, 不依赖任何业务模块。"""
 
 from PyQt6.QtCore import (
     QPoint,
@@ -779,3 +779,97 @@ class LayoutSettingsMixin:
                 spacer.changeSize(new_w, 0)
                 row.invalidate()
                 row.activate()
+
+    # ============ 网络页：「网络设置」分组按内容收紧 ============
+    #
+    # 设计几何（MDCx.ui，设计态逐字读出）：
+    #   groupBox_28「网络设置」   x30 y20  w701 h627
+    #     └ gridLayoutWidget_9    x20 y30  w661 h597（内层 gridLayout_9）
+    #   groupBox_10「Cookie设置」 x30 y662 w601
+    #   groupBox_14（API Token）  x30 y1278 h230
+    #   groupBox_44（本站目录）   x30 y1523 h210
+    _NET_BOX = "groupBox_28"
+    _NET_BOX_DESIGN_Y = 20
+    _NET_BOX_DESIGN_H = 627
+    _NET_HOST = "gridLayoutWidget_9"
+    _NET_HOST_DESIGN_Y = 30
+    _NET_HOST_DESIGN_H = 597
+    # 「网络设置」之下三个分组的 (控件名, 设计 y)
+    _NET_FOLLOW_BOXES = (("groupBox_10", 662), ("groupBox_14", 1278), ("groupBox_44", 1523))
+
+    def _sync_wangluo_net_box_hug(self, _scroll=None) -> None:
+        """设置-网络：宽态把「网络设置」分组收紧到贴住内容，窄态逐像素回到设计几何。
+
+        用户需求（最大化）：「状态：留空不校验（默认）」下方、`Cookie设置` 分组之前
+        有一大片空白，删掉它；最小化时页面布局、组件、控件、提示词等等全部保持不变。
+
+        根因（本机实测，离屏 Qt 同构复现）：本页内容 widget 无布局管理器，四个分组
+        绝对定位且高度写死；通用宽幅同步（CustomScrollArea.sync_wide_children_width）
+        每遍都按登记的设计几何 setGeometry，**只改宽、高恒为设计值**。而分组里的
+        两段说明（label_103 代理说明、label_cf_bypass_trusted_hosts_desc 校验服务说明）
+        是 wordWrap 换行标签：窗口拉宽后折行数下降、文字所需高度随之变矮
+        （离屏实测 label_103 136→120→100→80px、校验服务说明 54→40→26→12px），而
+        gridLayout_9 又设了 alignment=AlignTop（上一轮治「文字下方留空行」时加的），
+        于是省下来的高度全部堆在网格底部——组框仍按 627 高画、内容只到 567/533/513，
+        多出来的 30/64/84px 就是截图里那片空盒子。空白随窗口越宽越大（离屏实测视口
+        972/1272/1672 → 空白 30/64/84px），与用户「最大化才出现」的描述一致。
+
+        做法（只改宽态的高度，窄态一个像素都不动，双向幂等）：
+          - 判态用几何拉伸量 _scroll_stretch_extra() > 0 而非 isMaximized()：窗口
+            管理器最大化时先发尺寸、后发状态标志，那一拍 isMaximized() 还是 False。
+          - 宽态：先让 gridLayout_9 失效重排（拉宽后换行数才会真正收窄），再按
+            childrenRect 量内容真实底边，容器高 = 底边、组框高 = 容器 y + 容器高
+            （保持 .ui 里 627 = 30 + 597 那条恒等式）；组框矮了多少，下面三个分组
+            就整体上移多少，四个分组之间 15px 的设计间距原样保留——空白被删掉，
+            而不是挪到别处（tests/test_network_settings_group_hug.py 逐条锁）。
+          - 窄态：容器/组框/后续分组一律复位到设计几何。不靠通用同步「顺带复位」，
+            显式复位才能保证任何调用路径下最小化态都等于设计值。
+
+        休眠页直接返回（几何本就是设计值），由切 tab 的 showEvent 补齐——与
+        _sync_zimu_fill_blank / _sync_guaxiaomulu_page_align 同一套钩子约定。
+        """
+        ui = getattr(self, "Ui", None)
+        if ui is None:
+            return
+        box = getattr(ui, self._NET_BOX, None)
+        host = getattr(ui, self._NET_HOST, None)
+        if box is None or host is None:
+            return
+        scroll = _scroll if _scroll is not None else getattr(self, "_wangluo_scroll", None)
+        if scroll is None:
+            return
+        if not box.isVisibleTo(self):
+            return  # 休眠页：几何本就是设计值，切页 showEvent 会再跑一遍
+        if self._scroll_stretch_extra(scroll) > 0:
+            # 拉宽后换行数才收窄，必须让布局重排一遍再量，否则量到的是拉宽前的底边
+            layout = host.layout()
+            if layout is None:
+                return
+            layout.invalidate()
+            layout.activate()
+            host_h = host.childrenRect().bottom() + 1
+            if host_h <= 0:
+                return  # 尚未布局，读数无意义，保持设计几何
+            box_h = self._NET_HOST_DESIGN_Y + host_h
+        else:
+            host_h = self._NET_HOST_DESIGN_H
+            box_h = self._NET_BOX_DESIGN_H
+        changed = False
+        if box.height() != box_h:
+            box.setGeometry(box.x(), self._NET_BOX_DESIGN_Y, box.width(), box_h)
+            changed = True
+        if host.height() != host_h:
+            host.setGeometry(host.x(), self._NET_HOST_DESIGN_Y, host.width(), host_h)
+            changed = True
+        # 组框矮了多少，下面三个分组就上移多少，组间距恒为设计值 15px
+        delta = box_h - self._NET_BOX_DESIGN_H
+        for name, design_y in self._NET_FOLLOW_BOXES:
+            sub = getattr(ui, name, None)
+            if sub is None:
+                continue
+            want_y = design_y + delta
+            if sub.y() != want_y:
+                sub.move(sub.x(), want_y)
+                changed = True
+        if changed:
+            scroll.sync_content_min_height()
