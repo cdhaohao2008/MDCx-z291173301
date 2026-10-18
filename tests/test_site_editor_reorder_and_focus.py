@@ -1,8 +1,12 @@
-"""「编辑网站」对话框的两条实机反馈：
+"""「编辑网站」「字段优先级」两个对话框的两条实机反馈：
 
     一、「启用网站（从左到右优先级递减）」里的站点不能调整顺序了，左键选中调整顺序时
         站点直接就被移除了。
-    二、「可用网站（按类型分组）」里的网站选中时内部会有方框，删掉内部方框。
+    二、三个站点列表里的 chip 一被选中，内部就多出一个方框，删掉内部方框。
+
+第二条最初只提了「可用网站（按类型分组）」候选区一处，现按用户后续要求补上另两处：
+「编辑网站」里的「启用网站」列表、「字段优先级」窗口下方十九行字段列表。成因是同一个，
+修法也就收在同一个地方（`_SiteListBase`），见下面第二节。
 
 第一条的成因在 Qt 自己的收尾逻辑里，不在本项目的代码顺序上：
 `QAbstractItemView::startDrag`（qtbase/src/widgets/itemviews/qabstractitemview.cpp）在
@@ -23,6 +27,13 @@ clearOrRemove() 把它们从 model 里删了——用户看到的就是「拖一
 离屏环境跑不了真拖拽（`QDropEvent.source()` 恒为 None，见 test_site_group_linkage 的说明），
 所以这里直接构造 QDropEvent 喂给 dropEvent，并在之后照抄一遍 clearOrRemove 的实现当回归锁；
 `test_qt_cleanup_port_is_not_a_noop` 先证明这份抄写确实会删东西，免得锁了个空断言。
+
+第二条不是配色问题，是 Qt 给「当前项」画的那圈聚焦框：`QListView::paintEvent` 里
+`option.state.setFlag(QStyle::State_HasFocus, focus && current == index)`，左键一点那一格
+就成了当前项，`QStyleSheetStyle` 于是在 chip 内部再套一个圆角框——与 `:selected` 那层填充
+是两回事。`_style_site_list()` 的 QSS 里没有 `:focus` 规则可关，只能把当前项清掉，而
+「清当前项」本身有个坑（`setCurrentIndex(无效索引)` 会连带清空整个选中集），故用
+`_release_current_item` 那一套：记下选中的行 → `setCurrentRow(-1)` → 逐个还回去。
 """
 
 import os
@@ -38,8 +49,13 @@ from PyQt6.QtGui import QDropEvent  # noqa: E402
 from PyQt6.QtTest import QTest  # noqa: E402
 from PyQt6.QtWidgets import QApplication  # noqa: E402
 
-from mdcx.config.enums import Website  # noqa: E402
-from mdcx.controllers.main_window.site_priority_dialog import SiteListEditorDialog  # noqa: E402
+from mdcx.config.enums import FixedScrapingType, Website  # noqa: E402
+from mdcx.config.models import FieldPriorityConfig  # noqa: E402
+from mdcx.controllers.main_window.site_priority_dialog import (  # noqa: E402
+    FieldPriorityDialog,
+    SiteListEditorDialog,
+)
+from mdcx.gen.field_enums import CrawlerResultFields  # noqa: E402
 
 ALL_SITES = [Website(site) for site in __import__("mdcx.crawlers", fromlist=["c"]).get_registered_crawler_site_values()]
 
@@ -55,6 +71,15 @@ def qt_app():
 def _editor(qt_app, selected=None):
     dlg = SiteListEditorDialog("t", list(CUSTOM_ORDER if selected is None else selected), ALL_SITES, None)
     dlg.resize(860, 640)
+    dlg.show()
+    qt_app.processEvents()
+    return dlg
+
+
+def _field_dialog(qt_app):
+    """「字段优先级」对话框：十九行字段列表，每行都铺 CUSTOM_ORDER。"""
+    configs = {field: FieldPriorityConfig(site_prority=list(CUSTOM_ORDER)) for field in CrawlerResultFields}
+    dlg = FieldPriorityDialog("t", FixedScrapingType.YOUMA, ALL_SITES, configs, None)
     dlg.show()
     qt_app.processEvents()
     return dlg
@@ -172,43 +197,87 @@ def test_reordering_one_site_does_not_disturb_the_others(qt_app):
         dlg.deleteLater()
 
 
-# ------------------------------------------------------- 二、候选区不要内部方框
+# ------------------------------------------- 二、三个站点列表都不要内部方框
 
 
-def test_clicking_a_site_leaves_no_current_item(qt_app):
+def _left_click(list_widget, site_value: str) -> int:
+    """真左键点一次某个站点 chip，返回它的行号。"""
+    row = _row_of(list_widget, site_value)
+    QTest.mouseClick(
+        list_widget.viewport(),
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        list_widget.visualItemRect(list_widget.item(row)).center(),
+    )
+    return row
+
+
+@pytest.fixture(params=["palette", "enabled", "field_row"])
+def focus_list(qt_app, request):
+    """逐个取出三个站点列表：候选区、「启用网站」、「字段优先级」的一行字段。
+
+    用户分三轮把这三处都标了出来（第一轮只提候选区，后两轮补上「启用网站」列表与
+    字段行），成因与修法都在 `_SiteListBase` 一处，故用同一组断言钉住三个控件，
+    免得日后只修了其中一个、另两个又留上框。
+
+    一次只造一个对话框：聚焦框只在「视图有焦点」时才画，而两个窗口同时 show 时焦点
+    只落在活动的那一个上，另一个的差值恒为 0（踩过），那正是空过的样子。
+    """
+    which = request.param
+    if which == "field_row":
+        dlg = _field_dialog(qt_app)
+        yield which, dlg._field_lists[CrawlerResultFields.TITLE]
+    else:
+        dlg = _editor(qt_app)
+        yield which, dlg.available_list if which == "palette" else dlg.selected_list
+    dlg.deleteLater()
+
+
+def _any_site(list_widget) -> str:
+    """列表里第一个站点名（三个列表铺的站点不一样，不写死具体哪个）。"""
+    return _values(list_widget)[0]
+
+
+def test_clicking_a_site_leaves_no_current_item(qt_app, focus_list):
     """点站点只该选中，不该把它变成「当前项」。
 
     当前项会被 Qt 再套一层内嵌的聚焦框（`QListView::paintEvent` 给 `current == index`
     且视图有焦点的行加 `State_HasFocus`），于是 chip 里面多出一个方框——用户截图里的那圈。
     """
-    dlg = _editor(qt_app)
-    try:
-        palette = dlg.available_list
-        row = _row_of(palette, "7mmtv")
-        QTest.mouseClick(
-            palette.viewport(),
-            Qt.MouseButton.LeftButton,
-            Qt.KeyboardModifier.NoModifier,
-            palette.visualItemRect(palette.item(row)).center(),
-        )
-        qt_app.processEvents()
-        assert palette.currentRow() == -1, f"点完站点它成了当前项：{palette.currentItem().text()}"
-    finally:
-        dlg.deleteLater()
+    which, list_widget = focus_list
+    site_value = _any_site(list_widget)
+    _left_click(list_widget, site_value)
+    qt_app.processEvents()
+    assert list_widget.currentRow() == -1, f"{which} 点完站点它成了当前项：{list_widget.currentItem().text()}"
+
+
+def test_clicking_a_site_still_selects_it_everywhere(qt_app, focus_list):
+    """清当前项不能顺手把选中态也清了——「添加选中」「移除」与拖拽全都读选中集。"""
+    from mdcx.controllers.main_window.site_priority_dialog import _selected_sites
+
+    which, list_widget = focus_list
+    site_value = _any_site(list_widget)
+    row = _left_click(list_widget, site_value)
+    qt_app.processEvents()
+    assert [list_widget.row(item) for item in list_widget.selectedItems()] == [row], f"{which} 点完没选中"
+    assert [site.value for site in _selected_sites(list_widget)] == [site_value]
+
+
+def test_focusing_does_not_pick_a_current_item(qt_app, focus_list):
+    """光标进入列表时 Qt 会把当前项设成第一行，那一格于是开窗就被圈起来。"""
+    which, list_widget = focus_list
+    list_widget.setCurrentRow(-1)
+    list_widget.setFocus()
+    qt_app.processEvents()
+    assert list_widget.currentRow() == -1, f"{which} 一聚焦 Qt 就把当前项设成了第一行"
 
 
 def test_clicking_a_site_still_selects_it(qt_app):
-    """清当前项不能顺手把选中态也清了——「添加选中」全靠它。"""
+    """候选区这一处再钉一条「点完真能加进去」，把「清当前项」与「加入」串起来。"""
     dlg = _editor(qt_app)
     try:
         palette = dlg.available_list
-        row = _row_of(palette, "7mmtv")
-        QTest.mouseClick(
-            palette.viewport(),
-            Qt.MouseButton.LeftButton,
-            Qt.KeyboardModifier.NoModifier,
-            palette.visualItemRect(palette.item(row)).center(),
-        )
+        row = _left_click(palette, "7mmtv")
         qt_app.processEvents()
         assert [palette.row(item) for item in palette.selectedItems()] == [row]
         dlg._add_selected()
@@ -249,39 +318,32 @@ def _diff(a, b) -> int:
     return sum(1 for y in range(a.height()) for x in range(a.width()) if a.pixel(x, y) != b.pixel(x, y))
 
 
-def test_selected_chip_has_no_inner_box_left(qt_app):
+def test_selected_chip_has_no_inner_box_left(qt_app, focus_list):
     """像素级：点完那一格的画，和「不设当前项」的画一模一样。
 
     先量出「设了当前项」到底多画了多少像素（这是用户截图里那个内部方框），再量点完之后
-    那个数字归零——只断言归零会空过（万一这个版本 Qt 压根不画聚焦框）。
+    那个数字归零——只断言归零会空过（万一这个版本 Qt 压根不画聚焦框）。三个列表各量一次，
+    前半段那句 `> 0` 顺带证明后补的这两个列表此前**确实**画了框，不是无处可修。
     """
-    dlg = _editor(qt_app)
-    try:
-        palette = dlg.available_list
-        item = palette.item(_row_of(palette, "7mmtv"))
-        # 聚焦框只在「视图有焦点」时才画（QListView::paintEvent 里的 focus 变量）
-        palette.setFocus()
+    which, list_widget = focus_list
+    site_value = _any_site(list_widget)
+    item = list_widget.item(_row_of(list_widget, site_value))
+    # 聚焦框只在「视图有焦点」时才画（QListView::paintEvent 里的 focus 变量）
+    list_widget.setFocus()
+    qt_app.processEvents()
+    assert list_widget.hasFocus() or list_widget.viewport().hasFocus(), f"{which} 没拿到焦点，聚焦框压根不会画"
+
+    def paint():
         qt_app.processEvents()
-        assert palette.hasFocus() or palette.viewport().hasFocus(), "列表没拿到焦点，聚焦框压根不会画"
+        return list_widget.grab().toImage().copy(list_widget.visualItemRect(item))
 
-        def paint():
-            qt_app.processEvents()
-            return palette.grab().toImage().copy(palette.visualItemRect(item))
+    list_widget.setCurrentRow(-1)
+    item.setSelected(True)  # 单独设选中不会回填当前项（实测），这一步是「选中但没有当前项」
+    without_current = paint()
+    list_widget.setCurrentRow(_row_of(list_widget, site_value))
+    with_current = paint()
+    assert _diff(without_current, with_current) > 0, f"{which} 上当前项没有画出任何差异，这组对照说明不了问题"
 
-        palette.setCurrentRow(-1)
-        item.setSelected(True)  # 单独设选中不会回填当前项（实测），这一步是「选中但没有当前项」
-        without_current = paint()
-        palette.setCurrentRow(_row_of(palette, "7mmtv"))
-        with_current = paint()
-        assert _diff(without_current, with_current) > 0, "当前项没有画出任何差异，这组对照说明不了问题"
-
-        palette.setCurrentRow(-1)  # 清当前项会连带清掉选中态，正好从零开始模拟那一次点击
-        QTest.mouseClick(
-            palette.viewport(),
-            Qt.MouseButton.LeftButton,
-            Qt.KeyboardModifier.NoModifier,
-            palette.visualItemRect(item).center(),
-        )
-        assert _diff(without_current, paint()) == 0, "点完那一格里面还留着聚焦框"
-    finally:
-        dlg.deleteLater()
+    list_widget.setCurrentRow(-1)  # 清当前项会连带清掉选中态，正好从零开始模拟那一次点击
+    _left_click(list_widget, site_value)
+    assert _diff(without_current, paint()) == 0, f"{which} 点完那一格里面还留着聚焦框"

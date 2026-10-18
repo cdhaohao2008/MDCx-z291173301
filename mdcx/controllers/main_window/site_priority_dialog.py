@@ -367,19 +367,21 @@ def _is_site_item(item: QListWidgetItem | None) -> bool:
 
 
 def _site_tooltip_lines(site: Website) -> list[str]:
-    """站点项的悬停提示：定位说明 + 适用类型 + 联动组成员（说明加入一个会带上哪些）。
+    """站点项的悬停提示：定位说明 + 类型 + 联动组成员（说明加入一个会带上哪些）。
 
-    「适用类型」是候选区去重铺放后必须补上的一条：站点只在列表里出现一次，标题又都
+    「类型」这一行是候选区去重铺放后必须补上的：站点只在列表里出现一次，标题又都
     提到了顶部，不写这一条就看不出它同时是有码站、也是无码站。用的是候选区那套短名
-    （PALETTE_GROUP_TITLES），与标题对得上。
+    （PALETTE_GROUP_TITLES），与标题对得上。两行的标签只写「类型：」与「联动：」，
+    不再缀上「适用」「（加入其一即默认加入全组）」那半句解释——悬停框宽度有限，长标签
+    会把站点名单挤成两行还容易被截断，而这三个字本身已经说清了是什么。
     """
     lines: list[str] = []
     if description := _site_description(site):
         lines.append(description)
     if types := [PALETTE_GROUP_TITLES[key] for key in PALETTE_GROUP_TYPES if site in TYPE_DEFAULT_SITES.get(key, ())]:
-        lines.append("适用类型：" + "、".join(types))
+        lines.append("类型：" + "、".join(types))
     if group := site_group_of(site):
-        lines.append("联动组（加入其一即默认加入全组）：" + "、".join(member.value for member in group))
+        lines.append("联动：" + "、".join(member.value for member in group))
     return lines
 
 
@@ -648,6 +650,14 @@ class _SiteListBase(QListWidget):
     所以「鼠标在标题里滚只影响标题」要靠两处收口：wheelEvent 里滚不动也照样 accept
     （截住最常见的那条路径），以及 WA_NoMousePropagation（在列表这一层就把传递掐断，
     兜住没走到 wheelEvent 的路径，例如鼠标正好停在行内那条滚动条上）。
+
+    聚焦框那条：左键点中任意一个站点 chip，Qt 都会把它设成**当前项**，而
+    `QListView::paintEvent` 里 `option.state.setFlag(QStyle::State_HasFocus, focus &&
+    current == index)`（focus = 视图有焦点 && current 有效），于是 `QStyleSheetStyle`
+    在 chip 内部再套一个圆角框——肉眼就是 chip 里嵌了个小方框（与 `:selected` 那层填充
+    是两回事）。三个列表（候选区、「启用网站」、「字段优先级」的十九行字段）此前都留着
+    它，现在统一在左键按下后清掉当前项（见 `_release_current_item`）：这三处要的都是
+    「选中」不是「当前位置」，留着当前项只会多出一圈框。
     """
 
     def __init__(self, parent: QWidget | None = None):
@@ -678,8 +688,42 @@ class _SiteListBase(QListWidget):
                 for row in selected:
                     self.item(row).setSelected(True)
                 self.setCurrentRow(current)
+            # 右键点在一个分组标题上也要清：那一格带 ItemIsEnabled 而不带
+            # ItemIsSelectable，Qt 却照样会把它设成当前项，于是它被套上聚焦框
+            if _is_group_item(self.itemAt(_event_pos(event))):
+                self._release_current_item()
             return
         super().mousePressEvent(event)
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._release_current_item()
+
+    def _release_current_item(self) -> None:
+        """清掉当前项，但保住按下时已经选中的那几格。
+
+        为什么非得保住：`QAbstractItemView::setCurrentIndex` 对无效索引并不只清当前项——
+        它照样先问一句 `selectionCommand(无效索引, nullptr)`（无事件时是 ClearAndSelect），
+        再交给 `QItemSelectionModel::setCurrentIndex` → `select(无效索引, ClearAndSelect)`，
+        整个选中集跟着一起没了（实测：选中一行后 setCurrentRow(-1)，selectedItems 变空）。
+        「添加选中」「移除」按钮、以及拖拽加入与重排全都读的是选中集，清空了就是废的。
+        所以先记下选中的行、清完再逐个还回去；`setSelected` 不碰当前项（实测），还回去之后
+        当前项仍是 -1、聚焦框也就没有了。右键那条（上面的 mousePressEvent）用的也是同一
+        套路。
+
+        **只管鼠标**：键盘方向键仍由 Qt 走 `moveCursor` 设置当前项，于是键盘用户仍能看见
+        自己在哪儿——全靠视觉定位的键盘操作不该被这条一起抹掉。
+        """
+        selected = [self.row(item) for item in self.selectedItems()]
+        self.setCurrentRow(-1)
+        for row in selected:
+            if (item := self.item(row)) is not None:
+                item.setSelected(True)
+
+    def focusInEvent(self, event) -> None:
+        super().focusInEvent(event)
+        # 光标进入时若当前项为空，Qt 会把当前项设成第一行，于是那一格一被聚焦就被圈起来。
+        # 这三个列表要的都是「选中」不是「当前位置」（点站点照样选中、拖拽照样拖），所以
+        # 这里清掉，让开窗后的观感与别的格子一致。
+        self.setCurrentRow(-1)
 
 
 class SitePaletteList(_SiteListBase):
@@ -709,38 +753,6 @@ class SitePaletteList(_SiteListBase):
         # 标志，否则刷新一次分组就没了，故存成公开属性给调用方原样传回去。
         self.grouped = grouped
         _setup_site_list(self, sites, grouped=grouped)
-
-    def mousePressEvent(self, event) -> None:
-        super().mousePressEvent(event)  # 右键不改选中态由 _SiteListBase 负责
-        # 候选区不需要「当前项」这个状态：点分组标题是「整组加入」，点站点行只是「选中」，
-        # 谁都不是「当前位置」。留着当前项反而会被 Qt 套上一个内嵌的聚焦框——见
-        # _release_current_item 的说明。左键点哪一格都清，右键点标题也清（与旧行为一致）。
-        if _is_group_item(self.itemAt(_event_pos(event))) or event.button() == Qt.MouseButton.LeftButton:
-            self._release_current_item()
-
-    def _release_current_item(self) -> None:
-        """清掉当前项，但保住按下时已经选中的那几格。
-
-        为什么非得保住：`QAbstractItemView::setCurrentIndex` 对无效索引并不只清当前项——
-        它照样先问一句 `selectionCommand(无效索引, nullptr)`（无事件时是 ClearAndSelect），
-        再交给 `QItemSelectionModel::setCurrentIndex` → `select(无效索引, ClearAndSelect)`，
-        整个选中集跟着一起没了（实测：选中一行后 setCurrentRow(-1)，selectedItems 变空）。
-        所以先记下选中的行、清完再逐个还回去；`setSelected` 不碰当前项（实测），还回去之后
-        当前项仍是 -1、聚焦框也就没有了。右键那条（_SiteListBase.mousePressEvent）用的也是
-        同一套路。
-        """
-        selected = [self.row(item) for item in self.selectedItems()]
-        self.setCurrentRow(-1)
-        for row in selected:
-            if (item := self.item(row)) is not None:
-                item.setSelected(True)
-
-    def focusInEvent(self, event) -> None:
-        super().focusInEvent(event)
-        # 光标进入时若当前项为空，Qt 会把当前项设成第一行——那正好是第一个分组标题，
-        # 于是它一开窗就被圈起来。候选区不需要「当前项」这个状态（点站点照样选中、
-        # 拖拽照样拖），所以这里清掉，让开窗后的观感与别的格子一致。
-        self.setCurrentRow(-1)
 
     def _removable_drop_source(self, source) -> QListWidget | None:
         if self._removable_source is not None:

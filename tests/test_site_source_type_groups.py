@@ -628,11 +628,26 @@ def test_group_sites_read_back_from_the_widget(dialog):
 
 
 def test_site_tooltip_says_which_types_it_serves():
-    """候选区里每个站只出现一次，「它同时属于哪些类型」得靠悬停提示补上。"""
+    """候选区里每个站只出现一次，「它同时属于哪些类型」得靠悬停提示补上。
+
+    两行标签按用户要求只写「类型：」与「联动：」——原本是「适用类型：」和
+    「联动组（加入其一即默认加入全组）：」，后半句把悬停框挤到换行还容易被截断。
+    """
     dmm_lines = " ".join(_site_tooltip_lines(Website.DMM))
-    assert "适用类型：有码、素人" in dmm_lines
+    assert "类型：有码、素人" in dmm_lines
     # 不属于任何类型组的站点不该编出一个类型来
-    assert "适用类型" not in " ".join(_site_tooltip_lines(Website.MYWIFE))
+    assert "类型：" not in " ".join(_site_tooltip_lines(Website.MYWIFE))
+
+
+def test_site_tooltip_says_which_sites_link_together():
+    """联动组那行按用户要求只写「联动：」，成员名单照旧列全。"""
+    dmm_lines = " ".join(_site_tooltip_lines(Website.DMM))
+    assert "联动：DMM、DMM_API、LibreDMM" in dmm_lines
+    # 「加入其一即默认加入全组」这半句解释已从标签里去掉
+    assert "联动组" not in dmm_lines
+    assert "加入其一" not in dmm_lines
+    # 不属于任何联动组的站点不该编出一个来
+    assert "联动：" not in " ".join(_site_tooltip_lines(Website.MYWIFE))
 
 
 @pytest.mark.parametrize("title", EXPECTED_GROUP_ORDER)
