@@ -1164,7 +1164,7 @@ def test_bypass_trusted_hosts_copy_states_it_is_not_a_bypass_exclusion():
 
     text = _widget_string_prop(desc, "text") or ""
     assert "不控制哪些站点走" in text, f"说明行未点明「不控制哪些站点走Bypass」：{text!r}"
-    assert "不含裸域名" in text, f"说明行未点明通配不含裸域名本身：{text!r}"
+    assert "不包括裸域名" in text, f"说明行未点明通配不包括裸域名：{text!r}"
 
 
 # ---------- 使用说明「各类型网站源」名单 —— 与代码默认值逐项对齐的回归锁 ----------
