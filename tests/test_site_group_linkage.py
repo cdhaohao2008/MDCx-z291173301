@@ -91,7 +91,7 @@ def test_site_groups_are_exactly_the_requested_seven():
         ("FC2", "FC2PPVDB"),
         ("ThepornDB", "AVheat"),
         ("JavDB", "JavDB_API", "JavDB_APP"),
-        ("Madouqu", "Madou.club"),
+        ("Madou.club", "Madouqu"),
         # 原站与镜像站是同一份数据的两条通道，只勾一条不如两条都留（用户要求）
         ("JavLibrary", "Javlibrary\u00b7\u955c\u50cf"),
     ]

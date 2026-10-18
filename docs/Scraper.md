@@ -217,18 +217,18 @@ JavLibrary        有码：仅限有码            有码+无码+FC2            
 Javlibrary·镜像   有码：仅限有码                同 JavLibrary（默认中文页 /cn）  https://www.f101w.com/cn              
 LibreDMM          有码：仅限有码            有码                              https://www.libredmm.com                IPX-535
 Lulubar           综合：仅限有码            有码+无码+素人+欧美+国产          https://lulubar.co                      IPZZ-547
-Madou.club        麻豆：国产番号            国产                              https://madou.club                      MDX0236
+Madou.club        国产：麻豆番号            国产                              https://madou.club                      MDX0236
 Madouqu           国产：仅限国产            国产                              https://madouqu.shop                    MDX0216
 MGStage           有码：有码+素人           有码+素人                         https://www.mgstage.com                 ABF-389
 Missav            综合：有码+无码           有码+无码+素人                    https://missav.ws                       
 Missav_API        综合：有码+无码           有码+无码+素人                    https://missav.ws                       
-MyWife            素人：MyWife系列          不进任何类型组（单独指定）        https://mywife.cc                       mywife-2306
+MyWife            有码：MyWife             不进任何类型组（单独指定）        https://mywife.cc                       mywife-2306
 Official          综合：有码+无码           有码+无码                                                                 
 Prestige          有码：有码+素人           有码+素人                         https://www.prestige-av.com             ABW-130
 R18.dev           有码：仅限有码            有码                              https://r18.dev                         
 TheJavDB          有码：仅限有码            有码                              https://thejavdb.net             
 ThepornDB         欧美：欧美番号            无码+欧美                         https://api.theporndb.net               
-Xcity             综合：仅限有码            有码                              https://tc.xcity.jp                     ABF-050
+Xcity             有码：仅限有码            有码                              https://tc.xcity.jp                     ABF-050
 
   ↑ 「MDCx 站点说明」列是爬虫 `description` 的原样文案（`+` 连写能力），界面上显示时
     一律归一成 `/`；下拉框选项显示文本、「编辑网站」弹窗候选区悬停提示两处用的则一律是现算的
@@ -254,7 +254,8 @@ Xcity             综合：仅限有码            有码                       
     FC2  ⇄  FC2PPVDB
     ThepornDB  ⇄  AVheat
     JavDB  ⇄  JavDB_API  ⇄  JavDB_APP
-    Madouqu  ⇄  Madou.club
+    Madou.club  ⇄  Madouqu      （同一份麻豆系国产数据的两条路：Madou.club 的条目有番号
+                                也有标题名，Madouqu 只有标题名，故 Madou.club 排在前面）
     JavLibrary  ⇄  Javlibrary·镜像      （同一份数据的两条路：原站对大陆 IP 有 CF 墙、
                                           镜像没有；只勾一条不如两条都留着轮着试）
 
@@ -280,7 +281,7 @@ Xcity             综合：仅限有码            有码                       
                           没有单独的「其他」分组标题）
     站点悬停提示    只有一行，分隔符一律「/」（不用顿号，省宽度）：
                         <定位>：<类型名单>      7mmtv→「综合：有码/无码/欧美/国产」
-                                              AVSOX→「无码：无码」、Madou.club→「麻豆：国产」
+                                              AVSOX→「无码：无码」、Madou.club→「国产：麻豆」
                                               冒号前的定性词沿用各站自己的定位说明，
                                               后面的名单由 TYPE_DEFAULT_SITES 现算
                     名单里不写「素人」「动漫」「FC2」：素人本质就是有码，只不过用假名
@@ -291,6 +292,8 @@ Xcity             综合：仅限有码            有码                       
                     原本第一行的值还是爬虫 description 里写死的文案（「综合：有码+无码+素人+FC2」），
                     会与实际默认名单对不上（7mmtv 明明也在欧美、国产名单里）；不属任何类型组
                     或名单被隐空的站（MyWife、AVSEX、Getchu、FC2）改用自己那行定位说明。
+                    名单只有一项时，这一行冒号后可改用该站的别称（_CAPTION_TYPE_ALIAS），
+                    如 Madou.club 只有国产，重复一遍不如写厂牌别称「国产：麻豆」。
                     这一行同时也是**三个站点下拉**（刮削网站页「指定网站」、网络页「当前网站」
                     「不走代理的网站」）选项显示文本里那段文案，与那个弹窗同源、不会各写一份；
                     下拉框自己的悬停提示按用户要求只保留「上次检测：…」，不再重复能力文案。

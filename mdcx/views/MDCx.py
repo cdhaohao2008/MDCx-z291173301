@@ -14578,7 +14578,7 @@ class Ui_MDCx(object):
                 "<li><b>无码番号</b>：AVSOX、AVEntertainments、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API</li>\n"
                 "<li><b>素人番号</b>：DMM、DMM_API、LibreDMM、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像</li>\n"
                 "<li><b>个摄番号：</b>FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
-                "<li><b>国产番号</b>：Madouqu、Madou.club、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
+                "<li><b>国产番号</b>：Madou.club、Madouqu、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
                 "<li><b>欧美番号</b>：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、7mmtv、Missav、Missav_API、IQQTV、JavFree</li>\n"
                 "              <li><b>动漫里番</b>：Getchu、JavDB、JavDB_API、JavDB_APP</li>\n"
                 "<li><b>MyWifes</b>：不属于任何类型组的默认名单列表，需在「网站偏好」-「指定网站」勾选MyWife或让文件名称路径包含MyWife时才会启用</li>\n"

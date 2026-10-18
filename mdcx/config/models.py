@@ -296,8 +296,10 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
     ),
     FixedScrapingType.GUOCHAN: (
         # 官网 / 厂牌 / 官方接口
-        Website.MADOUQU,
+        # Madou.club 排在 Madouqu 之前（按用户要求）：同属麻豆系国产，Madou.club 的条目
+        # 有番号也有标题名，Madouqu 只有标题名，数据更权威，故优先级更高
         Website.MADOUCLUB,
+        Website.MADOUQU,
         # 第三方 / 聚合站
         Website.JAVDB,
         Website.JAVDB_API,
@@ -390,8 +392,9 @@ SITE_GROUPS: tuple[tuple[Website, ...], ...] = (
         Website.JAVDB_APP,
     ),
     (
-        Website.MADOUQU,
+        # 与 TYPE_DEFAULT_SITES[国产番号] 里的组内顺序一致：Madou.club 优先
         Website.MADOUCLUB,
+        Website.MADOUQU,
     ),
     (
         # 原站对大陆 IP 有 CF 墙、镜像没有，两条路是同一份数据：只勾一个不如两条都留着，

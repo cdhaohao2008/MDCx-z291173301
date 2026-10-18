@@ -189,8 +189,8 @@ USER_SITE_LISTS = {
         "JavFree",
     ],
     FixedScrapingType.GUOCHAN: [
-        "Madouqu",
         "Madou.club",
+        "Madouqu",
         "JavDB",
         "JavDB_API",
         "JavDB_APP",
@@ -646,7 +646,7 @@ def test_site_tooltip_is_only_the_capability_line(dialog):
         # 「素人」「动漫」「FC2」不写进这一行（用户要求：素人本质就是有码、用假名或根本没名
         # 字；动漫不必单列；FC2 同属有码那一类、只是没番号）。只看冒号后的名单段——MyWife
         # 不属任何类型组、FC2 与 Getchu 各自只剩被隐去的那一类，三者那行都是爬虫自己的
-        # 说明（MyWife 是「素人：MyWife系列」），前缀那句不在本次范围内
+        # 说明（MyWife 是「有码：MyWife」），前缀那句不在本次范围内
         types = caption.split("：", 1)[1].split("/")
         for hidden in ("素人", "动漫", "FC2"):
             assert hidden not in types, f"{site.value} 的类型名单里还有「{hidden}」：{caption!r}"
@@ -661,8 +661,8 @@ def test_site_tooltip_is_only_the_capability_line(dialog):
 def test_site_tooltip_keeps_each_site_own_leading_word():
     """冒号前面的定性词沿用站点自己的说法，不一律改成「综合」。
 
-    7mmtv 的说法是「综合」（跨类型站），AVSOX 说的是「无码」、FC2 说的是「FC2」、
-    Madou.club 说的是「麻豆」——那是各站定位说明里自带的词，换掉就把它说错了。
+    7mmtv 的说法是「综合」（跨类型站），AVSOX 说的是「无码」、FC2 说的是「FC2」——那是各站
+    定位说明里自带的词，换掉就把它说错了。
     冒号后面不再取爬虫 description 里那句写死的名单（「综合：有码+无码+素人+FC2」），
     改为现算的类型名单，也就不再随 TYPE_DEFAULT_SITES 的增删而失真；名单里不写
     「素人」「动漫」「FC2」。
@@ -670,10 +670,24 @@ def test_site_tooltip_keeps_each_site_own_leading_word():
     assert _site_capability_caption(Website.MMTV) == "综合：有码/无码/欧美/国产"
     assert _site_capability_caption(Website.JAVDB) == "综合：有码/无码/欧美/国产"
     assert _site_capability_caption(Website.AVSOX) == "无码：无码"
-    assert _site_capability_caption(Website.MADOUCLUB) == "麻豆：国产"
+    # Madou.club 原本是「麻豆：国产」——厂牌名当前缀把它说成了厂牌站。已把爬虫 description
+    # 改成「国产：麻豆番号」（前缀是它所属的类型，与 madouqu 的「国产：仅限国产」同口径）；
+    # 名单只有一项、重复一遍「国产」没什么信息量，故这一行改用别称「麻豆」（_CAPTION_TYPE_ALIAS）
+    assert _site_capability_caption(Website.MADOUCLUB) == "国产：麻豆"
+    assert spd._site_description(Website.MADOUCLUB) == "国产：麻豆番号"
+    # Madouqu 同属麻豆系国产，同样用别称「麻豆」而不是重复一遍「国产」
+    assert _site_capability_caption(Website.MADOUQU) == "国产：麻豆"
+    # Xcity 的定位说明原本写着「综合」，可它只出现在有码名单里、一个别的类型都不沾，
+    # 那个前缀把它说错了（悬停文案里就成了「综合：有码」）；已把爬虫 description 改回
+    # 「有码：仅限有码」，不是在这一行里单给它开后门
+    assert _site_capability_caption(Website.XCITY) == "有码：有码"
+    assert spd._site_description(Website.XCITY) == "有码：仅限有码"
     # 名单被隐空或本来就没有名单的站（FC2、Getchu、MyWife），原样留它自己的说明
     assert _site_capability_caption(Website.FC2) == "FC2：FC2官网"
-    assert _site_capability_caption(Website.MYWIFE) == "素人：MyWife系列"
+    # MyWife 原本是「素人：MyWife系列」，按用户口径（素人本质就是有码）改成「有码：MyWife」——
+    # 改的是爬虫自己的定位说明，不是只在这一行里换字
+    assert _site_capability_caption(Website.MYWIFE) == "有码：MyWife"
+    assert spd._site_description(Website.MYWIFE) == "有码：MyWife"
 
 
 def test_site_tooltip_no_longer_repeats_the_type_and_linkage_rows():

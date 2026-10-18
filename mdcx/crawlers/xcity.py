@@ -31,7 +31,7 @@ class XcityContext(Context):
 
 
 class XcityCrawler(BaseCrawler[XcityContext]):
-    description = "综合：仅限有码"
+    description = "有码：仅限有码"  # 冒号前只说有码：它不在任何无码/FC2/欧美/国产名单里（曾误写成「综合」）
     # xcity.jp 缺 SSNI-647（用户实测），ABF-050 已确认收录
     probe_number = "ABF-050"
     # xcity 镜像域名（主站 + 备用；用户配置 custom_url 时优先使用）

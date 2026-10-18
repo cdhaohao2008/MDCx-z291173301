@@ -67,7 +67,9 @@ class MadouClubContext(Context):
 
 
 class MadouClubCrawler(BaseCrawler[MadouClubContext]):
-    description = "麻豆：国产番号"
+    # 冒号前写它所属的类型、不是厂牌名（与 madouqu 的「国产：仅限国产」同口径）：候选区
+    # 悬停提示那行取的就是这个前缀，曾误写成「麻豆」导致提示成了「麻豆：国产」
+    description = "国产：麻豆番号"
     # madou.club 收录麻豆系 MDX 等番号，搜索需无横杠关键词（MDX-0236 无结果，MDX0236 命中，2026-08 实测）
     probe_number = "MDX0236"
 

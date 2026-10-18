@@ -62,7 +62,9 @@ def get_extrafanart(html):
 
 
 class MyWifeCrawler(BaseCrawler):
-    description = "素人：MyWife系列"
+    # 人妻・熟女・3P 这类素人系列，实质是有码、只是没番号（用户口径：素人本质就是有码），
+    # 故定位说明写「有码」而不是单设一个「素人」前缀（曾误写成「素人：MyWife系列」）
+    description = "有码：MyWife"
     # 议题 #128: 原探测番号 1500 的 model 页已被站点下架(HTTP 500), 换用户实测有效的 2306
     probe_number = "mywife-2306"
 

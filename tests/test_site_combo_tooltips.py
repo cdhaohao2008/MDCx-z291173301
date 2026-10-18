@@ -450,7 +450,7 @@ def test_populated_site_combo_shows_the_available_site_caption_and_only_check_re
     # 「素人」「动漫」「FC2」不写进这一行文案（用户要求）
     assert all(h not in combo.itemText(0) and h not in combo.itemText(3) for h in ("素人", "动漫", "FC2"))
     # 不属任何类型组的站仍只有自己那行定位说明，且它进了显示文本
-    assert "素人：MyWife系列" in combo.itemText(4)
+    assert "有码：MyWife" in combo.itemText(4)
 
 
 def test_combo_caption_is_the_very_same_line_as_the_site_editor():

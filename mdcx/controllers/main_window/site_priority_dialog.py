@@ -92,6 +92,16 @@ PALETTE_GROUP_TITLES = {
 # 默认名单都照旧。
 _CAPTION_HIDDEN_TYPES = ("素人", "动漫", "FC2")
 
+# 「<定位>：<类型名单>」那一行里，冒号后面的名单改用这个站自己的别称（用户要求）。
+# 默认是候选区那七个 chip 的短名，但只有一个类型的站把自己的类型名原样重复一遍没什么信息量，
+# 写它的别称/厂牌名更有用：Madou.club 只有国产，重复「国产」不如写「麻豆」。只在这一行的显示
+# 文案里换（且只对名单只有一项的站有意义），分组、默认名单、那七个 chip 与爬虫 description 一律
+# 不动。
+_CAPTION_TYPE_ALIAS: dict[Website, str] = {
+    Website.MADOUCLUB: "麻豆",
+    Website.MADOUQU: "麻豆",
+}
+
 
 FIELD_TITLES = {
     CrawlerResultFields.TITLE: "标题",
@@ -409,12 +419,14 @@ def _site_capability_caption(site: Website) -> str:
     变「综合：有码/无码/欧美/国产」，AVSOX 由「无码：无码/FC2」变「无码：无码」。**只隐去这一行
     文案里的它们**，候选区那七个 chip、设置页「个摄番号：」那一行与 TYPE_DEFAULT_SITES 默认
     名单一律照旧。名单被隐空时（Getchu、FC2 这类只属被隐去那一组的站）改用它自己的定位
-    说明，不留一个只剩前缀的空名单。
+    说明，不留一个只剩前缀的空名单。名单只有一项时可选地在这一行改用该站的别称
+    （`_CAPTION_TYPE_ALIAS`，如 Madou.club 的「国产：麻豆」）。
     """
     description = _site_description(site)
     types = [name for name in _site_types(site) if name not in _CAPTION_HIDDEN_TYPES]
     if types:
-        return f"{_site_capability_prefix(description, types)}：{'/'.join(types)}"
+        listed = _CAPTION_TYPE_ALIAS.get(site) or "/".join(types)
+        return f"{_site_capability_prefix(description, types)}：{listed}"
     # 名单被隐去后空了、或本来就不属任何类型组（MyWife、AVSEX）：原样留它自己的说明，
     # 不留一个只剩前缀的空名单
     return description
