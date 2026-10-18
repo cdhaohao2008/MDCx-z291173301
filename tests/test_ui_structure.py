@@ -538,6 +538,76 @@ def test_proxy_toggle_ui_texts_regression():
     assert "CF Bypass 代理" not in about_html
 
 
+# ---------- 「全部走代理」并到「使用代理」同一行（红/黄/绿回归） ----------
+
+
+def _layout_by_name(root, name):
+    for lay in root.iter("layout"):
+        if lay.get("name") == name:
+            return lay
+    return None
+
+
+def _child_widget_names(layout):
+    """布局里直接排布的控件 objectName（按顺序，跳过 spacer）。"""
+    return [w.get("name") for item in layout.findall("item") for w in item.findall("widget")]
+
+
+def test_proxy_route_all_green_shares_row_with_use_proxy():
+    """绿：两个代理开关同处一行（row 0 col 1 的 horizontalLayout_17），右对齐成对。
+
+    用户原话：「全部走代理向上移动到使用代理右侧，全部走代理与使用代理严格水平
+    对齐，使用代理位置保持不变」。修复前 checkBox_proxy_route_all 挂在
+    horizontalLayout_no_proxy（「使用代理网站」那一行）的最右侧，与「使用代理」
+    隔了一整行，既不同高也对不齐；且它挤在行尾把 lineEdit_no_proxy_sites 压短。
+    """
+    root = _parse_ui()
+
+    use_row = _layout_by_name(root, "horizontalLayout_17")
+    assert use_row is not None, "未找到「使用代理」所在行 horizontalLayout_17"
+
+    names = _child_widget_names(use_row)
+    assert names == ["checkBox_use_proxy", "checkBox_proxy_route_all"], (
+        f"两个代理开关应并列在同一行，实际布局成员 {names}"
+    )
+
+    # 「使用代理」位置不变：仍是本行第 1 项，紧贴标签列右侧（grid col 1）。
+    item = use_row.getparent()
+    assert item.get("row") == "0" and item.get("column") == "1", (
+        "「使用代理」行必须仍注册在 gridLayout_9 的 row=0 column=1"
+    )
+
+    # 「使用代理」与「全部走代理」之间是 Expanding spacer：把「使用代理」按自然宽度
+    # 钉在行首（不因新增兄弟项而右移），把「全部走代理」推到本行右端。
+    items = use_row.findall("item")
+    spacer = items[1].find("spacer")
+    assert spacer is not None, "两个开关之间必须有 spacer，否则两者会被均分拉伸、左边那个右移"
+    assert spacer.get("name") == "horizontalSpacer_proxy_switches"
+    assert _widget_enum_prop(spacer, "orientation") == "Qt::Horizontal"
+    assert _child_widget_names(use_row)[-1] == "checkBox_proxy_route_all"
+
+
+def test_proxy_route_all_yellow_no_longer_in_no_proxy_row():
+    """黄：「全部走代理」已不在「使用代理网站」那一行，行尾只剩下拉框 + 输入框。"""
+    root = _parse_ui()
+    sites_row = _layout_by_name(root, "horizontalLayout_no_proxy")
+    assert sites_row is not None, "未找到「使用代理网站」所在行 horizontalLayout_no_proxy"
+    assert _child_widget_names(sites_row) == [
+        "comboBox_no_proxy_sites",
+        "lineEdit_no_proxy_sites",
+    ], f"「使用代理网站」行只应剩下拉框与输入框，实际 {_child_widget_names(sites_row)}"
+
+
+def test_proxy_route_all_red_still_at_end_of_no_proxy_row():
+    """红（失败回归）：修复前形态不再出现——「全部走代理」又回到「使用代理网站」行尾。"""
+    root = _parse_ui()
+    sites_row = _layout_by_name(root, "horizontalLayout_no_proxy")
+    assert sites_row is not None
+    assert "checkBox_proxy_route_all" not in _child_widget_names(sites_row), (
+        "「全部走代理」又退回「使用代理网站」行尾了"
+    )
+
+
 # ---------- #182 Gfriends「选择目录」按钮样式 —— 红/黄/绿回归 ----------
 
 # 全局药丸按钮三态选择器（浅色/深色主题各一处，共 6 处）：

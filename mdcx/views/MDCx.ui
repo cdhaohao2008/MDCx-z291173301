@@ -22664,6 +22664,9 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         </item>
                         <item row="0" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_17">
+                            <property name="spacing">
+                              <number>20</number>
+                            </property>
                             <item>
                               <widget class="QCheckBox" name="checkBox_use_proxy">
                                 <property name="toolTip">
@@ -22671,6 +22674,29 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 </property>
                                 <property name="text">
                                   <string>使用代理</string>
+                                </property>
+                              </widget>
+                            </item>
+                            <item>
+                              <spacer name="horizontalSpacer_proxy_switches">
+                                <property name="orientation">
+                                  <enum>Qt::Horizontal</enum>
+                                </property>
+                                <property name="sizeHint" stdset="0">
+                                  <size>
+                                    <width>40</width>
+                                    <height>20</height>
+                                  </size>
+                                </property>
+                              </spacer>
+                            </item>
+                            <item>
+                              <widget class="QCheckBox" name="checkBox_proxy_route_all">
+                                <property name="toolTip">
+                                  <string>开启后所有请求都发给代理地址，分流规则交给代理软件（Clash 等）裁决；"使用代理"列表不再生效。会显著增加代理流量消耗（高清图为大流量来源），默认关闭。</string>
+                                </property>
+                                <property name="text">
+                                  <string>全部走代理</string>
                                 </property>
                               </widget>
                             </item>
@@ -22959,16 +22985,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 </property>
                                 <property name="placeholderText">
                                   <string>逗号分隔，如api.tmdb.org,LibreDMM</string>
-                                </property>
-                              </widget>
-                            </item>
-                            <item>
-                              <widget class="QCheckBox" name="checkBox_proxy_route_all">
-                                <property name="toolTip">
-                                  <string>开启后所有请求都发给代理地址，分流规则交给代理软件（Clash 等）裁决；"使用代理"列表不再生效。会显著增加代理流量消耗（高清图为大流量来源），默认关闭。</string>
-                                </property>
-                                <property name="text">
-                                  <string>全部走代理</string>
                                 </property>
                               </widget>
                             </item>

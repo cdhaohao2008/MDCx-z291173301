@@ -10848,10 +10848,18 @@ class Ui_MDCx(object):
         self.label_103.setObjectName("label_103")
         self.gridLayout_9.addWidget(self.label_103, 9, 1, 1, 3)
         self.horizontalLayout_17 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_17.setSpacing(20)
         self.horizontalLayout_17.setObjectName("horizontalLayout_17")
         self.checkBox_use_proxy = QtWidgets.QCheckBox(parent=self.gridLayoutWidget_9)
         self.checkBox_use_proxy.setObjectName("checkBox_use_proxy")
         self.horizontalLayout_17.addWidget(self.checkBox_use_proxy)
+        spacerItem14 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
+        )
+        self.horizontalLayout_17.addItem(spacerItem14)
+        self.checkBox_proxy_route_all = QtWidgets.QCheckBox(parent=self.gridLayoutWidget_9)
+        self.checkBox_proxy_route_all.setObjectName("checkBox_proxy_route_all")
+        self.horizontalLayout_17.addWidget(self.checkBox_proxy_route_all)
         self.gridLayout_9.addLayout(self.horizontalLayout_17, 0, 1, 1, 1)
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
@@ -10995,9 +11003,6 @@ class Ui_MDCx(object):
         )
         self.lineEdit_no_proxy_sites.setObjectName("lineEdit_no_proxy_sites")
         self.horizontalLayout_no_proxy.addWidget(self.lineEdit_no_proxy_sites)
-        self.checkBox_proxy_route_all = QtWidgets.QCheckBox(parent=self.gridLayoutWidget_9)
-        self.checkBox_proxy_route_all.setObjectName("checkBox_proxy_route_all")
-        self.horizontalLayout_no_proxy.addWidget(self.checkBox_proxy_route_all)
         self.gridLayout_9.addLayout(self.horizontalLayout_no_proxy, 2, 1, 1, 1)
         self.label_direct_sites = QtWidgets.QLabel(parent=self.gridLayoutWidget_9)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
@@ -12628,10 +12633,10 @@ class Ui_MDCx(object):
         self.pushButton_about.setMaximumSize(QtCore.QSize(16777215, 40))
         self.pushButton_about.setObjectName("pushButton_about")
         self.verticalLayout.addWidget(self.pushButton_about)
-        spacerItem14 = QtWidgets.QSpacerItem(
+        spacerItem15 = QtWidgets.QSpacerItem(
             20, 0, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding
         )
-        self.verticalLayout.addItem(spacerItem14)
+        self.verticalLayout.addItem(spacerItem15)
         self.left_backgroud_widget = QtWidgets.QWidget(parent=self.widget_setting)
         self.left_backgroud_widget.setGeometry(QtCore.QRect(0, 0, 210, 720))
         self.left_backgroud_widget.setObjectName("left_backgroud_widget")
@@ -14426,10 +14431,6 @@ class Ui_MDCx(object):
         )
         self.checkBox_use_proxy.setToolTip(_translate("MDCx", "仅控制常规网络请求代理开关，不控制CF Bypass代理"))
         self.checkBox_use_proxy.setText(_translate("MDCx", "使用代理"))
-        self.label_73.setText(_translate("MDCx", "超时时间："))
-        self.label_no_proxy_sites.setText(_translate("MDCx", "使用代理："))
-        self.comboBox_no_proxy_sites.setCurrentText(_translate("MDCx", "选择网站..."))
-        self.lineEdit_no_proxy_sites.setPlaceholderText(_translate("MDCx", "逗号分隔，如api.tmdb.org,LibreDMM"))
         self.checkBox_proxy_route_all.setToolTip(
             _translate(
                 "MDCx",
@@ -14437,6 +14438,10 @@ class Ui_MDCx(object):
             )
         )
         self.checkBox_proxy_route_all.setText(_translate("MDCx", "全部走代理"))
+        self.label_73.setText(_translate("MDCx", "超时时间："))
+        self.label_no_proxy_sites.setText(_translate("MDCx", "使用代理："))
+        self.comboBox_no_proxy_sites.setCurrentText(_translate("MDCx", "选择网站..."))
+        self.lineEdit_no_proxy_sites.setPlaceholderText(_translate("MDCx", "逗号分隔，如api.tmdb.org,LibreDMM"))
         self.label_direct_sites.setText(_translate("MDCx", "直连白名单："))
         self.lineEdit_direct_sites.setPlaceholderText(_translate("MDCx", "逗号分隔，如 google.com,github.com"))
         self.label_cf_bypass.setText(_translate("MDCx", "CF Bypass："))
