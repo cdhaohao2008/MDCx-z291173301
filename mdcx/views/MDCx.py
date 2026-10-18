@@ -14459,7 +14459,7 @@ class Ui_MDCx(object):
         self.label_cf_bypass_trusted_hosts_desc.setText(
             _translate(
                 "MDCx",
-                "默认留空不校验，填写域名后只在请求走完Cloudflare Bypass之后核对最终落在哪个域名防止请求被劫持、篡改等，不控制哪些站点走Bypass，落地域名不在名单内的响应将会被拒绝，支持*.example.com子域通配：只匹配子域不含裸域名，要覆盖裸域名需另写example.com",
+                "默认留空不校验，填写域名后只在请求走完Cloudflare Bypass之后核对最终落在哪个域名防止请求被劫持、篡改等，不控制哪些站点走Bypass，落地域名不在名单内的响应将会被拒绝，支持*.example.com子域通配：只匹配子域不含裸域名，覆盖裸域名需另写example.com",
             )
         )
         self.label_cf_bypass_trusted_hosts_check.setText(_translate("MDCx", "状态：留空不校验（默认）"))
