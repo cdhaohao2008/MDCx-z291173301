@@ -556,6 +556,48 @@ _GFRIENDS_STYLE_BROKEN = (
 )
 
 
+# ---------- 网络设置页说明文字下方的大片空白 —— 红/黄/绿回归 ----------
+
+
+def test_network_grid_top_aligned_and_no_forced_label_height() -> None:
+    """绿：gridLayout_9 顶对齐，且 label_103 不写死 minimumHeight（两处空白的根因）。
+
+    用户报障：代理说明（label_103）与「HTTPS证书校验」之间、以及 Cloudfleare
+    校验服务说明与「状态：留空不校验（默认）」之间各有一大片空白。两处根因不同：
+
+    ① gridLayout_9 未设对齐方式，而 groupBox_28（设计固定 689 高）比内容高出
+       约 45px，QGridLayout 把这份富余纵向空间摊给了「可伸展」的换行 label
+       （实测校验服务说明分到 23px、状态行分到 37px），于是文字下方留出空行。
+       修法：gridLayout_9 设 `alignment=Qt::AlignTop`，富余整体挪到分组底部。
+    ② label_103 写死 `minimumHeight=160`（当初为「说明文字不被裁掉」而加），
+       实测该宽度下文字只需 100px，于是恒定多出 60px。修法：删掉该属性，标签
+       改按 heightForWidth 自适应——这同时消掉了「行数变化时被裁」的原隐患：
+       底部余量原本是被 minimumHeight 顶出来的，不是布局给的。
+
+    刻意锁 .ui 源文件属性而非运行时几何：空白是否显现取决于用户配置里的字体与
+    窗口宽度，测试环境用默认字体时旧代码正好不触发（实测旧 .ui 按 sizeHint 摆
+    与按设计尺寸摆两种姿势都测不出），写成几何断言会是一道永远绿的假门禁。
+    """
+    root = _parse_ui()
+
+    grid = next((lay for lay in root.iter("layout") if lay.get("name") == "gridLayout_9"), None)
+    assert grid is not None, "未找到 gridLayout_9"
+    align_el = grid.find("property[@name='alignment']/set")
+    align = align_el.text if align_el is not None else None
+    assert align is not None and "AlignTop" in align, (
+        f"gridLayout_9 缺 alignment=Qt::AlignTop（实际 {align!r}）：分组框比内容高出的"
+        "富余纵向空间会被摊进换行说明标签，在文字下方留出空白"
+    )
+
+    label_103 = _find_widget_by_name(root, "label_103")
+    assert label_103 is not None, "未找到 label_103（代理说明）"
+    min_h = label_103.find("property[@name='minimumHeight']/number")
+    assert min_h is None, (
+        f"label_103 不应写死 minimumHeight（实际 {min_h is not None and min_h.text}）："
+        "文字实际所需高度随窗口宽度变化，写死后文字下方恒定留空白"
+    )
+
+
 def test_gfriends_select_button_green_in_global_style():
     """绿（成功）：Gfriends 选择目录按钮在全局药丸样式三态选择器中（浅色+深色共6处）。"""
     style_text = _STYLE_PATH.read_text(encoding="utf-8")

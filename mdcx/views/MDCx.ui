@@ -22631,6 +22631,9 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         </rect>
                       </property>
                       <layout class="QGridLayout" name="gridLayout_9">
+                        <property name="alignment">
+                          <set>Qt::AlignTop</set>
+                        </property>
                         <item row="9" column="1" colspan="3">
                           <widget class="QLabel" name="label_103">
                             <property name="sizePolicy">
@@ -22638,9 +22641,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 <horstretch>0</horstretch>
                                 <verstretch>0</verstretch>
                               </sizepolicy>
-                            </property>
-                            <property name="minimumHeight">
-                              <number>160</number>
                             </property>
                             <property name="styleSheet">
                               <string notr="true">color: rgb(8, 128, 128);</string>
