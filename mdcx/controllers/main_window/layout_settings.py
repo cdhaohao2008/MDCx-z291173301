@@ -796,6 +796,57 @@ class LayoutSettingsMixin:
     _NET_HOST_DESIGN_H = 597
     # 「网络设置」之下三个分组的 (控件名, 设计 y)
     _NET_FOLLOW_BOXES = (("groupBox_10", 662), ("groupBox_14", 1278), ("groupBox_44", 1523))
+    # 「使用代理 / 全部走代理」同行所在行（gridLayout_9 的 row 0，跨 col 1~3）
+    _NET_PROXY_ROW = "horizontalLayout_17"
+    _NET_PROXY_USE = "checkBox_use_proxy"
+
+    def _sync_wangluo_proxy_row_margin(self) -> None:
+        """设置-网络：「全部走代理」右留白 ≡「使用代理」左留白，「使用代理」原地不动。
+
+        用户需求：「全部走代理向左移动使得全部走代理最右侧到右边界的间距与使用代理
+        最左侧到左边界的间距相等，使用代理位置保持不变，只向左移动全部走代理」。
+
+        两侧留白量必须量到**同一条分界线**才有可比性：gridLayout_9 的内容左右缘。
+        该网格 contentsMargins 为 0 且铺满容器 gridLayoutWidget_9，组框边框那点内外缩
+        对左右同量，加不加都不影响「相等」这个判据（本机离屏实测 1085×720 窗口：
+        网格 661 宽、col 0 = 132、spacing = 6、行内布局 x=138 w=523）。
+
+          · 左留白 = 标签列宽（col 0，最宽的是「HTTPS 证书校验:」）+ 网格 spacing，
+            也就是「使用代理」左缘到网格内容左缘那 138px——由**网格算法**算出；
+          · 右留白 = horizontalLayout_17 的右内边距——由**写死的数字**给出
+            （MDCx.ui 里 138 作设计态初值，让 .ui 自己就能看出版式意图）。
+
+        两者不同源：换字体 / 改系统 DPI / 换语言包都会让左留白变而右留白不变，等式即
+        破。故每遍用 mapTo 实测左留白（不写死常数），回写右内边距，二值恒等。
+
+        「使用代理」一个像素都不动：它是本行第 1 项、左内边距 0、中间是 Expanding
+        spacer，行内富余宽度全被 spacer 吃掉，故本方法只碰右内边距一个属性。
+
+        幂等：右内边距已等于实测左留白即返回。休眠页也照跑（几何本就是设计值，
+        与 _sync_wangluo_net_box_hug 的休眠页早退互不打架——那管的是高度）。
+        """
+        ui = getattr(self, "Ui", None)
+        if ui is None:
+            return
+        host = getattr(ui, self._NET_HOST, None)
+        row = getattr(ui, self._NET_PROXY_ROW, None)
+        use = getattr(ui, self._NET_PROXY_USE, None)
+        if host is None or row is None or use is None:
+            return
+        if use.parentWidget() is not host:
+            return  # 结构变了：开关不再与本行同父，交给上层排查，别盲改内边距
+        grid = host.layout()
+        if grid is not None:
+            # 容器拉宽后网格未必已重排，量到的会是上一遍的列宽（左留白跟着旧值走）
+            grid.invalidate()
+            grid.activate()
+        lead = use.mapTo(host, QPoint(0, 0)).x()
+        if lead <= 0:
+            return  # 尚未布局，读数无意义，保持 .ui 的设计初值
+        margins = row.contentsMargins()
+        if margins.right() == lead:
+            return
+        row.setContentsMargins(margins.left(), margins.top(), lead, margins.bottom())
 
     def _sync_wangluo_net_box_hug(self, _scroll=None) -> None:
         """设置-网络：宽态把「网络设置」分组收紧到贴住内容，窄态逐像素回到设计几何。
@@ -827,7 +878,13 @@ class LayoutSettingsMixin:
 
         休眠页直接返回（几何本就是设计值），由切 tab 的 showEvent 补齐——与
         _sync_zimu_fill_blank / _sync_guaxiaomulu_page_align 同一套钩子约定。
+
+        本函数同时是「全部走代理」行左右留白对齐的入口（钩子只有一个）：
+        _sync_wangluo_proxy_row_margin 排在最前先行，两步互不干涉（一个改高度、
+        一个改行内右内边距），但都必须晚于网格拉伸——拉伸会改列宽，先量后拉会量到
+        过期列宽（同 _sync_guaxiaomulu_clean_tip_align「须排在拉伸之后」的理由）。
         """
+        self._sync_wangluo_proxy_row_margin()
         ui = getattr(self, "Ui", None)
         if ui is None:
             return

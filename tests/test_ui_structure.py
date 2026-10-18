@@ -554,12 +554,17 @@ def _child_widget_names(layout):
 
 
 def test_proxy_route_all_green_shares_row_with_use_proxy():
-    """绿：两个代理开关同处一行（row 0 col 1 的 horizontalLayout_17），右对齐成对。
+    """绿：两个代理开关同处一行（row 0 col 1 的 horizontalLayout_17），同行同高。
 
-    用户原话：「全部走代理向上移动到使用代理右侧，全部走代理与使用代理严格水平
-    对齐，使用代理位置保持不变」。修复前 checkBox_proxy_route_all 挂在
+    用户原话（上一轮）：「全部走代理向上移动到使用代理右侧，全部走代理与使用代理严格
+    水平对齐，使用代理位置保持不变」。修复前 checkBox_proxy_route_all 挂在
     horizontalLayout_no_proxy（「使用代理网站」那一行）的最右侧，与「使用代理」
     隔了一整行，既不同高也对不齐；且它挤在行尾把 lineEdit_no_proxy_sites 压短。
+
+    本轮（用户再次要求）「使用代理位置保持不变，只向左移动全部走代理」：行内顺序、
+    第 1 项身份与注册格（row 0 col 1 起）全部不动，只把右界从 col 1 右缘换成网格
+    右缘（colspan=3）并加右内边距，让两侧留白相等——详见
+    test_proxy_route_all_row_right_margin_equals_lead_margin。
     """
     root = _parse_ui()
 
@@ -577,6 +582,14 @@ def test_proxy_route_all_green_shares_row_with_use_proxy():
         "「使用代理」行必须仍注册在 gridLayout_9 的 row=0 column=1"
     )
 
+    # 本行跨 col 1~3：右留白要与「左留白 = 标签列宽 + spacing」同口径比较，
+    # 而右界必须取网格内容右缘（col 1 右边还空着 col 2 / col 3 两个零宽格 + 两个
+    # spacing，本机离屏实测 col1 右缘 649、网格右缘 661）。只占 col 1 时那 12px
+    # 的差没人补，两侧留白天然不等。
+    assert item.get("colspan") == "3", (
+        f"代理开关行必须跨 col 1~3 才能取到网格右缘作右界，实际 colspan={item.get('colspan')}"
+    )
+
     # 「使用代理」与「全部走代理」之间是 Expanding spacer：把「使用代理」按自然宽度
     # 钉在行首（不因新增兄弟项而右移），把「全部走代理」推到本行右端。
     items = use_row.findall("item")
@@ -585,6 +598,39 @@ def test_proxy_route_all_green_shares_row_with_use_proxy():
     assert spacer.get("name") == "horizontalSpacer_proxy_switches"
     assert _widget_enum_prop(spacer, "orientation") == "Qt::Horizontal"
     assert _child_widget_names(use_row)[-1] == "checkBox_proxy_route_all"
+
+
+def test_proxy_route_all_row_right_margin_equals_lead_margin():
+    """绿：「全部走代理」行右内边距 = 左留白（标签列宽 + spacing），左内边距仍为 0。
+
+    用户要求：「全部走代理最右侧到右边界的间距与使用代理最左侧到左边界的间距相等，
+    使用代理位置保持不变，只向左移动全部走代理」。左界恒在网格内容左缘，右界取网格
+    内容右缘，故右留白只能由本行的右内边距给（.ui 里 138 = 本机 col0 132 + spacing 6
+    的设计态初值；换字体/DPI 后由 _sync_wangluo_proxy_row_margin 实测回写）。
+
+    左内边距必须仍是 0——它一非 0，「使用代理」就会右移，违反「位置保持不变」。
+    """
+    root = _parse_ui()
+    use_row = _layout_by_name(root, "horizontalLayout_17")
+    assert use_row is not None
+
+    margins = {
+        p.get("name"): int(p.find("number").text)
+        for p in use_row.findall("property")
+        if p.get("name", "").endswith("Margin") and p.find("number") is not None
+    }
+    assert margins.get("rightMargin") == 138, f"右内边距应留出右留白 138，实际 {margins}"
+    assert margins.get("leftMargin") == 0, f"左内边距必须为 0，否则「使用代理」会右移：{margins}"
+
+
+def test_proxy_route_all_red_row_still_single_column():
+    """红（失败回归）：修复前形态不再出现——代理开关行退回只占 col 1（右侧无边可比）。"""
+    root = _parse_ui()
+    use_row = _layout_by_name(root, "horizontalLayout_17")
+    assert use_row is not None
+    item = use_row.getparent()
+    colspan = item.get("colspan")
+    assert colspan != "1", "代理开关行退回了只占 col 1，右留白会少掉两个 spacing"
 
 
 def test_proxy_route_all_yellow_no_longer_in_no_proxy_row():
