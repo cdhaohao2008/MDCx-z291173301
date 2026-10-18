@@ -22658,7 +22658,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
                             </property>
                             <property name="text">
-                              <string>&lt;p style='line-height:20px'&gt;支持http、https、socks5代理，示例：http://127.0.0.1:7897&lt;br&gt;用户名和密码格式为: schema://username:password@host:port&lt;br&gt;"使用代理"仅控制常规网络请求代理开关，不控制CF Bypass代理，"CF Bypass代理"选项仅作用于Bypass的服务请求（mirror/html），当勾选"全部走代理"后"使用代理"列表将不再生效，所有分流全部交给代理软件处理，Cloudflare Bypass地址留空时，配置了"CloudFlare 绕过服务"将自动启动适配层，两者均留空时软件会自动关闭Cloudflare Bypass功能&lt;/p&gt;</string>
+                              <string>&lt;p style='line-height:20px'&gt;支持http、https、socks5代理，示例：http://127.0.0.1:7897&lt;br&gt;用户名和密码格式为: schema://username:password@host:port&lt;br&gt;"使用代理"仅控制常规网络请求代理开关，不控制CF Bypass代理，"CF Bypass代理"选项仅作用于Bypass的服务请求(mirror/html)，当勾选"全部走代理"后"使用代理"列表将不再生效，所有分流全部交给代理软件处理，Cloudflare Bypass地址留空时，配置了"CloudFlare 绕过服务"将自动启动适配层，两者均留空时软件会自动关闭Cloudflare Bypass功能&lt;/p&gt;</string>
                             </property>
                           </widget>
                         </item>
