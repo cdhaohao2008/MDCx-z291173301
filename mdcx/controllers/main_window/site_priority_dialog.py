@@ -60,7 +60,9 @@ class TypeWebsiteUi:
 TYPE_TITLES = {
     FixedScrapingType.YOUMA: "有码番号",
     FixedScrapingType.WUMA: "无码番号",
-    FixedScrapingType.SUREN: "素人番号",
+    # 「短剧」这一档 2.6.0 起改指国产短剧（枚举值/字段名仍沿用 suren，见 TYPE_DEFAULT_SITES）：
+    # 素人番号已并入有码组按有码刮削，这里只留国产短剧专用站。
+    FixedScrapingType.SUREN: "国产短剧",
     FixedScrapingType.FC2: "个摄番号",
     FixedScrapingType.OUMEI: "欧美番号",
     FixedScrapingType.GUOCHAN: "国产番号",
@@ -77,7 +79,7 @@ TYPE_TITLES = {
 PALETTE_GROUP_TITLES = {
     FixedScrapingType.YOUMA: "有码",
     FixedScrapingType.WUMA: "无码",
-    FixedScrapingType.SUREN: "素人",
+    FixedScrapingType.SUREN: "短剧",
     FixedScrapingType.FC2: "FC2",
     FixedScrapingType.OUMEI: "欧美",
     FixedScrapingType.GUOCHAN: "国产",
@@ -85,12 +87,13 @@ PALETTE_GROUP_TITLES = {
 }
 
 # 不写进「<定位>：<类型名单>」这一行能力文案的类型（用户要求）：
-#  - 「素人」：本质就是有码，只不过用假名或根本没名字
 #  - 「动漫」：与其它类型的片子混在一起时不必单列，只列它独家收录的那些
 #  - 「FC2」：同属有码那一类，只是没番号
-# **只是不写进这一行**：候选区那七个 chip、设置页「个摄番号：」那一行与 TYPE_DEFAULT_SITES
+# 「短剧」原先叫「素人」，那时隐去是因为素人本质就是有码；2.6.0 起它改指国产短剧，
+# 与有码是两回事，按用户要求照常显示（不再隐去）。
+# **只是不写进这一行**：候选区那七个 chip、设置页各行标签与 TYPE_DEFAULT_SITES
 # 默认名单都照旧。
-_CAPTION_HIDDEN_TYPES = ("素人", "动漫", "FC2")
+_CAPTION_HIDDEN_TYPES = ("动漫", "FC2")
 
 # 「<定位>：<类型名单>」那一行里，冒号后面的名单改用这个站自己的别称（用户要求）。
 # 默认是候选区那七个 chip 的短名，但只有一个类型的站把自己的类型名原样重复一遍没什么信息量，
@@ -230,7 +233,7 @@ PALETTE_GROUP_TYPES: tuple[FixedScrapingType, ...] = (
 
 
 def grouped_palette_groups(sites: Iterable[Website]) -> list[tuple[str, list[Website]]]:
-    """把候选站点按有码/无码/素人/FC2/欧美/国产/动漫分成 [(标题, 组内站点)]。
+    """把候选站点按有码/无码/短剧/FC2/欧美/国产/动漫分成 [(标题, 组内站点)]。
 
     组内顺序 = TYPE_DEFAULT_SITES 里该组的默认名单顺序（优先级从高到低），不重排。
     一个站点可同属多组，会在每个组里各出现一次——它确实是这几个类型的可用来源，
@@ -308,7 +311,7 @@ def _list_sites(list_widget: QListWidget) -> list[Website]:
     """列表里的站点，按行序去重。
 
     候选区按类型分组后，同一站点会因同属多个组而在多行各出现一次（DMM 同时落在
-    有码和素人）。去重让「这张列表有哪些站点」只有一个答案——复制、拖拽、移除、
+    有码和无码）。去重让「这张列表有哪些站点」只有一个答案——复制、拖拽、移除、
     启用列表的快照全都拿它做依据，不会因为站点重复出现而多带一次。
     """
     return list(
@@ -351,9 +354,9 @@ SITE_GROUP_SITES_ROLE = Qt.ItemDataRole.UserRole + 2
 def _make_group_item(title: str, sites: Sequence[Website]) -> QListWidgetItem:
     """候选区里的一个分组标题：文案就是类型名，成员名单挂在标题自己身上。
 
-    标题排在所有站点之前（用户要求「有码、无码、素人、FC2、欧美、国产这样默认排在 DMM
+    标题排在所有站点之前（用户要求「有码、无码、短剧、FC2、欧美、国产这样默认排在 DMM
     左边」），后面紧跟着站点、与站点共用同一个换行流——所以第一行看起来就是
-    「有码 无码 素人 FC2 欧美 国产 DMM DMM_API LibreDMM …」，右边不留空。
+    「有码 无码 短剧 FC2 欧美 国产 DMM DMM_API LibreDMM …」，右边不留空。
     标题只用加粗与站点区分，**不再另刷深色底**（用户明确要「和其他站点一样纯白背景」）。
     """
     item = QListWidgetItem(title)
@@ -413,14 +416,16 @@ def _site_capability_caption(site: Website) -> str:
     它属于哪几个类型说全了，后两行是同一件事的重复，还把悬停框撑高；候选区每个站只出现
     一次，标题都提到了顶部，读者手上要的就是这一行。分隔符一律「/」（不用顿号，省宽度）。
 
-    名单里的**「素人」「动漫」「FC2」不写进这一行**（用户要求）：素人本质就是有码，只不过
-    用假名或根本没名字；动漫与其它类型的片子混在一站时不必单列；FC2 同属有码那一类、只是没
-    番号。DMM 由「有码：有码/素人」变「有码：有码」，7mmtv 由「综合：有码/无码/素人/FC2/欧美/国产」
-    变「综合：有码/无码/欧美/国产」，AVSOX 由「无码：无码/FC2」变「无码：无码」。**只隐去这一行
-    文案里的它们**，候选区那七个 chip、设置页「个摄番号：」那一行与 TYPE_DEFAULT_SITES 默认
+    名单里的**「动漫」「FC2」不写进这一行**（用户要求）：动漫与其它类型的片子混在一站时
+    不必单列；FC2 同属有码那一类、只是没番号。DMM 由「有码：有码/无码」变「有码：有码」，
+    7mmtv 由「综合：有码/无码/FC2/欧美/国产」变「综合：有码/无码/欧美/国产」，
+    AVSOX 由「无码：无码/FC2」变「无码：无码」。**只隐去这一行
+    文案里的它们**，候选区那七个 chip、设置页各行标签与 TYPE_DEFAULT_SITES 默认
     名单一律照旧。名单被隐空时（Getchu、FC2 这类只属被隐去那一组的站）改用它自己的定位
     说明，不留一个只剩前缀的空名单。名单只有一项时可选地在这一行改用该站的别称
     （`_CAPTION_TYPE_ALIAS`，如 Madou.club 的「国产：麻豆」）。
+    「短剧」原先是「素人」、那时因「素人本质就是有码」被隐去，2.6.0 起它改指国产短剧，
+    按用户要求照常显示（如 JavDay 的「综合：有码/无码/短剧/国产」）。
     """
     description = _site_description(site)
     types = [name for name in _site_types(site) if name not in _CAPTION_HIDDEN_TYPES]
@@ -454,7 +459,7 @@ def _site_description(site: Website) -> str:
 def _setup_site_list(list_widget: QListWidget, sites: Iterable[Website], *, grouped: bool = False) -> None:
     """把 sites 铺进列表。grouped=True 时先放七个分组标题，紧跟着才是站点。
 
-    标题与站点在同一个换行流里顺排，所以第一行就是「有码 无码 素人 FC2 欧美 国产
+    标题与站点在同一个换行流里顺排，所以第一行就是「有码 无码 短剧 FC2 欧美 国产
     DMM DMM_API LibreDMM …」，右边不留空白（用户要求「不要空着，继续排列站点」），同时又满足「七个标题排在 DMM 之前」。
 
     默认（grouped=False）保持传入的原序——「启用网站」和各字段名单的原序就是用户的
@@ -1018,7 +1023,7 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         layout.addWidget(group_hint)
 
         copy_hint = QLabel(
-            "开头的七个加粗标题是有码/无码/素人/FC2/欧美/国产/动漫，"
+            "开头的七个加粗标题是有码/无码/短剧/FC2/欧美/国产/动漫，"
             "双击一个标题即加入该组全部网站，"
             "后面紧跟全部可用网站（按名称 A-Z 排序、每个站只出现一次）。"
             "右键：站点上复制该站点、标题上复制本组名单、空白处复制整张列表，"

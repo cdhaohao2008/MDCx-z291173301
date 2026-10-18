@@ -69,39 +69,12 @@ MDCx 刮削网站类型汇总表
     Missav_API        https://missav.ws                 Missav 接口实现（fourhoi.com）
 
 ================================================================================================================
-【素人番号（amateur / 人妻熟女）】  合计 28 站   （官网 12 + 第三方 16）
+【国产短剧（原「素人番号」组）】  合计 1 站   （第三方 1）
 ================================================================================================================
-  ── 官网 / 厂牌 / 官方接口 (12) ──
-    AVBase            https://www.avbase.net            FANZA/MGS/DUGA 50 万+ 作品名寄せ库，纯日系，无欧美/FC2/国产
-    DMM                                                 FANZA/DMM 本体。有码主体，站内含「素人」品牌区（SOD はめちゃん 等）
-    DMM_API           https://api.dmm.com               FANZA 官方 Web API（api.dmm.com）
-    Dahlia            https://dahlia-av.jp                DLDSS 前缀自动路由本站
-    Faleno            https://faleno.jp                   FNS/FLN/JIMMY 前缀自动路由本站
-    LibreDMM          https://www.libredmm.com          LibreFanza，DMM/FANZA 开源镜像
-    MGStage           https://www.mgstage.com           MGS 厂牌官网。菜单含 素人ホイホイ / はめちゃん。/ SODクリエイト
-    Official                                            官网聚合入口。30 家有码片商官网 + 5 家无码官网 JSON 直连；按番号前缀路由
-    Prestige          https://www.prestige-av.com       PRESTIGE 厂牌官网。MDCx 站点描述「有码+素人」
-    Xcity             https://tc.xcity.jp               XCITY 日系有码综合会员站（JS 渲染，导航不可读）
-
-  ── 第三方 / 聚合站 (16) ──
-    7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
-    Airav.cc          https://airav.io                  airav.io。分类磁贴含 素人 / 無碼，按分类切换有码/无码
-    AVMOO             https://avmoo.shop                「AVMOO - 你的线上日本成人影片情报站」，纯日系有码
-    FreeJavBT         https://freejavbt22.cc            导航 有碼 / 無碼 / 歐美 / FC2 + 系列 LUXU / ARA / SIRO / AV Bro
-    IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
-    JavDay            https://javday.app                「JAVDAY | 免費高清AV在線看| 麻豆 SWAG 看到飽」
-    JavDB             https://javdb.com                 Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
-    JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
-    JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
-    JavFree           https://javfree.me                菜单 Censored…Uncensored / FC2 / Caribbeancom / 1pondo / Heyzo / 10musume
-    JavLibrary        https://www.javlibrary.com        业界标准 有碼/無碼/FC2 三分类（Cloudflare 拦截，经公开资料交叉确认）
-    Javlibrary·镜像    https://www.f101w.com/cn           zlibz.com 公布的 JavLibrary 镜像（无 CF 墙，默认中文页 /cn）
-    Lulubar           https://lulubar.co                lulubar.co。HTML 关键词命中 有码/无码/欧美/素人/国产
-    Missav            https://missav.ws                 混合：有码 + 无码 + 素人（IPBZ-023 / INMR-029 等 IP 女優流出）
-    Missav_API        https://missav.ws                 Missav 接口实现（fourhoi.com）
-    R18.dev           https://r18.dev                   日系有码元数据库 + Database dumps API，前缀表锁定日系厂牌
-    TheJavDB          https://thejavdb.net              thejavdb.net 网页版，取数走它自己的免 CF 接口
+  ── 第三方 / 聚合站 (1) ──
+    JavDay            https://javday.app                国产短剧（DUANJU / AI 短劇）专查站。条目没有番号、只有站内随机 ID
+                                                    （/videos/Gb5WuoJw/），故取不到番号时改走站内搜索页 /search/?q=<剧名>，
+                                                    按标题相似度挑最接近的详情页（见 docs/Changelog.md 2.6.0）
 
 ================================================================================================================
 【个摄番号】  合计 12 站   （官网 2 + 第三方 10）
@@ -267,9 +240,9 @@ Xcity             有码：仅限有码            有码                       
                                     →  Official 内挂的无码官网分支
 
 ■ 编辑对话框 UI（软件设置 → 刮削网站 → 类型刮削网站 → 编辑网站）
-    可用网站候选区  开头七个加粗标题（有码｜无码｜素人｜FC2｜欧美｜国产｜动漫），紧接着右边
+    可用网站候选区  开头七个加粗标题（有码｜无码｜短剧｜FC2｜欧美｜国产｜动漫），紧接着右边
                     就接着铺全部可用站点、每个站只出现一次：
-                        有码｜无码｜素人｜FC2｜欧美｜国产｜动漫｜7mmtv｜Airav.cc｜AVBase ｜ …
+                        有码｜无码｜短剧｜FC2｜欧美｜国产｜动漫｜7mmtv｜Airav.cc｜AVBase ｜ …
                         …  Xcity                    ← 标题之下是一份去重后的 A-Z 名单
                         （分组只留在标题上：**双击**标题 = 整组加入、右键标题 = 复制本组
                           或整组加入，名单取自上面七组默认名单同一个常量 TYPE_DEFAULT_SITES，
@@ -280,12 +253,12 @@ Xcity             有码：仅限有码            有码                       
                                               AVSOX→「无码：无码」、Madou.club→「国产：麻豆」
                                               冒号前的定性词沿用各站自己的定位说明，
                                               后面的名单由 TYPE_DEFAULT_SITES 现算
-                    名单里不写「素人」「动漫」「FC2」：素人本质就是有码，只不过用假名
-                    或根本没名字；动漫与其它类型的片子混在一站时不必单列；FC2 同属有码
-                    那一类、只是没番号。候选区 chip、设置页各行标签与默认名单都照旧。
+                    名单里不写「动漫」「FC2」：动漫与其它类型的片子混在一站时不必单列；
+                    FC2 同属有码那一类、只是没番号。「短剧」照常显示（它只有 JavDay
+                    一站，正因如此更需要看得见）。候选区 chip、设置页各行标签与默认名单都照旧。
                     原本是三行（「能力概览 / 类型：… / 联动：…」），后两行按用户要求整行删掉：
                     第一行已经把类型名单说全，后两行是同一件事的重复，还把悬停框撑成三行。
-                    原本第一行的值还是爬虫 description 里写死的文案（「综合：有码+无码+素人+FC2」），
+                    原本第一行的值还是爬虫 description 里写死的文案（「综合：有码+无码+FC2」），
                     会与实际默认名单对不上（7mmtv 明明也在欧美、国产名单里）；不属任何类型组
                     或名单被隐空的站（MyWife、AVSEX、Getchu、FC2）改用自己那行定位说明。
                     名单只有一项时，这一行冒号后可改用该站的别称（_CAPTION_TYPE_ALIAS），

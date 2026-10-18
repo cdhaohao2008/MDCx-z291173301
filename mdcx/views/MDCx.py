@@ -13473,7 +13473,7 @@ class Ui_MDCx(object):
         self.pushButton_edit_website_dongman.setText(_translate("MDCx", "编辑网站"))
         self.pushButton_priority_website_dongman.setText(_translate("MDCx", "字段优先级"))
         self.label_154.setText(_translate("MDCx", "比如：MIDE-111，以及不符合以下类型的番号"))
-        self.label_152.setText(_translate("MDCx", "素人番号："))
+        self.label_152.setText(_translate("MDCx", "国产短剧："))
         self.label_153.setText(_translate("MDCx", "有码番号："))
         self.label_148.setText(_translate("MDCx", "个摄番号："))
         self.label_217.setText(_translate("MDCx", "国产番号："))
@@ -13485,7 +13485,7 @@ class Ui_MDCx(object):
         self.comboBox_fixed_scraping_type.setItemText(0, _translate("MDCx", "自动判断"))
         self.comboBox_fixed_scraping_type.setItemText(1, _translate("MDCx", "有码"))
         self.comboBox_fixed_scraping_type.setItemText(2, _translate("MDCx", "无码"))
-        self.comboBox_fixed_scraping_type.setItemText(3, _translate("MDCx", "素人"))
+        self.comboBox_fixed_scraping_type.setItemText(3, _translate("MDCx", "短剧"))
         self.comboBox_fixed_scraping_type.setItemText(4, _translate("MDCx", "FC2"))
         self.comboBox_fixed_scraping_type.setItemText(5, _translate("MDCx", "欧美"))
         self.comboBox_fixed_scraping_type.setItemText(6, _translate("MDCx", "国产"))
@@ -14550,7 +14550,7 @@ class Ui_MDCx(object):
                 "<h4>一、快速开始</h4>\n"
                 "<ol>\n"
                 "<li><b>媒体路径</b>：软件设置→刮削目录，配置「待刮削视频目录」「成功输出目录」和「失败输出目录」，也可以在软件界面点击「选择目录」临时选择待刮削目录</li>\n"
-                "<li><b>刮削网站</b>：软件设置→刮削网站，为不同类型，有码番号/无码番号/素人番号/个摄番号/欧美番号/国产番号/动漫里番，分别选择数据源网站</li>\n"
+                "<li><b>刮削网站</b>：软件设置→刮削网站，为不同类型，有码番号/无码番号/国产短剧/个摄番号/欧美番号/国产番号/动漫里番，分别选择数据源网站</li>\n"
                 "<li><b>下载选项</b>：软件设置→下载，勾选需要下载的元数据、图片与字幕</li>\n"
                 "<li><b>开始刮削</b>：软件界面点击「选择目录」选择待刮削目录，再点击「开始」按钮，建议先用1~3个文件测试效果</li>\n"
                 "</ol>\n"
@@ -14576,7 +14576,7 @@ class Ui_MDCx(object):
                 "<ul>\n"
                 "<li><b>有码番号</b>：DMM、DMM_API、LibreDMM、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像</li>\n"
                 "<li><b>无码番号</b>：AVSOX、AVEntertainments、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API</li>\n"
-                "<li><b>素人番号</b>：DMM、DMM_API、LibreDMM、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像</li>\n"
+                "<li><b>国产短剧</b>：JavDay</li>\n"
                 "<li><b>个摄番号：</b>FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
                 "<li><b>国产番号</b>：Madou.club、Madouqu、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、IQQTV、Missav、Missav_API</li>\n"
                 "<li><b>欧美番号</b>：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、Missav、Missav_API、IQQTV</li>\n"
@@ -14638,9 +14638,9 @@ class Ui_MDCx(object):
                 "<h4>十一、常见番号命名参考</h4>\n"
                 "<p>刮削前尽量命名规范、不区分大小写：</p>\n"
                 "<ul>\n"
-                "<li><b>标准有码</b>：JavDB/JavBus:SSNI-111；DMM:SSNI00111</li>\n"
+                "<li><b>标准有码</b>：JavDB/JavBus:SSNI-111；DMM:SSNI00111；素人系列（按有码刮削）：MGStage:259LUXU-1111、JavDB:LUXU-1111</li>\n"
                 "<li><b>标准无码</b>：JavDB/JavBus/Avsox:111111-1111、111111_111、HEYZO-1111、n1111</li>\n"
-                "<li><b>素人番号</b>：MGStage:259LUXU-1111；JavDB:LUXU-1111；FC2:FC2-111111、FC2-PPV-111111</li>\n"
+                "<li><b>国产短剧</b>：无统一番号格式、也无法按文件名识别，只有锁定刮削类型选「短剧」时才走该组网站（当前 JavDay）；FC2:FC2-111111、FC2-PPV-111111</li>\n"
                 "<li><b>欧美番号</b>：JavDB/JavBus:sexart.11.11.11，系列.年.月.日</li>\n"
                 "<li><b>字幕影片</b>：SSNI-xxx-c.mp4/-C.mp4，字幕标记靠近扩展名</li>\n"
                 "<li><b>分集影片</b>：SSNI-xxx-cd1.mp4默认支持-cdN/-partN/-hdN/-1等形式；-A或-01分集可在设置→命名中勾选『允许识别分集』对应选项</li>\n"

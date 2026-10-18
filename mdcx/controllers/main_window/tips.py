@@ -62,7 +62,7 @@ class TipsMixin:
       <p>· 国产番号：AVSEX、IQQTV、JavDay、Madou.club、Madouqu</p>
       <p>· 动漫里番：Getchu、JavDB、JavDB_API（锁定「动漫里番」用此三站；DLID 开头或路径含 getchu/里番/动漫自动用 Getchu 单站）</p>
       <p>· MyWifes：MyWife </p>
-      <p>· 素人番号：7mmtv、AVBase、DMM、DMM_API、IQQTV、JavBus、JavDB、MGStage、Missav、Missav_API、MyWife、Prestige </p>
+      <p>· 国产短剧：JavDay（无番号、无统一格式，只有锁定「短剧」时才走这一组；素人番号已并入有码番号）</p>
       <p>· <b>个摄番号：</b>7mmtv、FC2、FC2PPVDB、JavDB、JavFree </p>
     </body>
     </html>""")

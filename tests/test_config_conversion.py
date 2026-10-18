@@ -191,38 +191,10 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
         Website.MISSAV,
         Website.MISSAV_API,
     ]
-    assert config.website_suren == [
-        Website.DMM,
-        Website.DMM_API,
-        Website.LIBREDMM,
-        Website.DAHLIA,
-        Website.FALENO,
-        Website.MGSTAGE,
-        Website.PRESTIGE,
-        Website.OFFICIAL,
-        Website.AVBASE,
-        Website.AVMOO,
-        Website.JAVDB,
-        Website.JAVDB_API,
-        Website.JAVDB_APP,
-        Website.JAVBUS,
-        Website.JAVDAY,
-        Website.JAVFREE,
-        Website.MMTV,
-        Website.AIRAV_CC,
-        Website.FREEJAVBT,
-        Website.IQQTV,
-        Website.LULUBAR,
-        Website.MISSAV,
-        Website.MISSAV_API,
-        Website.R18DEV,
-        Website.XCITY,
-        Website.THEJAVDB,
-        Website.JAVLIBRARY,
-        Website.JAVLIBRARY_MIRROR,
-    ]
+    # 国产短剧（字段名沿用 website_suren）只挂 JavDay：条目无番号、别的站全靠番号查
+    assert config.website_suren == [Website.JAVDAY]
     # MyWife 由「指定网站」或路径含 MyWife 单独指定（file_crawler 走 website= 覆盖），
-    # 不进任何类型组名单，素人组里不该有它。
+    # 不进任何类型组名单，短剧组里不该有它。
     assert Website.MYWIFE not in config.website_suren
     assert config.website_fc2 == [
         Website.FC2,
@@ -266,8 +238,10 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
     # 加进这三组只会给每条影片白挂一次无效请求，故三组一律不含 Official。
     for group in (config.website_guochan, config.website_oumei, config.website_fc2):
         assert Website.OFFICIAL not in group
-    for group in (config.website_youma, config.website_wuma, config.website_suren):
+    for group in (config.website_youma, config.website_wuma):
         assert Website.OFFICIAL in group
+    # 短剧组只有 JavDay：官方站按番号前缀路由，短剧没有番号，路由不过去
+    assert Website.OFFICIAL not in config.website_suren
     assert config.get_field_config(CrawlerResultFields.TITLE).site_prority == DEFAULT_FIELD_SITE_PRIORITY
     assert config.get_type_field_config(FixedScrapingType.YOUMA, CrawlerResultFields.TITLE).site_prority == [
         Website.DMM,
@@ -359,6 +333,8 @@ def test_default_config_template_is_valid_json_and_matches_current_model():
     assert not hasattr(config, "amazon_strict_pic_verify")
     assert config.field_priority_try_all_images is False
     assert config.website_youma == Config().website_youma
+    # 「国产短剧」组（枚举值/字段名仍是 suren）默认只有 JavDay，出厂模板与代码默认值必须一致
+    assert config.website_suren == Config().website_suren == [Website.JAVDAY]
     assert config.get_field_config(CrawlerResultFields.TITLE).site_prority == DEFAULT_FIELD_SITE_PRIORITY
     for field in CrawlerResultFields:
         assert config.get_field_config(field) == Config().get_field_config(field)

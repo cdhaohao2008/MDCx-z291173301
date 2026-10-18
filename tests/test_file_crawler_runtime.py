@@ -7,7 +7,6 @@ from mdcx.config.models import Config, FieldConfig, FieldPriorityConfig
 from mdcx.core.file_crawler import (
     FileScraper,
     _deal_res,
-    _is_suren_number,
     classify_existing_scrape_result,
     classify_scrape_task,
 )
@@ -178,7 +177,7 @@ class _ClassificationConfig:
     fixed_scraping_type = FixedScrapingType.AUTO
     website_youma = {Website.DMM}
     website_wuma = {Website.JAVBUS}
-    website_suren = {Website.MGSTAGE}
+    website_suren = {Website.JAVDAY}
     website_fc2 = {Website.FC2}
     website_oumei = {Website.THEPORNDB}
     website_guochan = {Website.MADOUQU}
@@ -270,24 +269,12 @@ def test_deal_res_score_appends_source_site(value: str, site_value: str, expecte
 
 
 @pytest.mark.parametrize(
-    ("file_number", "short_number", "expected"),
-    [
-        ("259LUXU-1488", "LUXU-1488", True),
-        ("435MFC-142", "MFC-142", True),
-        ("SIRO-5533", "", True),
-        ("SSIS-001", "", False),
-        ("FC2-123456", "", False),
-    ],
-)
-def test_is_suren_number_matches_current_scrape_branch(file_number: str, short_number: str, expected: bool):
-    assert _is_suren_number(file_number, short_number) is expected
-
-
-@pytest.mark.parametrize(
     ("number", "mosaic", "short_number", "expected_type", "expected_sites"),
     [
-        ("259LUXU-1488", "", "LUXU-1488", FixedScrapingType.SUREN, {Website.MGSTAGE}),
-        ("SIRO-5533", "", "", FixedScrapingType.SUREN, {Website.MGSTAGE}),
+        # 素人番号（259LUXU-1488 / SIRO-5533）一律按有码走：短剧没有番号，
+        # 短剧组也就无从自动判断，只有锁定刮削类型选「短剧」时才会用到它。
+        ("259LUXU-1488", "", "LUXU-1488", FixedScrapingType.YOUMA, {Website.DMM}),
+        ("SIRO-5533", "", "", FixedScrapingType.YOUMA, {Website.DMM}),
         ("FC2-123456", "", "", FixedScrapingType.FC2, {Website.FC2}),
         ("100225_100", "无码", "", FixedScrapingType.WUMA, {Website.JAVBUS}),
         ("100225_101", "無修正", "", FixedScrapingType.WUMA, {Website.JAVBUS}),
@@ -362,17 +349,17 @@ def test_classify_existing_scrape_result_uses_nfo_mosaic_without_substring_wuma_
 
 
 def test_classify_scrape_task_fixed_type_overrides_auto_detection():
-    class FixedSurenConfig(_ClassificationConfig):
+    class FixedDuanjuConfig(_ClassificationConfig):
         fixed_scraping_type = FixedScrapingType.SUREN
 
     task = CrawlTask.empty()
     task.number = "DANDY-732"
 
-    classification = classify_scrape_task(task, FixedSurenConfig())
+    classification = classify_scrape_task(task, FixedDuanjuConfig())
 
     assert classification.scraping_type == FixedScrapingType.SUREN
     assert classification.scraping_type_source == "fixed"
-    assert classification.sites == {Website.MGSTAGE}
+    assert classification.sites == {Website.JAVDAY}
 
 
 @pytest.mark.parametrize(

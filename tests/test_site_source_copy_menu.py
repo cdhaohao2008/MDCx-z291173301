@@ -52,7 +52,7 @@ ALL_SITES = [Website(site) for site in __import__("mdcx.crawlers", fromlist=["c"
 CUSTOM_ORDER = [Website.XCITY, Website.MGSTAGE, Website.GETCHU, Website.DMM]
 
 # 顶部七个短名 chip 的次序（与 PALETTE_GROUP_TITLES 的声明序一致）
-CHIP_ORDER = ["有码", "无码", "素人", "FC2", "欧美", "国产", "动漫"]
+CHIP_ORDER = ["有码", "无码", "短剧", "FC2", "欧美", "国产", "动漫"]
 
 
 @pytest.fixture(scope="module")
@@ -359,7 +359,7 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
     [
         ("有码", 28),
         ("无码", 15),
-        ("素人", 28),
+        ("短剧", 1),
         ("FC2", 12),
         ("欧美", 10),
         ("国产", 10),

@@ -572,7 +572,10 @@ class FixedScrapingType(Enum):
 
     @classmethod
     def names(cls):
-        return ["自动判断", "有码", "无码", "素人", "FC2", "欧美", "国产", "动漫"]
+        # 「短剧」这一档原先叫「素人」（枚举值仍是 suren、配置字段仍是 website_suren）：
+        # 素人番号没有自己的稳定返回、番号也不成体系，已并入有码组按有码刮削；
+        # 这一档改作国产短剧（DUANJU）专用，只在锁定刮削类型时生效，见 TYPE_DEFAULT_SITES。
+        return ["自动判断", "有码", "无码", "短剧", "FC2", "欧美", "国产", "动漫"]
 
 
 class Language(Enum):

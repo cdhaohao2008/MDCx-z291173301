@@ -174,7 +174,7 @@ SCRAPING_TYPE_SITE_FIELDS = {
 #      （见 controllers/main_window/site_priority_dialog.py 的 grouped_palette_entries）。
 # 两处同源，才不会出现「默认名单是一套、候选区分组又是另一套」的自相矛盾。
 #
-# 组序 = 有码 / 无码 / 素人 / FC2 / 欧美 / 国产，与 UI 的分组标题顺序一致。
+# 组序 = 有码 / 无码 / 短剧 / FC2 / 欧美 / 国产，与 UI 的分组标题顺序一致。
 # 一个站点可同属多组（它是多个类型的可用来源），各组之间互不影响。
 TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
     FixedScrapingType.YOUMA: (
@@ -230,37 +230,12 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         Website.MISSAV_API,
     ),
     FixedScrapingType.SUREN: (
-        # 官网 / 厂牌 / 官方接口
-        Website.DMM,
-        Website.DMM_API,
-        Website.LIBREDMM,
-        Website.DAHLIA,
-        Website.FALENO,
-        Website.MGSTAGE,
-        Website.PRESTIGE,
-        Website.OFFICIAL,
-        # 第三方 / 聚合站
-        Website.AVBASE,
-        Website.AVMOO,
-        Website.JAVDB,
-        Website.JAVDB_API,
-        Website.JAVDB_APP,
-        Website.JAVBUS,
+        # 国产短剧（DUANJU）这一档只放 JavDay：目前全网只有它还能按片名/模糊词搜到短剧，
+        # 且它的「AI 短劇」分类条目本身没有番号、只有站内随机 ID，故这一组不做任何自动
+        # 识别，只有锁定刮削类型选「短剧」时才走它。后续发现新的短剧站再加进这一组。
+        # 原先这里的 28 个素人番号站已全部移除：素人番号并入有码组按有码刮削
+        # （见 core/file_crawler.py，不再按「无番号/假名」把它单独分流）。
         Website.JAVDAY,
-        Website.JAVFREE,
-        Website.MMTV,
-        Website.AIRAV_CC,
-        Website.FREEJAVBT,
-        Website.IQQTV,
-        Website.LULUBAR,
-        Website.MISSAV,
-        Website.MISSAV_API,
-        Website.R18DEV,
-        Website.XCITY,
-        Website.THEJAVDB,
-        # 镜像站排在原站前面：原站对大陆 IP 有 CF 墙，镜像没有，可达性优先
-        Website.JAVLIBRARY,
-        Website.JAVLIBRARY_MIRROR,
     ),
     FixedScrapingType.FC2: (
         # 官网 / 厂牌 / 官方接口
@@ -658,11 +633,12 @@ class Config(BaseModel):
         default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.WUMA]),
         title="无码网站源",
     )
+    # 「短剧」这一档（枚举值仍为 SUREN、字段名仍为 website_suren）现指国产短剧专用站。
     # 注意：MyWife 不在任何类型组里。它由「网站偏好-指定网站」或路径含 MyWife 时
     # 经 file_crawler 的 website= 覆盖单独指定，走的是另一条通道。
     website_suren: list[Website] = Field(
         default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.SUREN]),
-        title="素人网站源",
+        title="国产短剧网站源",
     )
     website_fc2: list[Website] = Field(
         default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.FC2]),

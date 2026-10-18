@@ -90,10 +90,6 @@ def _normalize_release_value(value: object) -> str:
         return ""
 
 
-def _is_suren_number(file_number: str, short_number: str) -> bool:
-    return bool(short_number) or "SIRO" in file_number.upper()
-
-
 def _crawl_cache_key(task_input: CrawlerInput) -> tuple[str, str] | None:
     """生成同番号刮削缓存键, 无文件路径或番号时返回 None（不缓存）."""
     number = task_input.number or ""
@@ -214,9 +210,11 @@ def classify_scrape_task(task_input: CrawlTask, config: "Config", use_fixed_type
     if is_plain_uncensored_mosaic(mosaic):
         return ScrapeClassification(FixedScrapingType.WUMA, "auto", sites=config.website_wuma)
 
-    if _is_suren_number(file_number, task_input.short_number):
-        return ScrapeClassification(FixedScrapingType.SUREN, "auto", sites=config.website_suren)
-
+    # 原先这里有一条「无番号或含 SIRO → 素人（suren）」的自动分支。2.6.0 起
+    # FixedScrapingType.SUREN 这一档改指国产短剧（DUANJU），而国产短剧没有统一番号格式、
+    # 靠路径或文件名根本分辨不出来（用户口径），故自动判断模式下不再分流到它：
+    # 这类文件继续往下走，最终按有码处理。
+    # SUREN 只在锁定刮削类型选「短剧」时才生效，见本函数开头的锁定类型分支。
     if is_uncensored(file_number):
         return ScrapeClassification(FixedScrapingType.WUMA, "auto", sites=config.website_wuma)
 
@@ -348,7 +346,8 @@ class FileScraper:
         short_number = task_input.short_number
         original_number = task_input.number
 
-        # 259LUXU-1111， mgstage 和 avsex 之外使用 LUXU-1111（素人番号时，short_number有值，不带前缀数字；反之，short_number为空)
+        # 259LUXU-1111， mgstage 和 avsex 之外使用 LUXU-1111（素人系列番号时，short_number有值，不带前缀数字；反之，short_number为空)
+        # 素人系列番号 2.6.0 起按有码走，但仍需剥掉前缀数字才能命中 JavDB 等站的检索键
         if short_number and website not in (Website.MGSTAGE, Website.AVSEX):
             task_input.number = short_number
 

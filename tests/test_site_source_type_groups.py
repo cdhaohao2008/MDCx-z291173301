@@ -130,34 +130,9 @@ USER_SITE_LISTS = {
         "Missav_API",
     ],
     FixedScrapingType.SUREN: [
-        "DMM",
-        "DMM_API",
-        "LibreDMM",
-        "Dahlia",
-        "Faleno",
-        "MGStage",
-        "Prestige",
-        "Official",
-        "AVBase",
-        "AVMOO",
-        "JavDB",
-        "JavDB_API",
-        "JavDB_APP",
-        "JavBus",
+        # 国产短剧只挂 JavDay：条目本身没有番号、文件名也没有统一格式，
+        # 别的站点全靠番号查，根本查不到；发现能用的新站再加进来。
         "JavDay",
-        "JavFree",
-        "7mmtv",
-        "Airav.cc",
-        "FreeJavBT",
-        "IQQTV",
-        "Lulubar",
-        "Missav",
-        "Missav_API",
-        "R18.dev",
-        "Xcity",
-        "TheJavDB",
-        "JavLibrary",
-        "Javlibrary\u00b7\u955c\u50cf",
     ],
     FixedScrapingType.FC2: [
         # FC2 自己家的站排在第三方聚合站前面（提交 e30bdbb 定的序）
@@ -206,8 +181,8 @@ USER_SITE_LISTS = {
     ],
 }
 
-# 分组次序：有码、无码、素人、FC2、欧美、国产、动漫（FC2 这一组在本弹窗内不再叫「个摄」）
-EXPECTED_GROUP_ORDER = ["有码", "无码", "素人", "FC2", "欧美", "国产", "动漫"]
+# 分组次序：有码、无码、短剧、FC2、欧美、国产、动漫（FC2 这一组在本弹窗内不再叫「个摄」）
+EXPECTED_GROUP_ORDER = ["有码", "无码", "短剧", "FC2", "欧美", "国产", "动漫"]
 
 # 候选区各组的标题（取自 PALETTE_GROUP_TITLES，即那七个短名 chip；
 # 设置页各行标签与两个弹窗标题用的是带「番号」的 TYPE_TITLES，两边不同源、也不同名）
@@ -291,13 +266,20 @@ def _shown(dlg, qt_app):
 
 
 def _title_rows(dialog) -> dict[str, int]:
-    """{分组标题: 所在行号}；候选区应当恰好七个标题（六类 + 动漫）。"""
+    """{分组标题: 所在行号}；候选区最多七个标题（六类 + 动漫），且次序与需求一致。
+
+    这里只校验「出现过的标题都按 EXPECTED_GROUP_ORDER 的次序排」：候选区只给了一部分
+    站点时该组没有成员、不会出标题（短剧组只挂 JavDay，用不含 JavDay 的名单测就会缺它）。
+    「七个标题都在」由 test_group_title_text_is_the_plain_type_name 那类用全量候选区的用例把守。
+    """
     rows = {
         str(dialog.available_list.item(row).text()): row
         for row in range(dialog.available_list.count())
         if _is_group_item(dialog.available_list.item(row))
     }
-    assert list(rows) == EXPECTED_GROUP_ORDER, f"标题不是 {EXPECTED_GROUP_ORDER}：{list(rows)}"
+    assert [title for title in EXPECTED_GROUP_ORDER if title in rows] == list(rows), (
+        f"标题不是 {EXPECTED_GROUP_ORDER} 的子序列：{list(rows)}"
+    )
     return rows
 
 
@@ -447,14 +429,14 @@ def test_empty_candidate_list_produces_no_groups():
 
 def test_group_without_available_sites_leaves_no_empty_title():
     """某一组在本机没有候选站点时不留空标题，否则会多出几个点开没内容的标题。"""
-    # Faleno 2.6.0 起同时在有码番号、素人番号两组，故候选区出现两个标题
-    assert _groups_of([Website.FALENO]) == {"有码": ["Faleno"], "素人": ["Faleno"]}
+    # JavDay 2.6.0 起同时在有码番号、国产短剧两组，故候选区出现两个标题
+    assert _groups_of([Website.JAVDAY]) == {"有码": ["JavDay"], "短剧": ["JavDay"]}
 
 
 def test_sites_outside_every_group_are_appended_without_a_title():
     """落在七组之外的站点（如 MyWife）按传入次序接在末尾，但不另起「其他」标题。"""
     groups = grouped_palette_groups([Website.MYWIFE, Website.DMM, Website.AVSOX])
-    assert [title for title, _ in groups] == ["有码", "无码", "素人", "FC2", ""]
+    assert [title for title, _ in groups] == ["有码", "无码", "FC2", ""]
     assert [site.value for site in groups[-1][1]] == ["MyWife"]
 
 
@@ -640,13 +622,16 @@ def test_site_tooltip_is_only_the_capability_line(dialog):
         if not caption:
             continue  # 没注册爬虫的历史枚举值（airav）本来就没有文案，界面退回显示站名
         assert "：" in caption, f"{site.value} 的文案没有「定位：名单」两段：{caption!r}"
-        # 「素人」「动漫」「FC2」不写进这一行（用户要求：素人本质就是有码、用假名或根本没名
-        # 字；动漫不必单列；FC2 同属有码那一类、只是没番号）。只看冒号后的名单段——MyWife
+        # 「动漫」「FC2」不写进这一行（用户要求：动漫不必单列；FC2 同属有码那一类、只是没番号）。
+        # 「短剧」要照常显示（用户口径）——短剧组只有 JavDay 一站，但正因如此更需要看得见。
+        # 只看冒号后的名单段——MyWife
         # 不属任何类型组、FC2 与 Getchu 各自只剩被隐去的那一类，三者那行都是爬虫自己的
         # 说明（MyWife 是「有码：MyWife」），前缀那句不在本次范围内
         types = caption.split("：", 1)[1].split("/")
-        for hidden in ("素人", "动漫", "FC2"):
+        for hidden in ("动漫", "FC2"):
             assert hidden not in types, f"{site.value} 的类型名单里还有「{hidden}」：{caption!r}"
+    # 短剧组只挂 JavDay，所以这一行里应当看得见「短剧」
+    assert _site_capability_caption(Website.JAVDAY) == "综合：有码/短剧"
     # 摆进候选区之后，悬停提示也必须只有这一行（不加换行、不带「类型：」「联动：」标签）
     for value in _site_row_values(dialog):
         item = dialog.available_list.item(_row_of(dialog, value))
@@ -660,9 +645,9 @@ def test_site_tooltip_keeps_each_site_own_leading_word():
 
     7mmtv 的说法是「综合」（跨类型站），AVSOX 说的是「无码」、FC2 说的是「FC2」——那是各站
     定位说明里自带的词，换掉就把它说错了。
-    冒号后面不再取爬虫 description 里那句写死的名单（「综合：有码+无码+素人+FC2」），
+    冒号后面不再取爬虫 description 里那句写死的名单（如「综合：有码+无码+FC2」），
     改为现算的类型名单，也就不再随 TYPE_DEFAULT_SITES 的增删而失真；名单里不写
-    「素人」「动漫」「FC2」。
+    「动漫」「FC2」（「短剧」照常显示）。
     """
     assert _site_capability_caption(Website.MMTV) == "综合：有码/无码/欧美/国产"
     assert _site_capability_caption(Website.JAVDB) == "综合：有码/无码/欧美/国产"
@@ -870,7 +855,6 @@ def test_add_all_uses_original_order_while_palette_stays_grouped(qt_app):
         assert _groups_from_widget(dlg) == {
             "有码": ["DMM", "AVBase", "Xcity"],
             "无码": ["AVSOX"],
-            "素人": ["DMM", "AVBase", "Xcity"],
             "FC2": ["AVSOX"],
             "欧美": ["ThepornDB"],
             "国产": ["Madouqu"],

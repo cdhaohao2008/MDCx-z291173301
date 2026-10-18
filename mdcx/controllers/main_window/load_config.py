@@ -192,7 +192,7 @@ def load_config(self: "MyMAinWindow"):
         self.Ui.lineEdit_website_youma.setText(",".join([site.value for site in manager.config.website_youma]))
         # 无码番号刮削网站
         self.Ui.lineEdit_website_wuma.setText(",".join([site.value for site in manager.config.website_wuma]))
-        # 素人番号刮削网站
+        # 国产短剧刮削网站（字段名沿用 website_suren，显示名已从「素人」改为「国产短剧」）
         self.Ui.lineEdit_website_suren.setText(",".join([site.value for site in manager.config.website_suren]))
         # FC2番号刮削网站
         self.Ui.lineEdit_website_fc2.setText(",".join([site.value for site in manager.config.website_fc2]))
@@ -203,7 +203,7 @@ def load_config(self: "MyMAinWindow"):
         # 动漫里番刮削网站
         self.Ui.lineEdit_website_dongman.setText(",".join([site.value for site in manager.config.website_dongman]))
         # 锁定刮削类型
-        _type_labels = ["自动判断", "有码", "无码", "素人", "FC2", "欧美", "国产", "动漫"]
+        _type_labels = ["自动判断", "有码", "无码", "短剧", "FC2", "欧美", "国产", "动漫"]
         _type_values = ["auto", "youma", "wuma", "suren", "fc2", "oumei", "guochan", "dongman"]
         _fixed_value = manager.config.fixed_scraping_type.value
         _idx = _type_values.index(_fixed_value) if _fixed_value in _type_values else 0

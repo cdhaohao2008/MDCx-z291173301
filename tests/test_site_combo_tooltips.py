@@ -447,8 +447,8 @@ def test_populated_site_combo_shows_the_available_site_caption_and_only_check_re
         assert "、" not in text, f"第 {i} 行显示文本还留着顿号：{text!r}"
         assert "类型：" not in tip_text and "联动" not in tip_text, f"第 {i} 行提示又抄了一遍能力文案：{tip_text!r}"
     assert "综合：有码/无码/欧美/国产" in combo.itemText(3)
-    # 「素人」「动漫」「FC2」不写进这一行文案（用户要求）
-    assert all(h not in combo.itemText(0) and h not in combo.itemText(3) for h in ("素人", "动漫", "FC2"))
+    # 「动漫」「FC2」不写进这一行文案（用户要求；「短剧」照常显示）
+    assert all(h not in combo.itemText(0) and h not in combo.itemText(3) for h in ("动漫", "FC2"))
     # 不属任何类型组的站仍只有自己那行定位说明，且它进了显示文本
     assert "有码：MyWife" in combo.itemText(4)
 

@@ -255,19 +255,20 @@ def test_mirror_crawler_defaults_to_the_chinese_language():
 
 
 def test_mirror_site_sits_right_after_javlibrary_in_coded_types():
-    """用户指定的位置：有码与素人两组里镜像紧跟在原站后面。"""
-    for scraping_type in (FixedScrapingType.YOUMA, FixedScrapingType.SUREN):
-        sites = list(TYPE_DEFAULT_SITES[scraping_type])
-        assert sites.index(Website.JAVLIBRARY_MIRROR) == sites.index(Website.JAVLIBRARY) + 1
+    """用户指定的位置：有码组里镜像紧跟在原站后面（素人组 2.6.0 起改叫国产短剧，只挂 JavDay）。"""
+    sites = list(TYPE_DEFAULT_SITES[FixedScrapingType.YOUMA])
+    assert sites.index(Website.JAVLIBRARY_MIRROR) == sites.index(Website.JAVLIBRARY) + 1
 
 
 def test_mirror_site_only_joins_the_coded_types():
-    """只加进有码/素人两组，其余四组不含它。"""
+    """只加进有码组，其余六组不含它。"""
     for scraping_type in (
         FixedScrapingType.WUMA,
+        FixedScrapingType.SUREN,
         FixedScrapingType.FC2,
         FixedScrapingType.OUMEI,
         FixedScrapingType.GUOCHAN,
+        FixedScrapingType.DONGMAN,
     ):
         assert Website.JAVLIBRARY_MIRROR not in TYPE_DEFAULT_SITES[scraping_type], scraping_type.name
 
