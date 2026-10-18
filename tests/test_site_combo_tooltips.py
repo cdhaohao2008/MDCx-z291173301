@@ -453,6 +453,35 @@ def test_populated_site_combo_shows_the_available_site_caption_and_only_check_re
     assert "有码：MyWife" in combo.itemText(4)
 
 
+def test_proxy_site_combo_omits_caption_but_others_keep_it():
+    """只有「使用代理」下拉框不显示能力概览，另两个下拉框一字未改（用户 2026-10-19）。
+
+    「使用代理」选的是要走代理的域名，「综合：有码+无码」「有码：有码」这类能力文案
+    与判断走不走代理无关，纯噪声 → 整段去掉。但区域标签、状态图标、tooltip、右列网址、
+    UserRole 里的纯站点值全部照旧；「指定网站」「当前网站」两个框的能力文案保持原样。
+    """
+    _ensure_app()
+    sites = ["AVBase", "AVSOX", "DMM", "7mmtv", "MyWife"]
+
+    proxy_box = QComboBox()
+    _populate_site_combo(proxy_box, sites, with_caption=False)
+    normal_box = QComboBox()
+    _populate_site_combo(normal_box, sites)
+
+    for i in range(proxy_box.count()):
+        text = proxy_box.itemText(i)
+        # 显示文本只剩「站点名（区域标签）」，能力概览一个都不许残留
+        assert text == sites[i] or text.startswith(f"{sites[i]}（"), f"使用代理下拉第 {i} 行仍有能力文案：{text!r}"
+        assert "：" not in text, f"使用代理下拉第 {i} 行仍有能力文案：{text!r}"
+        assert text == normal_box.itemText(i).split(" ")[0], f"区域标签被误删：{text!r}"
+        # 纯站点值仍存在，消费方（_add_no_proxy_site / 存盘）取值的口径不变
+        assert proxy_box.itemData(i, Qt.ItemDataRole.UserRole) == sites[i]
+
+    # 另两个下拉框的能力文案原样保留
+    assert "综合：有码/无码/欧美/传媒" in normal_box.itemText(3)
+    assert "有码：有码" in normal_box.itemText(0)
+
+
 def test_combo_caption_is_the_very_same_line_as_the_site_editor():
     """「网络→网站设置」与「编辑网站」摆的是同一批站：那一行能力文案必须逐字同源。
 
@@ -471,6 +500,15 @@ def test_combo_caption_is_the_very_same_line_as_the_site_editor():
     assert init_mod._site_combo_caption("AVSEX") == "综合：有码/无码/国产"
     # 不认识的站点值不炸下拉，只是没有文案
     assert init_mod._site_combo_caption("NotASite") == ""
+
+
+def test_init_ui_only_proxy_site_combo_drops_the_caption():
+    """Init_Ui 里只有「使用代理」那一行传 with_caption=False（防止后来人误扩散到别的框）。"""
+    source = inspect.getsource(Init_Ui)
+    calls = [line for line in source.splitlines() if "_populate_site_combo(" in line]
+    assert len(calls) == 3, f"三处调用不齐：{calls}"
+    with_flag = [line for line in calls if "with_caption=False" in line]
+    assert len(with_flag) == 1 and "comboBox_no_proxy_sites" in with_flag[0], f"关能力文案的下拉框不对：{calls}"
 
 
 def test_init_ui_installs_tips_on_all_three_site_combos():

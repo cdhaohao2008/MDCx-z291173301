@@ -137,12 +137,17 @@ def invalidate_check_cache() -> None:
     _CHECK_CACHE = None
 
 
-def _populate_site_combo(combo: QComboBox, site_values: list[str]) -> None:
+def _populate_site_combo(combo: QComboBox, site_values: list[str], *, with_caption: bool = True) -> None:
     """填充站点下拉框：区域标签与能力概览直接拼入显示文本，检测状态入图标，tooltip 只留上次检测。
 
     显示文本里的能力概览取自 `_site_combo_caption()`——即「编辑网站」弹窗「可用网站」候选区
     站点项的悬停提示那一行，同一批站在两处说同一句话；而 tooltip 按用户要求只保留
     「上次检测：…」，不再重复能力文案。
+
+    with_caption=False 时只显示「站点名（区域标签）」，不拼能力概览（「综合：有码/无码/…」
+    那段）。仅「使用代理」下拉框用这个姿势（用户 2026-10-19 提出）：那里选的是要走代理的
+    域名，能力概览（有无码/欧美/综合）与之无关，纯属噪声。区域标签、状态图标、tooltip、
+    UserRole 存的纯站点值、右列网址一律照旧，另两个下拉框行为完全不变。
     """
     from mdcx.manual import ManualConfig
 
@@ -152,9 +157,8 @@ def _populate_site_combo(combo: QComboBox, site_values: list[str]) -> None:
         icon = _site_status_icon(cache_entry.get("status", ""), combo) if cache_entry else QIcon()
         # UserRole 存纯站点值：显示文本=站点名+区域标签+能力概览（与「可用网站」同源），
         # 消费方统一经 currentData()/itemData(UserRole) 取纯值
-        caption = _site_combo_caption(value)
         name = f"{value}（{tag}）" if tag else value
-        if caption:
+        if with_caption and (caption := _site_combo_caption(value)):
             name = f"{name} {caption}"
         combo.addItem(icon, name, value)
         url = _resolve_site_url(value)
@@ -889,7 +893,9 @@ def Init_Ui(self: "MyMAinWindow"):
     # 初始化使用代理网站下拉框
     self.Ui.comboBox_no_proxy_sites.clear()
     self.Ui.comboBox_no_proxy_sites.addItem("选择网站...", "")
-    _populate_site_combo(self.Ui.comboBox_no_proxy_sites, sorted(supported_websites))
+    # 使用代理下拉框不要能力概览（「综合：有码+无码」「有码：有码」等）：用户 2026-10-19 提出，
+    # 这里选的是要走代理的域名，能力文案纯噪声。另两个下拉框保持原样。
+    _populate_site_combo(self.Ui.comboBox_no_proxy_sites, sorted(supported_websites), with_caption=False)
     # 连接选择事件
     self.Ui.comboBox_no_proxy_sites.currentTextChanged.connect(self._add_no_proxy_site)
     _setup_combo_boxes(self)
