@@ -128,4 +128,4 @@ async def test_fc2ppvdb_crawler_reports_login_page_xhr(monkeypatch):
 
     assert res.data is None
     assert res.debug_info.error is not None
-    assert "fc2ppvdb Cookie 可能无效或已过期" in str(res.debug_info.error)
+    assert "fc2ppvdb Cookie可能无效或已过期" in str(res.debug_info.error)

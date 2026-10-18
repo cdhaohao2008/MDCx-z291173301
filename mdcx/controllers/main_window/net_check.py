@@ -250,8 +250,8 @@ class NetCheckMixin:
     def pushButton_check_javdb_cookie_clicked(self):
         input_cookie = self.Ui.plainTextEdit_cookie_javdb.toPlainText()
         if not input_cookie:
-            self.set_javdb_status.emit("❌ 未填写 Cookie")
-            self.show_log_text(" ❌ JavDb 未填写 Cookie，可在「软件设置」-「网络」添加！")
+            self.set_javdb_status.emit("❌ 未填写Cookie")
+            self.show_log_text(" ❌ JavDb 未填写Cookie，可在「软件设置」-「网络」添加！")
             return
         self.set_javdb_status.emit("⏳ 正在检测中...")
         try:
@@ -262,7 +262,7 @@ class NetCheckMixin:
             signal_qt.show_log_text(traceback.format_exc())
 
     def _check_javdb_cookie(self, input_cookie: str):
-        tips = "❌ 未填写 Cookie，影响 FC2 刮削！"
+        tips = "❌ 未填写Cookie，影响 FC2 刮削！"
         if not input_cookie:
             self.set_javdb_status.emit(tips)
             return tips
@@ -302,7 +302,7 @@ class NetCheckMixin:
                 else:
                     # 议题 #130：/logout 缺失只说明"未检测到登录态"，可能是维护页/拦截页，
                     # 不构成 cookie 失效的确凿证据——只告警、保留 cookie，由用户手动替换。
-                    tips = "❌ 未检测到登录态，Cookie 可能无效（已保留，可手动替换）"
+                    tips = "❌ 未检测到登录态，Cookie可能无效（已保留，可手动替换）"
         except Exception as e:
             tips = f"❌ 连接失败！请检查网络或代理设置！ {e}"
             signal_qt.show_traceback_log(tips)

@@ -22185,14 +22185,14 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       <x>0</x>
                       <y>0</y>
                       <width>860</width>
-                      <height>1755</height>
+                      <height>1838</height>
                     </rect>
                   </property>
                   <widget class="QGroupBox" name="groupBox_10">
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>641</y>
+                        <y>724</y>
                         <width>701</width>
                         <height>601</height>
                       </rect>
@@ -22612,7 +22612,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         <x>30</x>
                         <y>20</y>
                         <width>701</width>
-                        <height>606</height>
+                        <height>689</height>
                       </rect>
                     </property>
                     <property name="styleSheet">
@@ -22627,17 +22627,20 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           <x>20</x>
                           <y>30</y>
                           <width>661</width>
-                          <height>576</height>
+                          <height>659</height>
                         </rect>
                       </property>
                       <layout class="QGridLayout" name="gridLayout_9">
-                        <item row="9" column="0" colspan="2">
+                        <item row="9" column="1" colspan="3">
                           <widget class="QLabel" name="label_103">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
                                 <horstretch>0</horstretch>
                                 <verstretch>0</verstretch>
                               </sizepolicy>
+                            </property>
+                            <property name="minimumHeight">
+                              <number>160</number>
                             </property>
                             <property name="styleSheet">
                               <string notr="true">color: rgb(8, 128, 128);</string>
@@ -22655,7 +22658,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
                             </property>
                             <property name="text">
-                              <string>&lt;p style='line-height:20px'&gt;支持http、https、socks5代理，示例：http://127.0.0.1:7897&lt;br&gt;用户名和密码格式为: schema://username:password@host:port&lt;br&gt;"使用代理"仅控制常规网络请求代理开关，不控制CF Bypass代理&lt;br&gt;"CF Bypass代理"选项仅作用于Bypass的服务请求(mirror/html)&lt;br&gt;勾选"全部走代理"后"使用代理"列表不再生效，分流交给代理软件&lt;br&gt;Cloudflare Bypass地址留空时，配置了"CloudFlare 绕过服务"自动启动适配层，两者均留空时关闭CF Bypass功能&lt;/p&gt;</string>
+                              <string>&lt;p style='line-height:20px'&gt;支持http、https、socks5代理，示例：http://127.0.0.1:7897&lt;br&gt;用户名和密码格式为: schema://username:password@host:port&lt;br&gt;"使用代理"仅控制常规网络请求代理开关，不控制CF Bypass代理&lt;br&gt;"CF Bypass代理"选项仅作用于Bypass的服务请求(mirror/html)&lt;br&gt;勾选"全部走代理"后"使用代理"列表不再生效，分流交给代理软件&lt;br&gt;Cloudflare Bypass地址留空时，配置了"CloudFlare 绕过服务"自动启动适配层，两者均留空时关闭Cloudflare Bypass功能&lt;/p&gt;</string>
                             </property>
                           </widget>
                         </item>
@@ -23393,7 +23396,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1502</y>
+                        <y>1585</y>
                         <width>701</width>
                         <height>210</height>
                       </rect>
@@ -23565,7 +23568,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1257</y>
+                        <y>1340</y>
                         <width>701</width>
                         <height>230</height>
                       </rect>

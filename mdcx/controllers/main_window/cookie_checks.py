@@ -77,17 +77,17 @@ def javbus_cookie_verdict(input_cookie: str, html: str | None, error: str | None
         return "unreachable", f"❌ 连接失败！请检查网络或代理设置！ {error or ''}".rstrip()
     state = classify_javbus_login_state(html)
     if state == "blocked":
-        return "blocked", "⚠️ 被 CloudFlare 或年龄验证拦截，无法判定 Cookie（已保留，可稍后重试）"
+        return "blocked", "⚠️ 被CloudFlare或年龄验证拦截，无法判定Cookie有效性（已保留，可稍后重试）"
     if not cookie:
         # 没填 Cookie 时只回答「这个节点要不要 Cookie」，不报「无效」
         if "lostpasswd" in html.lower():
-            return "needed", "❌ 当前节点需要 Cookie 才能刮削！请填写 Cookie 或更换节点！"
-        return "not_needed", "✅ 当前节点无需 Cookie 即可刮削，可留空！"
+            return "needed", "❌ 当前节点需要Cookie才能刮削！请填写Cookie或更换节点！"
+        return "not_needed", "✅ 当前节点无需Cookie即可刮削，可留空！"
     if state == "logged_in":
-        return "valid", "✅ 连接正常，Cookie 有效！"
+        return "valid", "✅ 连接正常，Cookie有效！"
     if state == "logged_out":
-        return "invalid", "❌ Cookie 无效或已过期！（已保留原值，可手动替换）"
-    return "unknown", "⚠️ 未识别页面结构，无法判定 Cookie（已保留，可手动替换）"
+        return "invalid", "❌ Cookie无效或已过期！（已保留，可手动替换）"
+    return "unknown", "⚠️ 未识别页面结构，无法判定Cookie有效性（已保留，可手动替换）"
 
 
 class CookieChecksMixin:
@@ -95,8 +95,8 @@ class CookieChecksMixin:
     def pushButton_check_fc2ppvdb_cookie_clicked(self):
         input_cookie = self.Ui.plainTextEdit_cookie_fc2ppvdb.toPlainText().strip()
         if not input_cookie:
-            self.set_fc2ppvdb_status.emit("❌ 未填写 Cookie")
-            self.show_log_text(" ❌ FC2PPVDB 未填写 Cookie，可在「软件设置」-「网络」添加！")
+            self.set_fc2ppvdb_status.emit("❌ 未填写Cookie")
+            self.show_log_text(" ❌ FC2PPVDB 未填写Cookie，可在「软件设置」-「网络」添加！")
             return
         self.set_fc2ppvdb_status.emit("⏳ 正在检测中...")
         try:
@@ -107,13 +107,14 @@ class CookieChecksMixin:
             signal_qt.show_log_text(traceback.format_exc())
 
     def _check_fc2ppvdb_cookie(self, input_cookie: str):
-        tips = "❌ 未填写 Cookie"
+        input_cookie = (input_cookie or "").strip()
+        tips = "❌ 未填写Cookie"
         if not input_cookie:
             self.set_fc2ppvdb_status.emit(tips)
             return tips
 
         if not cookie_has_login_key(input_cookie):
-            tips = "❌ Cookie 无效！请粘贴 fc2cmadb.com 登录后的完整 cookie（含 XSRF-TOKEN 与 session 项）"
+            tips = "❌ Cookie无效！请粘贴fc2cmadb.com登录后的完整Cookie（含XSRF-TOKEN与Session项）"
         else:
             cookies = cookie_str_to_dict(input_cookie)
             with manager.acquire_computed() as computed:
@@ -146,7 +147,7 @@ class CookieChecksMixin:
 
     # javbus cookie
     def pushButton_check_javbus_cookie_clicked(self):
-        input_cookie = self.Ui.plainTextEdit_cookie_javbus.toPlainText()
+        input_cookie = self.Ui.plainTextEdit_cookie_javbus.toPlainText().strip()
         self.set_javbus_status.emit("⏳ 正在检测中...")
         try:
             t = threading.Thread(target=self._check_javbus_cookie, args=(input_cookie,), daemon=True)

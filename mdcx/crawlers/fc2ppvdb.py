@@ -330,7 +330,7 @@ def describe_xhr_json_error(response, error: Exception) -> str:
     if not text.strip():
         reason = "接口返回空内容"
     elif "ログイン" in text or "login" in text.lower():
-        reason = "接口返回登录页，fc2ppvdb Cookie 可能无效或已过期"
+        reason = "接口返回登录页，fc2ppvdb Cookie可能无效或已过期"
     elif "text/html" in content_type.lower() or text.lstrip().startswith("<!DOCTYPE html"):
         reason = "接口返回 HTML 页面而不是 JSON"
     else:

@@ -166,7 +166,7 @@ def test_verdict_empty_cookie_asks_whether_node_needs_cookie():
     from mdcx.controllers.main_window.cookie_checks import javbus_cookie_verdict
 
     assert javbus_cookie_verdict("", _LOST_PASSWD_PAGE, "")[0] == "needed"
-    assert "需要 Cookie" in javbus_cookie_verdict("", _LOST_PASSWD_PAGE, "")[1]
+    assert "需要Cookie" in javbus_cookie_verdict("", _LOST_PASSWD_PAGE, "")[1]
     assert javbus_cookie_verdict("", _ANON_PAGE, "")[0] == "not_needed"
 
 
