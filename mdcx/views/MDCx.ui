@@ -22056,7 +22056,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           </rect>
                         </property>
                         <layout class="QHBoxLayout" name="horizontalLayout_148">
-                          <item>
+                          <item alignment="Qt::AlignTop">
                             <widget class="QCheckBox" name="checkBox_actor_pic_replace">
                               <property name="sizePolicy">
                                 <sizepolicy hsizetype="Minimum" vsizetype="Maximum">
@@ -22126,7 +22126,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       <property name="geometry">
                         <rect>
                           <x>300</x>
-                          <y>130</y>
+                          <y>68</y>
                           <width>180</width>
                           <height>40</height>
                         </rect>

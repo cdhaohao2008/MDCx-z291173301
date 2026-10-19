@@ -43,6 +43,10 @@ _KNOWN_OK_OVERLAPS: set[tuple[str, str, str]] = {
     ("widget_setting", "left_backgroud_widget", "widget_buttons"),
     # groupBox_10 内「演示动画：」label_7 与其后的链接 label_get_cookie_url 紧邻设计
     ("groupBox_10", "label_7", "label_get_cookie_url"),
+    # groupBox_68 内「刮削结束后自动创建头像」上移到「图片已存在时」行（y=68），
+    # 矩形与透明容器 frame_7（NoFrame）相交属刻意叠放：复选框在 frame_7 之上
+    # （.ui 中后创建、z 序在上），视觉无重影，属设计而非 bug。
+    ("groupBox_68", "checkBox_actor_photo_kodi", "frame_7"),
 }
 
 
