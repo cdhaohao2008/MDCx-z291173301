@@ -116,7 +116,7 @@ def javbus_cookie_verdict(input_cookie: str, html: str | None, error: str | None
             return "needed", "❌ 当前节点需要Cookie才能刮削！请填写Cookie或更换节点！"
         return "not_needed", "✅ 当前节点无需Cookie即可刮削，可留空！"
     if state == "logged_in":
-        return "valid", "✅ 连接正常，Cookie有效！"
+        return "valid", "✅ 连接正常！"
     if state == "logged_out":
         return "invalid", "❌ Cookie无效或已过期！（已保留，可手动替换）"
     return "unknown", "⚠️ 未识别页面结构，无法判定Cookie有效性（已保留，可手动替换）"
