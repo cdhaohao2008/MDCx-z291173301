@@ -119,6 +119,24 @@ def test_update_is_idempotent() -> None:
     assert json.loads(json.dumps(d, default=str)) == once
 
 
+def test_legacy_main_mode_remapped_exactly_once():
+    """旧编号里的「分离位」2 只迁移一次，第二次 Config.update 必须原地不动。
+
+    锁的是「config_version 冻结为 2 后，迁移判据改为结构性判据」这条改动：
+    若又退回拿版本号当判据，每次启动都会把 2 推成 3、3 推成 4、4 推成 5。
+    """
+    d = _v2_legacy_config()
+    d["main_mode"] = 2  # 旧编号：2 = 视频
+
+    Config.update(d)
+    assert d["main_mode"] == 3  # 新编号：3 = 视频
+    once = json.loads(json.dumps(d, default=str))
+
+    Config.update(d)
+    assert d["main_mode"] == 3
+    assert json.loads(json.dumps(d, default=str)) == once
+
+
 def test_migrate_list_items_does_not_create_absent_keys() -> None:
     """键整体缺失的列表项交给 pydantic default_factory，迁移不应凭空造键。"""
     d = _v2_legacy_config()

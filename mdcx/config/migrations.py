@@ -4,20 +4,18 @@ from typing import Any
 
 from .enums import DownloadableFile, HDPicSource, Website
 
-# 配置版本号只在「大配置框架」（整体结构语义）变更时才升。
-# 新增配置项、新增列表枚举值、给旧配置补缺键都**不要**改它——旧配置升级
-# 靠下面的 NEW_LIST_ITEMS 与 Config.update() 末尾的缺失键补齐，与版本号无关。
+# 配置版本号固定为 2（用户 2026-10-19 定规）：以后无论新增配置项、新增列表
+# 枚举值、给旧配置补缺键，还是真的动了大配置框架，都**不再**改它——版本号一格
+# 一格往上叠，除了让人误以为「框架变了」没有任何实际作用。
 # 本值与 resources/config/default_config.json 的 config_version 及
 # Config.config_version 的默认值必须三者一致。
-CURRENT_CONFIG_VERSION = 3
-
-
-def _config_version(data: dict[str, Any]) -> int:
-    """读取配置版本号；缺失或类型异常（含 bool）一律按 0 处理。"""
-    version = data.get("config_version")
-    if isinstance(version, bool) or not isinstance(version, int):
-        return 0
-    return version
+#
+# 连带后果：`config_version` 已不能当迁移判据（见 _migrate_main_mode 的结构性
+# 判据）。旧配置升级靠三条幂等路径，全部与版本号无关：
+#   ① 缺失的顶层键按 Config.factory_defaults() 补齐（backfill_missing_keys）
+#   ② 列表型配置项的新增值按 NEW_LIST_ITEMS 逐项幂等补齐
+#   ③ 结构语义变更（如刮削模式重新编号）改用**结构性判据**判断新旧框架
+CURRENT_CONFIG_VERSION = 2
 
 
 def _str_to_list(v: str | list[Any] | None, sep: str = ",", unique: bool = True) -> list[str]:
@@ -37,13 +35,32 @@ def _enum_value(value: Any) -> Any:
     return value.value if hasattr(value, "value") else value
 
 
-# 刮削模式编号（v3 调整）：分离模式插入为 2，视频/更新/读取顺延为 3/4/5。
+# 刮削模式编号（分离模式插入为 2）：视频/更新/读取顺延为 3/4/5。
 _MAIN_MODE_REMAP_V3 = {2: 3, 3: 4, 4: 5}
+
+# 判别「本配置是否已在新编号下」的结构性依据：分离模式的四个开关与新编号同时
+# 入列（2.2.3 起），新编号配置必然带这些键，旧编号配置必然一个都没有。
+# 这四个键是真实模型字段，能随 save() 的 model_dump_json 落盘、也会被
+# Config.update() 的 separate_* 继承分支补上，故「只迁移一次」由写盘保证。
+#
+# 为什么不能继续读 config_version：它已按用户定规冻结在 2，拿它当判据会让
+# **每次启动**都把已经是新编号的配置再迁移一遍——分离模式(2) 会被推成视频(3)、
+# 再被推成更新(4)、再被推成读取(5)，用户的刮削模式被悄悄改掉，且越用越偏。
+_SEPARATE_MODE_KEYS = (
+    "separate_success_file_move",
+    "separate_failed_file_move",
+    "separate_success_file_rename",
+    "separate_del_empty_folder",
+)
 
 
 def _migrate_main_mode(data: dict[str, Any]) -> str | None:
-    """旧编号（v2 及更早，或缺版本号的 legacy 配置）→ 新编号，返回迁移提示或 None。"""
-    if _config_version(data) >= 3:
+    """旧编号配置（分离模式之前）→ 新编号，返回迁移提示或 None。
+
+    判据是 `_SEPARATE_MODE_KEYS` 是否已在配置里，与已冻结的 `config_version`
+    无关。迁移后 `Config.update()` 会补上这四个键，故对同一份配置只生效一次。
+    """
+    if any(key in data for key in _SEPARATE_MODE_KEYS):
         return None
     mode = data.get("main_mode")
     if isinstance(mode, str) and mode.strip().isdigit():
