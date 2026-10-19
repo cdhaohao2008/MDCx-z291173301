@@ -100,13 +100,26 @@ def _site_combo_caption(value: str) -> str:
         return ""
 
 
-def _site_combo_item_tooltip(value: str) -> str:
+def _site_check_entry(value: str, fallback_key: str = "") -> dict | None:
+    """按检测键取缓存条目，取不到时回退到聚合键（official 子站行 → Official 本行）。
+
+    official 无码五站各占一行、各自探测自己那家官网，逐站结果以 `Official·厂牌` 为键存进缓存；
+    检测早于该存储的旧缓存、或用户自定义过 Official URL（只跑一条检测项）时没有子键，
+    此时回退到 Official 的聚合值——与拆分子行之前的表现一致，不会退回成一片空白圆点。
+    """
+    entry = _load_check_cache().get(value)
+    if entry is None and fallback_key:
+        entry = _load_check_cache().get(fallback_key)
+    return entry
+
+
+def _site_combo_item_tooltip(value: str, fallback_key: str = "") -> str:
     """下拉项 tooltip：只留上次检测结果。
 
     能力文案（有码：有码 / 无码：无码 / 综合：…）已直接拼进选项显示文本，
     按用户要求不再在提示里重复，提示只剩「上次检测：…」；没检测过的站点返回空串、悬停不弹。
     """
-    entry = _load_check_cache().get(value)
+    entry = _site_check_entry(value, fallback_key)
     if not entry:
         return ""
     label = {"ok": "✅可连通", "warn": "⚠️有需关注项", "fail": "❌连不通", "skip": "⏭上次未测"}.get(
@@ -183,19 +196,25 @@ def refresh_network_check_badges(self: "MyMAinWindow") -> None:
             )
             if not value:
                 continue
-            entry = _load_check_cache().get(value)
+            # official 子站行带自己的检测键（Official·厂牌）：各显各的状态，取不到才回退 Official 聚合
+            check_key = str(combo.itemData(i, _SITE_CHECK_KEY_ROLE) or "")
+            fallback_key = value if check_key else ""
+            entry = _site_check_entry(check_key or value, fallback_key)
             combo.setItemIcon(i, _site_status_icon(entry["status"], combo) if entry else QIcon())
             # 显式网址行（official 子站）：保留手工地址，只刷新图标与 tooltip
             url = combo.itemData(i, _SITE_URL_EXPLICIT_ROLE) or _resolve_site_url(
                 value
             )  # 自定义网址保存后此处同步最新值
             combo.setItemData(i, url, _SITE_URL_ROLE)
-            combo.setItemData(i, _site_combo_item_tooltip(value), Qt.ItemDataRole.ToolTipRole)
+            combo.setItemData(
+                i, _site_combo_item_tooltip(check_key or value, fallback_key), Qt.ItemDataRole.ToolTipRole
+            )
         _fit_site_url_popup(combo)
 
 
 _SITE_URL_ROLE = Qt.ItemDataRole.UserRole + 2  # 各站点当前网址：下拉右侧网址列显示，点击跳转浏览器
 _SITE_URL_EXPLICIT_ROLE = Qt.ItemDataRole.UserRole + 3  # 手工指定的行网址：刷新徽章时不被重算覆盖
+_SITE_CHECK_KEY_ROLE = Qt.ItemDataRole.UserRole + 4  # 该行检测键：official 子站行为 Official·厂牌，其余行为空
 _SITE_URL_GAP = 14
 _SITE_URL_LINK_COLOR = "#1a73e8"
 _SITE_URL_ICON_WIDTH = 24  # 状态圆点图标 + 间距预留
@@ -248,6 +267,11 @@ def _append_official_subsite_rows(combo: QComboBox, *, remove_base_row: bool = T
     official 本身就是按番号前缀路由，这五行只是把那层路由显式摆到界面上，不改判定。
     真实网址存显式角色，刷新徽章时不被重算覆盖。
 
+    状态圆点与悬停提示按**检测项名**（`Official·厂牌`）各取各的：五站逐站检测、各自探测自己
+    那家官网，一站失败不该把另外四行一起染红；缓存里没有子键（检测早于该存储，或用户自定义过
+    Official URL 只跑一条检测项）时回退 Official 聚合值，与拆分子行前一致。检测键另存
+    _SITE_CHECK_KEY_ROLE，供 refresh_network_check_badges 刷新徽标时重新取。
+
     remove_base_row：是否撤掉 official 本行（只留五个子站行）。网络页「当前网站」传 True
     ——那里选的是执行刮削的站点，五个子站行都落到 official 爬虫，藏起本行免得同一份
     能力摆两遍；刮削网站页「指定网站」传 False——那里选的是「这批番号交给哪个站」，
@@ -256,11 +280,12 @@ def _append_official_subsite_rows(combo: QComboBox, *, remove_base_row: bool = T
     （子站行都插在 anchor 之后），落在本行语义正确。
     """
     try:
+        from mdcx.core.network_check import OFFICIAL_SUBSITE_PREFIX
         from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
     except Exception:
         return
-    cache_entry = _load_check_cache().get("Official")
-    icon = _site_status_icon(cache_entry.get("status", ""), combo) if cache_entry else QIcon()
+    cache = _load_check_cache()
+    official_entry = cache.get("Official")
     anchor = -1
     for i in range(combo.count()):
         if (combo.itemData(i, Qt.ItemDataRole.UserRole) or "") == "Official":
@@ -269,11 +294,15 @@ def _append_official_subsite_rows(combo: QComboBox, *, remove_base_row: bool = T
     for offset, (name, spec) in enumerate(sorted(UNCENSORED_OFFICIAL_SITES.items())):
         url = spec.base_url.rstrip("/") + "/"
         description = f"无码：{_OFFICIAL_STUDIO_DISPLAY.get(spec.studio, spec.studio)}"
+        check_key = f"{OFFICIAL_SUBSITE_PREFIX}{spec.studio}"
+        entry = cache.get(check_key) or official_entry
+        icon = _site_status_icon(entry.get("status", ""), combo) if entry else QIcon()
         row = insert_at + offset
         combo.insertItem(row, icon, f"Official·{spec.studio} {description}", "Official")
+        combo.setItemData(row, check_key, _SITE_CHECK_KEY_ROLE)
         combo.setItemData(row, url, _SITE_URL_ROLE)
         combo.setItemData(row, url, _SITE_URL_EXPLICIT_ROLE)
-        combo.setItemData(row, _site_combo_item_tooltip("Official"), Qt.ItemDataRole.ToolTipRole)
+        combo.setItemData(row, _site_combo_item_tooltip(check_key, "Official"), Qt.ItemDataRole.ToolTipRole)
     # 撤 official 本行（可选）：子站行都插在 anchor 之后，anchor 下标此时仍有效
     if remove_base_row and anchor >= 0:
         combo.removeItem(anchor)

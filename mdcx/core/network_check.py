@@ -1998,24 +1998,47 @@ def load_site_check_cache() -> dict[str, dict]:
     return {}
 
 
+# 徽标取「最差」的排序：数值越小越差。同一站点在一轮里出现多条结果时按它聚合。
+_BADGE_ORDER = {"fail": 0, "warn": 1, "ok": 2, "skip": 3}
+
+# official 无码官网子检测项的命名前缀（`Official·{厂牌}`）：既是检测报告里那一行的名字，
+# 也是缓存里逐站记录的键；下拉里五行子站行按同名取自己的徽标/悬停提示
+# （init.py 的 _SITE_CHECK_KEY_ROLE），Official 本行才用聚合值。
+OFFICIAL_SUBSITE_PREFIX = "Official·"
+
+
+def _offer_site_check_entry(merged: dict, key: str, level: str, route: str, now: str) -> None:
+    """把一条检测结果并进**本轮**聚合（同一键多条取最差），只动 merged、不碰历史值。"""
+    prev = merged.get(key)
+    if prev is not None and _BADGE_ORDER.get(str(prev.get("status") or ""), 99) <= _BADGE_ORDER.get(level, 99):
+        return  # 本轮已有更差(或同级)结果, 保持最差聚合
+    merged[key] = {"status": level, "route": route, "checked_at": now}
+
+
 def merge_site_check_cache(results: "list[NetworkCheckResult]") -> None:
     """把检测结果中带站点归属的项合并进持久化缓存。
 
     议题 #129: 由"只收集站点检测组"放宽为凡 spec.site 非空即写——
     账号/API 组(DMM_API/TheJavDB/Missav_API/ThepornDB)的检测结果
     同样要回标到网站设置下拉; 基础环境/辅助服务等无站点归属项 site=None 仍排除。
-    Official 为五站子检测(议题 #129), 徽标按"取最差"聚合——路由依赖全部五站,
-    任一不可达整条链路即有异常。
-    重试失败项等部分结果按站点值覆盖更新，其余历史记录保留。
+
+    Official 为五站子检测(议题 #129), 五行都挂在 Website.OFFICIAL 上，故：
+    ① 逐站另存一份以检测项名(`Official·厂牌`)为键的记录，供下拉五行各显各的状态；
+    ② 站点值 Official 存五站的**本轮**聚合（路由依赖全部五站，任一不可达整条链路即有异常）。
+
+    取最差只在**本轮之内**做：先把本轮结果聚合成一条再整体覆盖写入。历史值不参与比较——
+    早先的实现拿历史值比等级，某轮 fail 之后所有更成功的轮次都被判成「不如历史」而被丢弃，
+    Official 于是永久钉在红点：用户 2026-10-19 实测「五站检测全部通过，状态却没变」。
+    重试失败项等部分结果同样按站点值覆盖更新，其余历史记录保留。
     写文件失败静默降级（缓存仅用于展示标注，不影响功能）。
     """
     import json
     import os
     from datetime import datetime
 
-    badge_worst = {"fail": 0, "warn": 1, "ok": 2, "skip": 3}
     sites = load_site_check_cache()
     now = datetime.now().astimezone().isoformat(timespec="seconds")
+    merged: dict[str, dict] = {}
     for result in results:
         site = result.spec.site
         if site is None:
@@ -2026,11 +2049,11 @@ def merge_site_check_cache(results: "list[NetworkCheckResult]") -> None:
         elif result.used_proxy is False:
             route = "direct"
         level = _site_result_level(result.status)
-        if site == Website.OFFICIAL and site.value in sites:
-            prev = str(sites[site.value].get("status") or "")
-            if badge_worst.get(prev, -1) <= badge_worst.get(level, 99):
-                continue  # 已有更差(或同级)子站结果, 保持最差聚合
-        sites[site.value] = {"status": level, "route": route, "checked_at": now}
+        _offer_site_check_entry(merged, site.value, level, route, now)
+        if site == Website.OFFICIAL and str(result.spec.name).startswith(OFFICIAL_SUBSITE_PREFIX):
+            # 五站子检测项各带自己的名字：另存一份逐站记录，下拉五行不必共用 Official 的颜色
+            _offer_site_check_entry(merged, str(result.spec.name), level, route, now)
+    sites.update(merged)
     try:
         path = _site_cache_path()
         path.parent.mkdir(parents=True, exist_ok=True)

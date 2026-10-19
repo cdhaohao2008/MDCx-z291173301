@@ -2120,7 +2120,7 @@ def test_merge_cache_includes_api_group_sites(monkeypatch, tmp_path):
 
 
 def test_merge_cache_official_aggregates_worst(monkeypatch, tmp_path):
-    """official 五站子结果按"取最差"聚合: 任一 fail 整条链路标红, 且不被后续 ok 覆盖。"""
+    """official 五站子结果按"取最差"聚合: 同一轮内任一 fail 整条链路标红, 与结果顺序无关。"""
     monkeypatch.setattr(nc, "_site_cache_path", lambda: tmp_path / "cache.json")
     merge_site_check_cache(
         [
@@ -2140,6 +2140,69 @@ def test_merge_cache_official_aggregates_worst(monkeypatch, tmp_path):
         ]
     )
     assert load_site_check_cache()["Official"]["status"] == "fail"
+
+
+def test_merge_cache_official_new_run_clears_stale_fail(monkeypatch, tmp_path):
+    """一轮 fail 不能把后续全绿的轮次永久钉死（用户 2026-10-19：五站全通过但状态不变）。
+
+    取最差只在本轮之内做，历史值不参与比较；否则 Official 一旦记过 fail，
+    之后任何更成功的轮次都会被判成「不如历史」丢弃，红点永远不翻绿。
+    """
+    monkeypatch.setattr(nc, "_site_cache_path", lambda: tmp_path / "cache.json")
+    merge_site_check_cache(
+        [
+            _result(Website.OFFICIAL, NetworkCheckStatus.OK, name="Official·1Pondo"),
+            _result(Website.OFFICIAL, NetworkCheckStatus.FAILED, name="Official·HEYZO"),
+        ]
+    )
+    assert load_site_check_cache()["Official"]["status"] == "fail"
+
+    # 下一轮五站全绿 → 聚合翻绿（历史 fail 不得参与比较）
+    merge_site_check_cache(
+        [
+            _result(Website.OFFICIAL, NetworkCheckStatus.OK, name=f"Official·{studio}")
+            for studio in ("10Musume", "1Pondo", "Caribbeancom", "HEYZO", "Pacopacomama")
+        ]
+    )
+    assert load_site_check_cache()["Official"]["status"] == "ok"
+
+
+def test_merge_cache_official_writes_per_subsite_keys(monkeypatch, tmp_path):
+    """五站子检测各存一份 `Official·厂牌` 记录，下拉里每行回显自己那站的状态。"""
+    monkeypatch.setattr(nc, "_site_cache_path", lambda: tmp_path / "cache.json")
+    merge_site_check_cache(
+        [
+            _result(Website.OFFICIAL, NetworkCheckStatus.OK, name="Official·10Musume"),
+            _result(Website.OFFICIAL, NetworkCheckStatus.FAILED, name="Official·HEYZO"),
+            _result(Website.OFFICIAL, NetworkCheckStatus.WARNING, name="Official·1Pondo"),
+        ]
+    )
+    cache = load_site_check_cache()
+    assert cache["Official·10Musume"]["status"] == "ok"
+    assert cache["Official·HEYZO"]["status"] == "fail"
+    assert cache["Official·1Pondo"]["status"] == "warn"
+    assert cache["Official"]["status"] == "fail"  # 本行仍取本轮最差
+    assert all(cache[k]["route"] == "proxy" for k in ("Official·10Musume", "Official·HEYZO", "Official·1Pondo"))
+
+
+def test_merge_cache_official_subsite_keys_follow_site_value_only_for_subsites(monkeypatch, tmp_path):
+    """非子站名的 Official 检测项（用户自定义 URL 时的本行）不写子键，只更新聚合。"""
+    monkeypatch.setattr(nc, "_site_cache_path", lambda: tmp_path / "cache.json")
+    merge_site_check_cache([_result(Website.OFFICIAL, NetworkCheckStatus.OK, name="Official")])
+    cache = load_site_check_cache()
+    assert cache["Official"]["status"] == "ok"
+    assert list(cache) == ["Official"]
+
+
+def test_official_subsite_prefix_keys_cover_five_sites():
+    """逐站缓存键由检测项名 `Official·厂牌` 拼成，五站互不重名（子站行按同名取徽标）。"""
+    from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
+
+    assert nc.OFFICIAL_SUBSITE_PREFIX == "Official·"
+    keys = [f"{nc.OFFICIAL_SUBSITE_PREFIX}{spec.studio}" for spec in UNCENSORED_OFFICIAL_SITES.values()]
+    assert len(keys) == 5
+    assert len(set(keys)) == 5
+    assert all(key.startswith(nc.OFFICIAL_SUBSITE_PREFIX) for key in keys)
 
 
 @pytest.mark.anyio

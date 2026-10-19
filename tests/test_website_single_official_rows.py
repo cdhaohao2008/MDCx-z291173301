@@ -24,16 +24,19 @@ import re
 import sys
 
 import pytest
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtWidgets import QApplication, QComboBox
 
 from mdcx.config.enums import Website
 from mdcx.controllers.main_window.init import (
+    _SITE_CHECK_KEY_ROLE,
+    _SITE_STATUS_DOT_PX,
     _SITE_URL_EXPLICIT_ROLE,
     _SITE_URL_ROLE,
     Init_Ui,
     _append_official_subsite_rows,
     _populate_site_combo,
+    refresh_network_check_badges,
 )
 from mdcx.crawlers import get_registered_crawler_site_values
 from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
@@ -217,3 +220,124 @@ def test_real_main_window_single_website_combo_has_the_five_rows(win):
         label for label in labels if label.startswith("Official·")
     ]
     assert "Official" not in network_labels
+
+
+# ---- 检测徽标（状态圆点 + 悬停提示）：五个子行各显各的那站 ----
+#   用户 2026-10-19 实测「Official·10Musume 等五行的网络检测全部通过，红点却不变」。
+#   两层原因各有回归：① 缓存合并（merge_site_check_cache，见 tests/test_network_check.py）
+#   把某轮 fail 当成历史值参与比较，后续全绿的轮次翻不回来；② 五个子行共用 Official 的
+#   聚合徽标，一站失败五行一起红、用户看不出是哪家。下面这组盯第 ② 层。
+
+
+def _cache_with_one_bad_subsite() -> dict:
+    """五站里只有 HEYZO 不通，其余全绿（HEYZO 挡风控，真实跑测里最常见的那一种）。"""
+    cache = {
+        "Official": {"status": "fail", "route": "proxy", "checked_at": "2026-10-19T21:00:00"},
+    }
+    for studio, status in (
+        ("10Musume", "ok"),
+        ("1Pondo", "ok"),
+        ("Caribbeancom", "ok"),
+        ("HEYZO", "fail"),
+        ("Pacopacomama", "ok"),
+    ):
+        cache[f"Official·{studio}"] = {"status": status, "route": "proxy", "checked_at": "2026-10-19T21:00:00"}
+    return cache
+
+
+def _install_cache(monkeypatch, cache: dict) -> None:
+    """把检测缓存换成给定的内容（真改读端，让 invalidate_check_cache() 后重新读到它）。"""
+    import mdcx.controllers.main_window.init as init_mod
+    import mdcx.core.network_check as nc_mod
+
+    monkeypatch.setattr(nc_mod, "load_site_check_cache", lambda: dict(cache))
+    init_mod.invalidate_check_cache()
+
+
+def _subsite_rows(combo: QComboBox) -> dict[str, int]:
+    """行首站名 → 行下标（只收五个子站行）。"""
+    return {label: i for i, label in enumerate(_labels(combo)) if label.startswith("Official·")}
+
+
+def _dot_rgb(box: QComboBox, row: int) -> tuple[int, ...]:
+    """把该行状态圆点图标栅格化后取中心像素的 RGB（空图标返回空元组）。"""
+    icon = box.itemIcon(row)
+    if icon.isNull():
+        return ()
+    sizes = icon.availableSizes()
+    image = icon.pixmap(sizes[0] if sizes else QSize(_SITE_STATUS_DOT_PX, _SITE_STATUS_DOT_PX)).toImage()
+    return image.pixelColor(image.width() // 2, image.height() // 2).getRgb()[:3]
+
+
+_GREEN = (67, 160, 71)
+_RED = (229, 57, 53)
+_OK_SUBSITES = ("Official·10Musume", "Official·1Pondo", "Official·Caribbeancom", "Official·Pacopacomama")
+
+
+@pytest.fixture()
+def cached_combo(app, monkeypatch) -> QComboBox:
+    """带检测缓存的「当前网站」框：五行子站行各带自己的检测键与状态。"""
+    _install_cache(monkeypatch, _cache_with_one_bad_subsite())
+    return _build_combo(remove_base_row=True)
+
+
+def test_subsite_rows_carry_own_check_key_equal_to_their_label(cached_combo):
+    """检测键必须逐字等于检测报告里那一行的名字（= 行首站名），否则徽标取不到自己那站的结果。"""
+    rows = _subsite_rows(cached_combo)
+    assert sorted(rows) == sorted(_EXPECTED_LABELS)
+    for label, row in rows.items():
+        assert cached_combo.itemData(row, _SITE_CHECK_KEY_ROLE) == label
+        # UserRole 仍是 Official（选中语义不变），检测键另存角色
+        assert cached_combo.itemData(row, Qt.ItemDataRole.UserRole) == Website.OFFICIAL.value
+
+
+def test_one_bad_subsite_does_not_paint_the_other_four_rows_red(cached_combo):
+    """只有 HEYZO 那一行是红点，另外四行必须是绿点（聚合徽标会把五行一起染红）。"""
+    rows = _subsite_rows(cached_combo)
+    assert _dot_rgb(cached_combo, rows["Official·HEYZO"]) == _RED
+    for label in _OK_SUBSITES:
+        assert _dot_rgb(cached_combo, rows[label]) == _GREEN, f"{label} 不该跟着 HEYZO 一起变红"
+
+
+def test_subsite_tooltip_reports_own_site_result(cached_combo):
+    """悬停提示同样各报各的：HEYZO 那行写「❌连不通」，其余四行写「✅可连通」。"""
+    rows = _subsite_rows(cached_combo)
+    tips = {label: str(cached_combo.itemData(row, Qt.ItemDataRole.ToolTipRole) or "") for label, row in rows.items()}
+    assert tips["Official·HEYZO"].startswith("上次检测：2026-10-19 21:00")
+    assert "❌连不通" in tips["Official·HEYZO"]
+    for label in _OK_SUBSITES:
+        assert "✅可连通" in tips[label], f"{label} 的提示被 HEYZO 的失败结果污染了：{tips[label]}"
+
+
+def test_subsite_rows_fall_back_to_official_aggregate_without_sub_keys(app, monkeypatch):
+    """缓存里没有子键（旧缓存/自定义过 Official URL）时回退 Official 聚合值，不退回空白圆点。"""
+    _install_cache(monkeypatch, {"Official": {"status": "ok", "route": "proxy", "checked_at": "2026-10-19T21:00:00"}})
+    box = _build_combo(remove_base_row=True)
+    for label, row in _subsite_rows(box).items():
+        assert _dot_rgb(box, row) == _GREEN, f"{label} 没有回退到 Official 聚合状态"
+        assert "✅可连通" in str(box.itemData(row, Qt.ItemDataRole.ToolTipRole) or "")
+
+
+def test_refresh_badges_recolors_subsite_rows_per_site(app, monkeypatch):
+    """检测完成后刷新徽标：仍按子站行的检测键取色，HEYZO 红、其余绿，不被 Official 聚合值覆盖。"""
+    box = _build_combo(remove_base_row=True)
+    other = QComboBox()
+    _populate_site_combo(other, sorted(get_registered_crawler_site_values()))  # 无子站行的普通框
+    win = type("_Win", (), {})()
+    win.Ui = type("_Ui", (), {})()
+    win.Ui.comboBox_website_all = box
+    win.Ui.comboBox_custom_website = box
+    win.Ui.comboBox_no_proxy_sites = other
+
+    # 先用「全红」缓存填出五行红点（只有 Official 聚合值，子站行回退到它）
+    _install_cache(monkeypatch, {"Official": {"status": "fail", "route": "proxy", "checked_at": "2026-10-19T20:00:00"}})
+    refresh_network_check_badges(win)
+    assert all(_dot_rgb(box, row) == _RED for row in _subsite_rows(box).values())
+
+    # 刷新成「只有 HEYZO 红」：这正是检测通过后用户看到的那一幕
+    _install_cache(monkeypatch, _cache_with_one_bad_subsite())
+    refresh_network_check_badges(win)
+    rows = _subsite_rows(box)
+    assert _dot_rgb(box, rows["Official·HEYZO"]) == _RED
+    for label in _OK_SUBSITES:
+        assert _dot_rgb(box, rows[label]) == _GREEN, f"{label} 刷新后仍未翻绿"

@@ -514,6 +514,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 - `Official` 的五个无码官网子检测项（`Official·Caribbeancom/HEYZO/1Pondo/Pacopacomama/10Musume`）各自带 `probe_number`（见 `mdcx/crawlers/official_uncensored.py` 的 `UNCENSORED_OFFICIAL_SITES`，取值均为**带站点前缀**的实存番号）：`official` 爬虫按番号前缀路由，不带前缀的番号会落到 `manager.computed.official_websites` 里的**别家**官网，检测项就与被测站点对不上号了。
 - 探测结果分两类：`_DETERMINISTIC_PROBE_MARKERS` 命中即首次定论（结构不匹配、番号不存在、404、人机验证…）；其余瞬时结果按 `SCRAPE_PROBE_ATTEMPT_TIMEOUTS`（30s→45s）递进重试。**终局说明只在两档都真超时时写「均超时」**，否则如实附上最后一次的真实原因——不把确定性失败改写成超时。
 - 站点可达但探测番号在本站不存在（404 / 番号形态不被识别 / 搜索无匹配）单独出提示，不计为站点故障（`_probe_number_missing_reason` / `_probe_missing_number_message`）。
+- 站点检测结果持久化在 `userdata/network_check_cache.json`（`merge_site_check_cache` / `load_site_check_cache`），供三个站点下拉回显状态圆点与悬停提示。两条口径：①**同一站点多条结果只在本轮之内取最差**（`Official` 的五站子检测都挂在它身上），聚合完再整体覆盖写入——历史值不参与比较，否则某轮 fail 之后所有更成功的轮次都被丢弃、红点永远翻不回来；②五站子检测项另以检测项名 `Official·厂牌` 为键各存一份，下拉里五个子站行按该键（`_SITE_CHECK_KEY_ROLE`）各显各的状态与提示，取不到才回退 `Official` 聚合值。
 
 ## 配置系统
 
