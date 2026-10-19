@@ -679,6 +679,44 @@ def test_format_result_line_does_not_duplicate_error():
     assert line.count("GET https://example.test 失败:HTTP 403") == 1
 
 
+def test_format_header_columns_align_with_result_lines():
+    """诊断表头四列（状态码/耗时/路由/信息）与数据行严格按显示宽度对齐。
+
+    表头此前用裸空格手拼、数据行用 _pad_left/_pad_right 拼，两套各走各的，
+    表头整体比数据列偏右——200 落在「状态码」左侧、耗时/路由/信息同理
+    （用户在检测网络页逐列对齐时实测）。
+    """
+    from mdcx.core.network_check import _disp_width, _format_header
+
+    header_line = next(line for line in _format_header() if "状态码" in line)
+    spec = NetworkCheckSpec(name="AVBase", group="站点检测", url="https://avbase.example", use_proxy=True)
+    result = NetworkCheckResult(
+        spec=spec,
+        status=NetworkCheckStatus.OK,
+        status_code=200,
+        elapsed_ms=153,
+        message="连接正常，刮削正常",
+    )
+    line = format_result_line(result)
+
+    def display_column(text: str, needle: str) -> int:
+        return _disp_width(text[: text.index(needle)])
+
+    # 路由 与下方的 代理/直连 同列起点；信息 与 说明文字 同列起点
+    assert display_column(header_line, "路由") == display_column(line, "代理")
+    assert display_column(header_line, "信息") == display_column(line, "连接正常")
+
+    # 耗时 右缘与数据 "ms" 右缘严格对齐（数值右对齐行宽 10，右缘恒定）
+    assert display_column(header_line, "耗时") + _disp_width("耗时") == display_column(line, "153 ms") + _disp_width(
+        "153 ms"
+    )
+
+    # 3 位状态码落在「状态码」表头正中（左留 1 列、右留 2 列，6 宽表头居中 3 位数字）
+    code_start = display_column(line, "200")
+    header_start = display_column(header_line, "状态码")
+    assert header_start == code_start - 1
+
+
 def test_format_result_line_tls_error_puts_url_first():
     """TLS 握手中断行：目标地址前置到行首，curl 英文尾巴译中文。"""
     from mdcx.core.network_check import _clean_error, _message_for_error

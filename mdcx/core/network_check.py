@@ -804,12 +804,13 @@ def _format_header(separator_width: int | None = None) -> list[str]:
         + "   "
         + " "
         + _pad_right("站点", 23)
-        + "      "
+        + "   "
         + "状态码"
-        + "        耗时"
-        + "           "
+        + "       "
+        + "耗时"
+        + "        "
         + "路由"
-        + "      "
+        + "     "
         + "信息"
     )
     lines.append(_separator("=", separator_width))
