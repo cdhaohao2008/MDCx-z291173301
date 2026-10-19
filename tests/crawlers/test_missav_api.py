@@ -92,3 +92,64 @@ def test_missav_api_pure_helpers():
 
 def test_missav_api_crawler_is_registered():
     assert get_crawler(Website.MISSAV_API) is MissavApiCrawler
+
+
+class FakeRecombeeUnrelatedClient:
+    """Recombee 搜不到目标番号时返回的是一批语义相近的无关条目（2026-10-19 实测）。"""
+
+    UNRELATED_IDS = [
+        "sdfk-001",
+        "agemix-403",
+        "ppx-004",
+        "hnd-843-uncensored-leak",
+        "miab-596-uncensored-leak",
+    ]
+
+    async def post_json(self, url, **kwargs):
+        return {"recomms": [{"id": i, "values": {"title_cn": f"无关条目 {i}"}} for i in self.UNRELATED_IDS]}, ""
+
+
+@pytest.mark.asyncio
+async def test_missav_api_recombee_fuzzy_hits_never_become_a_result(monkeypatch):
+    """搜不到就报「未找到」，绝不能把 Recombee 首条无关条目当成目标番号的结果。
+
+    旧实现 `return recomms[0]` 让搜 `Deeper.26.06.17` 返回 sdfk-001（SODrijf，2019），
+    而 `data.number` 取的是 input_number，用户看到「番号对得上、元数据全错」。
+    """
+    _mock_dmm_upgrade(monkeypatch)
+    crawler = MissavApiCrawler(client=FakeRecombeeUnrelatedClient())
+    data_input = CrawlerInput.empty()
+    data_input.number = "Deeper.26.06.17"
+
+    res = await crawler.run(data_input)
+
+    assert res.data is None, "Recombee 无番号匹配时不得产出结果"
+    assert res.debug_info.error is not None
+    assert "未找到" in str(res.debug_info.error)
+
+
+@pytest.mark.asyncio
+async def test_missav_api_recombee_search_returns_none_on_fuzzy_only(monkeypatch):
+    """直接钉住 `_recombee_search` 的返回值契约。"""
+    crawler = MissavApiCrawler(client=FakeRecombeeUnrelatedClient())
+    ctx = type("Ctx", (), {"debug": lambda self, _msg: None})()
+
+    assert await crawler._recombee_search(ctx, "Deeper.26.06.17") is None
+
+
+@pytest.mark.asyncio
+async def test_missav_api_prefix_match_still_accepted(monkeypatch):
+    """前缀匹配仍要放行（miab-596 -> miab-596-uncensored-leak 这类派生条目）。"""
+    _mock_dmm_upgrade(monkeypatch)
+    crawler = MissavApiCrawler(
+        client=FakeRecombeeClient({"id": "miab-596-uncensored-leak", "values": {"title_cn": "前缀命中"}})
+    )
+    data_input = CrawlerInput.empty()
+    data_input.number = "MIAB-596"
+
+    res = await crawler.run(data_input)
+
+    assert res.debug_info.error is None
+    assert res.data is not None
+    assert res.data.number == "MIAB-596"
+    assert res.data.external_id == "miab-596-uncensored-leak"

@@ -113,14 +113,20 @@ class MissavApiCrawler(BaseCrawler):
         if not recomms:
             ctx.debug("[MISSAV-API] Recombee 无结果")
             return None
-        # 优先精确 id 匹配, 其次 id 前缀匹配(含 -uncensored-leak), 最后退回首条
+        # 优先精确 id 匹配, 其次 id 前缀匹配(覆盖 miab-596 -> miab-596-uncensored-leak 这类派生条目)
         for it in recomms:
             if (it.get("id") or "").lower() == q:
                 return it
         for it in recomms:
             if (it.get("id") or "").lower().startswith(q):
                 return it
-        return recomms[0]
+        # 匹配不上就如实报「没找到」, 绝不退回首条: Recombee 搜不到时会返回一批语义相近的
+        # 无关条目(搜 deeper-26-06-17 返回 sdfk-001/ppx-004/agemix-403...), 回退等于把
+        # 首条的标题/演员/时长/封面整套贴到目标番号上, 且 number 取的是 input_number,
+        # 用户看到的是「番号对、元数据全错」——比直接报错危险得多, 也更难排查。
+        top_ids = ", ".join((it.get("id") or "") for it in recomms[:5])
+        ctx.debug(f"[MISSAV-API] Recombee 返回 {len(recomms)} 条但无番号匹配: {q}（候选: {top_ids}）")
+        return None
 
     def _build_data(self, item: dict, input_number: str) -> CrawlerData:
         values = item.get("values") or {}
