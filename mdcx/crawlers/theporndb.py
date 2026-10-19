@@ -142,6 +142,13 @@ def get_real_url(res_search, file_path, series_ex, date, kind: TheporndbKind):
                     actor_list_space.append(ac)
                     actor_list_nospace.append(ac.replace(" ", ""))
                 res_actor_title_space = (" ".join(actor_list_space) + " " + res_title_space).replace("  ", " ")
+                # 番号里带的日期与候选条目日期矛盾时, 本候选一律不可用。
+                # 只挡下面两条弱证据分支(站点名对不上的标题子串 / scenes 无条件兜底):
+                # 搜索词退化成纯系列名时(如 "Deeper.26.06.17" 的第二关键词就是 "Deeper "),
+                # ThePornDB 会把同名的其它作品捞回来, 标题去空格后正好是文件名归一化串的
+                # 子串("deeper" in "deeper260617"), 于是 2016 年的 SketchySex.16.10.19
+                # 「Deeper!」被当成 2026-06-17 的目标。日期矛盾是硬证据, 必须挡掉。
+                date_conflict = bool(date) and bool(res_date) and res_date != date
 
                 if series_ex:
                     if series_ex == res_series or series_ex in res_url:
@@ -157,8 +164,9 @@ def get_real_url(res_search, file_path, series_ex, date, kind: TheporndbKind):
                                 res_actor_list.append([res_id_url, res_actor_title_space])
                     elif res_title_nospace in temp_file_path_nospace:
                         # 站点名对不上但标题精确含在文件名里（如厂牌 slug 与实际站点归属不同，议题 #94）
-                        res_title_list.append([res_id_url, res_actor_title_space])
-                elif kind == "scenes" or res_title_nospace in temp_file_path_nospace:
+                        if not date_conflict:
+                            res_title_list.append([res_id_url, res_actor_title_space])
+                elif (kind == "scenes" or res_title_nospace in temp_file_path_nospace) and not date_conflict:
                     res_title_list.append([res_id_url, res_actor_title_space])
 
             # 采纳顺序：标题/演员精确命中 > 日期桶。日期桶证据最弱（同日多部作品常态，

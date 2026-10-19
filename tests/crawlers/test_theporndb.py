@@ -4,7 +4,7 @@ import pytest
 from mdcx.config.enums import Language, Switch, Website
 from mdcx.config.manager import manager
 from mdcx.crawlers.base import get_crawler
-from mdcx.crawlers.theporndb import ThepornDBCrawler
+from mdcx.crawlers.theporndb import ThepornDBCrawler, get_real_url
 from mdcx.models.model_types import CrawlerInput
 
 
@@ -358,3 +358,68 @@ async def test_theporndb_search_falls_through_when_date_bucket_mismatches(monkey
     assert res.data is not None
     assert res.data.title == "Fucking My Best Friend"
     assert res.debug_info.detail_urls == [f"https://api.theporndb.net/scenes/{right_slug}"]
+
+
+def _deeper_conflict_search() -> dict:
+    """2026-10-19 实测：搜 `Deeper.26.06.17` 时 ThePornDB 递回来的同名无关作品。
+
+    搜索关键词退化成纯系列名（"Deeper "）后，`scenes?parse=deeper ` 把 2016 年的
+    SketchySex.16.10.19「Deeper!」捞了回来；标题去空格后是 "deeper"，正好是文件名
+    归一化串 "deeper260617" 的子串，于是被旧逻辑当成目标。
+    """
+    return {
+        "data": [
+            {
+                "slug": "sketchysex-deeper",
+                "title": "Deeper!",
+                "date": "2016-10-19",
+                "site": {"short_name": "SketchySex", "url": "https://sketchysex.com"},
+                "performers": [{"name": "Someone Else"}],
+            }
+        ]
+    }
+
+
+def test_get_real_url_rejects_candidate_whose_date_contradicts_number():
+    """番号日期与候选条目日期矛盾时不得采纳。"""
+    assert (
+        get_real_url(
+            _deeper_conflict_search(),
+            "Deeper.26.06.17.mp4",
+            "Deeper",
+            "2026-06-17",
+            "scenes",
+        )
+        is False
+    )
+
+
+def test_get_real_url_accepts_candidate_whose_date_matches():
+    """阳性对照：日期一致时照常采纳，不能把这条路径改死。"""
+    search = _deeper_conflict_search()
+    search["data"][0]["date"] = "2026-06-17"
+
+    assert (
+        get_real_url(
+            search,
+            "Deeper.26.06.17.mp4",
+            "Deeper",
+            "2026-06-17",
+            "scenes",
+        )
+        == "https://api.theporndb.net/scenes/sketchysex-deeper"
+    )
+
+
+def test_get_real_url_no_date_in_filename_keeps_scenes_shortcut():
+    """文件名里没有日期（date 为空）时不判矛盾，scenes 无条件兜底必须保留。"""
+    assert (
+        get_real_url(
+            _deeper_conflict_search(),
+            "some scene title.mp4",
+            "",
+            "",
+            "scenes",
+        )
+        == "https://api.theporndb.net/scenes/sketchysex-deeper"
+    )
