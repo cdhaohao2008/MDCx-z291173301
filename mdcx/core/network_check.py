@@ -1700,6 +1700,7 @@ async def run_network_check(
     *,
     progress: ProgressCallback | None = None,
     on_item_done: "Callable[[int, int], None] | None" = None,
+    on_item_result: "Callable[[NetworkCheckResult], None] | None" = None,
     cancel_event: threading.Event | None = None,
     concurrency: int = 10,
     client: "AsyncWebClient | Any | None" = None,
@@ -1711,6 +1712,8 @@ async def run_network_check(
 
     specs: 指定检测子集（用于"重试失败项"只重测失败/警告项）；None 表示全量构建检测项。
     on_item_done: 每完成一项回调 (done, total) 结构化进度（"基础环境"组不参与计数）；供 UI 显示百分比。
+    on_item_result: 每完成一项回调该结果本身，与结果行打印同步；供 UI 逐站刷新检测状态，
+        不必等整轮跑完。回调异常被吞掉，绝不影响检测本身。
     全量构建时静态项与站点项分两段取（见下），站点项并入前 total 未知（=0），
     此期间不触发 on_item_done——避免回调出"1/0"这类自相矛盾的进度。
     单站刮削探测的超时递进（30s/45s 最多两次）在探测环节内部完成（议题 #118）。
@@ -1734,6 +1737,17 @@ async def run_network_check(
         check_specs = _build_static_specs()
 
     results: list[NetworkCheckResult] = []
+
+    def emit_item_result(result: NetworkCheckResult) -> None:
+        """逐项回调结果：UI 侧据此立刻回写缓存并刷新站点徽标。
+
+        回调失败只丢这一次刷新，不能让一个界面副作用中断整轮检测。
+        """
+        if on_item_result is None:
+            return
+        with suppress(Exception):
+            on_item_result(result)
+
     # 全量构建时站点 specs 还在后台构建中，总项数未知，喂 0 让 UI 保持"停止检测"
     # 按钮态（_on_net_check_progress 按 total>0 才刷新），既不显示"1/1"这种立刻
     # 跑满的误导进度，也不触发 on_item_done；站点 specs 并入后按真实总数回调。
@@ -1870,6 +1884,7 @@ async def run_network_check(
                         # 与并发路径一致：results 保留原始错误，打印行简化提示
                         display_result = replace(result, message="代理不可用（详见下方检测结果汇总区的提示）", error="")
                     progress(format_result_line(display_result))
+                    emit_item_result(display_result)
                 continue
             # task → spec 映射：单项逃逸异常时定位所属站点（议题 #73）
             tasks = {asyncio.create_task(run_one(spec)): spec for spec in group_specs}
@@ -1923,6 +1938,7 @@ async def run_network_check(
                         # 全局代理不可用时，站点失败多为代理导致，简化提示避免误导用户以为站点全挂
                         result = replace(result, message="代理不可用（详见下方检测结果汇总区的提示）", error="")
                     progress(format_result_line(result))
+                    emit_item_result(result)
 
         elapsed = time.perf_counter() - start_time
         for line in format_summary(

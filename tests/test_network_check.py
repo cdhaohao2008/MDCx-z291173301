@@ -1942,6 +1942,65 @@ async def test_run_network_check_reports_structured_progress(monkeypatch: pytest
     assert len(results) == 3  # "基础环境"组是输出横幅非实际检测项，不执行也不计进度
 
 
+@pytest.mark.anyio
+async def test_run_network_check_reports_each_item_result(monkeypatch: pytest.MonkeyPatch):
+    """每完成一项就回调该结果本身：UI 靠它逐站刷新徽标，不必等整轮跑完。
+
+    用户 2026-10-20 实测：整轮检测里慢站/探测超时拖到 30+ 分钟，站点列表
+    却一直保持上次的旧状态，直到全部跑完才一次性更新。回调必须覆盖所有分组
+    （并发「网络连通」与串行「站点检测」「账号/API」两条执行路径）。
+    """
+    _patch_check_specs(
+        monkeypatch,
+        [
+            NetworkCheckSpec(name="net", group="网络连通", url="https://net.example"),
+            NetworkCheckSpec(name="site", group="站点检测", url="https://site.example", site=Website.DMM),
+            NetworkCheckSpec(name="api", group="账号/API", url="https://api.example", site=Website.THEJAVDB),
+        ],
+    )
+    emitted: list[NetworkCheckResult] = []
+
+    results = await run_network_check(
+        on_item_result=emitted.append,
+        client=FakeClient(),
+        concurrency=3,
+        emit_header=False,
+    )
+
+    assert sorted(result.spec.name for result in emitted) == ["api", "net", "site"]
+    assert [result.spec.name for result in results] == ["net", "site", "api"]
+    # 回调出去的就是最终结果本身（不是摘要行/占位行），状态与返回值逐项一致
+    assert {result.spec.name: result.status for result in emitted} == {
+        result.spec.name: result.status for result in results
+    }
+
+
+@pytest.mark.anyio
+async def test_on_item_result_exception_does_not_abort_run(monkeypatch: pytest.MonkeyPatch):
+    """单项结果回调是界面副作用，抛异常不能让整轮检测中止。"""
+    _patch_check_specs(
+        monkeypatch,
+        [
+            NetworkCheckSpec(name="net", group="网络连通", url="https://net.example"),
+            NetworkCheckSpec(name="site", group="站点检测", url="https://site.example", site=Website.DMM),
+        ],
+    )
+    calls: list[str] = []
+
+    def explode(result: NetworkCheckResult):
+        calls.append(result.spec.name)
+        raise RuntimeError("UI 刷新失败")
+
+    results = await run_network_check(
+        on_item_result=explode,
+        client=FakeClient(),
+        emit_header=False,
+    )
+
+    assert [result.spec.name for result in results] == ["net", "site"]
+    assert sorted(calls) == ["net", "site"]
+
+
 # ==================== 检测起步延迟：动态域名解析不得挡住「网络连通」首组 ====================
 
 

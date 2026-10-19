@@ -178,6 +178,7 @@ class MyMAinWindow(
     version_check_done = pyqtSignal(bool)  # 版本检查完成（参数为是否有新版本），主线程执行 UI 操作
     net_check_done = pyqtSignal()  # 网络检测完成，主线程恢复按钮状态
     net_check_progress = pyqtSignal(int, int)  # 网络检测单项完成 (done, total)，主线程刷新按钮进度文本
+    net_check_item_done = pyqtSignal()  # 网络检测单项结果已写入缓存，主线程立刻刷新站点状态徽标
     nfo_lib_data_loaded = pyqtSignal(str)  # NFO 库管理：后台读取 NFO 完成，主线程填充表单
     nfo_lib_images_changed = pyqtSignal(str)  # NFO 库管理：信息管理页裁剪封面完成，主线程只刷新两张预览图（不切页）
     nfo_lib_save_done = pyqtSignal(str)  # NFO 库管理：后台保存完成，主线程恢复按钮

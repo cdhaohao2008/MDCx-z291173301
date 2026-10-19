@@ -61,6 +61,7 @@ class NetCheckMixin:
             self.network_check_cancel_event = cancel_event
             self.network_check_results = None
             self._net_check_lines = []
+            self._net_live_results = []
 
             def progress(line):
                 self._net_check_lines.append(line)
@@ -69,10 +70,23 @@ class NetCheckMixin:
             def on_item_done(done: int, total: int):
                 self.net_check_progress.emit(done, total)
 
+            def on_item_result(result):
+                """单项出结果就落缓存并刷新徽标——不让用户等到整轮跑完才看到状态。
+
+                缓存按「本轮已出结果的完整列表」合并（而不是只喂这一条），
+                Official 五站仍按本轮最差聚合，逐项写入也不会互相覆盖成最后一个。
+                """
+                if result.spec.site is None:
+                    return
+                self._net_live_results.append(result)
+                merge_site_check_cache(self._net_live_results)
+                self.net_check_item_done.emit()
+
             self.network_check_future = executor.submit(
                 run_network_check(
                     progress=progress,
                     on_item_done=on_item_done,
+                    on_item_result=on_item_result,
                     cancel_event=cancel_event,
                     separator_width=self._net_report_separator_width(),
                 )
@@ -112,6 +126,7 @@ class NetCheckMixin:
             cancel_event = threading.Event()
             self.network_check_cancel_event = cancel_event
             self._net_check_lines = []
+            self._net_live_results = []
             # 议题 #118：探测超时递进已移进单轮内部（30s/45s 最多两次），
             # 「重试失败项」回归纯重测——价值在于用户改完代理/CF 配置后再给一次机会
             signal_qt.show_net_info(f"⏱ 单站刮削探测自动递进重试，超时阶梯 {scrape_probe_ladder_text()}")
@@ -123,10 +138,18 @@ class NetCheckMixin:
             def on_item_done(done: int, total: int):
                 self.net_check_progress.emit(done, total)
 
+            def on_item_result(result):
+                if result.spec.site is None:
+                    return
+                self._net_live_results.append(result)
+                merge_site_check_cache(self._net_live_results)
+                self.net_check_item_done.emit()
+
             self.network_check_future = executor.submit(
                 run_network_check(
                     progress=progress,
                     on_item_done=on_item_done,
+                    on_item_result=on_item_result,
                     cancel_event=cancel_event,
                     specs=failed_specs,
                     emit_header=False,
@@ -185,6 +208,17 @@ class NetCheckMixin:
         """主线程：检测进行中，按钮文本显示进度百分比。"""
         if total > 0 and self.network_check_future is not None:
             self.Ui.pushButton_check_net.setText(f"停止检测 {done}/{total}")
+
+    def _on_net_check_item(self):
+        """主线程：单项结果已落缓存，立刻刷新站点下拉框徽标与悬停提示。
+
+        逐项刷新而非只在 `_on_net_check_done` 里刷一次：之前站点状态要等整轮
+        几十项跑完（含多个慢站/探测超时，实测 30+ 分钟）才变，用户会以为结果
+        没同步。刷新只改图标/tooltip/网址角色，不重排文本、保留选中项。
+        """
+        from .init import refresh_network_check_badges
+
+        refresh_network_check_badges(self)
 
     def _on_net_check_done(self):
         """主线程：网络检测完成，恢复按钮状态并刷新站点下拉框的检测状态徽标。"""
