@@ -104,5 +104,5 @@ Three more settings matter early:
 - I set the design, the scope and the audit rules, and I decide what stays.
 - Every tool must have a live test against a real Emby and a real Jellyfin in Docker. CI fails if a tool has none.
 - The generated Go clients are checked another way. Every operation must have a method, and a sweep calls every read against the live servers. Every write embyfin's own code sends must be reached by a live test, and CI fails if one is not.
-- CI lints with golangci-lint, actionlint, yamllint, ShellCheck, typos and markdownlint.
+- CI lints with golangci-lint, actionlint, yamllint, ShellCheck, typos and markdownlint. golangci-lint covers every Go file, the generated clients and the live tests included.
 - For security it runs CodeQL, govulncheck, zizmor on the workflows, and a Trivy scan of the built binary.

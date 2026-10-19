@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.1 (2026-10-18)
+
+### Changed
+
+- built on pandorest 0.13.1, whose generated SDK code passes the linters; nothing a caller uses changes, and no tool changes
+- the generated SDKs and their tests are linted like every other Go file
+
 ## 0.10.0 (2026-10-18)
 
 ### Breaking
