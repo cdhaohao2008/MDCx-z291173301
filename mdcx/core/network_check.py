@@ -341,14 +341,20 @@ _REQUEST_PREFIX_RE = re.compile(r"^((?:GET|POST|HEAD|PUT|PATCH|DELETE|OPTIONS)\s
 # curl 英文尾巴 → 中文。只收 TLS/SSL 家族，对不上的形态原样留着（仍是诊断线索）
 _CURL_TAIL_RE = re.compile(r"(?:Failed to perform,\s*)?curl:.*$", re.IGNORECASE)
 _CURL_TAIL_ZH = (
-    ("closed abruptly", "curl：连接被强制关闭"),
-    ("ssl_error_syscall", "curl：连接被强制关闭"),
-    ("error queue empty", "curl：连接被强制关闭"),
+    ("closed abruptly", "curl：连接被意外关闭"),
+    ("ssl_error_syscall", "curl：连接被意外关闭"),
+    ("error queue empty", "curl：连接被意外关闭"),
     ("unexpected_eof", "curl：连接被意外中断"),
     ("tls handshake", "curl：TLS握手失败"),
     ("handshake failure", "curl：TLS握手失败"),
     ("wrong version number", "curl：TLS版本不匹配"),
 )
+
+# curl 的引导词。联网检测行另有「TLS握手中断，常为…」这类友好提示头，重复的
+# `Failed to perform` 可以丢掉；刮削探测行没有提示头，丢掉就只剩一个孤零零的
+# 「curl：连接被意外关闭」，反而看不出「这次请求根本没执行成功」。故探测行保留它，
+# 译成「执行失败」。
+_FAILED_TO_PERFORM_RE = re.compile(r"^Failed to perform,\s*", re.IGNORECASE)
 
 
 def _split_request_prefix(error: str) -> tuple[str, str]:
@@ -359,16 +365,30 @@ def _split_request_prefix(error: str) -> tuple[str, str]:
     return matched.group(1), error[matched.end() :].strip()
 
 
-def _translate_error_detail(detail: str) -> str:
-    """把 curl 的英文 SSL 尾巴译成中文，`Failed to perform,` 这类无信息量的引导词一并丢掉。"""
+def _translate_error_detail(detail: str, *, keep_failed_to_perform: bool = False) -> str:
+    """把 curl 的英文 SSL 尾巴译成中文，`Failed to perform,` 这类无信息量的引导词一并丢掉。
+
+    `keep_failed_to_perform=True`（刮削探测行）时把引导词译成「执行失败，」保留在前面——
+    那条路径没有「TLS握手中断，常为…」这类友好提示头，丢掉引导词只剩一个孤零零的
+    curl 结论，看不出「这次请求压根没执行成功」。
+    """
 
     def _replace(matched: re.Match[str]) -> str:
         tail = matched.group(0)
+        lead = ""
+        # 引导词在 curl 尾巴的首位（`_CURL_TAIL_RE` 的可选前缀组吃的就是它）。
+        # 判定放在尾巴内部而非整串首：调用方给的细节常带 `搜索失败: ` 这类前置包装，
+        # 按整串首匹配会漏掉。
+        if keep_failed_to_perform:
+            found = _FAILED_TO_PERFORM_RE.match(tail)
+            if found:
+                lead = "执行失败，"
+                tail = tail[found.end() :]
         lowered = tail.lower()
         for marker, zh in _CURL_TAIL_ZH:
             if marker in lowered:
-                return zh
-        return tail
+                return f"{lead}{zh}"
+        return f"{lead}{tail}"
 
     return _CURL_TAIL_RE.sub(_replace, detail)
 
@@ -386,6 +406,26 @@ def _compose_failed_message(message: str, error: str) -> str:
     tail = _translate_error_detail(detail)
     head = f"{prefix}：{message}"
     return f"{head}，{tail}" if tail else head
+
+
+def _clean_probe_error(error: str) -> str:
+    """刮削探测行的错误串清理：`_clean_error` 之后把 curl 尾巴也中文化。
+
+    探测行没有联网检测行那套友好提示头，`_compose_failed_message` 用不上，但原始
+    curl 串照样要翻译：`GET {url} 失败: Failed to perform, curl: (35) BoringSSL
+    SSL_connect: Connection closed abruptly (SSL_ERROR_SYSCALL; error queue empty) in
+    connection to lulubar.co:443. See https://curl.se/… first for more details.`
+    → `GET {url} 失败: 执行失败，curl：连接被意外关闭`。
+
+    「{方法} {url} 失败」段原样保留、分隔符保持半角 `:`——这段是探测行的定位信息，
+    和联网检测行的 `：{友好提示}，{细节}` 是两套版式，不必强行统一。
+    """
+    cleaned = _clean_error(error)
+    prefix, detail = _split_request_prefix(cleaned)
+    if not prefix:
+        return _translate_error_detail(detail, keep_failed_to_perform=True)
+    tail = _translate_error_detail(detail, keep_failed_to_perform=True)
+    return f"{prefix}: {tail}" if tail else cleaned
 
 
 def _classify_http_result(spec: NetworkCheckSpec, status_code: int, text: str) -> tuple[NetworkCheckStatus, str]:
@@ -543,8 +583,9 @@ async def _probe_crawler_by_run(
         error = getattr(getattr(response, "debug_info", None), "error", None) if response else None
         probe_number = str(getattr(input_data, "number", "") or SCRAPE_PROBE_NUMBER)
         error_msg = str(error) if error else ""
-        # 同上：聚合串里逐 URL 的请求原因带整页响应体，进检测报告前先截掉
-        error_msg = _strip_response_body(error_msg)
+        # 同上：聚合串里逐 URL 的请求原因带整页响应体与整段 curl 报错，
+        # 进检测报告前按联网检测行同一套口径清理
+        error_msg = _clean_probe_error(error_msg)
         # 将常见 Python 解析错误翻译成中文，便于理解
         if "'NoneType' object has no attribute 'xpath'" in error_msg:
             error_display = "页面解析失败（解析结果为空，无法执行节点提取/xpath）"
@@ -636,7 +677,7 @@ async def _probe_crawler_capability(
                 retry_count=1,
             )
             if response is None:
-                return NetworkCheckStatus.WARNING, f"站点可达但搜索页请求失败: {_strip_response_body(error)}"
+                return NetworkCheckStatus.WARNING, f"站点可达但搜索页请求失败: {_clean_probe_error(error)}"
             search_text = ""
             try:
                 response.encoding = spec.encoding
@@ -704,6 +745,21 @@ def _is_transient_probe_result(message: str) -> bool:
     return any(marker in message for marker in _TRANSIENT_PROBE_MARKERS)
 
 
+# 末次原因外层的「站点可达但xxx: 」包装。终局说明以「站点无效：」开头，已把
+# 「站点可达但刮削不可用」说完了，再套一层就是同一句话念两遍
+# （`站点无效：…均失败，最后一次原因：站点可达但刮削探测失败: 搜索失败: …`）。
+_PROBE_CAUSE_WRAPPER_RE = re.compile(r"^站点可达但[^:：]{0,12}[:：]\s*")
+
+
+def _probe_root_cause(message: str) -> str:
+    """剥掉末次原因外层的「站点可达但xxx: 」包装，只留根因。
+
+    只剥一层、且必须带冒号——`站点可达但搜索页被 Cloudflare 拦截` 这类无冒号的
+    结论句自带完整语义，剥掉前缀反而读不懂；匹配不上就原样返回。
+    """
+    return _PROBE_CAUSE_WRAPPER_RE.sub("", str(message or ""), count=1).strip()
+
+
 async def _probe_crawler_capability_with_retry(
     client: Any,
     spec: NetworkCheckSpec,
@@ -714,9 +770,11 @@ async def _probe_crawler_capability_with_retry(
 
     任一次成功立即定论；只有瞬时性结果才继续下一档，确定性结果首次即定论。
     阶梯全部走完仍未通过时给出终局说明：两档都真超时才写「均超时」，否则如实
-    附上最后一次的真实原因（「均失败，最后一次原因：…」），避免把结构/番号类
-    的确定性失败谎报成超时（议题 #133）。重试过程静默，不再逐档打印进度行——
-    检测页只需看到每站一条最终结论，中间态噪音大且易被误读成独立检测项。
+    附上最后一次的真实原因（「均失败，<根因>」），避免把结构/番号类的确定性失败
+    谎报成超时（议题 #133）。原因里的「站点可达但xxx: 」外层包装由
+    `_probe_root_cause` 剥掉——「站点无效：」已经把那句话说完了。重试过程静默，
+    不再逐档打印进度行——检测页只需看到每站一条最终结论，中间态噪音大且易被
+    误读成独立检测项。
     """
     attempts = len(SCRAPE_PROBE_ATTEMPT_TIMEOUTS)
     all_timed_out = True
@@ -743,7 +801,7 @@ async def _probe_crawler_capability_with_retry(
     # （否则用户只会去无意义地重试一个已经定论的问题，议题 #133）
     return (
         NetworkCheckStatus.WARNING,
-        f"站点无效：刮削探测{attempts}次{ladder}均失败，最后一次原因：{last_message}",
+        f"站点无效：刮削探测{attempts}次{ladder}均失败，{_probe_root_cause(last_message)}",
     )
 
 
@@ -973,7 +1031,7 @@ def format_summary(
         if cause_counts["probe_failed"]:
             lines.append(
                 f"刮削探测确定性失败×{cause_counts['probe_failed']}：站点能连上，但按真实番号实刮仍失败"
-                "（多为页面结构/番号形态不匹配），重试不会改变结果，请看该行「最后一次原因」"
+                "（多为页面结构/番号形态不匹配），重试不会改变结果，请看该行「均失败」后的根因"
             )
         if cause_counts["unreachable"]:
             lines.append(f"  • 站点暂时不可达 ×{cause_counts['unreachable']}：检查网络或稍后重试")

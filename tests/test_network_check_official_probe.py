@@ -331,10 +331,7 @@ async def test_format_summary_separates_probe_failure_from_probe_timeout():
         nc.NetworkCheckResult(
             spec=_official_spec("Official·1Pondo", "https://www.1pondo.tv", "1pondo-072625_001"),
             status=NetworkCheckStatus.WARNING,
-            message=(
-                "站点无效：刮削探测2次30s/45s均失败，最后一次原因："
-                "站点可达但刮削探测失败: official uncensored data failed: title"
-            ),
+            message="站点无效：刮削探测2次30s/45s均失败，official uncensored data failed: title",
         ),
         nc.NetworkCheckResult(
             spec=_official_spec("Official·HEYZO", "https://www.heyzo.com", "heyzo-3935"),

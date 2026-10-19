@@ -801,7 +801,7 @@ def test_format_result_line_tls_error_puts_url_first():
     line = format_result_line(result)
 
     assert line.endswith(
-        "GET https://avsex.cc 失败：TLS握手中断，常为HTTP/2指纹/SNI策略与目标站不兼容，curl：连接被强制关闭"
+        "GET https://avsex.cc 失败：TLS握手中断，常为HTTP/2指纹/SNI策略与目标站不兼容，curl：连接被意外关闭"
     )
 
 
@@ -810,7 +810,7 @@ def test_format_result_line_tls_error_puts_url_first():
     [
         (
             "Failed to perform, curl: (35) BoringSSL SSL_connect: Connection closed abruptly",
-            "curl：连接被强制关闭",
+            "curl：连接被意外关闭",
         ),
         (
             "Failed to perform, curl: (35) OpenSSL SSL_read: UNEXPECTED_EOF_WHILE_READING",
@@ -829,7 +829,7 @@ def test_format_result_line_tls_error_puts_url_first():
         # 多轮累积的其他原因不被译文吃掉
         (
             "HTTP 403、Failed to perform, curl: (35) BoringSSL SSL_connect: Connection closed abruptly",
-            "HTTP 403、curl：连接被强制关闭",
+            "HTTP 403、curl：连接被意外关闭",
         ),
     ],
 )
@@ -1282,7 +1282,7 @@ async def test_probe_retry_mixed_transient_keeps_last_reason(monkeypatch: pytest
     status, message = await nc._probe_crawler_capability_with_retry(ProbeFakeClient(), _PROBE_SPEC)
 
     assert status == NetworkCheckStatus.WARNING
-    assert message == "站点无效：刮削探测2次30s/45s均失败，最后一次原因：站点可达但刮削探测失败: 500"
+    assert message == "站点无效：刮削探测2次30s/45s均失败，500"
     assert "均超时" not in message
 
 
@@ -1390,11 +1390,50 @@ async def test_probe_retry_final_message_drops_response_body(monkeypatch: pytest
     status, message = await nc._probe_crawler_capability_with_retry(client, _PROBE_SPEC)
 
     assert status == NetworkCheckStatus.WARNING
-    assert message == (
-        "站点无效：刮削探测2次30s/45s均失败，最后一次原因："
-        "站点可达但搜索页请求失败: GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403"
-    )
+    assert message == ("站点无效：刮削探测2次30s/45s均失败，GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403")
     assert len(client.calls) == 2
+
+
+def test_probe_root_cause_strips_reachable_wrapper():
+    """终局说明里「站点可达但xxx: 」是同一句话念两遍，只剥这一层包装。"""
+    # 剥：带冒号的外层包装
+    assert nc._probe_root_cause("站点可达但刮削探测失败: 搜索失败: 搜索页未解析到结果，页面标题=x") == (
+        "搜索失败: 搜索页未解析到结果，页面标题=x"
+    )
+    assert nc._probe_root_cause("站点可达但搜索页请求失败: GET https://x.test 失败: HTTP 403") == (
+        "GET https://x.test 失败: HTTP 403"
+    )
+    # 不剥：无冒号的结论句自带完整语义，剥掉前缀反而读不懂
+    assert nc._probe_root_cause("站点可达但搜索页被 Cloudflare 拦截") == "站点可达但搜索页被 Cloudflare 拦截"
+    # 不剥：根因里自带冒号，不能被当成外层包装剥掉第二层
+    assert nc._probe_root_cause("official uncensored data failed: title") == "official uncensored data failed: title"
+    assert nc._probe_root_cause("") == ""
+
+
+@pytest.mark.anyio
+async def test_probe_retry_final_message_drops_wrapper_and_body(monkeypatch: pytest.MonkeyPatch):
+    """两档重试的终局说明只留根因：既不带「最后一次原因：」，也不带响应体。"""
+    monkeypatch.setattr(
+        "mdcx.crawlers.get_crawler",
+        lambda site: ProbeCrawler,
+    )
+
+    class AggregatedErrorClient(ProbeBodyErrorClient):
+        async def request(self, method, url, **kwargs):
+            self.calls.append({"method": method, "url": url, **kwargs})
+            return None, (
+                "搜索失败: 搜索页未解析到结果，"
+                "页面标题=このページはお住まいの地域からご利用になれません。 - FANZA, 正文长度=3134 "
+                "body=<html>403</html>"
+            )
+
+    status, message = await nc._probe_crawler_capability_with_retry(AggregatedErrorClient(""), _PROBE_SPEC)
+
+    assert status == NetworkCheckStatus.WARNING
+    assert message == (
+        "站点无效：刮削探测2次30s/45s均失败，搜索失败: 搜索页未解析到结果，"
+        "页面标题=このページはお住まいの地域からご利用になれません。 - FANZA, 正文长度=3134"
+    )
 
 
 @pytest.mark.anyio
@@ -1416,6 +1455,99 @@ async def test_probe_crawler_by_run_drops_response_body():
     assert status == NetworkCheckStatus.WARNING
     assert "body=" not in message
     assert message.endswith("GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403")
+
+
+# 用户 2026-10-19 实测 lulubar.co：TLS 连接被掐，原始 curl 串整段进检测行
+_LULUBAR_TLS_ERROR = (
+    "GET https://lulubar.co/video/bysearch?search=IPZZ-547&page=1 失败: Failed to perform, "
+    "curl: (35) BoringSSL SSL_connect: Connection closed abruptly (SSL_ERROR_SYSCALL; "
+    "error queue empty) in connection to lulubar.co:443. "
+    "See https://curl.se/libcurl/c/libcurl-errors.html first for more details."
+)
+
+_LULUBAR_TLS_CLEAN = "GET https://lulubar.co/video/bysearch?search=IPZZ-547&page=1 失败: 执行失败，curl：连接被意外关闭"
+
+
+def test_clean_probe_error_translates_curl_tail():
+    """探测行的 curl 尾巴要按联网检测行同一套译表翻译，地址前缀与半角分隔符保持原样。"""
+    assert nc._clean_probe_error(_LULUBAR_TLS_ERROR) == _LULUBAR_TLS_CLEAN
+    # 没有「{方法} {url} 失败」段时整串当细节翻译，剥不出前缀不硬拼
+    assert nc._clean_probe_error(
+        "Failed to perform, curl: (35) TLS connect error: SSL routines: handshake failure"
+    ) == ("执行失败，curl：TLS握手失败")
+    # 对不上译表的 curl 形态原样留着（只把引导词译掉），仍是诊断线索
+    assert nc._clean_probe_error(
+        "GET https://x.test 失败: Failed to perform, curl: (7) Failed to connect to 127.0.0.1"
+    ) == ("GET https://x.test 失败: 执行失败，curl: (7) Failed to connect to 127.0.0.1")
+    # 响应体照样截掉；细节为空时不留下 `失败: ` 尾巴
+    assert nc._clean_probe_error("GET https://x.test 失败: HTTP 403 body=<html>403</html>") == (
+        "GET https://x.test 失败: HTTP 403"
+    )
+
+
+@pytest.mark.anyio
+async def test_probe_search_page_failure_translates_curl_tail(monkeypatch: pytest.MonkeyPatch):
+    """单轮探测：搜索页请求失败行里的 curl 串同样中文化。"""
+    monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: ProbeCrawler)
+
+    status, message = await _probe_crawler_capability(ProbeBodyErrorClient(_LULUBAR_TLS_ERROR), _PROBE_SPEC)
+
+    assert status == NetworkCheckStatus.WARNING
+    assert message == f"站点可达但搜索页请求失败: {_LULUBAR_TLS_CLEAN}"
+
+
+@pytest.mark.anyio
+async def test_probe_retry_final_message_translates_curl_tail(monkeypatch: pytest.MonkeyPatch):
+    """两档重试跑完的终局说明：剥包装 + 译 curl 尾巴一步到位。"""
+    monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: ProbeCrawler)
+    client = ProbeBodyErrorClient(_LULUBAR_TLS_ERROR)
+
+    status, message = await nc._probe_crawler_capability_with_retry(client, _PROBE_SPEC)
+
+    assert status == NetworkCheckStatus.WARNING
+    assert message == f"站点无效：刮削探测2次30s/45s均失败，{_LULUBAR_TLS_CLEAN}"
+    assert len(client.calls) == 2
+
+
+@pytest.mark.anyio
+async def test_probe_crawler_by_run_translates_curl_tail():
+    """回退 `_run` 探测：聚合串里的 curl 尾巴同样中文化。"""
+
+    class RunOnlyTlsCrawler(ProbeCrawler):
+        async def _generate_search_url(self, ctx):
+            return None
+
+        async def run(self, input_data):
+            return SimpleNamespace(data=None, debug_info=SimpleNamespace(error=f"搜索失败: {_LULUBAR_TLS_ERROR}"))
+
+    status, message = await nc._probe_crawler_by_run(
+        RunOnlyTlsCrawler(ProbeFakeClient()), SimpleNamespace(number="X-1"), 30.0
+    )
+
+    assert status == NetworkCheckStatus.WARNING
+    assert message == f"站点可达但刮削探测失败: 搜索失败: {_LULUBAR_TLS_CLEAN}"
+
+
+def test_translate_error_detail_keep_failed_to_perform():
+    """联网检测行照旧丢掉引导词；探测行（keep_failed_to_perform）译成「执行失败」。"""
+    from mdcx.core.network_check import _translate_error_detail
+
+    raw = "Failed to perform, curl: (35) BoringSSL SSL_connect: Connection closed abruptly"
+
+    assert _translate_error_detail(raw) == "curl：连接被意外关闭"
+    assert _translate_error_detail(raw, keep_failed_to_perform=True) == "执行失败，curl：连接被意外关闭"
+    # 引导词紧贴 curl 尾巴首位时照译，前面累积的其他失败原因不受影响
+    assert _translate_error_detail(f"HTTP 403、{raw}", keep_failed_to_perform=True) == (
+        "HTTP 403、执行失败，curl：连接被意外关闭"
+    )
+    # 没有引导词时不硬加「执行失败」
+    assert (
+        _translate_error_detail(
+            "curl: (35) TLS connect error: SSL routines: tlsv1 alert handshake failure",
+            keep_failed_to_perform=True,
+        )
+        == "curl：TLS握手失败"
+    )
 
 
 @pytest.mark.anyio

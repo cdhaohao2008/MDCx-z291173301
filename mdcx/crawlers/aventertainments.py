@@ -86,7 +86,7 @@ class AVEntertainmentsCrawler(BaseCrawler[AVEntertainmentsContext]):
             or "我不是机器人" in page_text
             or "私はロボットではありません" in page_text
         ):
-            raise CrawlerException("搜索页被站点人机验证拦截（verifybot/reCAPTCHA，需手工过验证），自动跳过")
+            raise CrawlerException("搜索页被站点人机验证拦截，verifybot/reCAPTCHA，需手工过验证，自动跳过")
         if (
             "page not found" in lower_text
             or "pagenotfound" in lower_text

@@ -2019,7 +2019,12 @@ class AsyncWebClient:
                         if final_url and final_url.strip() and final_url.strip() != target_url:
                             self._log_cf(f"🌐 /html 最终地址: {final_url}", host)
                         return bypass_response, ""
-                    error = f"{mirror_error}; GET {html_error}"
+                    # _call_bypass_html 的「请求级失败」原样返回 request() 的
+                    # `GET {url} 失败: …`（已自带方法+地址），再补一个 `GET ` 标签
+                    # 就成了 `GET GET http://…`。其余形态（HTTP 502 / 未配置 bypass
+                    # 地址 / /html 返回挑战页）只是裸原因，仍需标签点明这是 /html 那一步。
+                    html_label = "" if html_error.startswith(("GET ", "POST ", "HEAD ")) else "GET "
+                    error = f"{mirror_error}; {html_label}{html_error}"
                 else:
                     error = f"mirror 失败且 {str(method).upper()} 不支持 /html 兜底: {mirror_error}"
                     if mirror_status is not None and not self._is_retryable_status_code(mirror_status):
