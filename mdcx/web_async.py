@@ -668,6 +668,8 @@ class AsyncWebClient:
         self._fingerprint_default_request_range = (120, 240)
         self._fingerprint_amazon_lifetime_range = (8 * 60.0, 18 * 60.0)
         self._fingerprint_amazon_request_range = (60, 140)
+        # 代理连通性只探测一次(成功/失败都算), 避免每站点各报一遍传输层错误
+        self._proxy_probe_done = False
 
     def _maybe_prewarm_local_bypass(self, host: str) -> None:
         """#9: 非阻塞后台预热 TRAWL/FlareSolverr 适配层。
@@ -765,6 +767,45 @@ class AsyncWebClient:
         和 direct_sites，避免每次调用都传入两套列表。
         """
         return is_proxy_host(host, self.proxy_sites, self.direct_sites)
+
+    async def _warn_unreachable_proxy_once(self, proxy_url: str) -> None:
+        """配置的代理端口无监听时, 给出一次可诊断的结论（成功/失败都只探测一次）。
+
+        代理不通时每个站点各报一次传输层错误（`WinError 10061` / `curl: (7) Failed to
+        connect`），十来个站点就是十几条一模一样的报错，没有一条指向真正的原因——配置的
+        端口上根本没有代理进程在监听。端口错配极常见：Clash 默认 7890，而 clash-verge 的
+        mihomo 内核常改到 7897，用户照抄 7890 就是整片刮削失败，且看不出是配置问题。
+
+        这里只做一次 TCP 连通性探测；不可达时点名端口并给出常见取值，之后不再重复
+        （与 super_resolution 里 `_BUILTIN_MISS_REPORTED` 的「整个进程只报一次」同理）。
+        """
+        if self._proxy_probe_done:
+            return
+        self._proxy_probe_done = True
+        try:
+            parts = urlsplit(proxy_url if "://" in proxy_url else f"http://{proxy_url}")
+            host = parts.hostname or ""
+            scheme = (parts.scheme or "http").lower()
+            default_port = 1080 if scheme.startswith("socks") else 80
+            port = parts.port or default_port
+            if not host:
+                return
+            reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=3.0)
+            writer.close()
+            with contextlib.suppress(Exception):
+                await writer.wait_closed()
+            return
+        except (TimeoutError, OSError, ValueError) as e:
+            # ValueError: 代理串本身写坏了（如端口不是数字），同样属于配置错误
+            self._log(
+                f"⚠️ 配置的代理 {proxy_url} 连不上（{type(e).__name__}: {e}）："
+                f"该端口没有代理进程监听，后续走代理的站点都会失败。"
+                f"请到「软件设置 - 网络」核对端口——Clash 默认 7890，"
+                f"clash-verge 的 mihomo 内核常改用 7897。"
+            )
+        except Exception:
+            # 探测本身出问题不该影响正常请求，静默跳过
+            return
 
     def retain(self) -> None:
         """声明一个长生命周期使用方正在持有客户端，避免配置重载时提前关闭连接池。"""
@@ -2087,6 +2128,8 @@ class AsyncWebClient:
             # Check if this host should use proxy
             use_proxy = use_proxy and self._is_proxy_host(host)
             request_proxy = self.proxy if use_proxy else None
+            if request_proxy:
+                await self._warn_unreachable_proxy_once(request_proxy)
             purpose = infer_request_purpose(
                 url,
                 method=str(method),
