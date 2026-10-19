@@ -686,8 +686,10 @@ def test_format_header_columns_align_with_result_lines():
     列位算出「严格相等」在真机（Microsoft YaHei UI 等宽渲染）上反而差半个到
     一个汉字——中日韩字实渲染宽略大于 2 个 ASCII 列，数据行行首 ✅ emoji 的
     实宽也有出入。故列位按用户屏上实测校准（docs/Changelog.md v2.6.3）：
-    「状态码」36（按用户要求左移 1 格）、「耗时」49（居中于整串「1427 ms」）、
-    「路由」63（与 代理/直连 右缘）、「信息」72（与说明文字左缘）。
+    「状态码」37（= 数据行「200」所在列，使 200 居中于表头）、「耗时」49（居中于整串
+    「1427 ms」）、「路由」63（与 代理/直连 右缘）、「信息」72（与说明文字左缘）。
+    第九轮起「耗时/路由/信息」三列整体左移 1.281px（只缩「状态码→耗时」一处间隙，
+    见 test_format_header_elapsed_gap_shifts_trailing_columns_left），显示列号不变。
     """
     from mdcx.core.network_check import _disp_width, _format_header
 
@@ -726,8 +728,10 @@ def test_format_header_status_code_gap_is_four_ascii_spaces():
     3.0px；1 空格 = 7.141px，3 空格比 4 空格窄 7.141px，比 4 空格宽的候选里没有更近
     的纯 ASCII 方案，故取 4 空格（28.562px）。真实控件渲染复核：两列中心差 0.000px。
 
-    这里同时守住「报告正文只含可打印 ASCII」——诊断报告会被复制到剪贴板并粘贴进
-    issue，早前用 U+2800 盲文空格做亚格位移的方案会往文本里混进不可见字符。
+    早前用 U+2800 盲文空格做亚格位移的方案已弃用（刻度 8.453px 仍差 3.2px，且会往
+    复制进剪贴板/粘贴进 issue 的文本里混进不可见字符），这里守住该 gap 保持纯 ASCII。
+    （表头的另一处间隙「状态码→耗时」确实带一个 U+3000，见
+    test_format_header_elapsed_gap_shifts_trailing_columns_left。）
     """
     from mdcx.core.network_check import _format_header
 
@@ -735,9 +739,48 @@ def test_format_header_status_code_gap_is_four_ascii_spaces():
     head = header_line.index("状态码")
     gap = header_line[head - 4 : head]
     assert gap == "    "
-    assert not set(header_line) & set("\u1680\u2800\uffa0\u3000"), (
-        "表头不应混入不可见的填充字符（会被复制进剪贴板/issue）"
+    assert not set(header_line[:head]) & set("\u1680\u2800\uffa0\u3000"), (
+        "「状态码」表头前不应混入不可见的填充字符（会被复制进剪贴板/issue）"
     )
+
+
+def test_format_header_elapsed_gap_shifts_trailing_columns_left():
+    """「耗时/路由/信息」三列整体左移 1.281px（用户 2026-10-19 要求左移 1px）。
+
+    三列同量左移在结构上等价于只缩「状态码→耗时」这一处间隙 g1，g2/g3 不变。纯 ASCII
+    里唯一的隐形刻度是空格 7.141px，做不到 1px；在零墨迹刻度 {空格 7.141, U+FFA0 6.5,
+    U+2800 8.453, U+3000 13.0} 里穷举逼近 6 空格 −1.0px = 41.844px，最优为
+    「4 空格 + U+3000」= 41.563px（位移 −1.281px、误差 0.28px；理论最优 0.25px 的组合要
+    混三种特殊字符，不划算）。
+
+    截图实测依据：表头「路由」墨迹中心 689.0 vs「代理」688.0、「信息」左缘 739 vs
+    说明 738，两列各偏右 1.0px，左移 1px 即对齐。「耗时」表头中心 593.5 其实偏左
+    1.5px（vs「1136 ms」串中心 595.0），已把数据摆给用户确认，用户明确选择照原话执行。
+
+    U+3000 是 Unicode 类别 Zs 的正规空白、零墨迹、_disp_width 记 2 列（与 2 个空格
+    等价），所以「耗时/路由/信息」的显示列仍是 49/63/72。代价是复制到剪贴板/粘贴进
+    issue 的表头里会带一个不可见的表意空格——这是亚格对齐唯一的手段。
+    """
+    from mdcx.core.network_check import _HEADER_STATUS_TO_ELAPSED_GAP, _disp_width, _format_header
+
+    header_line = next(line for line in _format_header() if "状态码" in line)
+    head = header_line.index("状态码")
+    tail = header_line[head + len("状态码") :]
+
+    # 「状态码」与「耗时」之间的间隙被完整钉死：4 空格 + 1 个 U+3000
+    assert _HEADER_STATUS_TO_ELAPSED_GAP == "    \u3000"
+    assert tail.startswith(_HEADER_STATUS_TO_ELAPSED_GAP + "耗时")
+    assert header_line[head + len("状态码") : head + len("状态码") + 5] == "    \u3000"
+
+    # 零墨迹 + 显示列不变 ⇒ 三列显示列仍是 49/63/72
+    assert _disp_width(_HEADER_STATUS_TO_ELAPSED_GAP) == 6
+
+    def display_column(text: str, needle: str) -> int:
+        return _disp_width(text[: text.index(needle)])
+
+    assert display_column(header_line, "耗时") == 49
+    assert display_column(header_line, "路由") == 63
+    assert display_column(header_line, "信息") == 72
 
 
 def test_format_result_line_tls_error_puts_url_first():
