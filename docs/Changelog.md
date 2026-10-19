@@ -4,6 +4,33 @@
 ### 总结
 - **本轮五件事：①「软件设置 → 网络 → 使用代理」的「选择网站…」下拉框去掉每行后面的能力文案（`综合：有码+无码`、`有码：有码`、`无码：无码`、`欧美：欧美番号`…），另一个下拉框「当前网站」、「指定网站」以及布局、组件、控件、悬停提示等一律未动（`mdcx/controllers/main_window/init.py` + `tests/test_site_combo_tooltips.py`）；②「软件设置 → 网络」里的「全部走代理」向左让出等量右留白，与「使用代理」的左留白相等（`mdcx/views/MDCx.ui` + `mdcx/views/MDCx.py` + `mdcx/controllers/main_window/layout_settings.py` + 新增 `tests/test_network_proxy_row_margins.py` + `tests/test_ui_structure.py::test_proxy_route_all_row_right_margin_equals_lead_margin` / `…_red_row_still_single_column`）**：用户要求「软件设置-网络-全部走代理向左移动使得全部走代理最右侧到右边界的间距与使用代理最左侧到左边界的间距相等，使用代理位置保持不变，只向左移动全部走代理」。两侧留白此前压根不等（行右缘天生比网格右缘少 12px），现已按同一条分界线量、恒等（离屏实测左 138 / 右 138），「使用代理」左缘仍与代理地址输入框同一个 x、一个像素没动。详见下方「改进」里「全部走代理向左让出等量右留白」那条；③「软件设置 → 演员」里「覆盖已存在的演员图片」与行标签「图片已存在时：」严格水平对齐、并钉死布局 ±1px 时序振荡（`mdcx/views/MDCx.ui` + `mdcx/views/MDCx.py`）；④「软件设置 → 演员」里「刮削结束后自动创建头像」上移到「图片已存在时」行、与行标签文字严格同高，行标签与其上的复选框逐像素不动（`mdcx/views/MDCx.ui` + `mdcx/views/MDCx.py` + `mdcx/controllers/main_window/layout_actor.py` + `tests/test_ui_geometry.py`）。③④详见下方「改进」末尾两条。⑤「检测网络」页诊断报告表头四列与数据行严格按显示宽度对齐——「状态码」挪到使 200 等三位数字落在其正中间、「耗时」右缘与数据 xx ms 右缘齐平、「路由」与下方的 代理/直连 同列、「信息」与 说明文字 同列（`mdcx/core/network_check.py` + `tests/test_network_check.py::test_format_header_columns_align_with_result_lines`）。⑤详见下方「改进」末尾一条。经用户九轮真机反馈收敛到最终形态：「状态码」表头与数据行 `200` 的**墨迹中心差 0.000px（像素级正好居中）**、显示列同为 37（表头 `状态码` 列 == 数据 `200` 列）；第九轮按用户要求把 `耗时/路由/信息` 三列**同步左移 1.281px**（只缩「状态码→耗时」一处间隙，用「4 空格 + `U+3000` 表意空格」，`U+3000` 是类别 Zs 的正规空白、零墨迹、`_disp_width` 记 2 列，故显示列 49/63/72 不变）——为此表头重新含**一个不可见的表意空格**，是亚格对齐唯一的手段（第八轮清掉的 `U+2800` 那套机制本轮以更轻的形式换了个字符回来）。**
 - **版本号 2.6.2 -> 2.6.3**（`mdcx/consts.py` 的 `LOCAL_VERSION`（20261022 -> 20261023）与 `VERSION_NAME`、`pyproject.toml`、`uv.lock` 根 `mdcx` 四处按 `scripts/bump.py` 走，`docs/Changelog.md` 首个版本段由同一脚本同步日期；`python scripts/bump.py --check` 报「✓ 五处版本点一致」）。
+
+#### 附：诊断报告表头四列对齐 —— 九轮收敛小结
+
+经用户九轮真机反馈逐像素收敛，**最终形态**（`mdcx/core/network_check.py::_format_header`）：
+
+| 列 | 对齐基准 | 显示列 | 表头填充 |
+| --- | --- | --- | --- |
+| 状态 | 与数据行图标同列 | 2 | 2 空格 |
+| 站点 | 与数据行站名同列 | 10 | 3+1 空格 |
+| **状态码** | **数据行 `200` 正好居中于表头**（墨迹中心差 **0.000px**） | **37**（== 数据 `200` 的 37） | 4 个普通空格 |
+| **耗时/路由/信息** | 按用户第九轮要求**同步左移 1.281px** | **49 / 63 / 72** | 「状态码→耗时」用 `4 空格 + U+3000`，其余纯空格 |
+
+真机复核（同款 `QTextBrowser` + 同一套 QSS，渲染新旧两版逐像素量墨迹）：第九轮 `耗时/路由/信息` 同步 **−1.600px**（dpr 1.25 量化下的 −1.281px），`状态/站点/状态码` **+0.000px** 分毫未动，第八轮的 `状态码` vs `200` 中心差仍为 **+0.00px**。
+
+**九轮的关键教训（换字体/换数据行时照此重测）**：
+
+1. **先量再改，且以用户截图（1:1 逻辑像素）为准**。所有位移都从截图逐像素量出，手绘红框需按颜色剔除否则污染墨迹边界；`y` 超出红框范围的数据行是干净参照。
+2. **1 空格 = 7.141px 是纯 ASCII 里唯一的隐形刻度**。想要 1~3px 的亚格位移，纯 ASCII 做不到——这直接否掉了「按空格数表达任意像素」的想法。
+3. **真隐形刻度只有四个**（全 BMP 穷举 `horizontalAdvance` + 逐像素墨迹检测）：空格 7.141px、`U+FFA0` 6.5px、`U+2800` 8.453px、`U+3000` 13.0px。**已排除的伪隐形**：`U+1680`（5.438px，有 6 个墨迹像素）、`U+1361`（2.0px，有 2 个）；3.0px 桶里 45 个字符全是各文种数字（`U+1946~`/`U+1BB0~`/`U+1C40~`），有字体的机器上会显示成数字，**绝不能用**。
+4. **富文本路线实测否决**：`<span style="margin-left/padding-left:3px">` 在 `QTextDocument` 对行内 span 不生效（margin-left 甚至导致前一空格被吞、整体左移一整格）；且 `add_html_plain_text()` 会 `html.escape`、剪贴板会被污染。
+5. **「显示列」不等于像素**：汉字实宽 13.000px 而非 2 空格（14.28px）、`✅` emoji 17.844px，故列号相同不等于像素对齐，必须逐像素验。
+6. **最优解未必是特殊字符**：第八轮要找 +3px，穷举一圈后**纯 ASCII 的 4 个空格反而最准**（误差 0.203px），前两轮死磕隐形刻度是绕远路。
+7. **多列同量位移可折叠到单处间隙**：第九轮三列同左移 1px，等价于只缩「状态码→耗时」这一处间隙（其余两侧同时移动故不变）——改动面越小越安全。
+8. **代价要显式告知用户**：表头重新含一个不可见的 `U+3000`（粘到剪贴板/issue 里会带上），这是亚格对齐唯一手段，已知并被用户接受。
+
+`tests/test_network_check.py` **89 项**全绿（含 `test_format_header_columns_align_with_result_lines`、`test_format_header_status_code_gap_is_four_ascii_spaces`、`test_format_header_elapsed_gap_shifts_trailing_columns_left` 三道钉死列位/填充的回归）；`tests/` 全量 **3512 passed / 6 skipped**，唯二失败为 `tests/crawlers/test_aventertainments.py` 两项 `@pytest.mark.network` 联网测试撞 reCAPTCHA，与本改动无关。逐轮细节见下方「改进」第七~九轮三条。
+
 ### 改进
 - **「使用代理」的「选择网站…」下拉框去掉每行后面的能力文案，另两个下拉框与界面其它部分一律不动（`mdcx/controllers/main_window/init.py` + `tests/test_site_combo_tooltips.py`）**：用户要求「软件设置-网络-使用代理：选择网站....下拉选项里删除综合：***、有码：***、无码：***、欧美：***等等提示词，注意只删除选择网站这一个地方，其他的如当前网站、指定网站下拉选项界面、布局、组件、控件、提示词等等全部保持不变」。
   - **能力文案是怎么来的**：三个站点下拉共用 `_populate_site_combo()`，它把 `_site_combo_caption(value)`（即「编辑网站」弹窗「可用网站」候选区悬停提示那一行，与爬虫 `description` 同源）直接拼进选项显示文本，拼成「`站点名（区域标签） 综合：有码/无码/欧美/传媒`」这样的三段式。
