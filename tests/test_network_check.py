@@ -246,29 +246,33 @@ async def test_probe_crawler_strips_special_check_path_from_base_url(monkeypatch
 
 
 @pytest.mark.anyio
-async def test_mirror_sample_spec_skips_scrape_probe(monkeypatch: pytest.MonkeyPatch):
-    """议题 #77：镜像抽样项（如 xcity·镜像）只验证连通性，不做刮削探测。
+async def test_mirror_sample_spec_runs_scrape_probe(monkeypatch: pytest.MonkeyPatch):
+    """镜像项同样走刮削探测：通过时要说「连接正常，刮削正常」（用户 2026-10-19）。
 
-    实证：xcity.jp 是展示页域名、/api/search 不存在（实测 404；API 只在 tc.xcity.jp），
-    探测按主站 URL 模式打到镜像域名必出「搜索页请求失败」误报。
-    镜像抽样用途是让主站挂时看到镜像是否可用，连通即达标。
+    旧版（议题 #77）把镜像行整体豁免在探测之外，行尾永远只有一句「连接正常」——
+    用户看不出镜像到底能不能刮。现存唯一的镜像项 `Javlibrary·镜像` 的爬虫是
+    JavLibraryCrawler 的子类（页面结构同源、探测 URL 模式一致），当初豁免针对的
+    「展示页域名型镜像」（xcity.jp 无 /api/search）已不存在于检测项里，故一并探测。
     """
-    import mdcx.crawlers as crawlers_mod
+    probe_called: list[str] = []
 
-    probe_called = []
+    async def fake(client, spec, probe_timeout=None):
+        probe_called.append(spec.name)
+        return NetworkCheckStatus.OK, "连接正常，刮削正常"
 
-    class ShouldNotBeCalled:
-        def __init__(self, client, base_url="", browser=None):
-            probe_called.append(True)
+    monkeypatch.setattr(nc, "_probe_crawler_capability", fake)
 
-    monkeypatch.setattr(crawlers_mod, "get_crawler", lambda site: ShouldNotBeCalled)
-
-    spec = NetworkCheckSpec(name="Xcity·镜像", group="刮削站点", url="https://xcity.jp", site=Website.XCITY)
+    spec = NetworkCheckSpec(
+        name="Javlibrary·镜像",
+        group="站点检测",
+        url="https://www.f101w.com/cn/?v=javme2j2tu",
+        site=Website.JAVLIBRARY_MIRROR,
+    )
     result = await run_network_check_item(spec, client=FakeClient())
 
+    assert probe_called == ["Javlibrary·镜像"], "镜像项必须真的发起刮削探测"
     assert result.status == NetworkCheckStatus.OK
-    assert result.message == "连接正常"
-    assert not probe_called, "镜像抽样不应触发刮削探测"
+    assert result.message == "连接正常，刮削正常"
 
 
 @pytest.mark.anyio

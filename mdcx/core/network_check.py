@@ -1616,10 +1616,14 @@ async def run_network_check_item(
             and spec.site is not None
             and not spec.validator
             and spec.name != "Cloudflare Bypass"
-            # 镜像抽样项只看连通性（议题 #77）：镜像域名未必复刻主站全部接口
-            # （实测 xcity.jp 无 /api/search），探测会按主站 URL 模式产生误报。
-            and not spec.name.endswith("镜像")
         ):
+            # 镜像行同样走刮削探测（用户 2026-10-19：镜像项通过时同样要看到
+            # 「连接正常，刮削正常」，不能只给一句「连接正常」——那看不出镜像到底
+            # 能不能刮）。议题 #77 当初豁免的是「展示页域名型镜像」（实测 xcity.jp
+            # 是展示页域名、无 /api/search，按主站 URL 模式探测必出误报），而现存的
+            # 唯一镜像项 `Javlibrary·镜像` 的爬虫是 JavLibraryCrawler 的子类
+            # （`JavLibraryMirrorCrawler`，页面结构同源、探测 URL 模式一致），
+            # 不属于那一类，豁免随之撤销。
             probe_status, probe_message = await _probe_crawler_capability_with_retry(
                 request_client, spec, cancel_event=cancel_event
             )
