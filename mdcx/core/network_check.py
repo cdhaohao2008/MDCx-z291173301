@@ -298,7 +298,22 @@ def _message_for_error(error: str) -> str:
     return error
 
 
+def _strip_response_body(error: str) -> str:
+    """截掉请求错误串末尾的 ` body=<响应体>`，只留状态码等真因。
+
+    `web_async.request` 的错误串把响应体统一挂在末尾（见其 `_record_attempt_error`），
+    而这些原因会原样进检测报告行——403/404/502/CloudFlare 挑战页的响应体动辄几百上千
+    字符整页 HTML 或 JSON，还常带乱码（EUC-JP 等非 UTF-8 页面），真正要看的
+    「HTTP 502」被埋在后面。`_clean_error`（连通性检测行）与刮削探测两条路径共用
+    这一个截断口径。
+    """
+    return str(error or "").split(" body=", 1)[0].rstrip()
+
+
 def _clean_error(error: str) -> str:
+    # 先截掉 ` body=<响应体>`：它总挂在串末尾，留着会让下面的 curl 尾巴正则
+    # （锚在 `$`）匹配不到，响应体也会跟着整页进检测报告行。
+    error = _strip_response_body(error)
     error = str(error or "").strip()
     # 截断 curl 长错误尾巴（OpenSSL 内部细节 + 参考链接）
     if "See https://curl.se/libcurl/c/libcurl-errors.html" in error:
@@ -317,18 +332,6 @@ def _clean_error(error: str) -> str:
     if left.startswith(("GET ", "POST ", "HEAD ")) and right.startswith(left):
         return right
     return error
-
-
-def _strip_response_body(error: str) -> str:
-    """截掉请求错误串末尾的 ` body=<响应体>`，只留状态码等真因。
-
-    `web_async.request` 的错误串带响应体（见其 `_record_attempt_error`：响应体
-    统一挂在末尾供诊断），但这些原因会原样进检测报告行——403/404/CloudFlare
-    挑战页的响应体动辄几百上千字符整页 HTML，还常带乱码（EUC-JP 等非 UTF-8
-    页面），真正要看的「HTTP 403」被埋在后面。`_clean_error` 已对连通性检测行
-    做过同样的截断，这里把口径补齐到刮削探测路径。
-    """
-    return str(error or "").split(" body=", 1)[0].rstrip()
 
 
 # 失败串开头的「{方法} {url} 失败:」段（`web_async.request` 的返回格式），

@@ -1317,6 +1317,59 @@ def test_strip_response_body_keeps_status_only():
     )
 
 
+def test_clean_error_drops_response_body():
+    """连通性检测行：TRAWL 返回的 JSON 响应体同样不带进报告。"""
+    raw = (
+        "GET https://www.g102q.com 失败: 遭遇Cloudflare挑战页且Bypass失败: HTTP 502; "
+        'GET http://127.0.0.1:6757/html 失败: HTTP 502 body={"error": "TRAWL 返回 HTTP 502"}'
+    )
+
+    cleaned = nc._clean_error(raw)
+
+    assert "body=" not in cleaned
+    assert cleaned == (
+        "GET https://www.g102q.com 失败: 遭遇Cloudflare挑战页且Bypass失败: HTTP 502; "
+        "GET http://127.0.0.1:6757/html 失败: HTTP 502"
+    )
+    # 响应体挂在末尾会挡住 curl 尾巴正则（锚在 $），截断后必须恢复翻译
+    assert (
+        nc._clean_error(
+            "GET https://x.test 失败: Failed to perform, curl: (35) BoringSSL SSL_connect: "
+            "Connection closed abruptly (SSL_ERROR_SYSCALL; error queue empty) in connection to x:443 "
+            "body=<html>403</html>"
+        )
+        == "GET https://x.test 失败: Failed to perform, curl: (35) BoringSSL SSL_connect: Connection closed abruptly"
+    )
+
+
+@pytest.mark.anyio
+async def test_dynamic_domain_fallback_message_drops_response_body(monkeypatch: pytest.MonkeyPatch):
+    """「代码网址与动态域名均无法联通」这条也不该带 body= 响应体。"""
+    monkeypatch.setattr("mdcx.core.network_check._manager", lambda: FakeManager())
+
+    class AlwaysFailingClient:
+        def __init__(self):
+            self.urls: list[str] = []
+
+        async def request(self, method, url, **kwargs):
+            self.urls.append(url)
+            return None, 'GET https://x.test 失败: HTTP 502 body={"error": "TRAWL 返回 HTTP 502"}'
+
+    async def fake_get_aio_domain(name: str) -> str:
+        return "https://dynamic.example"
+
+    monkeypatch.setattr("mdcx.base.web.get_aio_domain", fake_get_aio_domain)
+    client = AlwaysFailingClient()
+    spec = NetworkCheckSpec(name="avmoo", group="刮削站点", url="https://hardcoded.example", site=Website.AVMOO)
+
+    result = await run_network_check_item(spec, client=client)
+
+    assert result.status == NetworkCheckStatus.FAILED
+    assert client.urls == ["https://hardcoded.example", "https://dynamic.example"]
+    assert "body=" not in result.message and "body=" not in (result.error or "")
+    assert result.message == ("代码网址与动态域名均无法联通：GET https://x.test 失败: HTTP 502")
+
+
 @pytest.mark.anyio
 async def test_probe_search_page_failure_drops_response_body(monkeypatch: pytest.MonkeyPatch):
     """单轮探测：403 响应体不该整页进说明行。"""
