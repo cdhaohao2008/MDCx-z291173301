@@ -1313,7 +1313,7 @@ def _fetch_remote_version_from_api(timeout: float, proxies: list[str], headers: 
     """走 REST API 取 **tag 最大** 的 release，返回 (版本, 失败原因)。
 
     取 tag 最大而非列表第一条：`/releases` 按 `created_at` 倒序而非 tag 倒序，而发版
-    工作流四个平台用同一 tag + `overwrite`（先删后建）重建 release，补发/重跑旧 tag 会
+    工作流各平台用同一 tag + `overwrite`（先删后建）重建 release，补发/重跑旧 tag 会
     把它的 `created_at` 刷成当前时间、顶到第一条——取第一条会让已发布的新版本整体被
     遮住，用户永远看不到更新提示。
     """

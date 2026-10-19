@@ -1,10 +1,16 @@
 name: Build and Release Python3.14
 
-# 唯一的正式发版流程（Python 3.14，四平台一体包）。
+# 唯一的正式发版流程（Python 3.14，三平台一体包）。
+#
+# 2026-10-20 起矩阵由四平台收敛为三平台：macOS Intel（`macos-15-intel` / x86_64）那条腿
+# 连同它在 `Verify all platform assets present` 里的核对项与 `Create Release - macOS (Intel)`
+# 上传步骤一并删除——macOS 已放弃 x86_64 架构（官方 Intel runner 2027 秋整体退役），
+# 再编一份 x86_64 dmg 只会白烧 runner 时间。注意三处必须同时删：只删矩阵那一条，
+# 产物核对会永远缺 `dist/MDCx-x86_64.dmg` 直接 exit 1，全平台发版被这条死腿卡死。
 #
 # 2026-09-28 起本工作流接过了 `build-py313.yml`（3.13 发版主流程，原 `release.yml`）
 # 的全部职责，那两个文件连同单平台手动构建的 `build-windows.yml` / `build-linux.yml`
-# 一并删除——四平台矩阵已完全覆盖后两者的功能，3.13 侧不再需要独立流程。
+# 一并删除——多平台矩阵已完全覆盖后两者的功能，3.13 侧不再需要独立流程。
 # 因此现在**只此一条发版路径**：推纯数字 tag 自动发，或手动 workflow_dispatch 发。
 #
 # 触发方式两种，tag 的取法见 `Resolve release metadata`：
@@ -26,7 +32,7 @@ name: Build and Release Python3.14
 # 资产名同时出现在 `docs/Development.md`、`DADA/MEMORY.md` 与
 # `tests/test_py314_release_workflow.py::_EXPECTED_ASSETS`，改一处必须同步另两处。
 #
-# 附注：正因为本工作流四个平台用**同一 tag + `overwrite: true`**（先删后建）重建 release，
+# 附注：正因为本工作流各平台用**同一 tag + `overwrite: true`**（先删后建）重建 release，
 # 任何一次补发/重跑都会把那条 release 的 `created_at` 刷成当前时间、顶到 `/releases`
 # 列表第一条（该接口按 created_at 而非 tag 倒序）。客户端因此不能取第一条，必须取
 # tag 最大值——否则手动补发一次旧 tag 就会让所有用户从此看不到新版本提示。
@@ -34,7 +40,7 @@ name: Build and Release Python3.14
 # 三处护栏（发半成品 Release 比不发更糟）：
 #   1. `build-app` 带 continue-on-error，某平台翻车不阻塞其余平台
 #   2. `publish-release` 用 `!cancelled() && needs.build-app.result == 'success'` 把关
-#   3. 上传前核对四个平台产物齐全，不留半成品 Release
+#   3. 上传前核对三个平台产物齐全，不留半成品 Release
 #   另有 `concurrency` 按 ref 分组且 `cancel-in-progress: false`，半路取消同样会留下残缺资产。
 
 env:
@@ -82,8 +88,9 @@ jobs:
 
           # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners
 
+          # 2026-10-20 起 macOS 只剩 Apple Silicon 一条腿：macOS 已放弃 x86_64
+          # （Intel runner 2027 秋整体退役），再编一份 x86_64 dmg 只是白烧 runner 时间。
           items+=('{"build": "macos", "os": "macos-latest", "arch": "aarch64"}')
-          items+=('{"build": "macos", "os": "macos-15-intel", "arch": "x86_64"}')
           items+=('{"build": "windows", "os": "windows-2025", "arch": "x86_64"}')
           items+=('{"build": "linux", "os": "ubuntu-latest", "arch": "x86_64"}')
 
@@ -357,13 +364,12 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # 半成品 Release 比不发更糟（用户会下到一个跑不起来的包），所以先核齐四个资产。
+      # 半成品 Release 比不发更糟（用户会下到一个跑不起来的包），所以先核齐三个资产。
       - name: Verify all platform assets present
         shell: bash
         run: |
           missing=()
           [ -s dist/MDCx-aarch64.dmg ] || missing+=("dist/MDCx-aarch64.dmg")
-          [ -s dist/MDCx-x86_64.dmg ] || missing+=("dist/MDCx-x86_64.dmg")
           [ -s dist/MDCx.exe ] || missing+=("dist/MDCx.exe")
           [ -s dist/MDCx ] || missing+=("dist/MDCx")
           if [ ${#missing[@]} -gt 0 ]; then
@@ -399,17 +405,6 @@ jobs:
           release_name: ${{ steps.metadata.outputs.name }}
           asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg
           file: dist/MDCx-aarch64.dmg
-          prerelease: ${{ steps.metadata.outputs.prerelease }}
-          body: ${{ steps.changelog.outputs.CHANGELOG }}
-          tag: ${{ steps.metadata.outputs.tag }}
-
-      - name: Create Release - macOS (Intel)
-        uses: svenstaro/upload-release-action@v2
-        with:
-          overwrite: true
-          release_name: ${{ steps.metadata.outputs.name }}
-          asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-x86_64-${{ github.sha }}.dmg
-          file: dist/MDCx-x86_64.dmg
           prerelease: ${{ steps.metadata.outputs.prerelease }}
           body: ${{ steps.changelog.outputs.CHANGELOG }}
           tag: ${{ steps.metadata.outputs.tag }}

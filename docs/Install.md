@@ -13,8 +13,7 @@
 | 系统 | 下载什么 |
 |------|---------|
 | Windows 10/11（64 位） | `MDCx-...-windows-x86_64-....exe`（单文件，直接运行）|
-| macOS（Apple Silicon）| `MDCx-...-macos-aarch64-....dmg` |
-| macOS（Intel）| `MDCx-...-macos-x86_64-....dmg` |
+| macOS（Apple Silicon）| `MDCx-...-macos-aarch64-....dmg`（macOS 已不再提供 Intel / x86_64 版）|
 | Linux（x86_64） | `MDCx-...-linux-x86_64-...`（单文件可执行程序） |
 
 Linux 下载后先赋予执行权限，再启动：

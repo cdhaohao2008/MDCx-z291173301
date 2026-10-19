@@ -718,7 +718,9 @@ uv sync --locked --all-extras --dev
 uv run build --debug
 ```
 
-正式发版只有一条工作流：`.github/workflows/build-py314.yml`（**Build and Release (Python 3.14)**），四平台矩阵（macOS ARM64 / macOS Intel / Windows x86_64 / Linux x86_64）全量构建，创建 tag 为纯数字 `LOCAL_VERSION` 的 Release，资产名 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，例如 `MDCx-2.4.7-20261020-windows-x86_64-<40位sha>.exe`。两个版本段刻意并存：`<展示版本号>` 是 `VERSION_NAME` 去 `v` 前缀（`v2.4.7` → `2.4.7`，由工作流的 `steps.metadata.outputs.asset_version` 提供），只给人看、不参与任何版本比较；`<tag>` 仍是纯数字 `LOCAL_VERSION`，`check_version()` 的 `int(tag_name)` 比的就是它——**新增展示版本号段不影响自动更新，因为客户端只读 `tag_name`、不解析资产名**。**客户端自动更新只看这个 Release，tag 形态（纯数字）与资产名都是对外契约，别动它。**
+正式发版只有一条工作流：`.github/workflows/build-py314.yml`（**Build and Release (Python 3.14)**），三平台矩阵（macOS ARM64 / Windows x86_64 / Linux x86_64）全量构建，创建 tag 为纯数字 `LOCAL_VERSION` 的 Release，资产名 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，例如 `MDCx-2.4.7-20261020-windows-x86_64-<40位sha>.exe`。两个版本段刻意并存：`<展示版本号>` 是 `VERSION_NAME` 去 `v` 前缀（`v2.4.7` → `2.4.7`，由工作流的 `steps.metadata.outputs.asset_version` 提供），只给人看、不参与任何版本比较；`<tag>` 仍是纯数字 `LOCAL_VERSION`，`check_version()` 的 `int(tag_name)` 比的就是它——**新增展示版本号段不影响自动更新，因为客户端只读 `tag_name`、不解析资产名**。**客户端自动更新只看这个 Release，tag 形态（纯数字）与资产名都是对外契约，别动它。**
+
+2026-10-20 起 macOS Intel 腿退役：macOS 已放弃 x86_64 架构（GitHub 官方 Intel runner 2027 秋整体退役），矩阵里的 `macos-15-intel` / x86_64 那一条连同它在 `Verify all platform assets present` 里的核对项与 `Create Release - macOS (Intel)` 上传步骤一并删除，矩阵由四平台收敛为三平台。**三处必须同删**：只删矩阵项会让产物核对永远缺 `dist/MDCx-x86_64.dmg` 而 exit 1，把**所有**平台的发版一起卡死；只删矩阵项而留着上传步骤则会让 upload 步骤因文件缺失报错，可能留下半成品 Release（`overwrite: true` 重建语义）。`tests/test_py314_release_workflow.py::test_macos_intel_leg_is_gone` 钉死这三条不得复活。
 
 两种触发方式：
 
@@ -727,15 +729,15 @@ uv run build --debug
 | `push` tag `2*`（如 `20260928`） | 推送的 ref | 一律 `false` |
 | `workflow_dispatch` 手动补发 | 输入的 `tag`，留空则取 `consts.py` 的 `LOCAL_VERSION` | 由 `prerelease` 输入决定 |
 
-2026-09-28 起本工作流接过了原 3.13 主流程（`build-py313.yml`，更早叫 `release.yml`）的全部职责，那两个文件连同单平台手动构建的 `build-windows.yml` / `build-linux.yml` 一并删除——四平台矩阵已完全覆盖后两者的功能，3.13 侧不再需要独立流程。
+2026-09-28 起本工作流接过了原 3.13 主流程（`build-py313.yml`，更早叫 `release.yml`）的全部职责，那两个文件连同单平台手动构建的 `build-windows.yml` / `build-linux.yml` 一并删除——多平台矩阵已完全覆盖后两者的功能，3.13 侧不再需要独立流程。
 
 3.14 专属三处：`python-version: 3.14`、`UV_PYTHON: 3.14`、构建前用 `sys.version_info[:2] == (3, 14)` 断言解释器（防 uv 悄悄挑到别的版本），以及 `uv sync --locked` 失败自动回退 `uv sync` 重新解析（`uv.lock` 未必有 cp314 wheel；只改 CI 临时工作树，不动仓库 lock）。另有三处护栏：
 
-1. **缺产物不发版**：`build-app` 带 `continue-on-error`，`publish-release` 用 `if: !cancelled() && needs.build-app.result == 'success'` 把关（不能写 `success()`：`needs` 里任一失败腿都会让它整体跳过），并在上传前核对四个平台产物齐全——半成品 Release 比不发更糟。
+1. **缺产物不发版**：`build-app` 带 `continue-on-error`，`publish-release` 用 `if: !cancelled() && needs.build-app.result == 'success'` 把关（不能写 `success()`：`needs` 里任一失败腿都会让它整体跳过），并在上传前核对三个平台产物齐全——半成品 Release 比不发更糟。
 2. **并发不互杀**：`concurrency` 按 ref 分组且 `cancel-in-progress: false`，半路取消会留下缺资产的 Release。
-3. **重跑幂等**：四个 Create Release 步骤都带 `overwrite: true`，同一版本号重复发版只更新同名资产，不新建。
+3. **重跑幂等**：三个 Create Release 步骤都带 `overwrite: true`，同一版本号重复发版只更新同名资产，不新建。
 
-上述约定由 `tests/test_py314_release_workflow.py`（10 项）与 `tests/test_workflow_action_pins.py` 守住（纯文本断言，不引入 yaml 依赖），改工作流后请一并跑 `uv run pytest tests/test_sr_bundling.py tests/test_py314_release_workflow.py tests/test_workflow_action_pins.py`。
+上述约定由 `tests/test_py314_release_workflow.py`（11 项）与 `tests/test_workflow_action_pins.py` 守住（纯文本断言，不引入 yaml 依赖），改工作流后请一并跑 `uv run pytest tests/test_sr_bundling.py tests/test_py314_release_workflow.py tests/test_workflow_action_pins.py`。
 
 
 依赖版本下限按 Python 3.14 抬过三处，改依赖时务必守住（否则 3.14 流水线的 `uv sync --locked` 会硬失败）：

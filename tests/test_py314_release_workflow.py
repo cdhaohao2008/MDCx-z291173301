@@ -2,7 +2,7 @@
 
 背景：2026-09-28 起本工作流是**仓库里唯一的正式发版路径**——原 3.13 主流程
 `build-py313.yml`（更早叫 `release.yml`）连同单平台手动构建的 `build-windows.yml` /
-`build-linux.yml` 一并删除，四平台矩阵已完全覆盖后两者的功能。本工作流同时负责
+`build-linux.yml` 一并删除，多平台矩阵已完全覆盖后两者的功能。本工作流同时负责
 `push` tag `2*` 自动发版与 `workflow_dispatch` 手动补发，任何一处被改坏都会伤到发版
 或客户端自动更新：
 
@@ -11,19 +11,21 @@
    取其中**最大**的一个，非纯数字 tag 会被跳过，自动更新就永久失效。故不得回退到早期
    版本的 `py314-<版本号>` 预览 tag 方案。（取最大而非取第一条的理由见
    `tests/test_version_check_pick_latest.py`：`/releases` 按 `created_at` 倒序，本工作流
-   四个平台用同一 tag + `overwrite` 重建 release，补发旧 tag 会把它顶到第一条。）
+   各平台用同一 tag + `overwrite` 重建 release，补发旧 tag 会把它顶到第一条。）
 2. **必须监听 tag `2*`**：3.13 流程删除后，本工作流是唯一监听 tag 的地方；丢了
    `push.tags` 就再没有自动发版路径了。同时保留 `workflow_dispatch` 供手动补发。
-3. **输入只有 tag 与 prerelease**：平台固定四平台（无 `platforms` 开关）、发版不再有
+3. **输入只有 tag 与 prerelease**：平台固定三平台（无 `platforms` 开关）、发版不再有
    `publish` 勾选、relock 回退不再有 true/false 开关（3.14 恒允许回退）。
 4. **缺产物不发版**：`build-app` 带 `continue-on-error`，所以 `publish-release` 必须用
    `needs.build-app.result == 'success'` 把关（不能写 `success()`：`needs` 里任一失败腿
-   都会让它整体跳过），并在上传前核对四个平台产物齐全——半成品 Release 比不发更糟。
+   都会让它整体跳过），并在上传前核对三个平台产物齐全——半成品 Release 比不发更糟。
 5. **资产命名是客户端契约**：`MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，同名资产靠
    `overwrite: true` 覆盖更新，格式一改客户端下载链接就全断。展示版本号取
    `mdcx/consts.py` 的 `VERSION_NAME` 去 v 前缀（`v2.4.7` → `2.4.7`），只进文件名、
    不参与版本比较；`tag` 仍是纯数字 `LOCAL_VERSION`，`check_version()` 比的就是它。
    资产名同时写在 `docs/Development.md` 与 `DADA/MEMORY.md`，改一处要同步三处。
+6. **macOS Intel 腿已于 2026-10-20 退役**：macOS 放弃 x86_64，矩阵、产物核对项与
+   `Create Release - macOS (Intel)` 三处必须同时消失（`_RETIRED_MACOS_INTEL`）。
 
 按仓库惯例做文本断言（`tests/` 不引入 yaml 依赖），改工作流后请同步更新本文件。
 """
@@ -34,22 +36,31 @@ from pathlib import Path
 _ROOT = Path(__file__).parent.parent
 _WORKFLOW = _ROOT / ".github" / "workflows" / "build-py314.yml"
 
-# 一次 Release 覆盖的平台资产（macOS 两架构共用一个构建目录，文件名由 build-app 决定）
+# 一次 Release 覆盖的平台资产（macOS 只剩 Apple Silicon 一条腿，文件名由 build-app 决定）
 _ASSET_FILES = (
     "dist/MDCx-aarch64.dmg",
-    "dist/MDCx-x86_64.dmg",
     "dist/MDCx.exe",
     "dist/MDCx",
 )
 
-_RELEASE_STEP_COUNT = 4
+_RELEASE_STEP_COUNT = 3
 
-# 固定四平台矩阵（actions/runner#1985）
+# 固定三平台矩阵（actions/runner#1985）。2026-10-20 起 macOS Intel（`macos-15-intel` /
+# x86_64）那条腿连同其产物核对项与 `Create Release - macOS (Intel)` 步骤一并删除：
+# macOS 已放弃 x86_64 架构，只编一份 Apple Silicon dmg。
 _MATRIX_ITEMS = (
     '{"build": "macos", "os": "macos-latest", "arch": "aarch64"}',
-    '{"build": "macos", "os": "macos-15-intel", "arch": "x86_64"}',
     '{"build": "windows", "os": "windows-2025", "arch": "x86_64"}',
     '{"build": "linux", "os": "ubuntu-latest", "arch": "x86_64"}',
+)
+
+# 2026-10-20 删除的 macOS Intel 腿留下的三处痕迹，任一处复活即说明没删干净。
+# 尤其第一条：矩阵里留着这条腿而产物核对项被删，会让 upload-artifact 因缺文件失败，
+# 连带 `needs.build-app.result != 'success'` 掐死整条发版链路。
+_RETIRED_MACOS_INTEL = (
+    "macos-15-intel",
+    "dist/MDCx-x86_64.dmg",
+    "Create Release - macOS (Intel)",
 )
 
 # 客户端依赖的资产名，逐条写死（唯一发版流程，没有第二份可对照，改名即破坏下载链接）。
@@ -59,7 +70,6 @@ _MATRIX_ITEMS = (
 # 的 `int(tag_name)` 比较走的是它）。
 _EXPECTED_ASSETS = (
     "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg",
-    "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-x86_64-${{ github.sha }}.dmg",
     "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-windows-x86_64-${{ github.sha }}.exe",
     "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}",
 )
@@ -70,6 +80,15 @@ _REMOVED_WORKFLOWS = ("build-py313.yml", "build-windows.yml", "build-linux.yml")
 
 def _workflow() -> str:
     return _WORKFLOW.read_text(encoding="utf-8")
+
+
+def _workflow_code() -> str:
+    """工作流去掉整行注释后的正文。
+
+    文件头保留着「macOS Intel 腿为何退役」的说明注释（含 `macos-15-intel` 等字样），
+    所以退役断言必须只看配置行，否则文档本身就会把守卫打红。
+    """
+    return "\n".join(line for line in _workflow().splitlines() if not line.lstrip().startswith("#"))
 
 
 def test_tag_is_plain_numeric_not_py314_prefixed():
@@ -86,7 +105,7 @@ def test_tag_is_plain_numeric_not_py314_prefixed():
     )
     assert 'echo "tag=$tag" >> "$GITHUB_OUTPUT"' in text, "metadata 步骤应回输出解析出的纯数字 tag"
     assert text.count("tag: ${{ steps.metadata.outputs.tag }}") == _RELEASE_STEP_COUNT, (
-        "四个 Create Release 步骤都应引用纯数字 tag"
+        "三个 Create Release 步骤都应引用纯数字 tag"
     )
     assert re.search(r"\^\[0-9\]\+\$", text), "tag 必须做纯数字校验（build-app 与 publish 两处都要）"
 
@@ -115,12 +134,12 @@ def test_prerelease_only_applies_to_manual_dispatch():
         "prerelease 必须由 event_name 守卫，否则推 tag 也会被标成预发布"
     )
     assert re.search(r"(?m)^\s+prerelease: \$\{\{ steps\.metadata\.outputs\.prerelease \}\}$", text), (
-        "四个 Create Release 步骤都应沿用 metadata 解析出的 prerelease"
+        "三个 Create Release 步骤都应沿用 metadata 解析出的 prerelease"
     )
 
 
 def test_only_tag_and_prerelease_inputs():
-    """手动触发只留版本号与 prerelease 两个输入，恒构建四平台、恒允许 relock 回退。"""
+    """手动触发只留版本号与 prerelease 两个输入，恒构建三平台、恒允许 relock 回退。"""
     text = _workflow()
 
     for removed in ("platforms:", "publish:", "allow_relock:"):
@@ -131,8 +150,8 @@ def test_only_tag_and_prerelease_inputs():
     assert re.search(r"(?m)^      prerelease:$", text) is not None, "应保留 prerelease 输入"
 
 
-def test_matrix_always_builds_all_four_platforms():
-    """平台固定四平台全量构建。"""
+def test_matrix_always_builds_all_three_platforms():
+    """平台固定三平台全量构建（macOS 只剩 Apple Silicon）。"""
     text = _workflow()
 
     for item in _MATRIX_ITEMS:
@@ -146,6 +165,24 @@ def test_matrix_always_builds_all_four_platforms():
     ):
         assert f"name: {artifact}" in text, f"产物名缺失：{artifact}"
     assert "pattern: mdcx-*" in text, "下载产物的 pattern 应覆盖全部平台"
+
+
+def test_macos_intel_leg_is_gone():
+    """macOS 放弃 x86_64，Intel 腿的矩阵项 / 产物核对项 / 上传步骤必须三处同删。
+
+    只删矩阵项而留着产物核对项最致命：`Verify all platform assets present` 会永远
+    缺 `dist/MDCx-x86_64.dmg` 直接 exit 1，把**所有**平台的发版一起卡死；
+    只删矩阵项而留着上传步骤则会让 svenstaro/upload-release-action 因文件缺失报错，
+    在 `overwrite: true` 重建 release 的语义下可能留下半成品 Release。
+    """
+    code = _workflow_code()
+
+    for retired in _RETIRED_MACOS_INTEL:
+        assert retired not in code, (
+            f"macOS Intel 腿已于 2026-10-20 退役（macOS 已放弃 x86_64），工作流里不该再出现：{retired}"
+        )
+    assert "-macos-x86_64-" not in code, "不该再拼 macos x86_64 资产名"
+    assert code.count("- name: Create Release - macOS") == 1, "macOS 只应有 Apple Silicon 一个 Create Release 步骤"
 
 
 def test_python_314_pins_and_relock_fallback():
@@ -163,7 +200,7 @@ def test_python_314_pins_and_relock_fallback():
 
 
 def test_publish_requires_all_platform_artifacts():
-    """上传前必须核对四平台产物齐全，避免发半成品 Release。"""
+    """上传前必须核对三平台产物齐全，避免发半成品 Release。"""
     text = _workflow()
 
     assert "- name: Verify all platform assets present" in text, "缺少产物核对步骤"
@@ -196,7 +233,7 @@ def test_release_uploads_are_idempotent():
     )
     assert "contents: write" in text, "创建 Release 需要 permissions: contents: write"
     assert text.count("- name: Create Release - ") == _RELEASE_STEP_COUNT, (
-        f"应有 {_RELEASE_STEP_COUNT} 个 Create Release 步骤（macOS 两架构 + Windows + Linux）"
+        f"应有 {_RELEASE_STEP_COUNT} 个 Create Release 步骤（macOS Apple Silicon + Windows + Linux）"
     )
 
 
@@ -213,18 +250,18 @@ def test_asset_names_and_release_title():
 
 
 def test_asset_version_segment_comes_from_version_name_without_v_prefix():
-    """资产名里的展示版本号段必须是 `VERSION_NAME` 去 v 前缀，且四个发布步骤都引用它。"""
+    """资产名里的展示版本号段必须是 `VERSION_NAME` 去 v 前缀，且三个发布步骤都引用它。"""
     text = _workflow()
 
     assert "asset_version=${version_name#v}" in text, (
         "展示版本号应由 VERSION_NAME 去掉 v 前缀得到（v2.4.7 → 2.4.7），不能直接拼带 v 的原值"
     )
     assert 'echo "asset_version=$asset_version" >> "$GITHUB_OUTPUT"' in text, (
-        "metadata 步骤应回输出 asset_version，四个 Create Release 步骤都靠它拼文件名"
+        "metadata 步骤应回输出 asset_version，三个 Create Release 步骤都靠它拼文件名"
     )
     assert "asset_version=${asset_version:-$tag}" in text, "读不到 VERSION_NAME 时应退回 tag，保证资产文件名不会缺一段"
     assert text.count("steps.metadata.outputs.asset_version") == _RELEASE_STEP_COUNT, (
-        f"四个 Create Release 步骤都应引用 asset_version（当前 {text.count('steps.metadata.outputs.asset_version')} 处）"
+        f"三个 Create Release 步骤都应引用 asset_version（当前 {text.count('steps.metadata.outputs.asset_version')} 处）"
     )
     # asset_version 只进文件名，绝不能被写回 tag——tag 必须保持纯数字
     assert 'echo "tag=$tag"' in text and "asset_version=$tag" not in text, (
