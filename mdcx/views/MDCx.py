@@ -14557,7 +14557,7 @@ class Ui_MDCx(object):
         self.label_71.setText(_translate("MDCx", "（时:分:秒）"))
         self.label_313.setText(_translate("MDCx", "隐藏窗口："))
         self.label_246.setText(_translate("MDCx", "界面外观："))
-        self.label_420.setText(_translate("MDCx", "选对话框："))
+        self.label_420.setText(_translate("MDCx", "Qt对话框："))
         self.label_426.setText(_translate("MDCx", "分屏缩放："))
         self.comboBox_ui_scale.setToolTip(
             _translate("MDCx", "界面缩放比例，保存后重启生效；放不下当前屏幕的档位会自动隐藏")
