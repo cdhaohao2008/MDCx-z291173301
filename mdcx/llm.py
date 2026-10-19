@@ -65,12 +65,22 @@ class LLMClient:
         timeout: Timeout,
         rate: tuple[float, float],
     ):
-        self.client = AsyncOpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            http_client=AsyncClient(proxy=proxy, timeout=timeout, follow_redirects=True),
-            timeout=timeout,
-        )
+        # 未填 API Key 时**绝不能**构造 AsyncOpenAI：OpenAI SDK 会当场抛
+        # OpenAIError("Missing credentials")，而本对象是在 Computed() 里、
+        # 即 ConfigManager 加载配置的路径上同步构造的——一旦抛错，第一次会被
+        # load() 的 except Exception 抓住并回退到 _replace_config(Config())，
+        # 那里又用同样的空 Key 再抛一次，而这次已无人接管，整个
+        # `manager = ConfigManager()` 模块级实例化直接失败，软件连启动都进不去
+        # （用户 2026-10-19 实测：源码运行 main.py 即崩）。改为惰性留空，
+        # 真正用到翻译时再在 ask() 里明确报「未配置密钥」。
+        self.client: AsyncOpenAI | None = None
+        if api_key and api_key.strip():
+            self.client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                http_client=AsyncClient(proxy=proxy, timeout=timeout, follow_redirects=True),
+                timeout=timeout,
+            )
         self.limiter = AsyncLimiter(*rate)
         self._closed = False
         self._close_requested = False
@@ -140,7 +150,8 @@ class LLMClient:
         self._close_requested = True
         self._closed = True
         with contextlib.suppress(Exception):
-            await self.client.close()
+            if self.client is not None:
+                await self.client.close()
 
     async def ask(
         self,
@@ -157,6 +168,11 @@ class LLMClient:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
+        if self.client is None:
+            # 未配置密钥时给出可执行的提示，而不是让整轮翻译静默失败
+            log_fn("💡 未配置 LLM API 密钥，已跳过本次翻译（请在设置页填写密钥后再试）")
+            return None
+        client = self.client
         wait = 1
         body = extra_body
         chat = None
@@ -165,7 +181,7 @@ class LLMClient:
             async with self.limiter:
                 for _ in range(max(0, max_try)):
                     try:
-                        chat = await self.client.chat.completions.create(
+                        chat = await client.chat.completions.create(
                             model=model,
                             messages=messages,
                             temperature=temperature,

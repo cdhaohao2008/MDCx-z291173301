@@ -292,8 +292,36 @@ class ConfigManager:
             text = self.config.model_dump_json(indent=2)
         self._write_config_text(self._path, text)
 
+    def _backup_before_reset(self):
+        """覆盖前先把当前配置另存一份，reset() 专用。
+
+        reset() 是全库唯一能写出「出厂默认值」的地方——save() 只写用户现有值，
+        产不出出厂值。2026-10-19 用户实测：actor.json / default.json / studios.json
+        三份被按字母序每隔约 10 秒重置一次，api_key、JavBus Cookie、FC2 Cookie、
+        ThePornDB token、真实媒体路径、file_name_max、actor_name_max、emby_url
+        全部丢失，无法从程序内恢复。
+
+        备份命名 `*.resetbak-<时间戳>.txt`（**刻意不用 .json**：list_configs() 会把
+        目录里所有 .json 列进「当前配置」下拉框，用 .json 会被当成真配置加载），
+        按名称倒序只保留最近 10 份。任何异常都只记日志、绝不打断重置本身。
+        """
+        try:
+            if not self._path.is_file():
+                return
+            import time
+
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            backup = self._path.with_name(f"{self._path.stem}.resetbak-{stamp}.txt")
+            backup.write_bytes(self._path.read_bytes())
+            logger.info("重置配置前已备份原配置: %s", backup)
+            for old in sorted(self._path.parent.glob(f"{self._path.stem}.resetbak-*.txt"), reverse=True)[10:]:
+                old.unlink(missing_ok=True)
+        except Exception:
+            logger.exception("重置配置前备份失败（不影响重置）")
+
     def reset(self):
-        """写入默认配置"""
+        """写入默认配置（整份覆盖；覆盖前先自动备份，见 _backup_before_reset）"""
+        self._backup_before_reset()
         template_path = self._get_default_template_path()
         if template_path.is_file():
             try:
@@ -315,10 +343,20 @@ class ConfigManager:
         return MAIN_PATH / "resources" / "config" / "default_config.json"
 
     def list_configs(self) -> list[str]:
-        """列出配置文件夹中的所有配置文件名."""
-        if not self._path.parent.exists():
+        """列出配置文件夹中的所有 **.json** 配置文件名，一个都不许少。
+
+        只列 .json：.ini 是 1.0 时代的配置格式，早已废弃（load() 里的
+        handle_v1() 只为「标记文件仍指向某个历史 .ini」的极端情况留了一条兼容
+        路径，不等于还该把它摆进「当前配置」下拉框里让人选）。
+
+        不做任何有效性过滤：这份列表的用途是让用户从多个配置之间切换，滤掉
+        「读不出来的那份」等于堵死逃生通道（用户 2026-10-19 定规）。目录不存在
+        或读不了时返回空列表，不抛异常——调用方要的是「拿不到就空着」，不是崩溃。
+        """
+        try:
+            return sorted(f.name for f in self._path.parent.iterdir() if f.suffix.lower() == ".json")
+        except OSError:
             return []
-        return [f.name for f in self._path.parent.iterdir() if f.suffix in (".json", ".ini")]
 
     @staticmethod
     def write_mark_file(path: str | Path):
