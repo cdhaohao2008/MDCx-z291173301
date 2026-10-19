@@ -12,6 +12,10 @@
   第六组（最小化「向左缩进」，同样要求最大化态一切不变）：「每次间隔」时长框右缘
     缩到与「间歇刮削」文件数框右缘严格上下对齐——**唯一一处比右缘而不是左缘**的
     需求，锚点行及其余控件一律不许动。
+  第七组（最小化「向左移」）：「隐藏NFO 文件管理」与两枚「关」→ 「显示字段来源信息」，
+    且「显示字段来源信息」**位置保持不变**（它重新变成窄态的锚点）。
+    上一批（第四组需求①）曾把它窄态右移到 nfo 那一列，本批与那一批方向相反，
+    故 `_sync_advanced_page_debug_row` 连同调用一并删除——该行两项回到自然位。
 
 根因防线（任一回归都会让本文件失败）：
   - 三处手法不同，勿互相套用。①所在行容器是顶层组框的**直接子项**、被通用
@@ -31,6 +35,11 @@
     只按锚点区分（第三组把这两处的窄态也纳入了需求），而「点最小化按钮」的锚点
     随态切换（宽→显示字段来源信息 / 窄→隐藏NFO 文件管理），漏了 narrow 分支会让它
     在还原后停在 from_log 而不是 nfo。
+  - 第七组把「隐藏NFO 文件管理」的窄态锚点也换成了「显示字段来源信息」，于是窄态
+    下「隐藏NFO 文件管理」/ 两枚「关」/「点最小化按钮」四者同落在 from_log 那条竖线。
+    这一段带**可行性门槛**（前导项「隐藏 Emby 演员管理」被钉窄到 pin_d 后仍须 ≥ 它
+    自己的 sizeHint，否则必然裁字），放不下就整行放弃、保持自然位——故它在
+    `_NARROW_FIT` 里单列，不与「两态无条件的落点」混在一起断言。
   - 跨分支 mapTo（锚点在 groupBox_12 内、目标在 groupBox_17/_4 与 frame_3）必须
     经公共祖先 scrollAreaWidgetContents_gaoji 中转。
   - 「向左移动」这个**方向**在本离屏环境里无法断言：resources/fonts 下没有任何 CJK
@@ -127,7 +136,7 @@ def _extra(win) -> int:
     return win._scroll_stretch_extra(win._adv_scroll)
 
 
-# 本文件覆盖高级页四组竖线需求：
+# 本文件覆盖高级页七组竖线需求：
 #   第一组（最大化「右移」）：两个「关」→「隐藏NFO 文件管理」、「点最小化按钮」→
 #     「显示字段来源信息」、「无」→「显示字段内容信息」
 #   第二组（最大化「左移」）：刮削结束后自动退出软件 / 停止刮削时 /
@@ -138,10 +147,13 @@ def _extra(win) -> int:
 #   第四组（最小化「右移」）：「显示字段来源信息」→「隐藏NFO 文件管理」（需求①）；
 #     「停止刮削时」/「隐藏菜单栏图标（Mac）」/「暗黑模式」/ 两枚「关」
 #     → 「显示字段内容信息」（需求②）
-# 第三组与第四组在同一批控件上方向相反（第三组说「关」左移到 nfo，第四组说右移到
-# 「显示字段内容信息」），第四组是后一条需求，故窄态以第四组为准；两组在宽态下
-# **同时成立**：宽态两枚「关」先随「隐藏NFO 文件管理」落位、再被第一组的 tail_align
-# 拉回它右侧，最终都精确落在「显示字段来源信息」那条竖线上。
+#   第七组（最小化「左移」）：「隐藏NFO 文件管理」+ 两枚「关」→「显示字段来源信息」，
+#     且「显示字段来源信息」位置保持不变（第四组需求①已撤销，见 _NARROW_FIT）
+# 第三、四、七组在同一批控件上反复改方向（第三组说「关」左移到 nfo，第四组说右移到
+# 「显示字段内容信息」，第七组又改回左移到 from_log），**后一条需求为准**：窄态以第七组
+# 为准、第四组需求①整段撤销；它们在宽态下**同时成立**：宽态两枚「关」先随「隐藏NFO
+# 文件管理」落位、再被第一组的 tail_align 拉回它右侧，最终都精确落在「显示字段来源
+# 信息」那条竖线上。
 _LEFT_TARGETS = (
     ("checkBox_auto_exit", "checkBox_show_from_log"),
     ("checkBox_show_dialog_stop_scrape", "checkBox_show_from_log"),
@@ -160,11 +172,11 @@ _LEFT_TARGETS = (
 _NARROW_AUTO_EXIT = (("checkBox_auto_exit", "checkBox_hide_menu_icon"),)
 
 # 第四组需求②在最小化态的落点（都锚「显示字段内容信息」，它是窄态最靠右的竖线）。
+#   注意两枚「关」已移出：第七组把它们的窄态锚点换成了「隐藏NFO 文件管理」，
+#   而 nfo 本批又对齐到「显示字段来源信息」，故窄态两枚「关」实际落最左那条竖线。
 _NARROW_RIGHT = (
     ("checkBox_show_dialog_stop_scrape", "checkBox_show_data_log"),
     ("checkBox_dark_mode", "checkBox_show_data_log"),
-    ("radioButton_log_off", "checkBox_show_data_log"),
-    ("radioButton_update_off", "checkBox_show_data_log"),
 )
 
 # 第六组（最小化「向左缩进」）：「每次间隔」时长框右缘 → 「间歇刮削」文件数框右缘。
@@ -176,18 +188,30 @@ _NARROW_RIGHT = (
 #   宽态不需要这一段：那时两枚框都是满宽，右缘本就相等（见本文件末尾那组用例）。
 #   （对应需求：目标 lineEdit_timed_interval、锚点 lineEdit_rest_count。）
 
-# 第三、四组（最小化态）：目标 -> 窄态锚点。
+# 第三、四、七组（最小化态）：目标 -> 窄态锚点。
 #   「点最小化按钮」窄态锚的是 checkBox_hide_nfo_nav 而**不是**
-#     checkBox_show_from_log（窄态两者分处 307 / 292，取错会让它在还原后停在 292）。
-#     注意第四组需求①把 checkBox_show_from_log 搬到了 nfo 那一列，两者随即相等，
-#     但代码里仍显式按态取锚，不依赖这个巧合。
-#   第四组需求①的两段钉宽见 _sync_advanced_page_debug_row：必须前两项一起钉，
-#     只钉前导项会让末位「显示字段内容信息」被重新等分推着右移 ~10px。
+#     checkBox_show_from_log（两态不同）。第七组把 nfo 钉到 from_log 之后两者
+#     在窄态同列，但代码里仍显式按态取锚，不依赖这个巧合。
+#   第四组需求①的两段钉宽（把「显示字段来源信息」窄态右移到 nfo 那一列）已随
+#     _sync_advanced_page_debug_row 一并撤销——它与第七组方向相反，后者是后一条
+#     需求。「显示字段来源信息」/「显示刮削过程信息」窄态回到自然位（不再被钉宽），
+#     「显示字段内容信息」也一并回到基线（那一段撤销后不再有钉宽压着它）。
 _NARROW_TARGETS = (
-    ("checkBox_show_from_log", "checkBox_hide_nfo_nav"),
     ("radioButton_hide_mini", "checkBox_hide_nfo_nav"),
     ("radioButton_hide_none", "checkBox_show_data_log"),
+    # 第七组：两枚「关」窄态一律跟「隐藏NFO 文件管理」（无条件，落点即 nfo 的实时 x）
+    ("radioButton_log_off", "checkBox_hide_nfo_nav"),
+    ("radioButton_update_off", "checkBox_hide_nfo_nav"),
 ) + _NARROW_RIGHT
+
+# 第七组里**带可行性门槛**的那一条：窄态把「隐藏NFO 文件管理」钉到「显示字段来源
+# 信息」那条竖线。做法与本页其余各行同款（钉死前导项「隐藏 Emby 演员管理」为
+# `pin_d = 竖线 - 行左缘 - 间隔`），但判据比别处多一道：`pin_d >= actor.sizeHint()`
+# ——前导项被钉窄后仍须装得下自己的字，否则必然裁字，需求原话又要求「提示词不许变」。
+# 放不下就整行放弃（解除钉宽、保持自然位），这与本文件 test_menu_icon_row_aligns_
+# or_defers / test_dock_row 同款：可行性依赖字体度量、跨环境不一定同档，故不能把
+# 「窗口一窄就必须对齐」写成死断言。
+_NARROW_FIT = (("checkBox_hide_nfo_nav", "checkBox_show_from_log"),)
 
 # 「隐藏菜单栏图标（Mac）」单列，不在 _LEFT_TARGETS 里做钉死像素的断言，原因见
 # _dock_row 的说明：它所在行是「Fixed 前缀 + 间隔 + 末项」结构，前缀宽度等于两个
@@ -210,10 +234,12 @@ _TARGETS = (
 )
 
 # 宽态下**整块几何**都不许动的参照：两个锚点、其余行内控件、容器、组框。
-# 注意 checkBox_show_from_log 已移出：它是第四组需求①的**窄态目标**（窄态要右移
-# 21px 到「隐藏NFO 文件管理」那一列），只有宽态才不许动，故改由 _NARROW_TARGETS 覆盖。
+# 注意 checkBox_show_from_log 已移出：第四组需求①曾把它当窄态目标右移 21px，那一段
+# 已随第七组撤销，故它回到「宽窄两态都不许动」的行列——但窄态它是**锚点**（不动）、
+# 宽态它是第二组的目标（也不动），两态都不许动，故仍可留在 _REFS 里。
 _REFS = (
     "checkBox_show_data_log",
+    "checkBox_show_from_log",
     "frame_3",
     "layoutWidget_3",
     "horizontalLayoutWidget_11",
@@ -227,14 +253,16 @@ _REFS = (
 # 宽态下**只许改宽度、不许改左缘**的中间量：它们正是需求生效的搬运工与容器，
 # 量到宽度差异恰恰是对齐生效的证据，拿整块几何去卡会误报。
 #   checkBox_auto_start      阶段一被钉死的前导项，「刮削结束后自动退出软件」靠它落到竖线
-#   checkBox_hide_actor_nav  第 12 行被钉的前导项，「隐藏NFO 文件管理」靠它落到竖线
+#   checkBox_hide_actor_nav  隐藏入口行被钉的前导项，「隐藏NFO 文件管理」靠它落到竖线
+#                           （宽态锚本页竖线、窄态锚「显示字段来源信息」，见 _NARROW_FIT）
 #   radioButton_log_on / radioButton_update_on
 #                           两行被钉的前导项「开」，两枚「关」靠它们落到目标竖线
-#                           （第一、三、四组都要用）
+#                           （第一、三、七组都要用）
 #   radioButton_hide_close   「隐藏窗口」行被钉的前导项，「点最小化按钮」「无」靠它排下去
 #   layoutWidget5            「界面外观行」容器，按落点收窄/加宽（frame 无布局，用 setGeometry）
 #   layoutWidget_17          「隐藏窗口」行容器，两态都按落点调宽（frame_3 无布局，用 setGeometry）
-#   checkBox_show_web_log    调试模式行被钉的前导项（第四组需求①），左缘恒为容器左缘
+#   checkBox_show_web_log    调试模式行的前导项；第四组需求①曾把它钉宽、随第七组撤销，
+#                           左缘恒为容器左缘
 #   checkBox_hide_window_title
 #                           「界面外观行」被钉的前导项；第四组需求②在窄态改走「钉前导项」
 #                           那条路（两均分放不下），宽态仍走「加宽容器 + 两均分」
@@ -272,6 +300,7 @@ def _snapshot(ui):
         + tuple(n for n, _ in _LEFT_TARGETS)
         + tuple(n for n, _ in _NARROW_TARGETS)
         + tuple(n for n, _ in _NARROW_AUTO_EXIT)
+        + tuple(n for n, _ in _NARROW_FIT)
         + ("checkBox_hide_menu_icon",)
         + _EXTRA_NAMES
     )
@@ -282,6 +311,7 @@ def _statics(ui):
     """提示词 / 控件提示 / 尺寸提示：需求要求一个都不许动。"""
     names = ("radioButton_hide_close",) + tuple(t for t, _ in _TARGETS) + tuple(a for _, a in _TARGETS)
     names += tuple(t for t, _ in _LEFT_TARGETS) + tuple(n for n, _ in _NARROW_TARGETS) + _EXTRA_NAMES
+    names += tuple(n for n, _ in _NARROW_FIT) + ("checkBox_hide_actor_nav",)
     return {
         name: (
             getattr(ui, name).text(),
@@ -501,11 +531,12 @@ def test_wide_never_moves_anchors_and_never_clips(win, app, monkeypatch, width, 
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
 def test_narrow_hide_row_aligns_to_anchors(win, app, width, height):
-    """最小化态：第三组与第四组两批落点全部精确对齐。
+    """最小化态：第三、四、七组里**无条件**的落点全部精确对齐。
 
-    第四组需求①「显示字段来源信息」→「隐藏NFO 文件管理」、需求②「停止刮削时」/
-    「暗黑模式」/两枚「关」→「显示字段内容信息」，与第三组的落点合并在
-    _NARROW_TARGETS 里一起断言。
+    第四组需求②「停止刮削时」/「暗黑模式」→「显示字段内容信息」与第七组两枚「关」
+    →「隐藏NFO 文件管理」、第三组「点最小化按钮」/「无」的落点合并在
+    _NARROW_TARGETS 里一起断言。第七组里「隐藏NFO 文件管理」→「显示字段来源信息」
+    那一条带可行性门槛，单列在 _NARROW_FIT / test_narrow_nav_row_aligns_or_defers。
 
     只断言「精确对齐」不断言「向左/向右移动」——方向取决于字体度量，而本离屏环境
     resources/fonts 下没有任何 CJK 字体，度量既不真实也不稳定（见 _EXTRA_NAMES）。
@@ -522,14 +553,38 @@ def test_narrow_hide_row_aligns_to_anchors(win, app, width, height):
         assert got == want, f"窄态 {width} 宽下「{target}」未与「{anchor}」严格上下对齐: x={got} 期望={want}"
 
 
-@pytest.mark.parametrize("width,height", _NARROW_SIZES)
-def test_narrow_debug_row_keeps_content_info_in_place(win, app, monkeypatch, width, height):
-    """第四组需求①最难的一条：前两项一起钉，末位「显示字段内容信息」必须原地不动。
+def _nav_row(ui, anchor_name):
+    """隐藏入口行（horizontalLayout_nav_hide）的实测可行性。
 
-    只钉前导项「显示刮削过程信息」也能让「显示字段来源信息」落到锚点上，但末位
-    会被重新等分推着右移 ~10px（离屏 495 -> 505），违反「显示字段内容信息位置
-    保持不变」。故这里对照「只有通用宽幅逻辑」的基线逐位断言末位没动，并核对
-    「显示字段来源信息」的钉宽恰为「末位原左缘 - 锚点 - 间隔」。
+    与 _sync_advanced_page_align「隐藏入口行」段同式：钉死前导项「隐藏 Emby 演员管理」
+    为 `pin = 竖线 - 行左缘 - 间隔`，末位「隐藏NFO 文件管理」即落竖线。放得下的条件
+    是 pin >= actor.sizeHint()（前导项被钉窄后仍须装得下自己的字，sizeHint 就是不裁字
+    下界）且让出 pin 后剩余宽度仍 >= nfo.sizeHint()。
+    竖线按态传入：宽态是本页竖线（「显示字段来源信息」），窄态是「显示字段来源信息」
+    本身（第七组）。
+    """
+    lay = ui.horizontalLayout_nav_hide
+    host = ui.gridLayoutWidget_20
+    content = ui.scrollAreaWidgetContents_gaoji
+    host_x = host.mapTo(content, QPoint(0, 0)).x()
+    row_x = _abs(ui, ui.checkBox_show_dialog_exit) - host_x
+    col_w = host.width() - row_x
+    nav_x = _abs(ui, getattr(ui, anchor_name)) - host_x
+    actor = ui.checkBox_hide_actor_nav
+    nfo = ui.checkBox_hide_nfo_nav
+    pin = nav_x - row_x - lay.spacing()
+    room = col_w - pin - 2 * lay.spacing()
+    return {"pin": pin, "room": room, "feasible": pin >= actor.sizeHint().width() and room >= nfo.sizeHint().width()}
+
+
+@pytest.mark.parametrize("width,height", _NARROW_SIZES)
+def test_narrow_debug_row_stays_at_natural_position(win, app, monkeypatch, width, height):
+    """第四组需求①已随第七组撤销：调试模式行窄态回到自然位，且不再有残留钉宽。
+
+    那一段原本把「显示字段来源信息」窄态右移到「隐藏NFO 文件管理」那一列（钉
+    web/from 两段宽度），方向与第七组相反；撤销后它必须与「只有通用宽幅逻辑」的
+    基线**逐位相同**（左缘与宽度都比），否则说明还有钉宽没摘干净——那正是当初把
+    「显示字段来源信息」钉到固定宽度、在还原时留在原位的老毛病。
     """
     ui = win.Ui
     win.show()
@@ -540,25 +595,204 @@ def test_narrow_debug_row_keeps_content_info_in_place(win, app, monkeypatch, wid
     win._sync_page_layouts()
     app.processEvents()
 
-    data = ui.checkBox_show_data_log
-    assert _abs(ui, data) == base["checkBox_show_data_log"][0], (
-        f"窄态 {width} 宽下「显示字段内容信息」被带偏: 基线={base['checkBox_show_data_log'][0]} 实际={_abs(ui, data)}"
-    )
-    assert data.width() == base["checkBox_show_data_log"][1], (
-        f"窄态 {width} 宽下「显示字段内容信息」宽度被改: 基线={base['checkBox_show_data_log'][1]} 实际={data.width()}"
-    )
-    # 两段钉宽共同把「显示字段来源信息」夹在 [锚点, 末位原左缘 - 间隔] 之间
-    anchor_x = _abs(ui, ui.checkBox_hide_nfo_nav)
-    want_from_w = base["checkBox_show_data_log"][0] - anchor_x - ui.horizontalLayout_29.spacing()
-    frm = ui.checkBox_show_from_log
-    assert frm.width() == want_from_w, (
-        f"窄态 {width} 宽下「显示字段来源信息」钉宽={frm.width()} 期望={want_from_w}（不多留也不压缩）"
-    )
-    for name in ("checkBox_show_web_log", "checkBox_show_from_log"):
+    for name in ("checkBox_show_web_log", "checkBox_show_from_log", "checkBox_show_data_log"):
+        box = getattr(ui, name)
+        assert (_abs(ui, box), box.width()) == base[name], (
+            f"窄态 {width} 宽下调试模式行「{name}」未回到基线: 基线={base[name]} 实际={(_abs(ui, box), box.width())}"
+        )
+        assert box.maximumWidth() == _QWIDGETSIZE_MAX, (
+            f"窄态 {width} 宽下「{name}」还残留着第四组需求①的钉宽: maxW={box.maximumWidth()}"
+        )
+
+
+@pytest.mark.parametrize("width,height", _NARROW_SIZES)
+def test_narrow_nav_row_aligns_or_defers(win, app, monkeypatch, width, height):
+    """第七组：窄态把「隐藏NFO 文件管理」钉到「显示字段来源信息」，放得下就必须对齐。
+
+    放弃态的语义与本页其余各行一致：整行解除钉宽、保持自然位、绝不裁字。
+    可行性依赖字体度量（见 _EXTRA_NAMES）：本离屏环境没有 CJK 字体，前导项
+    「隐藏 Emby 演员管理」的 sizeHint 与它在真实字体下的宽高比不同，于是同一档窗宽
+    在两个环境下的可行性结论可能相反。故断言写成条件式（放得下却没对齐、或放不下
+    却硬对齐——后者必然裁字——都会红），不写死「窗口一窄就必须对齐」。
+    生产环境那一档可行时，用户实测前导项富余够（需求原话也明写「提示词不许变」），
+    走的就是对齐这条分支（见 test_narrow_nav_row_lands_on_from_log_when_it_fits）。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_advanced(win, app)
+    _resize(win, app, width, height)
+    assert _extra(win) <= 0, f"{width} 宽下应处于窄态（拉伸量 <= 0）"
+
+    (target, anchor) = _NARROW_FIT[0]
+    row = _nav_row(ui, anchor)
+    nfo = ui.checkBox_hide_nfo_nav
+    from_x = _abs(ui, ui.checkBox_show_from_log)
+
+    if row["feasible"]:
+        assert _abs(ui, nfo) == from_x, (
+            f"窄态 {width} 宽下「{target}」放得下（pin={row['pin']}）却未与「{anchor}」对齐: "
+            f"x={_abs(ui, nfo)} 期望={from_x}"
+        )
+        # 是真走了 setFixedWidth 那条路，不是「恰好排成这样」
+        assert nfo.minimumWidth() == nfo.maximumWidth() == nfo.sizeHint().width(), (
+            f"窄态 {width} 宽下「{target}」未按 sizeHint 钉宽: min={nfo.minimumWidth()} max={nfo.maximumWidth()}"
+        )
+    else:
+        # 放弃态：与「只有通用宽幅逻辑」的基线逐位相同，且三项都不许被压到裁字
+        base, _ = _without_feature(win, app, monkeypatch, width, height)
+        win._sync_page_layouts()
+        app.processEvents()
+        assert (_abs(ui, nfo), nfo.width()) == base["checkBox_hide_nfo_nav"], (
+            f"窄态 {width} 宽下本应整行放弃（pin={row['pin']} < sizeHint），却动了几何: "
+            f"基线={base['checkBox_hide_nfo_nav']} 实际={(_abs(ui, nfo), nfo.width())}"
+        )
+        assert nfo.minimumWidth() == 0 and nfo.maximumWidth() == _QWIDGETSIZE_MAX, (
+            f"窄态 {width} 宽下放弃态仍残留钉宽: min={nfo.minimumWidth()} max={nfo.maximumWidth()}"
+        )
+
+    for name in ("checkBox_hide_actor_nav", "checkBox_hide_nfo_nav"):
         box = getattr(ui, name)
         assert box.width() >= box.sizeHint().width(), (
             f"窄态 {width} 宽下「{name}」被压到 {box.width()}px（sizeHint {box.sizeHint().width()}），会裁字"
         )
+
+
+@pytest.mark.parametrize("width,height", _NARROW_SIZES)
+def test_narrow_nav_row_lands_on_from_log_when_it_fits(win, app, width, height):
+    """**判别力所在**：人为制造出「放得下」的行，断言三项真的精确落上那条竖线。
+
+    本离屏环境里前导项「隐藏 Emby 演员管理」被 .notdef 字形撑到与 pin 几乎一样宽
+    （离屏 1030×753 是 sizeHint 144 vs pin 138，差 6px），于是自然态永远落在
+    「放不下」那条分支上——真实字体下前导项的富余足够（用户实测「不会裁字」），
+    走的是对齐分支。为覆盖到那条分支，这里把前导项的提示词临时改短（等价于让
+    它的 sizeHint 变小），余量立即变得充裕，判据转真；断言后原样恢复。
+
+    手法与本文件既有的 test_timed_interval_* 一致（用 setFixedWidth 模拟 Qt 的处置、
+    断言后 _unpin 复原），只是这里模拟的是**放得下**的那一侧。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_advanced(win, app)
+    _resize(win, app, width, height)
+    assert _extra(win) <= 0, f"{width} 宽下应处于窄态（拉伸量 <= 0）"
+
+    actor = ui.checkBox_hide_actor_nav
+    original = actor.text()
+    actor.setText("隐藏演员")
+    try:
+        assert actor.sizeHint().width() < _nav_row(ui, "checkBox_show_from_log")["pin"], (
+            f"{width} 宽下临时提示词仍不够短，没能制造出可行场景"
+        )
+        _resize(win, app, width, height)
+        assert _nav_row(ui, "checkBox_show_from_log")["feasible"], (
+            f"{width} 宽下改短提示词后仍判为放不下，判据本身有问题"
+        )
+
+        from_x = _abs(ui, ui.checkBox_show_from_log)
+        assert _abs(ui, actor) + actor.width() + ui.horizontalLayout_nav_hide.spacing() == from_x, (
+            f"窄态 {width} 宽下前导项右缘未贴住锚点: "
+            f"{_abs(ui, actor) + actor.width() + ui.horizontalLayout_nav_hide.spacing()} != {from_x}"
+        )
+        assert actor.minimumWidth() == actor.maximumWidth() == _nav_row(ui, "checkBox_show_from_log")["pin"], (
+            f"窄态 {width} 宽下前导项未按 pin 钉宽: min={actor.minimumWidth()} max={actor.maximumWidth()}"
+        )
+        # 本批需求的三项：隐藏NFO库管理 + 两枚「关」，同落 from_log 那条竖线
+        for name in ("checkBox_hide_nfo_nav", "radioButton_log_off", "radioButton_update_off"):
+            assert _abs(ui, getattr(ui, name)) == from_x, (
+                f"窄态 {width} 宽下「{name}」未与「显示字段来源信息」严格上下对齐: "
+                f"x={_abs(ui, getattr(ui, name))} 期望={from_x}"
+            )
+        # 「隐藏窗口」行的「点最小化按钮」窄态锚的也是 nfo，四者同列
+        assert _abs(ui, ui.radioButton_hide_mini) == from_x, (
+            f"窄态 {width} 宽下「点最小化按钮」未与「显示字段来源信息」同列"
+        )
+    finally:
+        actor.setText(original)
+        _resize(win, app, width, height)
+
+
+@pytest.mark.parametrize("width,height", _WIDE_SIZES)
+def test_wide_nav_row_anchor_is_state_independent(win, app, width, height):
+    """隐藏入口行的锚点两态统一取「显示字段来源信息」，宽态也必须精确落上它。
+
+    用户真机事故：还原态窗口 1085×793（dpr 1.25、屏幕 1536×864）算出的
+    `_scroll_stretch_extra` 是 **+33 > 0**，程序把它判成「最大化」，于是按 anchor
+    分两态的老写法在用户真正想改的那一档走的是**宽态**那一支——而那一支在该尺寸下
+    阶段一的门也会卡掉（anchor 停在自然位，与 col_x(from) 差 17px），算出的
+    pin_d/room 放不下整行，三个目标纹丝不动（用户截图实测：nfo 328 vs from 311）。
+
+    修法是锚点不再分两态。宽态之所以逐位不变，是因为阶段一已把
+    「刮削结束后自动退出软件」钉到 src_from 那条竖线，anchor 恒等于
+    col_x(src_from)（真机 1200/1366/1536 三档实测 anchor≡nav_x）。
+    本用例把这条不变量写成断言：宽态下 anchor 与 col_x(from) 必须逐位相等，
+    且「隐藏NFO库管理」与两枚「关」都精确落在它上面；顺手钉住
+    「显示字段来源信息」自身不动（需求明写它位置保持不变）。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_advanced(win, app)
+    _resize(win, app, width, height)
+    assert _extra(win) > 0, f"{width} 宽下应处于宽态（拉伸量 > 0）"
+
+    content = ui.scrollAreaWidgetContents_gaoji
+    host_x = ui.gridLayoutWidget_20.mapTo(content, QPoint(0, 0)).x()
+    anchor_x = _abs(ui, ui.checkBox_auto_exit) - host_x
+    from_x = _abs(ui, ui.checkBox_show_from_log) - host_x
+    assert anchor_x == from_x, (
+        f"宽态 {width} 宽下本页竖线与「显示字段来源信息」不同列，"
+        f"锚点统一取 col_x(src_from) 会改变最大化结果: anchor={anchor_x} from={from_x}"
+    )
+
+    from_abs = _abs(ui, ui.checkBox_show_from_log)
+    for name in ("checkBox_hide_nfo_nav", "radioButton_log_off", "radioButton_update_off"):
+        assert _abs(ui, getattr(ui, name)) == from_abs, (
+            f"宽态 {width} 宽下「{name}」未与「显示字段来源信息」严格上下对齐: "
+            f"x={_abs(ui, getattr(ui, name))} 期望={from_abs}"
+        )
+
+
+@pytest.mark.parametrize("width,height", _WIDE_SIZES)
+def test_wide_nav_row_survives_deferred_stage_one(win, app, width, height):
+    """回归守卫：**阶段一整行放弃时**，隐藏入口行仍必须落「显示字段来源信息」。
+
+    这正是用户真机 1085×793 那一档的形状：真实字体度量下阶段一的门
+    `pin_2 >= auto_start.sizeHint()` 会卡掉（`anchor` 停在自然位、与
+    col_x(src_from) 差 17px），于是按 anchor 分两态的老写法在那一档把三个目标
+    钉到了一条**错的**竖线上，再叠加 room < need_d 而整行放弃——用户看到的现象
+    就是「根本没动」。
+
+    这里把前导项「自动启动后自动开始刮削」的提示词临时加长来复现同一形状
+    （sizeHint 变大 -> ok_2 为假），断言锚点不再依赖 anchor：三项目标仍然精确落在
+    「显示字段来源信息」上。断言后恢复文案并重排。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_advanced(win, app)
+    _resize(win, app, width, height)
+    assert _extra(win) > 0, f"{width} 宽下应处于宽态（拉伸量 > 0）"
+
+    content = ui.scrollAreaWidgetContents_gaoji
+    host_x = ui.gridLayoutWidget_20.mapTo(content, QPoint(0, 0)).x()
+
+    lead = ui.checkBox_auto_start
+    original = lead.text()
+    lead.setText(original + "自动启动后自动开始刮削并立即进入无人值守守候模式")
+    try:
+        _resize(win, app, width, height)
+        anchor_x = _abs(ui, ui.checkBox_auto_exit) - host_x
+        from_x = _abs(ui, ui.checkBox_show_from_log) - host_x
+        assert anchor_x != from_x, (
+            f"{width} 宽下没能复现「阶段一整行放弃」的场景（anchor 仍等于 from），这个回归守卫就形同虚设"
+        )
+        from_abs = _abs(ui, ui.checkBox_show_from_log)
+        for name in ("checkBox_hide_nfo_nav", "radioButton_log_off", "radioButton_update_off"):
+            assert _abs(ui, getattr(ui, name)) == from_abs, (
+                f"宽态 {width} 宽下阶段一放弃时「{name}」没跟上「显示字段来源信息」: "
+                f"x={_abs(ui, getattr(ui, name))} 期望={from_abs}（anchor={anchor_x}）"
+            )
+    finally:
+        lead.setText(original)
+        _resize(win, app, width, height)
 
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
@@ -591,7 +825,12 @@ def test_narrow_hide_row_never_clips_or_escapes(win, app, width, height):
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
 def test_narrow_never_moves_anchors(win, app, monkeypatch, width, height):
-    """窄态下三个锚点与所有参照件整块几何不动，搬运工/容器只许改宽度。"""
+    """窄态下三个锚点与所有参照件整块几何不动，搬运工/容器只许改宽度。
+
+    注意 checkBox_show_from_log 已在 _REFS 里：第七组撤销了第四组需求①之后，它
+    在窄态是**锚点**（不许动），而 _REFS 的比对基准是「只有通用宽幅逻辑」的另一个
+    窗口——锚点自己从不被钉宽，故两者逐位相同，正是「位置保持不变」的直接断言。
+    """
     ui = win.Ui
     win.show()
     _goto_advanced(win, app)
@@ -616,9 +855,13 @@ def test_narrow_keeps_wide_only_feature_at_baseline(win, app, monkeypatch, width
     """第二组需求在窄态仍须完全退让——它换过基准线，最容易漏掉窄态分支。
 
     第四组把第二组六项里的「停止刮削时」「暗黑模式」「隐藏菜单栏图标」「关」×2
-    也纳入了窄态（落点换成更靠右的「显示字段内容信息」），只有
-    「刮削结束后自动退出软件」（第二组的基准本身，还原态必须留在自然位）与
-    「隐藏NFO 文件管理」（第四组的锚点）两项仍须原地不动。
+    也纳入了窄态（落点换成更靠右的「显示字段内容信息」），第七组又把「隐藏NFO
+    文件管理」与两枚「关」改成锚「显示字段来源信息」，于是第二组六项全部被窄态接管，
+    只剩「刮削结束后自动退出软件」（第二组的基准本身，还原态必须留在自然位）与
+    「隐藏菜单栏图标（Mac）」由第五组单独接管（落点即它自己，须留在基线）。
+
+    仍须原地不动的只有第七组那条「隐藏NFO 文件管理」→「显示字段来源信息」——
+    它带可行性门槛，放不下就整行放弃（由 test_narrow_nav_row_aligns_or_defers 断言）。
     """
     ui = win.Ui
     win.show()
@@ -629,8 +872,8 @@ def test_narrow_keeps_wide_only_feature_at_baseline(win, app, monkeypatch, width
     win._sync_page_layouts()
     app.processEvents()
 
-    # 第二组六项里，第四组窄态已接管四项；余下两项与「隐藏菜单栏图标」必须仍在基线上
-    narrow_targets = {t for t, _ in _NARROW_TARGETS} | {t for t, _ in _NARROW_AUTO_EXIT}
+    # 第二组六项全部已被第四/七组的窄态分支接管，只剩基准「刮削结束后自动退出软件」
+    narrow_targets = {t for t, _ in _NARROW_TARGETS} | {t for t, _ in _NARROW_AUTO_EXIT} | {t for t, _ in _NARROW_FIT}
     for target, _ in _LEFT_TARGETS:
         if target in narrow_targets:
             continue
@@ -708,11 +951,9 @@ def test_narrow_round_trip_matches_first_pass(win, app, width, height):
     #           radioButton_hide_close / radioButton_hide_mini（「隐藏窗口」行）、
     #           checkBox_show_dialog_exit（第 6 行搬运工，两态都钉）、
     #           checkBox_hide_window_title（第 9 行搬运工，窄态走「钉前导项」那条路）、
-    #           checkBox_show_web_log / checkBox_show_from_log（第四组需求①）、
     #           checkBox_auto_start（第五组：钉它把「刮削结束后自动退出软件」推到
     #               「隐藏菜单栏图标」那一列；**宽态也钉**、只是钉宽不同）
-    #   仅宽态钉：checkBox_hide_actor_nav / checkBox_hide_nfo_nav /
-    #           checkBox_show_data_log
+    #   随态切换：checkBox_hide_actor_nav / checkBox_hide_nfo_nav（隐藏入口行）
     for name in (
         "radioButton_log_on",
         "radioButton_update_on",
@@ -720,21 +961,35 @@ def test_narrow_round_trip_matches_first_pass(win, app, width, height):
         "radioButton_hide_mini",
         "checkBox_show_dialog_exit",
         "checkBox_hide_window_title",
-        "checkBox_show_web_log",
-        "checkBox_show_from_log",
         "checkBox_auto_start",
     ):
         box = getattr(ui, name)
         assert box.minimumWidth() == box.maximumWidth() > 0, f"窄态「{name}」的钉宽缺失或未生效"
-    # 注意 checkBox_show_data_log 判的是 maxW：它在 .ui 里就写死了 minW=100
-    # （MDCx.py 的 setMinimumSize(QSize(100, 30))），拿 min==0 判「已解除」会误报
-    assert ui.checkBox_show_data_log.maximumWidth() == 16777215, "窄态「显示字段内容信息」的钉宽未解除"
-    for name in (
-        "checkBox_hide_actor_nav",
-        "checkBox_hide_nfo_nav",
-    ):
-        box = getattr(ui, name)
-        assert box.minimumWidth() == 0 and box.maximumWidth() == 16777215, f"窄态「{name}」的钉宽未解除"
+
+    # 第四组需求①那一段随第七组撤销：调试模式行两项窄态不再被钉宽，
+    # 且还原回自然位（这条正是「显示字段来源信息位置保持不变」的钉宽侧证据）。
+    for name in ("checkBox_show_web_log", "checkBox_show_from_log", "checkBox_show_data_log"):
+        assert getattr(ui, name).maximumWidth() == _QWIDGETSIZE_MAX, f"窄态「{name}」的钉宽未解除"
+
+    # 隐藏入口行：钉没钉由「前导项装不装得下自己的字」决定（第七组的可行性门槛），
+    # 两种结果都必须自洽——钉了钉宽 == pin、且 nfo 被钉回自己的 sizeHint；
+    # 没钉则两者都回到 (0, QWIDGETSIZE_MAX)。
+    row = _nav_row(ui, "checkBox_show_from_log")
+    actor, nfo = ui.checkBox_hide_actor_nav, ui.checkBox_hide_nfo_nav
+    if row["feasible"]:
+        assert (actor.minimumWidth(), actor.maximumWidth()) == (row["pin"], row["pin"]), (
+            f"窄态隐藏入口行判为可行却没钉前导项: {(actor.minimumWidth(), actor.maximumWidth())}"
+        )
+        assert (nfo.minimumWidth(), nfo.maximumWidth()) == (nfo.sizeHint().width(), nfo.sizeHint().width()), (
+            f"窄态隐藏入口行可行却没把 nfo 钉回 sizeHint: {(nfo.minimumWidth(), nfo.maximumWidth())}"
+        )
+    else:
+        for name in ("checkBox_hide_actor_nav", "checkBox_hide_nfo_nav"):
+            box = getattr(ui, name)
+            assert box.minimumWidth() == 0 and box.maximumWidth() == _QWIDGETSIZE_MAX, (
+                f"窄态隐藏入口行判为放不下（pin={row['pin']}）却仍钉着「{name}」: "
+                f"min={box.minimumWidth()} max={box.maximumWidth()}"
+            )
 
 
 def test_round_trip_is_stable(win, app):

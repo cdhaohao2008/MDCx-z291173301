@@ -540,6 +540,14 @@ class LayoutMasterMixin:
         checkBox_hide_nfo_nav 自动到位——它量的是 nfo 的实时 x，nfo 换竖线它
         就跟着换，无需改动。
 
+        最新一条需求（「隐藏NFO库管理」与两枚「关」在**最小化态**向左移动到与
+        「显示字段来源信息」上下严格对齐，且「显示字段来源信息」位置保持不变）
+        落在下面「隐藏入口行」那一段：窄态锚点由 anchor 换成 col_x(src_from)，
+        即该动的是 nfo 而非 from（与上一批 _sync_advanced_page_debug_row 方向
+        相反，故那一方法已连同调用一并删除，见方法体内「调试模式行本方法不再
+        介入」那段）。最大化那一支的 pin_d/room 判据一个字节都没改，宽态结果
+        与本批需求之前逐位相同。
+
         竖线取法分两态（这是「最小化时页面、布局、控件、提示词等等均保持不变」
         的唯一保证）：最大化取 `checkBox_show_from_log`；还原态仍取
         `checkBox_auto_exit` 的自然位——它在 1030×753 下是 x=412，而新锚点只有
@@ -551,7 +559,8 @@ class LayoutMasterMixin:
         （Mac）」「暗黑模式」「隐藏 NFO 库管理」四个复选框的左缘都挤在第1列起
         点，要求对齐到第2行「刮削结束后自动退出软件」的正下方严格上下对齐；该
         基准复选框自身位置必须保持不变。最大化态要全对齐、还原态只要求前三个
-        （「隐藏NFO库管理」在还原态放不下，用户没要求、也不该裁字）。
+        （「隐藏NFO库管理」在还原态放不下，用户没要求、也不该裁字）——该限制
+        已由最新一条需求解除（见方法体内「隐藏入口行」段与开头那段说明）。
 
         根因（离屏实测 + 用户截图双证，gridLayoutWidget_20 两列 QGridLayout，
         col1 起于 x=97）：QHBoxLayout 把剩余空间在**所有可拉伸项之间等分**
@@ -583,7 +592,9 @@ class LayoutMasterMixin:
           隐藏入口行  钉「隐藏 Emby 演员管理」    -> 「隐藏 NFO 库管理」落 anchor，
                       并把它自己钉回 sizeHint 宽（QCheckBox 可拉伸，不钉会被余量
                       撑到 658px，左对齐绘制时字形只占 152，与说明标签之间空出
-                      394px，见用户截图红框）-> 说明标签紧贴其右 6px（仅最大化）
+                      394px，见用户截图红框）-> 说明标签紧贴其右 6px。锚点两态统一 =
+                       「显示字段来源信息」col_x(src_from)（宽态阶段一已让 anchor 等于
+                       它，故最大化结果逐位不变）
         前导控件全是左对齐绘制，钉宽/插间隔只改右侧留白，不移动自身字形。
         走 setFixedWidth / QSpacerItem / setGeometry 而非 move()：layout
         重新 activate 会覆盖 move()。任一行余量放不下（窗口太窄、说明标签挤不
@@ -630,10 +641,14 @@ class LayoutMasterMixin:
         row_x = col_x(lead_box)
         col_w = host.width() - row_x
 
-        # ---- 先摆平调试模式行（本批需求①），它一动下面量到的 data_log 锚点就变 ----
-        # 详见 _sync_advanced_page_debug_row：那里的钉宽会改变「显示字段内容信息」
-        # 的坐标，而本方法紧接着就要用它当还原态锚点，顺序反了会量到旧值。
-        self._sync_advanced_page_debug_row(wide)
+        # ---- 调试模式行（groupBox_3）本方法不再介入 -----------------------------
+        # 曾有过一个 _sync_advanced_page_debug_row：它在**还原态**把「显示字段来源信息」
+        # 右移到 nfo 那一列（钉 web/from 两段）。本批需求与之**方向相反**且明写
+        # 「显示字段来源信息位置保持不变」，故窄态已把那两段钉宽整段撤掉，该方法连同
+        # 调用一并删除：调试模式行回到三均分的自然位，「显示字段内容信息」的坐标
+        # 于是与「只有通用宽幅逻辑」的基线逐位相同（它正是本方法窄态的竖线锚点）。
+        # 最大化态本来就只做解除（那时 from 与 nfo 天然同列，钉不钉一样），故宽态
+        # 结果与删除前逐位相同。
 
         # ---- 阶段一：先把需求①自己的目标「刮削结束后自动退出软件」搬到新竖线上 ----
         # 它与「自动启动后自动开始刮削」同在 horizontalLayout_102 里两均分、x 随
@@ -748,19 +763,38 @@ class LayoutMasterMixin:
             lw.setGeometry(lw.x(), lw.y(), new_w, lw.height())
             changed = True
 
-        # ---- 隐藏入口行：钉「隐藏 Emby 演员管理」，「隐藏NFO库管理」落 anchor ----
-        # 仅最大化：还原态列宽只有 568，pin_d 之后余量 255 放不下「隐藏NFO库管理
-        # + 说明标签」的 412，钉了必然裁字，用户也只要求最大化时对齐。
+        # ---- 隐藏入口行：钉「隐藏 Emby 演员管理」，「隐藏NFO库管理」落锚点 ----
         # 钉住后还须把 nfo 本身也钉回 sizeHint 宽：QCheckBox 默认 sizePolicy 可拉伸，
         # 最大化时它会独吞余量把说明标签顶到 1323（实测），而复选框是左对齐绘制、
         # 文字只占 152，于是文字与说明标签之间出现 394px 空洞（用户截图红框）。
         # 钉死后余量全归末位的说明标签，它紧贴 nfo 文字右侧 6px。
+        # 锚点统一取「显示字段来源信息」col_x(src_from)，**两态相同**：
+        #   最大化：阶段一已把「刮削结束后自动退出软件」钉到 src_from 那条竖线，故
+        #     anchor 恒等于 col_x(src_from)（真机实测 1200/1366/1536 三档 anchor 与
+        #     nav_x 逐位相等 289/344/401），pin_d/room/need_d/ok_d 一个字节都没变，
+        #     最大化结果与本批改动前逐位相同。
+        #   最小化：需求是「隐藏NFO库管理向左移动到与它上下严格对齐，且它位置保持
+        #     不变」，故该动的是 nfo 而不是 from（与本批撤销的
+        #     _sync_advanced_page_debug_row 方向相反）。实测 nfo 的自然位在 from
+        #     左侧（真机 1085×793 是 328 vs 311），所以这一步就是一次**左移**。
+        # **为什么不能继续拿 anchor 分两态**：真机 dpr=1.25、屏幕 1536×864，用户
+        # 还原态窗口 1085×793 的 _scroll_stretch_extra 已经是 **+33 > 0**，程序
+        # 把它判成「最大化」，最小化那段代码根本不会执行（用户截图：三个目标纹丝
+        # 不动）。该尺寸下阶段一的门也会卡掉（anchor 停在自然位 401 ≠ 311），
+        # 于是宽态那一支算出 pin_d=298、room=291 < need_d=371（= nfo 111 + 说明
+        # 标签 260）而整行放弃。改用 col_x(src_from) 后 pin_d=148、room=441 ≥ 371
+        # 恰好放得下，而真最大化三档因 anchor≡nav_x 而逐位不变。
+        # 放不下时整行放弃（解除钉宽、保持自然位）。下限只卡 nfo 的 sizeHint：说明
+        # 标签「仅隐藏入口…」在窄态本就压得动（实测已被压到 240/211/151），拿它
+        # 一起卡门会让窄态这一段永远放不下（实测 col_w=557 时 room 只剩 332 < 360）。
         actor = ui.checkBox_hide_actor_nav
         nfo = ui.checkBox_hide_nfo_nav
         hint = ui.label_nav_hide_hint
-        pin_d = anchor - row_x - lay_d.spacing()
+        nav_x = col_x(src_from)
+        pin_d = nav_x - row_x - lay_d.spacing()
         room = col_w - pin_d - 2 * lay_d.spacing()
-        ok_d = wide and pin_d >= actor.sizeHint().width() and room >= (nfo.sizeHint().width() + hint.sizeHint().width())
+        need_d = nfo.sizeHint().width() + (hint.sizeHint().width() if wide else 0)
+        ok_d = pin_d >= actor.sizeHint().width() and room >= need_d
         changed |= self._pin_row_lead_width(actor, pin_d if ok_d else None)
         changed |= self._pin_row_lead_width(nfo, nfo.sizeHint().width() if ok_d else None)
 
@@ -897,78 +931,6 @@ class LayoutMasterMixin:
             target_row.invalidate()
             target_row.activate()
 
-    def _sync_advanced_page_debug_row(self, wide: bool) -> None:
-        """还原态：调试模式行「显示字段来源信息」右移到与「隐藏NFO库管理」上下对齐。
-
-        本批需求①。这一处在 groupBox_3（调试模式）自己的 horizontalLayout_29 里，
-        与 _sync_advanced_page_align 处理的那几行不在同一个 grid，且**必须排在它
-        之前**：那边量「显示字段内容信息」当锚点，钉宽一动这一项的坐标就变。
-
-        行内三项（显示刮削过程信息 / 显示字段来源信息 / 显示字段内容信息）
-        **等分余量**（实测 1030×753 各 196/197/196、1920×1170 各 493），所以钉住
-        任何一项都会把后面几项一起挪动。需求要「显示字段来源信息」右移 21px 落到
-        nfo 上，而「显示字段内容信息」**位置保持不变**：只钉前导项「显示刮削过程
-        信息」的话，末位会被重新等分推着右移 ~10px（495 → 505），违反需求。故
-        **前两项一起钉**：
-          钉 web  = nfo_x - 行左缘 - spacing ->「显示字段来源信息」左缘 = nfo_x
-          钉 from = data_x - nfo_x - spacing ->「显示字段来源信息」右缘紧贴末位的
-                                                原左缘，末位因此原地不动
-        末位不设任何钉宽、只吃余量，它的左缘恒等于「行左缘 + 钉web + 间隔 + 钉from
-        + 间隔」= data_x，与容器宽无关（容器宽的增减全被末位吸收），故改变窗宽也
-        不会让末位漂移；两条钉宽也只由两个锚点决定，反复同步幂等。
-
-        **量 data_x 之前必须先把两段钉宽解除并重排**，否则量到的是上一遍自己钉出
-        来的落点、不是自然位：pin_from = data_x - nfo_x - spacing 与 data_x =
-        nfo_x + pin_from + spacing 互为反函数，带着旧钉宽迭代会自我强化成一个错值
-        （实测会把「显示字段内容信息」从 495 一路拉到 408、钉宽缩到 89px）。
-        故这里无条件「解除 → activate → 量 → 钉 → activate」，代价是本行两次重排
-        （行内只有 3 项，可忽略），且全程在绘制之前完成、看不到中间态。
-        最大化态本方法**只做解除**：那时「显示字段来源信息」与「隐藏NFO库管理」
-        本来就同在一条竖线上（实测 1100×800 起四档全部相等），钉不钉都一样。
-        """
-        ui = self.Ui
-        content = ui.scrollAreaWidgetContents_gaoji
-        if not content.isVisibleTo(self):
-            return
-        lay_web = ui.horizontalLayout_29
-        lw3 = ui.layoutWidget_3
-        web_log = ui.checkBox_show_web_log
-        src_from = ui.checkBox_show_from_log
-        src_data = ui.checkBox_show_data_log
-        nfo = ui.checkBox_hide_nfo_nav
-        if not (lay_web is not None and lw3.isVisibleTo(self) and web_log.isVisibleTo(self)):
-            return
-        if not (src_from.isVisibleTo(self) and src_data.isVisibleTo(self) and nfo.isVisibleTo(self)):
-            return
-
-        def cx(widget) -> int:
-            """控件左缘映射到滚动内容的绝对 x（跨分支必须经 content 中转）。"""
-            return widget.mapTo(content, QPoint(0, 0)).x()
-
-        # ---- 第一步：回到自然态，量末位的自然左缘（见上文「自我强化」那段）----
-        self._pin_row_lead_width(web_log, None)
-        self._pin_row_lead_width(src_from, None)
-        lay_web.invalidate()
-        lay_web.activate()
-        data_x = cx(src_data)
-
-        # ---- 第二步：按两个锚点算出两条钉宽，放得下才钉，放不下保持自然态 ----
-        sp = lay_web.spacing()
-        pin_web = cx(nfo) - cx(lw3) - sp
-        pin_from = data_x - cx(nfo) - sp
-        room = lw3.width() - pin_web - pin_from - 2 * sp
-        ok = (
-            not wide
-            and pin_web >= web_log.sizeHint().width()
-            and pin_from >= src_from.sizeHint().width()
-            and room >= src_data.sizeHint().width()
-        )
-        if not ok:
-            return
-        if self._pin_row_lead_width(web_log, pin_web) | self._pin_row_lead_width(src_from, pin_from):
-            lay_web.invalidate()
-            lay_web.activate()
-
     def _sync_advanced_page_tail_align(self) -> None:
         """高级页下半三处对齐（三条需求分属最大化 / 最小化两态），锚点一律不动。
 
@@ -980,7 +942,10 @@ class LayoutMasterMixin:
              上下对齐；
           ③ 同一行最右侧的「无」右移到与「显示字段内容信息」严格上下对齐。
           最小化态（第二批，「最大化时页面、布局、控件、提示词等均保持不变」）：
-          ① 同上的两行「关」**向左**移到与「隐藏NFO库管理」严格上下对齐；
+          ① 同上的两行「关」**向左**移到与「隐藏NFO库管理」严格上下对齐——而
+             上一条需求已把窄态的 nfo 钉到「显示字段来源信息」那一列（见
+             _sync_advanced_page_align 隐藏入口行段），故两枚「关」实际是随它
+             一起落到 from_log 那条竖线上，三者同列；
           ② 「点最小化按钮」**向左**移到与「隐藏NFO库管理」严格上下对齐
              （注意最小化态的锚点是 nfo 而非 from_log，两态不同）；
           ③ 「无」**向左**移到与「显示字段内容信息」严格上下对齐（与最大化态
@@ -1010,12 +975,12 @@ class LayoutMasterMixin:
         锚点与落点全部运行时 mapTo 实测，不写死像素。宽态实测（竖线换到
         checkBox_show_from_log 之后）：1920 为 nfo=589 / from=589 / data=1088、
         关=589、mini=589、none=1088；1100 最小的一档为 nfo=316 / from=316 /
-        data=541、关=316、mini=316、none=541。窄态 1030 实测 nfo=313 /
-        from=292 / data=495，关=393（→nfo，钉宽 217）、mini=301（→nfo，
-        钉 close=192 / mini=176、容器 411）、none=486（→data，容器收窄）。
-        窄态之所以也要做：nfo 在窄态是这半页最靠右的那条竖线（313 > from=292），
-        且两枚「关」的窄态自然位 393 恰在它右侧 80px——不钉住就会一直歪着。
-        mapTo 一律经公共祖先
+        data=541、关=316、mini=316、none=541。窄态 1030 实测 nfo=294（=
+        from 的自然位，本批需求把它左移到此）/ from=294 / data=495，关=294
+        （钉宽 198）、mini=294（钉 close=192 / mini=176、容器 411）、
+        none=486（→data，容器收窄）。窄态之所以也要做：nfo 在窄态是这半页
+        靠右的一条竖线，且两枚「关」的窄态自然位 497 恰在它右侧 200px——
+        不钉住就会一直歪着。mapTo 一律经公共祖先
         scrollAreaWidgetContents_gaoji 中转：三处目标分属 groupBox_17/_4
         （groupBox_12 的兄弟）与 frame_3（groupBox_12 的孙子），跨分支 mapTo 是
         未定义行为（同 _sync_guaxiaomulu_checkbox_align 的教训）。
@@ -1042,13 +1007,16 @@ class LayoutMasterMixin:
         lays: list = []
 
         nfo_x = cx(nfo)
-        data_x = cx(src_data)
 
-        # ---- 需求②：两个「关」-> 宽态跟「隐藏NFO库管理」，窄态跟「显示字段内容信息」 ----
-        # 两态锚点不同，故按态取。宽态 need 与既有实现逐位相同；窄态把落点从上一批
-        # 需求的 nfo（1030×753 = 313）换成本批指定的「显示字段内容信息」（实测
-        # 1030×753 = 495、1000×700 = 475，是这半页最靠右的那条竖线）。
-        off_x = nfo_x if wide else data_x
+        # ---- 两枚「关」：两态都跟 nfo ----------------------------------------------------
+        # 宽态这是上一批需求②（nfo 已由 _sync_advanced_page_align 钉到 from_log
+        # 那条竖线上），本批需求只要求最大化时逐位不变，故这一支原样保留。
+        # 窄态此前跟的是「显示字段内容信息」（离屏实测 1030×753 = 497 / 1000×700
+        # = 477，是这半页最靠右的那条竖线）；本批需求要两枚「关」**向左**移到
+        # 「显示字段来源信息」那一列，改法是把锚点换成 nfo 即可——窄态的 nfo 已
+        # 被钉到 from_log（离屏 294 / 300），两者同列，落点自然跟着左移过去
+        # （497 → 294）。若那一段因放不下而放弃（820 宽），三者仍同列不散。
+        off_x = nfo_x
         for cont, lay, lead, tail in (
             (ui.horizontalLayoutWidget_11, ui.horizontalLayout_13, ui.radioButton_log_on, ui.radioButton_log_off),
             (ui.horizontalLayoutWidget_7, ui.horizontalLayout_9, ui.radioButton_update_on, ui.radioButton_update_off),
@@ -1073,8 +1041,10 @@ class LayoutMasterMixin:
             base = cx(lw)
             sp = lay_h.spacing()
             # 「点最小化按钮」：宽态对齐「显示字段来源信息」，窄态对齐「隐藏NFO库
-            # 管理」。两者在窄态分处 292 / 313，取错会让它在还原后停在 292 而非
-            # 313（这正是需求②与需求①在窄态要求落到同一条竖线上的用意）。
+            # 管理」。后者本批需求已钉到 from_log 那一列，故两态实际同落一条线
+            # （离屏窄态实测两者都是 294）。取错会让它在还原后停在 from 上
+            # 而 nfo 留在自然位（这正是需求①与需求②在窄态要求落到同一条竖线
+            # 上的用意）。
             m = (cx(src_from) if wide else nfo_x) - base
             # 「无」：两态同一锚点「显示字段内容信息」。
             n = cx(src_data) - base
