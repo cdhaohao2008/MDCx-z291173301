@@ -1286,6 +1286,85 @@ async def test_probe_retry_mixed_transient_keeps_last_reason(monkeypatch: pytest
     assert "均超时" not in message
 
 
+# 用户 2026-10-19 实测 faleno.jp：搜索页 403，错误串带着整页响应体进检测行
+_FALENO_403_ERROR = (
+    "GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403 "
+    'body=<!DOCTYPE html> <html lang="ja"> <head> <meta charset="EUC-JP" /> '
+    '<title>403 Forbidden</title> <meta name="copyright" content="Copyright XSERVER Inc.">'
+)
+
+
+class ProbeBodyErrorClient:
+    """搜索页请求恒定失败，且错误串带整页响应体（`web_async.request` 的真实格式）。"""
+
+    def __init__(self, error: str):
+        self.error = error
+        self.calls: list[dict] = []
+
+    async def request(self, method, url, **kwargs):
+        self.calls.append({"method": method, "url": url, **kwargs})
+        return None, self.error
+
+
+def test_strip_response_body_keeps_status_only():
+    """按首个 ` body=` 截断：无 body 的原样返回，多轮累积原因不被误切。"""
+    assert nc._strip_response_body(_FALENO_403_ERROR) == "GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403"
+    assert nc._strip_response_body("HTTP 403") == "HTTP 403"
+    assert nc._strip_response_body("") == ""
+    # 多轮重试累积的失败原因必须全在 ` body=` 之前，截断后一条都不丢
+    assert nc._strip_response_body("HTTP 403、curl: (35) TLS connect error: body=<html>x</html>") == (
+        "HTTP 403、curl: (35) TLS connect error:"
+    )
+
+
+@pytest.mark.anyio
+async def test_probe_search_page_failure_drops_response_body(monkeypatch: pytest.MonkeyPatch):
+    """单轮探测：403 响应体不该整页进说明行。"""
+    monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: ProbeCrawler)
+
+    status, message = await _probe_crawler_capability(ProbeBodyErrorClient(_FALENO_403_ERROR), _PROBE_SPEC)
+
+    assert status == NetworkCheckStatus.WARNING
+    assert message == "站点可达但搜索页请求失败: GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403"
+
+
+@pytest.mark.anyio
+async def test_probe_retry_final_message_drops_response_body(monkeypatch: pytest.MonkeyPatch):
+    """两档重试跑完的终局说明同样不带响应体（用户实测的原文案形态）。"""
+    monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: ProbeCrawler)
+    client = ProbeBodyErrorClient(_FALENO_403_ERROR)
+
+    status, message = await nc._probe_crawler_capability_with_retry(client, _PROBE_SPEC)
+
+    assert status == NetworkCheckStatus.WARNING
+    assert message == (
+        "站点无效：刮削探测2次30s/45s均失败，最后一次原因："
+        "站点可达但搜索页请求失败: GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403"
+    )
+    assert len(client.calls) == 2
+
+
+@pytest.mark.anyio
+async def test_probe_crawler_by_run_drops_response_body():
+    """回退 `_run` 探测：聚合串里逐 URL 的响应体同样不进说明行。"""
+    error = "搜索失败: 请求失败: GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403 body=<html>403</html>"
+
+    class RunOnlyBodyCrawler(ProbeCrawler):
+        async def _generate_search_url(self, ctx):
+            return None
+
+        async def run(self, input_data):
+            return SimpleNamespace(data=None, debug_info=SimpleNamespace(error=error))
+
+    status, message = await nc._probe_crawler_by_run(
+        RunOnlyBodyCrawler(ProbeFakeClient()), SimpleNamespace(number="X-1"), 30.0
+    )
+
+    assert status == NetworkCheckStatus.WARNING
+    assert "body=" not in message
+    assert message.endswith("GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403")
+
+
 @pytest.mark.anyio
 async def test_probe_crawler_capability_ok_when_search_finds_detail(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: ProbeCrawler)

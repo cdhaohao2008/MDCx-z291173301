@@ -319,6 +319,18 @@ def _clean_error(error: str) -> str:
     return error
 
 
+def _strip_response_body(error: str) -> str:
+    """截掉请求错误串末尾的 ` body=<响应体>`，只留状态码等真因。
+
+    `web_async.request` 的错误串带响应体（见其 `_record_attempt_error`：响应体
+    统一挂在末尾供诊断），但这些原因会原样进检测报告行——403/404/CloudFlare
+    挑战页的响应体动辄几百上千字符整页 HTML，还常带乱码（EUC-JP 等非 UTF-8
+    页面），真正要看的「HTTP 403」被埋在后面。`_clean_error` 已对连通性检测行
+    做过同样的截断，这里把口径补齐到刮削探测路径。
+    """
+    return str(error or "").split(" body=", 1)[0].rstrip()
+
+
 # 失败串开头的「{方法} {url} 失败:」段（`web_async.request` 的返回格式），
 # 前置到行首后一眼就知道这条在查哪个站，行尾只留根因
 _REQUEST_PREFIX_RE = re.compile(r"^((?:GET|POST|HEAD|PUT|PATCH|DELETE|OPTIONS)\s+\S+\s+(?:失败|未知错误))\s*[:：]\s*")
@@ -528,6 +540,8 @@ async def _probe_crawler_by_run(
         error = getattr(getattr(response, "debug_info", None), "error", None) if response else None
         probe_number = str(getattr(input_data, "number", "") or SCRAPE_PROBE_NUMBER)
         error_msg = str(error) if error else ""
+        # 同上：聚合串里逐 URL 的请求原因带整页响应体，进检测报告前先截掉
+        error_msg = _strip_response_body(error_msg)
         # 将常见 Python 解析错误翻译成中文，便于理解
         if "'NoneType' object has no attribute 'xpath'" in error_msg:
             error_display = "页面解析失败（解析结果为空，无法执行节点提取/xpath）"
@@ -619,7 +633,7 @@ async def _probe_crawler_capability(
                 retry_count=1,
             )
             if response is None:
-                return NetworkCheckStatus.WARNING, f"站点可达但搜索页请求失败: {error}"
+                return NetworkCheckStatus.WARNING, f"站点可达但搜索页请求失败: {_strip_response_body(error)}"
             search_text = ""
             try:
                 response.encoding = spec.encoding
@@ -1330,13 +1344,9 @@ async def run_network_check_item(
                     except Exception:
                         fallback_bypass_mode = ""
                 else:
-                    base_error = str(error or "").split(" body=", 1)[0].rstrip()
+                    base_error = _strip_response_body(error)
                     clean_bypass = (
-                        str(bypass_error or "")
-                        .split(" body=", 1)[0]
-                        .strip()
-                        .replace("; GET ", "、")
-                        .replace("; ", "、")
+                        _strip_response_body(bypass_error).strip().replace("; GET ", "、").replace("; ", "、")
                     )
                     if clean_bypass:
                         error = f"{base_error} CloudFlare Bypass失败：{clean_bypass}"
