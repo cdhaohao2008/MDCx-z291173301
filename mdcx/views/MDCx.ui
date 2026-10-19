@@ -24920,7 +24920,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>Qt::RightToLeft</enum>
                             </property>
                             <property name="text">
-                              <string>选择对话框：</string>
+                              <string>选对话框：</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -24945,7 +24945,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <enum>Qt::RightToLeft</enum>
                             </property>
                             <property name="text">
-                              <string>高分屏缩放：</string>
+                              <string>分屏缩放：</string>
                             </property>
                             <property name="alignment">
                               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
