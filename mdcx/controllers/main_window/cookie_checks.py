@@ -1,7 +1,9 @@
 """FC2PPVDB / JavBus 的 Cookie 登录态检测。
 
 从 `main_window.py` 按集群切出。FC2PPVDB 部分逻辑与文案逐字不变；
-JavBus 部分按 2026-10-18 的实网实测重做了登录态判定（见下方 `classify_javbus_login_state`）。"""
+JavBus 部分按 2026-10-18 的实网实测重做了登录态判定（见下方 `classify_javbus_login_state`），
+并在 2026-10-19 修掉了「有效 Cookie 被误报无效」——根因是检测打的是不带 www 的裸 apex，
+跨主机 301 时 httpx 会丢掉请求头里的 Cookie（见 `_JAVBUS_COOKIE_CHECK_BASES` 注释）。"""
 
 import re
 import threading
@@ -39,6 +41,36 @@ _JAVBUS_BLOCKED_MARKERS = (
     "我已經成年",
     "我已经成年",
 )
+
+# ── JavBus 检测节点 ───────────────────────────────────────────────────────────
+# 域名「带不带 www」直接决定登录态能不能判出来。裸 apex（https://javbus.com）会 301
+# 跳到 www.javbus.com，而 httpx 在跨主机重定向时无条件丢掉请求头里的 Cookie
+# （`Client._redirect_headers` 里的 `headers.pop("Cookie", None)`，注释写明
+# 「用 client 的 cookie jar 决定 Cookie 头，而不是沿用原始请求上的」）。于是跳转后
+# 的请求成了匿名请求：服务端照样返回 200 的完整详情页，只是头像恒为
+# `avatar.php?uid=0`，判定遂落到「❌ Cookie无效或已过期！」——而用户填的
+# Cookie 其实完全有效，站点只是从头到尾没收到它。
+# 2026-10-19 实测（真实 Cookie + 代理）：javbus.com → uid=0；
+# www.javbus.com 与 www.dmmbus.casa → uid=678400，且均无重定向。
+# 故这里只列 Cookie 能直达到位的入口域名。
+_JAVBUS_COOKIE_CHECK_BASES = (
+    "https://www.javbus.com",
+    "https://www.dmmbus.casa",
+)
+_JAVBUS_CHECK_PATH = "/FSDSS-660"
+# 单个节点给不出定论 ≠ Cookie 有问题（301 丢 Cookie、CloudFlare 拦、节点已挂都会
+# 让某一个域名误报），所以所有候选节点都投一票，取可信度最高的那一票。
+# 排序：能证明登录态的（valid/invalid）压过「证明不了」的（blocked/unreachable/unknown）；
+# 未填 Cookie 时「需要 Cookie」压过「无需 Cookie」。
+_JAVBUS_VERDICT_RANK = {
+    "valid": 6,
+    "invalid": 5,
+    "needed": 4,
+    "not_needed": 3,
+    "blocked": 2,
+    "unreachable": 1,
+    "unknown": 0,
+}
 
 
 def _has_marker(html: str, markers: tuple[str, ...]) -> bool:
@@ -88,6 +120,40 @@ def javbus_cookie_verdict(input_cookie: str, html: str | None, error: str | None
     if state == "logged_out":
         return "invalid", "❌ Cookie无效或已过期！（已保留，可手动替换）"
     return "unknown", "⚠️ 未识别页面结构，无法判定Cookie有效性（已保留，可手动替换）"
+
+
+def javbus_cookie_check_urls() -> list[str]:
+    """JavBus Cookie 检测要依次尝试的地址（用户在网站设置里自定义了则排最前，已去重）。
+
+    逐个试而不是只打一个，是因为单个节点说「无效」并不能证明 Cookie 无效。
+    """
+    bases: list[str] = []
+    for candidate in (manager.config.get_site_url(Website.JAVBUS, ""), *_JAVBUS_COOKIE_CHECK_BASES):
+        base = str(candidate or "").strip().rstrip("/")
+        if base and base not in bases:
+            bases.append(base)
+    return [base + _JAVBUS_CHECK_PATH for base in bases]
+
+
+def javbus_cookie_verdict_sync(input_cookie: str) -> tuple[str, str]:
+    """逐节点实测 JavBus Cookie，返回 (状态, 文案)。
+
+    任一节点判 valid 即立刻收工；否则走完全部候选，取可信度最高的一票。
+    """
+    headers = {"Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,ja;q=0.6", "cookie": input_cookie}
+    best_state, best_tips = "", ""
+    for url in javbus_cookie_check_urls():
+        try:
+            html, error = get_text_sync(url, headers=headers)
+        except Exception as e:
+            signal_qt.show_traceback_log(traceback.format_exc())
+            html, error = None, str(e)
+        state, tips = javbus_cookie_verdict(input_cookie, html, error)
+        if _JAVBUS_VERDICT_RANK.get(state, 0) > _JAVBUS_VERDICT_RANK.get(best_state, -1):
+            best_state, best_tips = state, tips
+        if state == "valid":
+            break
+    return best_state, best_tips
 
 
 class CookieChecksMixin:
@@ -159,16 +225,13 @@ class CookieChecksMixin:
     def _check_javbus_cookie(self, input_cookie: str):
         # self.Ui.pushButton_check_javbus_cookie.setEnabled(False)
         input_cookie = (input_cookie or "").strip()
-        headers = {"Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,ja;q=0.6", "cookie": input_cookie}
-        javbus_url = manager.config.get_site_url(Website.JAVBUS, "https://javbus.com") + "/FSDSS-660"
 
         try:
-            response, error = get_text_sync(javbus_url, headers=headers)
-        except Exception as e:
+            state, tips = javbus_cookie_verdict_sync(input_cookie)
+        except Exception:
             signal_qt.show_traceback_log(traceback.format_exc())
-            response, error = None, str(e)
+            state, tips = "unreachable", "❌ 连接失败！请检查网络或代理设置！"
 
-        state, tips = javbus_cookie_verdict(input_cookie, response, error)
         # 只有真正验证到登录态才写盘：无效 / 被拦截 / 判定不了时一律只告警并保留用户填的 Cookie
         if state == "valid" and manager.config.javbus != input_cookie:
             self.exec_save_config.emit()

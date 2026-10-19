@@ -100,6 +100,38 @@ def _patch_get_text(monkeypatch, html, error=""):
     monkeypatch.setattr(cookie_checks, "get_text_sync", lambda url, headers=None, **kw: (html, error))
 
 
+def _patch_get_text_by_url(monkeypatch, pages, default=(None, "没有这个节点")):
+    """按 URL 返回不同页面，用来验证「多节点投票」而不是「所有节点同答」。
+
+    `pages` 的 key 用 URL 子串匹配，命中即返回该节点的 (html, error)。
+    """
+    from mdcx.controllers.main_window import cookie_checks
+
+    def _fake(url, headers=None, **kw):
+        for needle, page in pages.items():
+            if needle in url:
+                return page if isinstance(page, tuple) else (page, "")
+        return default
+
+    monkeypatch.setattr(cookie_checks, "get_text_sync", _fake)
+
+
+def _patch_custom_node(monkeypatch, url):
+    """把「软件设置」里自定义的 JavBus 网址钉成 `url`。
+
+    换掉 `cookie_checks.manager` 整个引用而不是给 `manager.config` 打补丁：
+    全量跑时 `manager.config` 是真的 pydantic `Config`，而它对未知属性直接
+    `__setattr__` 抛 `ValueError: "Config" object has no field "get_site_url"`，
+    `monkeypatch.setattr(..., raising=False)` 也拦不住（那参数只作用于 getattr）。
+    """
+    from types import SimpleNamespace
+
+    from mdcx.controllers.main_window import cookie_checks
+
+    stub = SimpleNamespace(config=SimpleNamespace(get_site_url=lambda *a, **kw: url, javbus=""))
+    monkeypatch.setattr(cookie_checks, "manager", stub)
+
+
 # ── 1. 页面分类 ────────────────────────────────────────────────────────────────
 
 
@@ -314,3 +346,97 @@ def test_network_check_javbus_follows_same_verdict(monkeypatch, html, cookie, ex
     status, _ = _classify_http_result(spec, 200, html)
 
     assert status == NetworkCheckStatus[expected], f"{cookie!r} / {html[:40]!r} 判定为 {status}"
+
+
+# ── 5. 检测节点：不能打裸 apex，且要多节点投票 ──────────────────────────────────
+# 回归背景（2026-10-19）：`_check_javbus_cookie` 原本打的是不带 www 的
+# `https://javbus.com`。该地址 301 跳到 www.javbus.com，而 httpx 在跨主机重定向时
+# 无条件 `headers.pop("Cookie", None)`，跳转后的请求成了匿名请求——服务端照样返回
+# 200 的完整详情页，只是头像恒为 `avatar.php?uid=0`，于是有效的 Cookie 被误报成
+# 「❌ Cookie无效或已过期！」。实测：javbus.com → uid=0；
+# www.javbus.com / www.dmmbus.casa → uid=678400 且无重定向。
+
+
+def test_check_urls_default_to_www_nodes_only(monkeypatch):
+    """默认节点必须是能把 Cookie 直送到服务器的 www 入口，且不得含裸 apex。"""
+    from mdcx.controllers.main_window.cookie_checks import javbus_cookie_check_urls
+
+    _patch_custom_node(monkeypatch, "")
+
+    urls = javbus_cookie_check_urls()
+
+    assert urls == [
+        "https://www.javbus.com/FSDSS-660",
+        "https://www.dmmbus.casa/FSDSS-660",
+    ]
+    assert not any(url.startswith("https://javbus.com/") for url in urls), "裸 apex 会丢 Cookie，不得作为检测节点"
+
+
+def test_check_urls_prefer_custom_node_and_dedupe(monkeypatch):
+    """自定义网址排最前；与默认节点重合时不得重复请求。"""
+    from mdcx.controllers.main_window.cookie_checks import javbus_cookie_check_urls
+
+    _patch_custom_node(monkeypatch, "https://www.javbus.com/")
+
+    assert javbus_cookie_check_urls() == [
+        "https://www.javbus.com/FSDSS-660",
+        "https://www.dmmbus.casa/FSDSS-660",
+    ]
+
+    _patch_custom_node(monkeypatch, "https://my.mirror.tv")
+    assert javbus_cookie_check_urls() == [
+        "https://my.mirror.tv/FSDSS-660",
+        "https://www.javbus.com/FSDSS-660",
+        "https://www.dmmbus.casa/FSDSS-660",
+    ]
+
+
+def test_check_falls_back_to_next_node_when_one_says_logged_out(win, monkeypatch, saved_cookie):
+    """首个节点掉 Cookie/被拦不代表 Cookie 无效——只要有节点判 valid 就以 valid 为准。"""
+    saved_cookie("")
+    _patch_custom_node(monkeypatch, "")
+    _patch_get_text_by_url(
+        monkeypatch,
+        {
+            "javbus.com": _ANON_PAGE,  # 301 丢 Cookie → 服务端看到匿名用户
+            "dmmbus.casa": _LOGGED_IN_PAGE,
+        },
+    )
+
+    saves = []
+    win.exec_save_config.connect(lambda: saves.append(1))
+
+    tips = win._check_javbus_cookie("PHPSESSID=real")
+
+    assert tips.startswith("✅"), f"有效节点已确认，不应被前一个节点的误报盖掉，实得 {tips!r}"
+    assert len(saves) == 1
+
+
+def test_check_reports_invalid_only_when_every_node_agrees(win, monkeypatch, saved_cookie):
+    """所有节点都判未登录时才报无效（此时确实是 Cookie 的问题）。"""
+    saved_cookie("")
+    _patch_custom_node(monkeypatch, "")
+    _patch_get_text_by_url(monkeypatch, {"javbus.com": _ANON_PAGE, "dmmbus.casa": _ANON_PAGE})
+
+    saves = []
+    win.exec_save_config.connect(lambda: saves.append(1))
+
+    tips = win._check_javbus_cookie("PHPSESSID=dead")
+
+    assert tips.startswith("❌")
+    assert "无效" in tips
+    assert saves == []
+
+
+def test_check_prefers_conclusive_verdict_over_inconclusive_one(win, monkeypatch, saved_cookie):
+    """被 CloudFlare 拦 / 结构不认识只能算「判不了」，不能盖过站得住的结论。"""
+    saved_cookie("")
+    _patch_custom_node(monkeypatch, "")
+    _patch_get_text_by_url(monkeypatch, {"javbus.com": _CF_CHALLENGE_PAGE, "dmmbus.casa": _ANON_PAGE})
+
+    win.exec_save_config.connect(lambda: pytest.fail("无效判定不得触发写盘"))
+
+    tips = win._check_javbus_cookie("PHPSESSID=dead")
+
+    assert tips.startswith("❌")
+    assert "无效" in tips, f"应取 invalid 而非 intercepted，实得 {tips!r}"
