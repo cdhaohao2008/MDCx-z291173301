@@ -14548,7 +14548,7 @@ class Ui_MDCx(object):
         self.checkBox_dialog_qt.setText(_translate("MDCx", "使用 QT 选择对话框"))
         self.label_421.setText(_translate("MDCx", "目录中的文件较多时，可以勾选此项提高文件打开速度"))
         self.label_314.setText(_translate("MDCx", "隐藏图标："))
-        self.label_243.setText(_translate("MDCx", "配置文件目录："))
+        self.label_243.setText(_translate("MDCx", "配置目录："))
         self.radioButton_hide_close.setText(_translate("MDCx", "点关闭按钮"))
         self.radioButton_hide_mini.setText(_translate("MDCx", "点最小化按钮"))
         self.radioButton_hide_none.setText(_translate("MDCx", "无"))
