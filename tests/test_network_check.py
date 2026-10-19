@@ -680,11 +680,14 @@ def test_format_result_line_does_not_duplicate_error():
 
 
 def test_format_header_columns_align_with_result_lines():
-    """诊断表头四列（状态码/耗时/路由/信息）与数据行严格按显示宽度对齐。
+    """诊断表头四列（状态码/耗时/路由/信息）与数据行对齐（真机实测校准列位）。
 
-    表头此前用裸空格手拼、数据行用 _pad_left/_pad_right 拼，两套各走各的，
-    表头整体比数据列偏右——200 落在「状态码」左侧、耗时/路由/信息同理
-    （用户在检测网络页逐列对齐时实测）。
+    表头用裸空格手拼、数据行用 _pad_left/_pad_right 拼，按 _disp_width 理论
+    列位算出「严格相等」在真机（Microsoft YaHei UI 等宽渲染）上反而差半个到
+    一个汉字——中日韩字实渲染宽略大于 2 个 ASCII 列，数据行行首 ✅ emoji 的
+    实宽也有出入。故列位按用户屏上实测校准（docs/Changelog.md v2.6.3）：
+    「状态码」37–42（200 落在其三字正中间）、「耗时」51–54（与 xx ms 右缘）、
+    「路由」63–66（与 代理/直连）、「信息」72–75（与说明文字左缘）。
     """
     from mdcx.core.network_check import _disp_width, _format_header
 
@@ -702,19 +705,15 @@ def test_format_header_columns_align_with_result_lines():
     def display_column(text: str, needle: str) -> int:
         return _disp_width(text[: text.index(needle)])
 
-    # 路由 与下方的 代理/直连 同列起点；信息 与 说明文字 同列起点
-    assert display_column(header_line, "路由") == display_column(line, "代理")
-    assert display_column(header_line, "信息") == display_column(line, "连接正常")
-
-    # 耗时 右缘与数据 "ms" 右缘严格对齐（数值右对齐行宽 10，右缘恒定）
-    assert display_column(header_line, "耗时") + _disp_width("耗时") == display_column(line, "153 ms") + _disp_width(
-        "153 ms"
-    )
-
-    # 3 位状态码落在「状态码」表头正中（左留 1 列、右留 2 列，6 宽表头居中 3 位数字）
+    # 数据列的理论列位（数字右对齐终点 39 / 耗时右缘 52 / 代理 61 / 说明文字 70）
     code_start = display_column(line, "200")
-    header_start = display_column(header_line, "状态码")
-    assert header_start == code_start - 1
+    assert code_start == 37
+
+    # 校准后的表头列位：状态码 +半汉字、耗时/路由/信息 各 +1 汉字
+    assert display_column(header_line, "状态码") == 37
+    assert display_column(header_line, "耗时") == 51
+    assert display_column(header_line, "路由") == 63
+    assert display_column(header_line, "信息") == 72
 
 
 def test_format_result_line_tls_error_puts_url_first():

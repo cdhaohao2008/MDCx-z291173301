@@ -798,15 +798,21 @@ def _format_header(separator_width: int | None = None) -> list[str]:
         f"  {_pad_right('刮削探测', 16)}单站最多{len(SCRAPE_PROBE_ATTEMPT_TIMEOUTS)}次({scrape_probe_ladder_text()})"
     )
     lines.append(_separator("=", separator_width))
+    # 表头四列的空格不是按 _disp_width 理论列位算的，而是按真机（Microsoft YaHei UI
+    # 等宽渲染）屏上实测校准的：中日韩字实渲染宽略大于 2 个 ASCII 列，数据行行首
+    # ✅ emoji 的实宽也有出入，理论对齐在真机上仍差半个到一个汉字。以用户的实测
+    # 为准：「状态码」显示列 37–42（三位状态码 37–39 落在其三字正中间）、「耗时」
+    # 51–54（与数据行 xx ms 右缘对齐）、「路由」63–66（与 代理/直连 对齐）、
+    # 「信息」72–75（与说明文字左缘对齐）。改数据行或字体时需同步重测。
     lines.append(
         "  "
         + _pad_right("状态", 4)
         + "   "
         + " "
         + _pad_right("站点", 23)
-        + "   "
+        + "    "
         + "状态码"
-        + "       "
+        + "        "
         + "耗时"
         + "        "
         + "路由"
