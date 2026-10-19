@@ -710,12 +710,34 @@ def test_format_header_columns_align_with_result_lines():
     assert code_start == 37
 
     # 校准后的表头列位（真机实测，见 _format_header 内注释）：
-    # 「耗时」49 = 整串「1427 ms」的串中心（该串占 46–52）；「状态码」36 = 按用户
-    # 第四轮要求左移 1 格（1 空格 = 7.141px，5px 只能取整格）；其余两列按右/左对齐
-    assert display_column(header_line, "状态码") == 36
+    # 「耗时」49 = 整串「1427 ms」的串中心（该串占 46–52）；「状态码」37 = 与数据行
+    # 「200」同列（截图实测「200」需居中于表头，4 空格版两列墨迹中心差 0.000px）；
+    # 其余两列按右/左对齐
+    assert display_column(header_line, "状态码") == 37
     assert display_column(header_line, "耗时") == 49
     assert display_column(header_line, "路由") == 63
     assert display_column(header_line, "信息") == 72
+
+
+def test_format_header_status_code_gap_is_four_ascii_spaces():
+    """「状态码」表头前用 4 个普通空格，使 200 正好居中于表头。
+
+    截图实测（2026-10-19）「状态码」墨迹中心 515.0、「200」墨迹中心 518.0，需右移
+    3.0px；1 空格 = 7.141px，3 空格比 4 空格窄 7.141px，比 4 空格宽的候选里没有更近
+    的纯 ASCII 方案，故取 4 空格（28.562px）。真实控件渲染复核：两列中心差 0.000px。
+
+    这里同时守住「报告正文只含可打印 ASCII」——诊断报告会被复制到剪贴板并粘贴进
+    issue，早前用 U+2800 盲文空格做亚格位移的方案会往文本里混进不可见字符。
+    """
+    from mdcx.core.network_check import _format_header
+
+    header_line = next(line for line in _format_header() if "状态码" in line)
+    head = header_line.index("状态码")
+    gap = header_line[head - 4 : head]
+    assert gap == "    "
+    assert not set(header_line) & set("\u1680\u2800\uffa0\u3000"), (
+        "表头不应混入不可见的填充字符（会被复制进剪贴板/issue）"
+    )
 
 
 def test_format_result_line_tls_error_puts_url_first():
