@@ -7,6 +7,7 @@ import hashlib
 import sys
 import zipfile
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -22,6 +23,9 @@ def _isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(manager.config, "poster_sr_enabled", True)
     monkeypatch.setattr(manager.config, "poster_sr_preset", "realesr-photo-4x")
     monkeypatch.setattr(manager.config, "poster_sr_max_dim", 1200)
+    # 「只报一次」类模块全局逐例复位，避免上一例的结论吞掉本例要断言的日志
+    monkeypatch.setattr(sr, "_SR_SKIP_REPORTED", False, raising=False)
+    monkeypatch.setattr(sr, "_BUILTIN_MISS_REPORTED", False, raising=False)
     yield
 
 
@@ -295,7 +299,8 @@ async def test_ensure_binary_prefers_builtin_without_download(tmp_path, monkeypa
     """一体包（_MEIPASS）内置工具时直接释放使用，不触发下载。"""
     builtin = tmp_path / "mei" / "sr_tools" / "realesrgan"
     builtin.mkdir(parents=True)
-    (builtin / "realesrgan-ncnn-vulkan").write_text("#!/bin/sh\nexit 0")
+    # 按平台实际的可执行文件名造（Windows 带 .exe），内置目录缺二进制会被判释放失败
+    (builtin / sr._binary_name("realesrgan")).write_text("#!/bin/sh\nexit 0")
     monkeypatch.setattr(sr.sys, "_MEIPASS", str(tmp_path / "mei"), raising=False)
 
     async def fail_download(url):
@@ -457,3 +462,198 @@ def test_extract_zip_rejects_path_traversal(tmp_path):
     else:
         raise AssertionError("非法路径包应抛 ValueError")
     assert not (tmp_path / "evil.txt").exists()
+
+
+# ── 内置工具「为什么没走内置」必须可诊断（Windows 上看到「📥 首次使用下载」的排查依据）──
+
+
+def _make_builtin(tool: str = "realesrgan", *, with_binary: bool = True) -> Path:
+    """在 `sys._MEIPASS` 下造一份内置工具目录（模拟一体包内容）。"""
+    root = sr._builtin_root()
+    assert root is not None
+    builtin = root / sr._SR_TOOLS_BUNDLE_DIR / tool
+    builtin.mkdir(parents=True, exist_ok=True)
+    if with_binary:
+        (builtin / sr._binary_name(tool)).write_text("#!/bin/sh\nexit 0")
+    return builtin
+
+
+def test_install_from_builtin_reports_reason_codes(tmp_path, monkeypatch):
+    """返回 None=成功；否则给出原因码，让调用方能区分「包里没有」与「复制失败」。"""
+    dest = tmp_path / "tools" / "realesrgan"
+
+    monkeypatch.delattr(sr.sys, "_MEIPASS", raising=False)
+    assert sr._install_from_builtin("realesrgan", dest) == (
+        "not_frozen",
+        "未打包运行（sys._MEIPASS 为空），本就没有内置工具",
+    )
+
+    monkeypatch.setattr(sr.sys, "_MEIPASS", str(tmp_path / "mei"), raising=False)
+    assert sr._install_from_builtin("realesrgan", dest)[0] == "not_bundled"
+
+    _make_builtin(with_binary=False)
+    monkeypatch.setattr(sr.log_console, "show_traceback_log", lambda *_a, **_k: None)
+    assert sr._install_from_builtin("realesrgan", dest)[0] == "extract_failed"
+
+
+def test_install_from_builtin_rejects_bundle_without_binary(tmp_path, monkeypatch):
+    """空/残缺的内置目录不算释放成功——否则会谎报「✅ 内置就绪」直到执行时才炸。"""
+    monkeypatch.setattr(sr.sys, "_MEIPASS", str(tmp_path / "mei"), raising=False)
+    monkeypatch.setattr(sr.log_console, "show_traceback_log", lambda *_a, **_k: None)
+    _make_builtin(with_binary=False)
+
+    dest = tmp_path / "tools" / "realesrgan"
+    reason = sr._install_from_builtin("realesrgan", dest)
+    assert reason is not None and reason[0] == "extract_failed"
+    assert "缺少可执行文件" in reason[1]
+
+
+def test_install_from_builtin_succeeds_with_complete_bundle(tmp_path, monkeypatch):
+    """正常内置目录：释放成功并落出可执行文件（正向兜住上一条别改过头）。"""
+    monkeypatch.setattr(sr.sys, "_MEIPASS", str(tmp_path / "mei"), raising=False)
+    _make_builtin(with_binary=True)
+
+    dest = tmp_path / "tools" / "realesrgan"
+    assert sr._install_from_builtin("realesrgan", dest) is None
+    assert (dest / sr._binary_name("realesrgan")).is_file()
+
+
+def test_rmtree_force_raises_and_names_blocked_files(tmp_path, monkeypatch):
+    """文件被占用时必须抛错并点名，旧的 `ignore_errors=True` 会静默吞掉。
+
+    旧行为下 rmtree 假装删干净 → 紧接着 copytree 抛 FileExistsError →
+    内置工具明明在包里却去下载 30-60MB。
+    """
+    import os
+
+    locked = tmp_path / "tools" / "realesrgan"
+    locked.mkdir(parents=True)
+    victim = locked / "realesrgan-ncnn-vulkan"
+    victim.write_text("busy")
+
+    def boom(*_a, **_k):
+        raise PermissionError(13, "另一个程序正在使用此文件")
+
+    monkeypatch.setattr(os, "unlink", boom)
+    with pytest.raises(OSError) as err:
+        sr._rmtree_force(locked)
+    assert "被占用" in str(err.value)
+    assert victim.name in str(err.value)
+
+
+def test_rmtree_force_removes_locked_readonly_file(tmp_path, monkeypatch):
+    """只读属性（PyInstaller 从 zip 解出的常见形态）先 chmod 再删，仍应删得掉。"""
+    import os
+    import stat as stat_mod
+
+    target = tmp_path / "tools" / "realesrgan"
+    target.mkdir(parents=True)
+    readonly = target / "readme.txt"
+    readonly.write_text("x")
+    readonly.chmod(0o444)
+
+    real_unlink = os.unlink
+    seen: list[int] = []
+
+    def picky_unlink(p, *a, **k):
+        if stat_mod.S_ISDIR(os.stat(p).st_mode):
+            return real_unlink(p, *a, **k)
+        seen.append(1)
+        if os.stat(p).st_mode & stat_mod.S_IWUSR:
+            return real_unlink(p, *a, **k)
+        raise PermissionError(13, "只读文件")
+
+    monkeypatch.setattr(os, "unlink", picky_unlink)
+    sr._rmtree_force(target)
+    assert seen and not target.exists()
+
+
+def test_explain_builtin_unavailable_says_why_not_silent(tmp_path, monkeypatch):
+    """一体包内缺工具必须打结论日志；源码运行要说明来源；两者都不该是零日志。"""
+    logs: list[str] = []
+    monkeypatch.setattr(sr.log_console, "log_text", logs.append)
+
+    # 源码运行：不是异常，但要说清「不是包没集成」
+    monkeypatch.delattr(sr.sys, "_MEIPASS", raising=False)
+    sr._explain_builtin_unavailable("realesrgan", "not_frozen", "")
+    assert any("源码运行" in t for t in logs), logs
+
+    # 冻结运行但包内没有工具：打包问题，必须点名并给出包内路径
+    mei = tmp_path / "mei"
+    mei.mkdir()
+    monkeypatch.setattr(sr.sys, "_MEIPASS", str(mei), raising=False)
+    monkeypatch.setattr(sr, "_BUILTIN_MISS_REPORTED", False, raising=False)
+    logs.clear()
+    sr._explain_builtin_unavailable("realesrgan", "not_bundled", "包内缺少 sr_tools/realesrgan")
+    assert len(logs) == 1
+    assert "sr_tools 目录都不在包内" in logs[0]
+    assert str(mei / "sr_tools") in logs[0]
+
+
+def test_explain_builtin_unavailable_silent_on_macos(tmp_path, monkeypatch):
+    """macOS 一体包本就不内嵌，找不到内置不是异常，不能报成打包问题。"""
+    logs: list[str] = []
+    monkeypatch.setattr(sr, "_PLATFORM", {"darwin": "macos"})
+    monkeypatch.setattr(sr.log_console, "log_text", logs.append)
+    monkeypatch.setattr(sr.sys, "_MEIPASS", str(tmp_path / "mei"), raising=False)
+
+    sr._explain_builtin_unavailable("realesrgan", "not_bundled", "包内缺少 sr_tools/realesrgan")
+    assert logs == []
+    assert sr._BUILTIN_MISS_REPORTED is False, "未解释就不该置位，否则会吞掉后续真结论"
+
+
+def test_explain_builtin_unavailable_reported_only_once(tmp_path, monkeypatch):
+    """批刮会反复问到，只解释一次。"""
+    logs: list[str] = []
+    monkeypatch.setattr(sr.log_console, "log_text", logs.append)
+    monkeypatch.delattr(sr.sys, "_MEIPASS", raising=False)
+    for _ in range(3):
+        sr._explain_builtin_unavailable("realesrgan", "not_frozen", "")
+    assert len(logs) == 1
+
+
+@pytest.mark.asyncio
+async def test_ensure_binary_logs_real_cause_before_downloading(tmp_path, monkeypatch):
+    """下载前必须先说清「为什么没走内置」，否则用户只看到「📥 首次使用下载」。"""
+    logs: list[str] = []
+    monkeypatch.setattr(sr.log_console, "log_text", logs.append)
+    monkeypatch.setattr(sr.sys, "_MEIPASS", str(tmp_path / "mei"), raising=False)
+    bundled = (sr._PLATFORM.get(sys.platform) or "") in sr._SR_BUNDLED_PLATFORMS
+
+    async def offline(url):
+        raise RuntimeError("offline")
+
+    monkeypatch.setattr(sr, "_download_bytes", offline)
+    monkeypatch.setattr(sr, "_SR_DOWNLOAD_ATTEMPTS", 1)
+    assert await sr.ensure_binary("realesrgan") is None
+
+    warned = [t for t in logs if "一体包内未找到内置工具" in t]
+    assert bool(warned) is bundled, f"内置缺失诊断与平台预期不符: {logs}"
+    assert any("首次使用，下载超分工具" in t for t in logs)
+
+
+@pytest.mark.asyncio
+async def test_ensure_binary_reports_copy_failure_reason(tmp_path, monkeypatch):
+    """内置在包里却释放失败：真因（文件占用）要同时进 traceback 和最终结论。"""
+    logs: list[str] = []
+    traces: list[str] = []
+    monkeypatch.setattr(sr.log_console, "log_text", logs.append)
+    monkeypatch.setattr(sr.log_console, "show_traceback_log", traces.append)
+    monkeypatch.setattr(sr.sys, "_MEIPASS", str(tmp_path / "mei"), raising=False)
+    _make_builtin(with_binary=True)
+
+    def blocked_copytree(src, dst, **kwargs):
+        raise FileExistsError(17, "File exists", str(dst))
+
+    async def offline(url):
+        raise RuntimeError("offline")
+
+    monkeypatch.setattr(sr.shutil, "copytree", blocked_copytree)
+    monkeypatch.setattr(sr, "_download_bytes", offline)
+    monkeypatch.setattr(sr, "_SR_DOWNLOAD_ATTEMPTS", 1)
+
+    assert await sr.ensure_binary("realesrgan") is None
+    assert any("内置工具释放失败" in t for t in traces), traces
+    assert not any("超分工具就绪（内置）" in t for t in logs), logs
+    skip = [t for t in logs if "海报超分未生效" in t]
+    assert skip and "内置工具释放失败" in skip[0], f"最终结论应带真因: {logs}"

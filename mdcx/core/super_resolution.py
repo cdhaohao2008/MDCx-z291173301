@@ -39,6 +39,13 @@ _RELEASE_WAIFU2X = "https://github.com/nihui/waifu2x-ncnn-vulkan/releases/downlo
 
 _PLATFORM = {"darwin": "macos", "linux": "linux", "win32": "windows"}
 
+# 打包时内置超分工具的包内目录名（与 scripts/build.py 的 `--add-binary ... sr_tools/<tool>` 对应）
+_SR_TOOLS_BUNDLE_DIR = "sr_tools"
+
+# 只有 Windows/Linux 一体包会内置工具（macOS 不内嵌：签名/公证与 Gatekeeper 风险）。
+# 只有这两个平台「包内找不到内置目录」才算异常，macOS 找不到是设计如此，别报警。
+_SR_BUNDLED_PLATFORMS = frozenset({"windows", "linux"})
+
 
 class SrPreset(StrEnum):
     REALESR_PHOTO_4X = "realesr-photo-4x"
@@ -156,13 +163,43 @@ def is_binary_ready(tool: str) -> bool:
 
 
 def _make_executable(path: Path) -> None:
+    """补可执行位；失败必须抛。
+
+    原来这里是 `except OSError: pass`——补位失败照样 `return True`，于是「✅ 工具就绪」
+    一直报到真正执行超分时才炸。缺二进制（`stat` 抛 FileNotFoundError）同样在这里暴露。
+    """
     if sys.platform == "win32":
         return
-    try:
-        mode = path.stat().st_mode
-        path.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    except OSError:
-        pass
+    mode = path.stat().st_mode
+    path.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def _rmtree_force(path: Path) -> None:
+    """删干净一棵目录树；删不掉就抛，并报出到底哪个文件被占着。
+
+    原来这里是 `shutil.rmtree(path, ignore_errors=True)`：Windows 上残留的超分进程、
+    杀毒软件扫描或资源管理器预览会短暂锁住 `userdata/sr/tools/<tool>` 里的文件，
+    `ignore_errors=True` 会「假装删干净」，紧接着的 `shutil.copytree` 必然抛
+    FileExistsError —— 内置工具明明就在包里，却被 catch 之后又去下载 30-60MB。
+    """
+    if not path.exists():
+        return
+    blocked: list[str] = []
+
+    def _handle(func, target, exc) -> None:
+        # PyInstaller 从 zip 解出的文件常带只读属性，先 chmod 再删一次
+        if isinstance(exc, PermissionError):
+            with contextlib.suppress(OSError):
+                os.chmod(target, stat.S_IWRITE)
+                func(target)
+                return
+        blocked.append(f"{target}（{type(exc).__name__}: {exc}）")
+
+    shutil.rmtree(path, onexc=_handle)
+    if blocked:
+        raise OSError(
+            f"目录被占用，{len(blocked)} 项删不掉（多半有残留的超分进程或杀软正在扫描）: {'; '.join(blocked[:3])}"
+        )
 
 
 def _extract_zip(data: bytes, dest_dir: Path) -> None:
@@ -185,7 +222,7 @@ def _extract_zip(data: bytes, dest_dir: Path) -> None:
             zf.extractall(tmp)
             extracted = Path(tmp) / top if top and (Path(tmp) / top).is_dir() else Path(tmp)
             if dest_dir.exists():
-                shutil.rmtree(dest_dir, ignore_errors=True)
+                _rmtree_force(dest_dir)
             shutil.copytree(extracted, dest_dir, dirs_exist_ok=True)
     _make_executable(binary_path_from_dir(dest_dir.name, dest_dir))
 
@@ -194,34 +231,52 @@ def binary_path_from_dir(tool: str, tool_dir: Path) -> Path:
     return tool_dir / _binary_name(tool)
 
 
+def _builtin_root() -> Path | None:
+    """打包体的解包根目录（一体包，无论 onefile/onedir 都有）；源码运行/调试时返回 None。"""
+    meipass = getattr(sys, "_MEIPASS", "")
+    return Path(meipass) if meipass else None
+
+
 def _builtin_dir(tool: str) -> Path | None:
     """打包体内置的工具目录（仅一体包存在）；源码运行时返回 None。"""
-    meipass = getattr(sys, "_MEIPASS", "")
-    if not meipass:
+    root = _builtin_root()
+    if root is None:
         return None
-    path = Path(meipass) / "sr_tools" / tool
+    path = root / _SR_TOOLS_BUNDLE_DIR / tool
     return path if path.is_dir() else None
 
 
-def _install_from_builtin(tool: str, dest_dir: Path) -> bool:
+def _install_from_builtin(tool: str, dest_dir: Path) -> tuple[str, str] | None:
     """把内置工具目录整目录释放到 userdata 缓存目录再使用。
 
     二进制按自身所在目录解析模型与依赖库，且打包解压目录不保证可写，
     所以必须整目录复制后执行，不能直接在打包体内运行。
+
+    返回 None 表示释放成功；否则返回 `(原因码, 原因描述)`，原因码取
+    `not_frozen` / `not_bundled` / `extract_failed`。调用方据此打可诊断的日志，
+    而不是在「包里根本没有」和「复制失败」两种截然不同的情况下都只说一句
+    「首次使用，下载超分工具（约 30-60MB，仅一次）」。
     """
     src = _builtin_dir(tool)
     if src is None:
-        return False
+        if _builtin_root() is None:
+            return ("not_frozen", "未打包运行（sys._MEIPASS 为空），本就没有内置工具")
+        return ("not_bundled", f"包内缺少 {_SR_TOOLS_BUNDLE_DIR}/{tool}")
     try:
-        if dest_dir.exists():
-            shutil.rmtree(dest_dir, ignore_errors=True)
+        _rmtree_force(dest_dir)
         dest_dir.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src, dest_dir)
-        _make_executable(binary_path_from_dir(tool, dest_dir))
-        return True
+        # copytree 返回不等于产物完整：空/残缺的内置目录必须在这里暴露，
+        # 否则会一路谎报「✅ 内置就绪」直到真正执行超分时才炸。
+        # （Windows 上 `_make_executable` 直接 return，存在性得单独判。）
+        dest_bin = binary_path_from_dir(tool, dest_dir)
+        if not dest_bin.is_file():
+            raise FileNotFoundError(f"内置目录缺少可执行文件: {dest_bin}")
+        _make_executable(dest_bin)
     except Exception as e:
         log_console.show_traceback_log(f"🔶 超分：内置工具释放失败 {tool}: {e}")
-        return False
+        return ("extract_failed", str(e))
+    return None
 
 
 async def _download_bytes(url: str) -> bytes:
@@ -269,6 +324,42 @@ def _sr_report_skip(tool: str, reasons: list[str]) -> None:
     log_console.log_text(f"ℹ️ 可手动下载后解压到: {binary_path(tool)}")
 
 
+# 「为什么没走内置」整进程只解释一次：批量刮削里每个工具会被反复问到
+_BUILTIN_MISS_REPORTED = False
+
+
+def _explain_builtin_unavailable(tool: str, code: str, detail: str) -> None:
+    """把「一体包为什么没走内置」讲清楚。
+
+    此前 `_builtin_dir()` 返回 None 时**零日志**：一体包漏打工具（或旧版漏打包的
+    产物）会静默降级成「📥 首次使用，下载超分工具」，用户只看到这一行，
+    只会以为「Windows 也没集成到 exe 里」，无从判断该查包还是该查网络。
+    """
+    global _BUILTIN_MISS_REPORTED
+    if _BUILTIN_MISS_REPORTED:
+        return
+    if code == "not_frozen":
+        # 源码运行/调试：下载是设计行为，但说清来源，别让人误判成包没集成
+        log_console.log_text(f"ℹ️ 超分：当前是源码运行（未打包），{tool} 没有内置副本，将在线下载一次")
+    elif code == "not_bundled":
+        if (_PLATFORM.get(sys.platform) or "") not in _SR_BUNDLED_PLATFORMS:
+            return  # macOS 一体包本就不内嵌（签名/公证风险），不是异常
+        root = _builtin_root()
+        sr_root = root / _SR_TOOLS_BUNDLE_DIR if root else None
+        why = (
+            "整个 sr_tools 目录都不在包内"
+            if sr_root is not None and not sr_root.is_dir()
+            else f"包内缺少 {tool} 子目录"
+        )
+        log_console.log_text(
+            f"🔶 超分：一体包内未找到内置工具（{why}，包内路径 {sr_root}），已回退到在线下载一次；"
+            f"若你用的是官方 Windows/Linux 一体包，请把这条日志反馈给开发者（{detail}）"
+        )
+    else:
+        return  # extract_failed 已打过 traceback，不重复
+    _BUILTIN_MISS_REPORTED = True
+
+
 async def ensure_binary(tool: str) -> Path | None:
     """返回可执行文件路径；平台不支持/内置缺失且下载失败返回 None（调用方降级）。"""
     path = binary_path(tool)
@@ -283,11 +374,18 @@ async def ensure_binary(tool: str) -> Path | None:
         if not url:
             _sr_report_skip(tool, [f"当前系统不支持自动下载（{sys.platform}）"])
             return None
-        if _install_from_builtin(tool, path.parent):
+        failure = _install_from_builtin(tool, path.parent)
+        if failure is None:
             log_console.log_text(f"✅ 超分工具就绪（内置）: {path}")
             return path
+        code, detail = failure
+        _explain_builtin_unavailable(tool, code, detail)
         log_console.log_text(f"📥 首次使用，下载超分工具 {tool}（约 30-60MB，仅一次）...")
         failures: list[str] = []
+        if code == "extract_failed":
+            # 内置明明在包里却释放不出来：把真因带进最终结论，否则用户只会看到
+            # 「下载失败」而不知道包里其实有工具、真正卡住的是文件占用。
+            failures.append(f"内置工具释放失败: {detail}")
         for attempt in range(1, _SR_DOWNLOAD_ATTEMPTS + 1):
             try:
                 data = await _download_bytes(url)
