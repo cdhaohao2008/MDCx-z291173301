@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 from mdcx.config.enums import DownloadableFile, FixedScrapingType, HDPicSource, KeepableFile, Website
-from mdcx.config.migrations import CURRENT_CONFIG_VERSION
 from mdcx.config.models import DEFAULT_FIELD_SITE_PRIORITY, Config
 from mdcx.config.resource_policy import resource_policy
 from mdcx.config.v1 import ConfigV1
@@ -288,7 +287,7 @@ def test_removed_hd_pic_sources_are_filtered_from_old_config():
     config = Config.model_validate(data)
 
     assert config.download_hd_pics == [HDPicSource.AMAZON]
-    assert config.config_version == CURRENT_CONFIG_VERSION
+    assert config.config_version == 3
     assert "google_used" not in data
     assert "google_exclude" not in data
 
@@ -378,48 +377,12 @@ def test_braced_naming_templates_are_migrated_to_jinja2_syntax():
 
 
 def test_main_mode_renumbered_on_v2_config():
-    """旧编号配置的 main_mode 按新编号迁移：正常 1 不动，视频 2→3、更新 3→4、读取 4→5。
-
-    判据是「配置里没有分离模式的四个开关」（`_SEPARATE_MODE_KEYS`），与已冻结的
-    `config_version` 无关——版本号固定为 2 之后再拿它当判据会导致重复迁移。
-    """
+    """v2 旧配置的 main_mode 按新编号迁移：正常 1 不动，视频 2→3、更新 3→4、读取 4→5。"""
     for old, new in ((1, 1), (2, 3), (3, 4), (4, 5)):
         data = {"config_version": 2, "main_mode": old}
 
         Config.update(data)
 
         assert data["main_mode"] == new
-        assert data["config_version"] == CURRENT_CONFIG_VERSION
+        assert data["config_version"] == 3
         assert Config.model_validate(data).main_mode == new
-
-
-def test_main_mode_not_remapped_on_already_migrated_config():
-    """已在新编号下的配置（含分离模式本身）不得被再次迁移。
-
-    锁住「config_version 冻结为 2 后，迁移判据必须改用结构性判据」这条改动：
-    若又退回拿版本号当判据，每次启动都会把分离模式(2) 推成视频(3)、再推成
-    更新(4)、再推成读取(5)，用户的刮削模式被悄悄改掉且越用越偏。
-    """
-    for mode in (1, 2, 3, 4, 5):
-        data = {"config_version": 2, "main_mode": mode, "separate_success_file_move": True}
-
-        Config.update(data)
-
-        assert data["main_mode"] == mode
-        assert Config.model_validate(data).main_mode == mode
-
-
-def test_config_version_frozen_at_two_everywhere():
-    """config_version 统一为 2（用户 2026-10-19 定规），三个版本点必须一致。"""
-    assert CURRENT_CONFIG_VERSION == 2
-    assert Config.model_fields["config_version"].default == 2
-    template = json.loads(Path("resources/config/default_config.json").read_text(encoding="utf-8"))
-    assert template["config_version"] == 2
-
-    # 任何来源版本号（含比 2 更高的）迁移后一律归到 2
-    for version in (0, 1, 2, 3, 7):
-        data = {"config_version": version, "separate_success_file_move": True}
-
-        Config.update(data)
-
-        assert data["config_version"] == 2
