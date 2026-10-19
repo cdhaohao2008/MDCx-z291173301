@@ -686,7 +686,7 @@ def test_format_header_columns_align_with_result_lines():
     列位算出「严格相等」在真机（Microsoft YaHei UI 等宽渲染）上反而差半个到
     一个汉字——中日韩字实渲染宽略大于 2 个 ASCII 列，数据行行首 ✅ emoji 的
     实宽也有出入。故列位按用户屏上实测校准（docs/Changelog.md v2.6.3）：
-    「状态码」37–42（200 落在其三字正中间）、「耗时」51–54（与 xx ms 右缘）、
+    「状态码」37–42（200 落在其三字正中间）、「耗时」47–50（居中于耗时数值）、
     「路由」63–66（与 代理/直连）、「信息」72–75（与说明文字左缘）。
     """
     from mdcx.core.network_check import _disp_width, _format_header
@@ -709,9 +709,10 @@ def test_format_header_columns_align_with_result_lines():
     code_start = display_column(line, "200")
     assert code_start == 37
 
-    # 校准后的表头列位：状态码 +半汉字、耗时/路由/信息 各 +1 汉字
+    # 校准后的表头列位（真机实测，见 _format_header 内注释）：
+    # 状态码 +半汉字、耗时 -2 汉字（居中于数值）、路由/信息 各自右对齐说明列
     assert display_column(header_line, "状态码") == 37
-    assert display_column(header_line, "耗时") == 51
+    assert display_column(header_line, "耗时") == 47
     assert display_column(header_line, "路由") == 63
     assert display_column(header_line, "信息") == 72
 
