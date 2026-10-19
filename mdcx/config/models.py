@@ -421,7 +421,7 @@ SENSITIVE_FIELDS = frozenset(
 class Config(BaseModel):
     model_config = ConfigDict()
     # region: General Settings
-    config_version: int = Field(default=3, title="配置版本")
+    config_version: int = Field(default=2, title="配置版本")
     media_path: str = Field(default="./media", title="媒体路径")
     data_path: str = Field(default="", title="数据存放目录")
     softlink_path: str = Field(default="softlink", title="软链接路径")
