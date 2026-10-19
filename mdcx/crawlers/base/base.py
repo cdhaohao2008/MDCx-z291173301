@@ -27,7 +27,11 @@ def _page_fingerprint(html: str) -> str:
     title = ""
     matched = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
     if matched:
-        title = " ".join(matched.group(1).split())[:80]
+        # 指纹是「这段报告里的一枚标识」，不是给人读的标题：站点标题里的空格/换行/
+        # 制表符会把定宽面板的说明列撑乱，复制粘贴进 issue 时也会断行。实测 DMM
+        # 地域封锁页的标题正是「…ご利用になれません。 - FANZA」这种带空格的形态，
+        # 折成单个空格（原先的 `" ".join(split())`）仍是 `。 - FANZA`，故一律剔除。
+        title = re.sub(r"\s+", "", matched.group(1))[:80]
     return f"页面标题={title or '无'}, 正文长度={len(html)}"
 
 

@@ -1378,7 +1378,8 @@ async def test_probe_search_page_failure_drops_response_body(monkeypatch: pytest
     status, message = await _probe_crawler_capability(ProbeBodyErrorClient(_FALENO_403_ERROR), _PROBE_SPEC)
 
     assert status == NetworkCheckStatus.WARNING
-    assert message == "站点可达但搜索页请求失败: GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403"
+    # `?s=fns%20165` 的转义在成文时已还原（`decode_url_escapes`），报告里是 `fns 165`
+    assert message == "站点可达但搜索页请求失败: GET https://faleno.jp/top/?s=fns 165 失败: HTTP 403"
 
 
 @pytest.mark.anyio
@@ -1390,7 +1391,7 @@ async def test_probe_retry_final_message_drops_response_body(monkeypatch: pytest
     status, message = await nc._probe_crawler_capability_with_retry(client, _PROBE_SPEC)
 
     assert status == NetworkCheckStatus.WARNING
-    assert message == ("站点无效：刮削探测2次30s/45s均失败，GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403")
+    assert message == ("站点无效：刮削探测2次30s/45s均失败，GET https://faleno.jp/top/?s=fns 165 失败: HTTP 403")
     assert len(client.calls) == 2
 
 
@@ -1423,7 +1424,7 @@ async def test_probe_retry_final_message_drops_wrapper_and_body(monkeypatch: pyt
             self.calls.append({"method": method, "url": url, **kwargs})
             return None, (
                 "搜索失败: 搜索页未解析到结果，"
-                "页面标题=このページはお住まいの地域からご利用になれません。 - FANZA, 正文长度=3134 "
+                "页面标题=このページはお住まいの地域からご利用になれません。-FANZA, 正文长度=3134 "
                 "body=<html>403</html>"
             )
 
@@ -1432,7 +1433,7 @@ async def test_probe_retry_final_message_drops_wrapper_and_body(monkeypatch: pyt
     assert status == NetworkCheckStatus.WARNING
     assert message == (
         "站点无效：刮削探测2次30s/45s均失败，搜索失败: 搜索页未解析到结果，"
-        "页面标题=このページはお住まいの地域からご利用になれません。 - FANZA, 正文长度=3134"
+        "页面标题=このページはお住まいの地域からご利用になれません。-FANZA, 正文长度=3134"
     )
 
 
@@ -1454,7 +1455,7 @@ async def test_probe_crawler_by_run_drops_response_body():
 
     assert status == NetworkCheckStatus.WARNING
     assert "body=" not in message
-    assert message.endswith("GET https://faleno.jp/top/?s=fns%20165 失败: HTTP 403")
+    assert message.endswith("GET https://faleno.jp/top/?s=fns 165 失败: HTTP 403")
 
 
 # 用户 2026-10-19 实测 lulubar.co：TLS 连接被掐，原始 curl 串整段进检测行

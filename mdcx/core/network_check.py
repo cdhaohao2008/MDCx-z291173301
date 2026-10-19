@@ -12,6 +12,7 @@ from urllib.parse import quote_plus, urljoin
 
 from mdcx.config.enums import Website
 from mdcx.utils import mask_proxy_url
+from mdcx.utils.url_display import decode_url_escapes
 
 if TYPE_CHECKING:
     from mdcx.web_async import AsyncWebClient
@@ -397,15 +398,17 @@ def _compose_failed_message(message: str, error: str) -> str:
     """失败行文案：`{方法} {url} 失败：{友好提示}，{中文细节}`。
 
     原先是 `{友好提示}: {错误串}`，目标地址压在行尾，得读到行末才知道这条在查哪个站。
+
+    同 `_clean_probe_error`，成文后把链接里的百分号转义还原（见那里的说明）。
     """
     if message == error:
         return message
     prefix, detail = _split_request_prefix(error)
     if not prefix:
-        return f"{message}: {error}"
+        return decode_url_escapes(f"{message}: {error}")
     tail = _translate_error_detail(detail)
     head = f"{prefix}：{message}"
-    return f"{head}，{tail}" if tail else head
+    return decode_url_escapes(f"{head}，{tail}") if tail else decode_url_escapes(head)
 
 
 def _clean_probe_error(error: str) -> str:
@@ -419,13 +422,18 @@ def _clean_probe_error(error: str) -> str:
 
     「{方法} {url} 失败」段原样保留、分隔符保持半角 `:`——这段是探测行的定位信息，
     和联网检测行的 `：{友好提示}，{细节}` 是两套版式，不必强行统一。
+
+    收尾再把链接里的百分号转义还原（`decode_url_escapes`）：Getchu DL 这类站点的
+    搜索 URL 按 EUC-JP 转义（`btnWordSearch=%B8%A1%BA%F7`），报告里给用户看的
+    是机器形态。还原放在全部正则处理之后——`_REQUEST_PREFIX_RE` 的 `\S+` 匹配
+    不了带空格的解码结果，先解会拆不出「{方法} {url} 失败」段。
     """
     cleaned = _clean_error(error)
     prefix, detail = _split_request_prefix(cleaned)
     if not prefix:
-        return _translate_error_detail(detail, keep_failed_to_perform=True)
+        return decode_url_escapes(_translate_error_detail(detail, keep_failed_to_perform=True))
     tail = _translate_error_detail(detail, keep_failed_to_perform=True)
-    return f"{prefix}: {tail}" if tail else cleaned
+    return decode_url_escapes(f"{prefix}: {tail}") if tail else decode_url_escapes(cleaned)
 
 
 def _classify_http_result(spec: NetworkCheckSpec, status_code: int, text: str) -> tuple[NetworkCheckStatus, str]:
@@ -577,7 +585,7 @@ async def _probe_crawler_by_run(
     except TimeoutError:
         return NetworkCheckStatus.WARNING, "站点可达但刮削探测超时"
     except Exception as exc:
-        return NetworkCheckStatus.WARNING, f"站点可达但刮削探测异常: {exc}"
+        return NetworkCheckStatus.WARNING, decode_url_escapes(f"站点可达但刮削探测异常: {exc}")
 
     if response is None or response.data is None:
         error = getattr(getattr(response, "debug_info", None), "error", None) if response else None
@@ -696,9 +704,11 @@ async def _probe_crawler_capability(
     except NotImplementedError:
         return NetworkCheckStatus.WARNING, "站点可达但无法自动探测刮削，可用设置页指定网址实测"
     except CrawlerException as exc:
-        return NetworkCheckStatus.WARNING, f"站点可达但刮削探测失败: {exc}"
+        # 爬虫自抛的 CrawlerException 同样可能内嵌带转义的搜索 URL
+        # （如 Getchu DL 的 `请求错误:GET {url} 失败: …`），一并还原
+        return NetworkCheckStatus.WARNING, decode_url_escapes(f"站点可达但刮削探测失败: {exc}")
     except Exception as exc:
-        return NetworkCheckStatus.WARNING, f"站点可达但刮削探测异常: {exc}"
+        return NetworkCheckStatus.WARNING, decode_url_escapes(f"站点可达但刮削探测异常: {exc}")
 
 
 # 值得在同一轮里再试一次的探测结果：换个时间窗就可能过（慢站、代理抖动、偶发异常）。
@@ -1471,7 +1481,7 @@ async def run_network_check_item(
                             return NetworkCheckResult(
                                 spec=spec,
                                 status=NetworkCheckStatus.FAILED,
-                                message=f"代码网址与动态域名均无法联通：{message}",
+                                message=decode_url_escapes(f"代码网址与动态域名均无法联通：{message}"),
                                 elapsed_ms=elapsed_ms,
                                 error=clean_error,
                                 used_proxy=used_proxy,
