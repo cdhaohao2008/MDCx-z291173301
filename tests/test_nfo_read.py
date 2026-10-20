@@ -1,3 +1,4 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -69,6 +70,30 @@ async def test_get_nfo_data_reads_multiline_plot_via_xpath(monkeypatch: pytest.M
     assert data.outline == "中文简介第一段\n\n中文简介第二段"
     assert data.originalplot == "極上のエロスを纏ってカムバックした国民的AV女優『めぐり』。"
     assert data.outline_from == "百度"
+
+
+@pytest.mark.asyncio
+async def test_get_nfo_data_finds_case_insensitive_nfo(monkeypatch: pytest.MonkeyPatch, tmp_path):
+    monkeypatch.setattr(nfo_module.manager.config, "read_mode", [])
+
+    video_path = tmp_path / "ABC-123.mp4"
+    video_path.write_bytes(b"")
+    nfo_path = tmp_path / "ABC-123.NFO"
+    nfo_path.write_text("<movie><title>[ABC-123] Test</title></movie>", encoding="utf-8")
+
+    async def fake_isfile(path):
+        # 模拟大小写敏感的 WebDAV：精确小写路径不可用，实际文件名是大写扩展名。
+        if Path(path).name == "ABC-123.nfo":
+            return False
+        return True
+
+    monkeypatch.setattr(nfo_module.aiofiles.os.path, "isfile", fake_isfile)
+
+    data, info = await nfo_module.get_nfo_data(video_path, "ABC-123")
+
+    assert data is not None
+    assert info is not None
+    assert "ABC-123" in data.title
 
 
 @pytest.mark.asyncio

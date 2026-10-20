@@ -246,8 +246,13 @@ class Scraper:
                     break
                 # 连续刮削配置开启时：当前批次全部完成后再投喂下一批。
                 remaining_in_batch = min(batch_size, task_count - submitted_total)
+                batch_started = 0
                 for _ in range(min(thread_number, remaining_in_batch)):
-                    _submit_next_task()
+                    if _submit_next_task():
+                        batch_started += 1
+                if batch_started == 0:
+                    # 文件列表提前耗尽时避免空批次无限循环。
+                    break
         except asyncio.CancelledError:
             for pending_task in running_tasks:
                 pending_task.cancel()
@@ -1282,13 +1287,14 @@ class Scraper:
                     res.actor_tmdb_ids = await fetch_actor_tmdb_ids(res.actors, self.crawler_provider.client)
             # 保存原始演员名（映射前），供读取模式反向查找使用
             res.original_actors = res.actors.copy() if res.actors else []
-            await translate_actor(res)  # 映射输出演员名/信息
+            # 整理模式完全离线：只做本地映射，不请求 Av-wiki 真实演员名
+            await translate_actor(res, query_network=not organize_mode)  # 映射输出演员名/信息
             translate_info(res, file_info.has_sub)  # 映射输出标签等信息
             replace_word(res)
 
         # 更新视频分辨率（整理模式需解析 STRM 指向的视频或 mediainfo.json）
         if organize_mode:
-            definition, codec = await get_video_size_for_file(file_path, file_info.number)
+            definition, codec = await get_video_size_for_file(file_path, movie_number)
         else:
             definition, codec = await get_video_size(file_path, file_info.number)
         file_info.definition, file_info.codec = definition, codec
@@ -1478,8 +1484,7 @@ class Scraper:
                 folder_new_path=organize_folder,
                 nfo_new_path=nfo_new_path,
                 naming_rule=naming_rule,
-                file_name=file_name,
-                number=res.number,
+                number=movie_number or res.number,
                 sub_list=sub_list,
                 poster_final_path=poster_final_path,
                 thumb_final_path=thumb_final_path,

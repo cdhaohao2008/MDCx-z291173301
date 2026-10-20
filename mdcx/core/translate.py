@@ -209,12 +209,13 @@ def translate_info(json_data: CrawlersResult, has_sub: bool):
     return json_data
 
 
-async def translate_actor(res: CrawlersResult):
+async def translate_actor(res: CrawlersResult, query_network: bool = True):
     # 网络请求真实的演员名字
     actor_realname = manager.config.actor_realname
 
     # 非读取模式，勾选了使用真实名字时; 读取模式，勾选了允许更新真实名字时
-    if actor_realname:
+    # 整理模式要求完全离线，query_network=False 时只做本地映射。
+    if actor_realname and query_network:
         start_time = time.time()
         if _should_query_avwiki_actor(res):
             result, temp_actor = await get_actorname(res.number)

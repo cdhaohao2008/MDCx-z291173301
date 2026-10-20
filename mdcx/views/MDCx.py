@@ -13419,7 +13419,7 @@ class Ui_MDCx(object):
         self.groupBox.setTitle(_translate("MDCx", "刮削模式"))
         self.radioButton_mode_organize.setText(_translate("MDCx", "整理模式"))
         self.label_organize_mode.setText(
-            _translate("MDCx", "执行：刮削->整理文件->重新命名->等操作不打水印，适合需要海报墙的情况")
+            _translate("MDCx", "执行：刮削->整理文件->重命名->移动文件操作，适合需要海报墙的情况")
         )
         self.radioButton_mode_separate.setText(_translate("MDCx", "分离模式"))
         self.label_separate_mode.setText(

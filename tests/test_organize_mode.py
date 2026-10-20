@@ -177,7 +177,7 @@ def test_organize_mode_ui_texts():
     assert label is not None
     assert (
         label.findtext("property[@name='text']/string")
-        == "执行：刮削->整理文件->重新命名->等操作不打水印，适合需要海报墙的情况"
+        == "执行：刮削->整理文件->重命名->移动文件操作，适合需要海报墙的情况"
     )
 
 
@@ -210,7 +210,6 @@ async def test_organize_files_moves_all_companions(monkeypatch: pytest.MonkeyPat
         folder_new_path=new_folder,
         nfo_new_path=new_folder / "ABS-040.nfo",
         naming_rule="ABS-040",
-        file_name="ABS-040",
         number="ABS-040",
         sub_list=[".zh.srt"],
         poster_final_path=new_folder / "poster.jpg",
@@ -241,8 +240,12 @@ async def test_organize_files_rolls_back_when_video_move_fails(monkeypatch: pyte
     async def failed_elevated(_src, _dst):
         return False, "mock elevated failure"
 
+    async def failed_copy(_src, _dst):
+        return False, "mock copy failure"
+
     monkeypatch.setattr(organize_module, "move_file_async", flaky_move)
     monkeypatch.setattr(organize_module, "elevated_move_file", failed_elevated)
+    monkeypatch.setattr(organize_module, "copy_then_delete_file", failed_copy)
 
     old_folder = tmp_path / "old"
     new_folder = tmp_path / "new"
@@ -261,7 +264,6 @@ async def test_organize_files_rolls_back_when_video_move_fails(monkeypatch: pyte
         folder_new_path=new_folder,
         nfo_new_path=new_folder / "ABS-040.nfo",
         naming_rule="ABS-040",
-        file_name="ABS-040",
         number="ABS-040",
         sub_list=[],
         poster_final_path=new_folder / "poster.jpg",
@@ -278,6 +280,261 @@ async def test_organize_files_rolls_back_when_video_move_fails(monkeypatch: pyte
     assert (old_folder / "ABS-040-mediainfo.json").exists()
     assert not (new_folder / "ABS-040.nfo").exists()
     assert not (new_folder / "poster.jpg").exists()
+
+
+@pytest.mark.asyncio
+async def test_organize_files_only_moves_current_number_in_shared_folder(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setattr(manager.config, "subtitle_add_chs", False)
+    monkeypatch.setattr(manager.config, "sub_type", [".srt"])
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "trailer_simple_name", False)
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart")
+
+    old_folder = tmp_path / "old"
+    new_folder = tmp_path / "new"
+    old_folder.mkdir()
+    new_folder.mkdir()
+    video = old_folder / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    (old_folder / "ABS-040-1.mp4").write_bytes(b"other video")
+    (old_folder / "ABS-040.nfo").write_text("<movie><title>ABS-040</title></movie>", encoding="utf-8")
+    (old_folder / "ABS-040-1.nfo").write_text("<movie><title>ABS-040-1</title></movie>", encoding="utf-8")
+    (old_folder / "ABS-040-poster.jpg").write_bytes(b"poster")
+    (old_folder / "ABS-040-1-poster.jpg").write_bytes(b"other poster")
+    (old_folder / "poster.jpg").write_bytes(b"shared poster")
+    (old_folder / "ABS-040-1-mediainfo.json").write_text("{}", encoding="utf-8")
+    (old_folder / "ABS-040-1.zh.srt").write_text("other subtitle", encoding="utf-8")
+    (old_folder / "extrafanart").mkdir()
+    (old_folder / "extrafanart" / "ABS-040-extra.jpg").write_bytes(b"extra")
+    (old_folder / "extrafanart" / "ABS-040-1-extra.jpg").write_bytes(b"other extra")
+
+    moved, error = await organize_files(
+        file_path=video,
+        file_new_path=new_folder / "ABS-040.mp4",
+        folder_old_path=old_folder,
+        folder_new_path=new_folder,
+        nfo_new_path=new_folder / "ABS-040.nfo",
+        naming_rule="ABS-040",
+        number="ABS-040",
+        sub_list=[],
+        poster_final_path=new_folder / "poster.jpg",
+        thumb_final_path=new_folder / "thumb.jpg",
+        fanart_final_path=new_folder / "fanart.jpg",
+    )
+
+    assert moved, error
+    assert (new_folder / "ABS-040.mp4").exists()
+    assert (new_folder / "ABS-040.nfo").exists()
+    assert (new_folder / "poster.jpg").read_bytes() == b"poster"
+    assert (new_folder / "extrafanart" / "ABS-040-extra.jpg").exists()
+    # 同目录其它番号的视频、nfo、图片、json、字幕、剧照必须保持原位。
+    assert (old_folder / "ABS-040-1.mp4").exists()
+    assert (old_folder / "ABS-040-1.nfo").exists()
+    assert (old_folder / "ABS-040-1-poster.jpg").exists()
+    assert (old_folder / "poster.jpg").exists()
+    assert (old_folder / "ABS-040-1-mediainfo.json").exists()
+    assert (old_folder / "ABS-040-1.zh.srt").exists()
+    assert (old_folder / "extrafanart" / "ABS-040-1-extra.jpg").exists()
+
+
+@pytest.mark.asyncio
+async def test_organize_files_uses_actual_video_stem(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setattr(manager.config, "subtitle_add_chs", False)
+    monkeypatch.setattr(manager.config, "sub_type", [".srt"])
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "trailer_simple_name", False)
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart")
+
+    old_folder = tmp_path / "old"
+    new_folder = tmp_path / "new"
+    old_folder.mkdir()
+    new_folder.mkdir()
+    video = old_folder / "hhd800.com@ABS-040.mp4"
+    video.write_bytes(b"video")
+    (old_folder / "hhd800.com@ABS-040.nfo").write_text("<movie><title>ABS-040</title></movie>", encoding="utf-8")
+    (old_folder / "hhd800.com@ABS-040-poster.jpg").write_bytes(b"poster")
+    (old_folder / "hhd800.com@ABS-040-mediainfo.json").write_text("{}", encoding="utf-8")
+
+    moved, error = await organize_files(
+        file_path=video,
+        file_new_path=new_folder / "ABS-040.mp4",
+        folder_old_path=old_folder,
+        folder_new_path=new_folder,
+        nfo_new_path=new_folder / "ABS-040.nfo",
+        naming_rule="ABS-040",
+        number="ABS-040",
+        sub_list=[],
+        poster_final_path=new_folder / "poster.jpg",
+        thumb_final_path=new_folder / "thumb.jpg",
+        fanart_final_path=new_folder / "fanart.jpg",
+    )
+
+    assert moved, error
+    assert (new_folder / "ABS-040.mp4").exists()
+    assert (new_folder / "ABS-040.nfo").exists()
+    assert (new_folder / "poster.jpg").exists()
+    assert (new_folder / "ABS-040-mediainfo.json").exists()
+
+
+@pytest.mark.asyncio
+async def test_get_movie_list_respects_ignore_dirs_in_organize_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    movie_dir = tmp_path / "movie"
+    ignored_dir = movie_dir / "skip"
+    ignored_dir.mkdir(parents=True)
+    (movie_dir / "keep.mp4").write_bytes(b"video")
+    (ignored_dir / "skip.mp4").write_bytes(b"video")
+    monkeypatch.setattr(manager.config, "main_mode", ORGANIZE_MAIN_MODE)
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "clean_enable", [])
+    monkeypatch.setattr(manager.config, "no_escape", [])
+
+    movies = await get_movie_list(FileMode.Default, movie_dir, [ignored_dir])
+
+    assert {path.name for path in movies} == {"keep.mp4"}
+
+
+@pytest.mark.asyncio
+async def test_organize_commit_removes_overwritten_backup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setattr(manager.config, "subtitle_add_chs", False)
+    monkeypatch.setattr(manager.config, "sub_type", [".srt"])
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "trailer_simple_name", False)
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart")
+
+    old_folder = tmp_path / "old"
+    new_folder = tmp_path / "new"
+    old_folder.mkdir()
+    new_folder.mkdir()
+    video = old_folder / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    (old_folder / "ABS-040.nfo").write_text("<movie><title>new</title></movie>", encoding="utf-8")
+    (new_folder / "ABS-040.nfo").write_text("<movie><title>old</title></movie>", encoding="utf-8")
+
+    moved, error = await organize_files(
+        file_path=video,
+        file_new_path=new_folder / "ABS-040.mp4",
+        folder_old_path=old_folder,
+        folder_new_path=new_folder,
+        nfo_new_path=new_folder / "ABS-040.nfo",
+        naming_rule="ABS-040",
+        number="ABS-040",
+        sub_list=[],
+        poster_final_path=new_folder / "poster.jpg",
+        thumb_final_path=new_folder / "thumb.jpg",
+        fanart_final_path=new_folder / "fanart.jpg",
+    )
+
+    assert moved, error
+    assert "new" in (new_folder / "ABS-040.nfo").read_text(encoding="utf-8")
+    assert not any("mdcx_organize_backup" in path.name for path in new_folder.iterdir())
+
+
+@pytest.mark.asyncio
+async def test_organize_copy_fallback_moves_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    async def failed_move(_src, _dst, *, overwrite: bool = False):
+        return False, "mock move failure"
+
+    async def failed_elevated(_src, _dst):
+        return False, "mock elevated failure"
+
+    monkeypatch.setattr(organize_module, "move_file_async", failed_move)
+    monkeypatch.setattr(organize_module, "elevated_move_file", failed_elevated)
+
+    source = tmp_path / "source.jpg"
+    target = tmp_path / "target.jpg"
+    source.write_bytes(b"image")
+    transaction = organize_module.OrganizeTransaction()
+
+    ok, error = await transaction._move_once(source, target)
+
+    assert ok, error
+    assert target.read_bytes() == b"image"
+    assert not source.exists()
+
+
+@pytest.mark.asyncio
+async def test_get_video_size_for_file_uses_url_filename(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    strm = tmp_path / "ABS-040.strm"
+    strm.write_text("https://cdn.example.com/library/ABS-040-4K.mp4?token=abc", encoding="utf-8")
+    monkeypatch.setattr(manager.config, "hd_get", "path")
+    monkeypatch.setattr(manager.config, "hd_name", "height")
+
+    definition, _codec = await get_video_size_for_file(strm, "ABS-040")
+
+    assert definition == "4K"
+
+
+@pytest.mark.asyncio
+async def test_organize_files_moves_number_prefixed_poster_when_video_has_prefix(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setattr(manager.config, "subtitle_add_chs", False)
+    monkeypatch.setattr(manager.config, "sub_type", [".srt"])
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "trailer_simple_name", False)
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart")
+
+    old_folder = tmp_path / "old"
+    new_folder = tmp_path / "new"
+    old_folder.mkdir()
+    new_folder.mkdir()
+    video = old_folder / "hhd800.com@ABS-040.mp4"
+    video.write_bytes(b"video")
+    (old_folder / "hhd800.com@ABS-040.nfo").write_text("<movie><title>ABS-040</title></movie>", encoding="utf-8")
+    (old_folder / "ABS-040-poster.jpg").write_bytes(b"number poster")
+
+    moved, error = await organize_files(
+        file_path=video,
+        file_new_path=new_folder / "ABS-040.mp4",
+        folder_old_path=old_folder,
+        folder_new_path=new_folder,
+        nfo_new_path=new_folder / "ABS-040.nfo",
+        naming_rule="ABS-040",
+        number="ABS-040",
+        sub_list=[],
+        poster_final_path=new_folder / "poster.jpg",
+        thumb_final_path=new_folder / "thumb.jpg",
+        fanart_final_path=new_folder / "fanart.jpg",
+    )
+
+    assert moved, error
+    assert (new_folder / "poster.jpg").read_bytes() == b"number poster"
+
+
+@pytest.mark.asyncio
+async def test_organize_transaction_rejects_destination_directory(tmp_path: Path):
+    source = tmp_path / "source.jpg"
+    source.write_bytes(b"image")
+    target = tmp_path / "target.jpg"
+    target.mkdir()
+    transaction = organize_module.OrganizeTransaction()
+
+    ok, error = await transaction.move_file(source, target)
+
+    assert ok is False
+    assert "同名目录" in error
+    assert source.exists()
+
+
+@pytest.mark.asyncio
+async def test_organize_batch_stops_when_file_list_is_shorter_than_task_count(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    scraper = Scraper(object())  # type: ignore[arg-type]
+    scraper._organize_batch_size = 2
+    processed: list[int] = []
+
+    async def fake_process(file_info):
+        processed.append(file_info[1])
+
+    monkeypatch.setattr(scraper, "process_one_file", fake_process)
+    files = [tmp_path / "1.mp4", tmp_path / "2.mp4"]
+
+    await asyncio.wait_for(scraper._run_tasks_with_limit(files, 5, 2), timeout=1)
+
+    assert sorted(processed) == [1, 2]
 
 
 @pytest.mark.asyncio

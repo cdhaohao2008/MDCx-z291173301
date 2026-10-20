@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import aiofiles.os
 
@@ -309,10 +310,32 @@ def _mediainfo_codec(data) -> str:
     return ""
 
 
-async def _get_mediainfo_size(file_path: Path) -> tuple[str, str]:
-    """读取同目录 <文件名>-mediainfo.json，返回清晰度与编码。"""
-    mediainfo_path = file_path.with_name(f"{file_path.stem}-mediainfo.json")
-    if not await aiofiles.os.path.isfile(mediainfo_path):
+async def _get_mediainfo_size(file_path: Path, file_number: str = "") -> tuple[str, str]:
+    """读取同目录 ``<文件名>-mediainfo.json`` 或 ``<番号>-mediainfo.json``。"""
+    candidates = [f"{file_path.stem}-mediainfo.json"]
+    if file_number and file_number.casefold() != file_path.stem.casefold():
+        candidates.append(f"{file_number}-mediainfo.json")
+    mediainfo_path: Path | None = None
+    for name in candidates:
+        candidate = file_path.with_name(name)
+        try:
+            candidate_is_file = await aiofiles.os.path.isfile(candidate)
+        except OSError:
+            candidate_is_file = False
+        if candidate_is_file:
+            mediainfo_path = candidate
+            break
+    if mediainfo_path is None:
+        # 网络盘可能大小写敏感，按实际文件名再找一次。
+        wanted = {name.casefold() for name in candidates}
+        try:
+            for name in await aiofiles.os.listdir(file_path.parent):
+                if name.casefold() in wanted:
+                    mediainfo_path = file_path.parent / name
+                    break
+        except OSError:
+            pass
+    if mediainfo_path is None:
         return "", ""
     try:
         async with aiofiles.open(mediainfo_path, encoding="utf-8") as f:
@@ -332,11 +355,13 @@ async def get_video_size_for_file(file_path: Path, file_number: str = "") -> tup
     """获取视频/STRM 的清晰度与编码。
 
     STRM 本身不是视频，优先读取其指向的本地视频；无法访问时（网盘链接、
-    URL 等）退回到 STRM 文件名/路径中的分辨率标记，最后读取同名
+    URL 等）退回到 STRM 文件名/路径中的分辨率标记，最后读取同名或同番号的
     ``-mediainfo.json``。整理模式只移动文件、不联网，因此该链路不回退到刮削。
     """
-    target_path = file_path
+    target_path: Path | None = file_path
+    path_fallback = file_path
     if file_path.suffix.lower() == ".strm":
+        target_path = None
         try:
             async with aiofiles.open(file_path, encoding="utf-8-sig") as f:
                 content = await f.read()
@@ -344,23 +369,31 @@ async def get_video_size_for_file(file_path: Path, file_number: str = "") -> tup
                 target_text = line.strip()
                 if not target_text or target_text.startswith("#"):
                     continue
-                if "://" not in target_text:
+                if "://" in target_text:
+                    # 网盘链接无法直接探测，退回到 URL 文件名中的分辨率标记。
+                    url_name = unquote(Path(urlparse(target_text).path).name)
+                    if url_name:
+                        path_fallback = file_path.parent / url_name
+                else:
                     target = Path(target_text)
                     if not target.is_absolute():
                         target = file_path.parent / target
+                    path_fallback = target
                     if await aiofiles.os.path.exists(target):
                         target_path = target
                 break
         except OSError:
             pass
 
-    definition, codec = await get_video_size(target_path, file_number)
+    definition, codec = "", ""
+    if target_path is not None:
+        definition, codec = await get_video_size(target_path, file_number)
     if not definition:
-        mediainfo_definition, mediainfo_codec = await _get_mediainfo_size(file_path)
+        mediainfo_definition, mediainfo_codec = await _get_mediainfo_size(file_path, file_number)
         definition = mediainfo_definition
         codec = codec or mediainfo_codec
     if not definition:
-        definition = _definition_from_height(_detect_height_from_path(file_path, file_number))
+        definition = _definition_from_height(_detect_height_from_path(path_fallback, file_number))
     return definition, codec
 
 

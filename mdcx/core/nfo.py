@@ -438,19 +438,46 @@ async def write_nfo(
 
 async def get_nfo_data(file_path: Path, movie_number: str) -> tuple[CrawlersResult | None, OtherInfo | None]:
     local_nfo_path = file_path.with_suffix(".nfo")
-    local_nfo_name = local_nfo_path.name
     file_folder = file_path.parent
+    try:
+        exact_nfo_is_file = await aiofiles.os.path.isfile(local_nfo_path)
+    except OSError:
+        exact_nfo_is_file = False
+    if not exact_nfo_is_file:
+        # WebDAV / 网络共享可能区分大小写，按实际文件名查找同名 nfo。
+        expected_key = f"{file_path.stem}.nfo".casefold()
+        try:
+            for name in await aiofiles.os.listdir(file_folder):
+                if name.casefold() == expected_key:
+                    local_nfo_path = file_folder / name
+                    break
+        except OSError:
+            pass
+    local_nfo_name = local_nfo_path.name
     json_data = CrawlersResult.empty()
     json_data.field_sources = dict.fromkeys(CrawlerResultFields, "local")
 
-    if not await aiofiles.os.path.exists(local_nfo_path):
+    try:
+        nfo_is_file = await aiofiles.os.path.isfile(local_nfo_path)
+    except OSError as e:
+        LogBuffer.error().write(f"nfo文件读取失败: {e}")
+        json_data.outline = file_path.name
+        json_data.tag = str(file_path)
+        return None, None
+    if not nfo_is_file:
         LogBuffer.error().write("nfo文件不存在")
         json_data.outline = file_path.name
         json_data.tag = str(file_path)
         return None, None
 
-    async with aiofiles.open(local_nfo_path, encoding="utf-8") as f:
-        content = await f.read()
+    try:
+        async with aiofiles.open(local_nfo_path, encoding="utf-8") as f:
+            content = await f.read()
+    except (OSError, UnicodeDecodeError) as e:
+        LogBuffer.error().write(f"nfo文件读取失败: {e}")
+        json_data.outline = file_path.name
+        json_data.tag = str(file_path)
+        return None, None
 
     parser = etree.XMLParser(encoding="utf-8", recover=True)
     try:

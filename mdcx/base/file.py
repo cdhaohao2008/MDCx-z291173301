@@ -626,12 +626,13 @@ async def get_movie_list(file_mode: FileMode, movie_path: Path, ignore_dirs: lis
             log_console.log_text(f" 🖥 Movie path: {movie_path}")
             log_console.log_text(" 🔎 Searching all videos, Please wait...")
             ui_hooks.set_label_file_path(f"正在遍历待刮削视频目录中的所有视频，请等待...\n {movie_path}")
-            if NoEscape.FOLDER in manager.config.no_escape or manager.config.main_mode in (4, 5, 6):
+            if NoEscape.FOLDER in manager.config.no_escape or manager.config.main_mode in (4, 5):
                 ignore_dirs = []
             media_type = list(manager.config.media_type)
             organize_mode = manager.config.main_mode == 6
             # 整理模式需要扫描已刮削成功的文件，并处理 STRM 链接文件
-            if organize_mode and ".strm" not in (ext.lower() for ext in media_type):
+            normalized_media_type = {str(ext).lower().lstrip(".") for ext in media_type}
+            if organize_mode and "strm" not in normalized_media_type:
                 media_type.append(".strm")
             try:
                 # 获取所有需要刮削的影片列表
