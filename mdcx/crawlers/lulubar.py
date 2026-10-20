@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import re
 from dataclasses import dataclass
 from typing import override
 
@@ -10,6 +11,30 @@ from ..config.manager import manager
 from ..config.models import Website
 from ..models.model_types import CrawlerInput
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException, get_year
+
+_DEFAULT_BASE_URL = "https://lulubar.co"
+
+
+def _absolute_url(url: str, base_url: str = "") -> str:
+    """把站点返回的相对地址补全为绝对地址，已是绝对地址时原样返回."""
+    url = str(url or "").strip()
+    if not url:
+        return ""
+    if url.startswith("//"):
+        return "https:" + url
+    if url.lower().startswith(("http://", "https://")):
+        return url
+    base = (base_url or _DEFAULT_BASE_URL).rstrip("/")
+    return base + (url if url.startswith("/") else "/" + url)
+
+
+def _matches_number(text: str, number: str) -> bool:
+    """按番号整词匹配，兼容标题前缀/后缀和大小写，避免 IPZZ-5470 误命中 IPZZ-547."""
+    target = str(number or "").strip().upper()
+    if not target:
+        return False
+    pattern = rf"(?<![0-9A-Z]){re.escape(target)}(?![0-9A-Z])"
+    return re.search(pattern, str(text or "").upper()) is not None
 
 
 def get_web_number(html, number):
@@ -39,15 +64,15 @@ def get_actor(html):
 
 
 def get_studio(html):
-    result = html.xpath("string(//div[@class='tag_box d-flex flex-wrap p-1 col-12 mb-1']/a[@title='片商'])")
+    result = html.xpath("string(//div[contains(@class,'tag_box')]/a[@title='片商'])")
     return result.strip()
 
 
-def get_extrafanart(html):
-    result = html.xpath('//div[@id="stills"]/div/img/@src')
-    for i in range(len(result)):
-        result[i] = "https://lulubar.co" + result[i]
-    return result
+def get_extrafanart(html, base_url: str = ""):
+    result = html.xpath('//div[@id="stills"]//img/@src')
+    if not result:
+        result = html.xpath('//div[@id="lightgallery"]//a/@href')
+    return [_absolute_url(src, base_url) for src in result if src]
 
 
 def get_release(html):
@@ -56,7 +81,7 @@ def get_release(html):
 
 
 def get_mosaic(html):
-    result = html.xpath('//div[@class="tag_box d-flex flex-wrap p-1 col-12 mb-1"]/a[@class="tag"]/text()')
+    result = html.xpath('//div[contains(@class,"tag_box")]/a[@class="tag"]/text()')
     total = ",".join(result)
     mosaic = ""
     if "有码" in total:
@@ -69,19 +94,28 @@ def get_mosaic(html):
 
 
 def get_tag(html):
-    result = html.xpath(
-        '//div[@class="tag_box d-flex flex-wrap p-1 col-12 mb-1"]/a[@class="tag" and contains(@href,"bytagdetail")]/text()'
-    )
+    result = html.xpath('//div[contains(@class,"tag_box")]/a[@class="tag" and contains(@href,"bytagdetail")]/text()')
     new_list = []
     for a in result:
         new_list.append(a.strip())
     return ",".join(new_list)
 
 
-def get_cover(html):
-    result = html.xpath('//a[@class="notVipAd imgBoxW position-relative d-block"]/img/@src')
-    cover = result[0] if result else ""
-    return f"https://lulubar.co{cover}" if cover and "http" not in cover else cover
+def get_cover(html, base_url: str = ""):
+    # 新版详情页把封面放在播放器 poster 的 background-image 里（pl.jpg 大图）
+    for style in html.xpath('//div[contains(@class,"plyr__poster")]/@style'):
+        match = re.search(r'url\(["\']?([^"\')]+)', style)
+        if match:
+            return _absolute_url(match.group(1), base_url)
+    # 旧版详情页封面锚点，img 可能被额外容器包裹
+    for src in html.xpath('//a[contains(@class,"notVipAd")]//img/@src'):
+        if src:
+            return _absolute_url(src, base_url)
+    # 兜底使用 og:image（ps.jpg 竖版封面）
+    for content in html.xpath('//meta[@property="og:image"]/@content'):
+        if content:
+            return _absolute_url(content, base_url)
+    return ""
 
 
 def get_outline(html):
@@ -89,18 +123,22 @@ def get_outline(html):
     return a[0] if a else ""
 
 
-def get_real_url(html, number):
-    result = html.xpath('//a[@class="imgBoxW"]')
-    for each in result:
+def get_real_url(html, number, base_url: str = ""):
+    # 新版搜索页的 img 被包在 div.img_frame 里，不能再用直接子节点 img 取属性
+    for each in html.xpath('//a[contains(@class,"imgBoxW")]'):
         href = each.get("href")
-        title = each.xpath("img/@alt")
-        poster = each.xpath("img/@src")
-        if title and title[0].upper().startswith(number.upper()) and href:
-            poster = f"https://lulubar.co{poster[0]}" if poster else ""
-            return (
-                "https://lulubar.co" + href,
-                f"https://lulubar.co{poster}" if poster and "http" not in poster else poster,
-            )
+        if not href:
+            continue
+        images = each.xpath(".//img")
+        image = images[0] if images else None
+        alt = image.get("alt") if image is not None else ""
+        title = alt or each.get("title") or " ".join(each.xpath(".//text()"))
+        if not _matches_number(title, number):
+            continue
+        poster = ""
+        if image is not None:
+            poster = image.get("data-src") or image.get("data-original") or image.get("src") or ""
+        return _absolute_url(href, base_url), _absolute_url(poster, base_url)
     return "", ""
 
 
@@ -139,7 +177,7 @@ class LulubarCrawler(BaseCrawler[LulubarContext]):
     @override
     async def _parse_search_page(self, ctx: LulubarContext, html: Selector, search_url: str) -> list[str] | str | None:
         search_page = etree.fromstring(html.get(), etree.HTMLParser())
-        detail_url, poster = get_real_url(search_page, ctx.input.number)
+        detail_url, poster = get_real_url(search_page, ctx.input.number, self.base_url)
         if not detail_url:
             ctx.debug("lulubar 搜索页没有匹配结果")
             return None
@@ -159,7 +197,7 @@ class LulubarCrawler(BaseCrawler[LulubarContext]):
         # DMM 高清直链升级（横版+竖版，无码番号内部跳过）
         from mdcx.crawlers.dmm_direct import upgrade_dmm_cover
 
-        thumb, upgraded_poster = await upgrade_dmm_cover(ctx, number, get_cover(detail_page), "")
+        thumb, upgraded_poster = await upgrade_dmm_cover(ctx, number, get_cover(detail_page, self.base_url), "")
         return CrawlerData(
             number=number,
             title=title,
@@ -174,7 +212,7 @@ class LulubarCrawler(BaseCrawler[LulubarContext]):
             studio=get_studio(detail_page),
             thumb=thumb,
             poster=upgraded_poster or ctx.search_poster,
-            extrafanart=get_extrafanart(detail_page),
+            extrafanart=get_extrafanart(detail_page, self.base_url),
             trailer="",
             image_download=False,
             mosaic=get_mosaic(detail_page),

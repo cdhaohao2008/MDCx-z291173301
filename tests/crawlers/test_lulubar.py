@@ -40,3 +40,58 @@ def test_get_real_url_matches_lowercase_number():
 def test_get_real_url_no_match_returns_empty():
     html = _html('<a class="imgBoxW" href="/video/x"><img alt="IPX-535 标题" src="/images/x.jpg"></a>')
     assert lulubar.get_real_url(html, "SSNI-647") == ("", "")
+
+
+def test_get_real_url_nested_img_frame_and_absolute_poster():
+    """新版搜索页 img 被 div.img_frame 包裹，封面已是绝对地址时不能被二次拼接."""
+    html = _html(
+        '<a class="imgBoxW" href="/video/detail?id=446350">'
+        '<div class="img_frame">'
+        '<img class="img-fluid imgsize" alt="IPZZ-547 - 标题" '
+        'src="https://image.lulubar.co/films/2025/05/10/5816845/ipzz00547pl.jpg">'
+        "</div></a>"
+    )
+    assert lulubar.get_real_url(html, "IPZZ-547") == (
+        "https://lulubar.co/video/detail?id=446350",
+        "https://image.lulubar.co/films/2025/05/10/5816845/ipzz00547pl.jpg",
+    )
+
+
+def test_get_real_url_matches_number_not_at_start():
+    """番号不在标题开头（如 [AI解码版] IPZZ-547）时也能命中."""
+    html = _html(
+        '<a class="imgBoxW" href="/video/abc">'
+        '<div class="img_frame"><img alt="[AI解码版] IPZZ-547 标题" src="/images/a.jpg"></div></a>'
+    )
+    assert lulubar.get_real_url(html, "IPZZ-547")[0] == "https://lulubar.co/video/abc"
+
+
+def test_get_real_url_does_not_match_longer_number():
+    html = _html(
+        '<a class="imgBoxW" href="/video/abc">'
+        '<div class="img_frame"><img alt="IPZZ-5470 标题" src="/images/a.jpg"></div></a>'
+    )
+    assert lulubar.get_real_url(html, "IPZZ-547") == ("", "")
+
+
+def test_get_cover_from_player_poster():
+    """新版详情页封面在 plyr__poster 的 background-image 中."""
+    html = _html(
+        '<div class="plyr__poster" '
+        'style="background-image: url(&quot;https://image.lulubar.co/films/2025/05/10/5816845/ipzz00547pl.jpg&quot;);">'
+        "</div>"
+    )
+    assert lulubar.get_cover(html) == "https://image.lulubar.co/films/2025/05/10/5816845/ipzz00547pl.jpg"
+
+
+def test_get_cover_falls_back_to_og_image():
+    html = etree.fromstring(
+        '<html><head><meta property="og:image" content="/films/2025/05/10/5816846/ipzz00547ps.jpg"></head></html>',
+        etree.HTMLParser(),
+    )
+    assert lulubar.get_cover(html) == "https://lulubar.co/films/2025/05/10/5816846/ipzz00547ps.jpg"
+
+
+def test_get_extrafanart_keeps_absolute_url():
+    html = _html('<div id="stills"><div><img src="https://image.lulubar.co/still/1.jpg"></div></div>')
+    assert lulubar.get_extrafanart(html) == ["https://image.lulubar.co/still/1.jpg"]
