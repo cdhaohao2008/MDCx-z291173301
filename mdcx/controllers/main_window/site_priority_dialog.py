@@ -968,6 +968,10 @@ class PrioritySiteList(_SiteListBase):
         # 「字段优先级」对话框里的每字段名单仍完全由用户手动指定）
         self._auto_group = auto_group
         self.drag_sites: list[Website] = []
+        # 拖拽加入/拖动排序直接改的是控件里的行，调用方（编辑网站对话框）手里的
+        # _selected_sites 不会自动跟着变。这里留一个回调，重建完列表后立刻回写，
+        # 免得随后一次「启用/禁用」刷新又按旧名单把刚拖进来的站点打回去。
+        self.on_sites_changed = None
         self.setFlow(QListWidget.Flow.LeftToRight)
         self.setWrapping(True)
         self.setResizeMode(QListWidget.ResizeMode.Adjust)
@@ -1042,6 +1046,7 @@ class PrioritySiteList(_SiteListBase):
         # 字段优先级那几行走的是基类 dropEvent（Qt 自己 moveRows），Qt 搬动时已经先把选中态
         # 带走了，所以那边不受这条收尾影响；只有这条自实现路径要自己把选中态清干净。
         self.clearSelection()
+        self._notify_sites_changed()
 
     def mimeData(self, items: list[QListWidgetItem]):
         self.drag_sites = _selected_sites(self)
@@ -1050,6 +1055,7 @@ class PrioritySiteList(_SiteListBase):
     def normalize(self) -> None:
         allowed_set = set(self._allowed_sites)
         _setup_site_list(self, [site for site in _list_sites(self) if site in allowed_set])
+        self._notify_sites_changed()
 
     def _drop_row(self, event) -> int:
         row = self.indexAt(_event_pos(event)).row()
@@ -1066,6 +1072,11 @@ class PrioritySiteList(_SiteListBase):
         current = [site for site in _list_sites(self) if site not in inserted]
         row = max(0, min(row, len(current)))
         _setup_site_list(self, current[:row] + inserted + current[row:])
+        self._notify_sites_changed()
+
+    def _notify_sites_changed(self) -> None:
+        if self.on_sites_changed is not None:
+            self.on_sites_changed()
 
 
 class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
@@ -1105,6 +1116,7 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
             self._palette_sites, self, removable_source=self.selected_list, dark=self._dark, grouped=True
         )
         self.available_list.on_removed = self._sync_selected_from_list
+        self.selected_list.on_sites_changed = self._sync_selected_from_list
         for list_widget in (self.available_list, self.selected_list):
             list_widget.disabled_sites = set(self._disabled_sites)
             list_widget.on_toggle_site_disabled = self._toggle_site_disabled
@@ -1210,6 +1222,9 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         disabled_set = set(self._disabled_sites)
         for list_widget in (self.available_list, self.selected_list):
             list_widget.disabled_sites = disabled_set
+        # 右键前可能刚拖过站（拖拽加入/排序只改了控件行），先按当前控件回写名单再重建，
+        # 否则这一刷会把用户刚拖进来的站点或刚调好的顺序按旧快照还原掉。
+        self._sync_selected_from_list()
         self._refresh_lists()
         if self._on_disabled_sites_changed is not None:
             self._on_disabled_sites_changed(self.disabled_sites())

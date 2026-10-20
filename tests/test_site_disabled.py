@@ -212,6 +212,28 @@ def test_disable_and_enable_site_keeps_palette_and_enabled_list_in_sync(qt_app, 
         dlg.deleteLater()
 
 
+def test_drag_changes_survive_disable_toggle(qt_app):
+    """拖拽加入或排好序后马上右键禁用，刷新不能按旧快照把拖拽结果还原掉。"""
+    dlg = SiteListEditorDialog("t", [Website.DMM], SITES, None)
+    try:
+        _shown(dlg)
+        # 模拟从候选区拖入 JAVDB（PrioritySiteList.dropEvent 的外部拖入分支）
+        dlg.selected_list._insert_sites([Website.JAVDB], dlg.selected_list.count())
+        assert dlg.selected_sites() == [Website.DMM, Website.JAVDB]
+
+        # 模拟把 JAVDB 拖到最前（内部拖动排序分支）
+        dlg.selected_list.drag_sites = [Website.JAVDB]
+        dlg.selected_list._move_sites(0)
+        assert dlg.selected_sites() == [Website.JAVDB, Website.DMM]
+
+        # 拖完立刻右键禁用另一个站：这一刷必须保留刚拖进来的站点与顺序
+        dlg._toggle_site_disabled(Website.MGSTAGE, True)
+        assert dlg.selected_sites() == [Website.JAVDB, Website.DMM]
+        assert dlg.disabled_sites() == [Website.MGSTAGE]
+    finally:
+        dlg.deleteLater()
+
+
 def test_disabled_item_is_drawn_grey_but_stays_interactive(qt_app):
     dlg = SiteListEditorDialog("t", [Website.DMM, Website.MGSTAGE], SITES, None, disabled_sites=[Website.DMM])
     try:
