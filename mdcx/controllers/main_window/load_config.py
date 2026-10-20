@@ -473,15 +473,17 @@ def load_config(self: "MyMAinWindow"):
         mode_mapping = {
             1: ("common", "正常模式"),
             2: ("separate", "分离模式"),
-            3: ("sort", "整理模式"),
+            3: ("sort", "视频模式"),
             4: ("update", "更新模式"),
             5: ("read", "读取模式"),
+            6: ("organize", "整理模式"),
         }
         mode_key, mode_text = mode_mapping.get(main_mode, ("common", "正常模式"))
         Flags.main_mode_text = mode_text
         set_radio_buttons(
             mode_key,
             (self.Ui.radioButton_mode_common, "common"),
+            (self.Ui.radioButton_mode_organize, "organize"),
             (self.Ui.radioButton_mode_separate, "separate"),
             (self.Ui.radioButton_mode_sort, "sort"),
             (self.Ui.radioButton_mode_update, "update"),

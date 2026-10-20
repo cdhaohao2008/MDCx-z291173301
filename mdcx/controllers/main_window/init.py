@@ -768,7 +768,7 @@ def Init_Ui(self: "MyMAinWindow"):
     self.Ui.treeWidget_number.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
     self.Ui.treeWidget_number.setStyleSheet(build_tree_widget_style(False))
     # 图片不得改变原始宽高比：scaledContents 必须保持 False，否则 QLabel 会把已按
-    # KeepAspectRatio 缩放好的 pixmap 再拉伸铺满整个框（正常/分离/视频/更新/读取五种
+    # KeepAspectRatio 缩放好的 pixmap 再拉伸铺满整个框（正常/整理/分离/视频/更新/读取六种
     # 模式都走这里，故一处关闭即全局生效）。等比缩放由 _rescale_preview_pixmaps 用
     # KeepAspectRatio 完成，两个 label 的 alignment 均为 AlignCenter，多余部分留白居中。
     self.Ui.label_poster.setScaledContents(False)
@@ -797,6 +797,15 @@ def Init_Ui(self: "MyMAinWindow"):
     self.Ui.pushButton_tips_normal_mode.setIcon(help_icon)
     self.Ui.pushButton_tips_normal_mode.setToolTip("""<html><head/><body><p><b>正常模式：</b><br/>1）适合海报墙用户。正常模式将联网刮削视频字段信息，并执行翻译字段信息，移动和重命名视频文件及文件夹，下载图片、剧照、预告片，添加字幕、4K水印等一系列自动化操作<br/>2）刮削目录请在「设置→刮削目录」-「视频刮削目录」中设置<br/>3）刮削网站请在「设置→刮削网站」中设置。部分网站需要代理访问，可在「设置→网络」中设置代理和走代理网站。你可以点击左侧的「检测网络」查看网络连通性<br/>\
         4）字段翻译请在「设置→翻译」中设置<br/>5）图片、剧照、预告片请在「设置→下载」中设置<br/>6）视频文件命名请在「设置→命名」中设置<br/>7）如果刮削后不需要重命名，请在下面的「刮削成功后重命名文件」设置为「关」<br/>8）如果刮削后不需要移动文件，请在下面的「刮削成功后移动文件」设置为「关」<br/>9）如果想自动刮削，请在「设置→高级」中勾选「自动刮削」<br/>10）其他设置项和功能玩法可自行研究</p></body></html>""")
+    self.Ui.pushButton_tips_organize_mode.setIcon(help_icon)
+    self.Ui.pushButton_tips_organize_mode.setToolTip(
+        """<html><head/><body><p><b>整理模式：</b><br/>\
+        1，适合已刮削完成、需要海报墙，但想按新的命名规则重新整理文件的用户。<br/>\
+        2，不联网刮削、不下载图片、不生成或更新 nfo。软件读取视频或 STRM 同目录同名 nfo 中的字段，再按照「设置→命名」中的目录名、文件名、字段、长度、马赛克、分集、图片、预告片、画质等命名规则，重新组织并移动视频/STRM、图片、nfo、字幕、种子等文件。<br/>\
+        3，同目录下的「番号-mediainfo.json」会随视频同步移动并按新文件名重命名。<br/>\
+        4，没有同名 nfo 的文件会跳过并记录失败原因，不会自动联网刮削。<br/>\
+        5，STRM 文件会解析其指向的本地视频获取画质；无法访问时读取同名 mediainfo.json 或文件名中的画质标记。</p></body></html>"""
+    )
     self.Ui.pushButton_tips_separate_mode.setIcon(help_icon)
     self.Ui.pushButton_tips_separate_mode.setToolTip("""<html><head/><body><p><b>分离模式：</b><br/>1）适合海报墙用户。分离模式将联网刮削视频字段信息，并执行翻译字段信息，移动和重命名视频文件及文件夹，下载图片、剧照、预告片，添加字幕、4K水印等一系列自动化操作，视频与元数据将分开存放<br/>2）刮削目录请在「设置→刮削目录」-「视频刮削目录」中设置<br/>3）刮削网站请在「设置→刮削网站」中设置。部分网站需要代理访问，可在「设置→网络」中设置代理和走代理网站。你可以点击左侧的「检测网络」查看网络连通性<br/>\
         4）字段翻译请在「设置→翻译」中设置<br/>5）图片、剧照、预告片请在「设置→下载」中设置<br/>6）视频文件命名请在「设置→命名」中设置<br/>7）如果刮削后不需要重命名，请在下面的「刮削成功后重命名文件」设置为「关」<br/>8）如果刮削后不需要移动文件，请在下面的「刮削成功后移动文件」设置为「关」<br/>9）如果想自动刮削，请在「设置→高级」中勾选「自动刮削」<br/>10）其他设置项和功能玩法可自行研究</p></body></html>""")
@@ -1099,6 +1108,7 @@ def Init_Singal(self: "MyMAinWindow"):
     self.Ui.pushButton_scrape_note.clicked.connect(self.pushButton_scrape_note_clicked)
     self.Ui.pushButton_field_tips_nfo.clicked.connect(self.pushButton_field_tips_nfo_clicked)
     self.Ui.pushButton_tips_normal_mode.clicked.connect(self.pushButton_tips_normal_mode_clicked)
+    self.Ui.pushButton_tips_organize_mode.clicked.connect(self.pushButton_tips_organize_mode_clicked)
     self.Ui.pushButton_tips_separate_mode.clicked.connect(self.pushButton_tips_separate_mode_clicked)
     self.Ui.pushButton_tips_sort_mode.clicked.connect(self.pushButton_tips_sort_mode_clicked)
     self.Ui.pushButton_tips_update_mode.clicked.connect(self.pushButton_tips_update_mode_clicked)
@@ -1115,7 +1125,7 @@ def Init_Singal(self: "MyMAinWindow"):
         _grid.setColumnStretch(1, 1)
     _col0_w = 0
     for _grid, _rows in (
-        (self.Ui.gridLayout_2, range(9)),
+        (self.Ui.gridLayout_2, range(10)),
         (self.Ui.gridLayout_15, range(3)),
     ):
         for _r in _rows:
@@ -1136,6 +1146,7 @@ def Init_Singal(self: "MyMAinWindow"):
     self.Ui.checkBox_separate_generate_strm.toggled.connect(self.checkBox_separate_generate_strm_changed)
     for _lbl in (
         self.Ui.label_11,
+        self.Ui.label_organize_mode,
         self.Ui.label_separate_mode,
         self.Ui.label_15,
         self.Ui.label_36,

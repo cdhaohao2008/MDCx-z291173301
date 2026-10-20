@@ -44,6 +44,9 @@ def parse_media_paths(media_path: str | Path | None = None) -> list[Path]:
 SEPARATE_MAIN_MODE = 2
 """分离模式的 main_mode 值：视频与元数据分开存放，其余逻辑同正常模式。"""
 
+ORGANIZE_MAIN_MODE = 6
+"""整理模式的 main_mode 值：不联网刮削，读取同目录 nfo 字段后按命名规则重新整理文件。"""
+
 SEPARATE_META_EXTS = frozenset({".nfo", ".jpg", ".jpeg", ".png", ".webp", ".strm"})
 """分离模式下归入数据存放目录的元数据文件扩展名（小写）。
 
@@ -59,6 +62,15 @@ def is_separate_mode() -> bool:
     「分离模式」开关；正常模式下全部走左侧开关（右侧开关被忽略）。
     """
     return manager.config.main_mode == SEPARATE_MAIN_MODE
+
+
+def is_organize_mode() -> bool:
+    """当前是否为整理模式（刮削模式 == 6）。
+
+    整理模式不联网刮削、不下载图片、不生成/更新 nfo，只读取同目录 nfo
+    中的字段，按「设置→命名」重新组织视频/STRM、图片、nfo 及 mediainfo。
+    """
+    return manager.config.main_mode == ORGANIZE_MAIN_MODE
 
 
 def should_generate_strm(meta_root: Path | None, skip_reorganize: bool) -> bool:

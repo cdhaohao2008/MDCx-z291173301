@@ -82,11 +82,11 @@ async def creat_folder(
     dont_creat_folder = False  # 不需要创建文件夹
 
     # 正常模式、视频模式时，软链接关，成功后不移动文件开时，这时不创建文件夹
-    if manager.config.main_mode in (1, 3) and manager.config.soft_link == 0 and not eff_success_file_move():
+    if manager.config.main_mode in (1, 3, 6) and manager.config.soft_link == 0 and not eff_success_file_move():
         dont_creat_folder = True
 
     # 更新模式、读取模式，选择更新c文件时，不创建文件夹
-    if manager.config.main_mode > 3 and manager.config.update_mode == "c":
+    if manager.config.main_mode in (4, 5) and manager.config.update_mode == "c":
         dont_creat_folder = True
 
     # 如果不需要创建文件夹，当不重命名时，直接返回

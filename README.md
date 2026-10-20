@@ -40,7 +40,7 @@ MDCx 是一个桌面工具，自动从 53 个网站抓取视频文件的元数�
 | **[使用 Wiki](https://github.com/cdlongbow/MDCx/wiki)** | **新用户先看这里** | 三分钟上手、常见问题 FAQ（90% 问题有答案） |
 | [QuickStart.md](docs/QuickStart.md) | 所有人 | 5 分钟上手，完成第一次刮削 |
 | [Install.md](docs/Install.md) | 需要安装的人 | 系统要求、Release/源码两种安装方式 |
-| [Features.md](docs/Features.md) | 想了解能做什么的人 | 全部功能、53 个网站列表、四种刮削模式 |
+| [Features.md](docs/Features.md) | 想了解能做什么的人 | 全部功能、53 个网站列表、六种刮削模式 |
 | [User_Guide.md](docs/User_Guide.md) | 日常使用的人 | 完整使用手册、常见问题、实际场景 |
 | [Configuration.md](docs/Configuration.md) | 想调设置的人 | 每个配置项是干什么的 |
 | [Changelog.md](docs/Changelog.md) | 关注版本更新的人 | 每个版本改了啥 |

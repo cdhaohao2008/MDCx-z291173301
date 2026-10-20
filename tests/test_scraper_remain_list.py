@@ -148,6 +148,44 @@ async def test_read_mode_ignores_done_cache(monkeypatch: pytest.MonkeyPatch, tmp
 
 
 @pytest.mark.asyncio
+async def test_organize_mode_ignores_done_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """整理模式（main_mode=6）：即使缓存标记 done 也不跳过，全部入队。"""
+    from mdcx.core.scrape_cache import ScrapeStateCache
+
+    scraper_module = _patch_scraper_env(monkeypatch, main_mode=6)
+
+    files = []
+    for name in ("a.mp4", "b.mp4", "c.mp4"):
+        p = tmp_path / name
+        p.write_bytes(b"x")
+        files.append(p)
+
+    db = tmp_path / "scrape_state.db"
+    cache = ScrapeStateCache(db)
+    assert cache.open() is True
+    for p in files:
+        cache.set_done(p, mtime=p.stat().st_mtime)
+    cache.close()
+
+    scheduled: list[Path] = []
+
+    async def fake_run_tasks_with_limit(_self, task_list: list[Path], _task_count: int, _thread_number: int):
+        scheduled.extend(task_list)
+        Flags.scrape_done = _task_count
+
+    monkeypatch.setattr(scraper_module.Scraper, "_run_tasks_with_limit", fake_run_tasks_with_limit)
+    monkeypatch.setattr(scraper_module.resources, "u", lambda _name: db)
+
+    scraper = scraper_module.Scraper(crawler_provider=object())
+    await scraper._run(FileMode.Default, files.copy())
+
+    # 整理模式：全部 3 个文件都应入队，保证每次都能重新整理
+    assert scheduled == files
+    if scraper._state_cache:
+        scraper._state_cache.close()
+
+
+@pytest.mark.asyncio
 async def test_unexpected_cancelled_scrape_task_is_not_silent(monkeypatch: pytest.MonkeyPatch):
     from mdcx.core import scraper as scraper_module
 

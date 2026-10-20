@@ -355,6 +355,7 @@ def save_config(self: "MyMAinWindow"):
     # 主模式设置
     manager.config.main_mode = get_radio_buttons(
         (self.Ui.radioButton_mode_common, 1),
+        (self.Ui.radioButton_mode_organize, 6),
         (self.Ui.radioButton_mode_separate, 2),
         (self.Ui.radioButton_mode_sort, 3),
         (self.Ui.radioButton_mode_update, 4),
@@ -822,9 +823,10 @@ def save_config(self: "MyMAinWindow"):
     mode_mapping = {
         1: ("common", "正常模式"),
         2: ("separate", "分离模式"),
-        3: ("sort", "整理模式"),
+        3: ("sort", "视频模式"),
         4: ("update", "更新模式"),
         5: ("read", "读取模式"),
+        6: ("organize", "整理模式"),
     }
 
     mode_key, mode_text = mode_mapping.get(main_mode, ("common", "正常模式"))

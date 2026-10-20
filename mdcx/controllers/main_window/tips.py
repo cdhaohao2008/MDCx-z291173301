@@ -8,6 +8,9 @@ class TipsMixin:
     def pushButton_tips_normal_mode_clicked(self):
         self._show_tips(self.Ui.pushButton_tips_normal_mode.toolTip())
 
+    def pushButton_tips_organize_mode_clicked(self):
+        self._show_tips(self.Ui.pushButton_tips_organize_mode.toolTip())
+
     def pushButton_tips_separate_mode_clicked(self):
         self._show_tips(self.Ui.pushButton_tips_separate_mode.toolTip())
 

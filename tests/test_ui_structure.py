@@ -1146,14 +1146,14 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
     if grid is None:
         problems.append("gridLayout_2 不存在")
     else:
-        if _grid_item_pos(grid, "horizontalLayout_strm") != ("2", "1"):
-            problems.append(f"STRM 行被移动（应在 row=2 col=1）: {_grid_item_pos(grid, 'horizontalLayout_strm')!r}")
-        if _grid_item_pos(grid, "horizontalLayout_reuse_meta") != ("3", "1"):
+        if _grid_item_pos(grid, "horizontalLayout_strm") != ("3", "1"):
+            problems.append(f"STRM 行被移动（应在 row=3 col=1）: {_grid_item_pos(grid, 'horizontalLayout_strm')!r}")
+        if _grid_item_pos(grid, "horizontalLayout_reuse_meta") != ("4", "1"):
             problems.append(
-                f"复用行被移动（应在 row=3 col=1）: {_grid_item_pos(grid, 'horizontalLayout_reuse_meta')!r}"
+                f"复用行被移动（应在 row=4 col=1）: {_grid_item_pos(grid, 'horizontalLayout_reuse_meta')!r}"
             )
-        if _grid_item_pos(grid, "horizontalLayout_125") != ("5", "1"):
-            problems.append(f"删除行被移动（应在 row=5 col=1）: {_grid_item_pos(grid, 'horizontalLayout_125')!r}")
+        if _grid_item_pos(grid, "horizontalLayout_125") != ("6", "1"):
+            problems.append(f"删除行被移动（应在 row=6 col=1）: {_grid_item_pos(grid, 'horizontalLayout_125')!r}")
         strm_spacer = _find_widget_by_name(root, "label_strm_spacer")
         del_spacer = _find_widget_by_name(root, "label_344")
         if strm_spacer is None or del_spacer is None:

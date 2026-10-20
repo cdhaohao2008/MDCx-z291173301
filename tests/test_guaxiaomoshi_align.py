@@ -11,19 +11,19 @@
   - gridLayout_2（8 行模式组）与 gridLayout_15（Javdb 延时组）第 0 列
     stretch 钉 0、第 1 列钉 1，两网格第 0 列最小宽取各自全部行部件
     sizeHint 最大值再统一取大，保证两网格第 1 列左缘跨网格对齐。
-  - 5 个描述 label 的 wordWrap 在 .ui 里直接改为 false（单行），并配同
+  - 6 个描述 label 的 wordWrap 在 .ui 里直接改为 false（单行），并配同
     文案 tooltip 防极端 DPI 下被裁剪。
   - 一次性 init 钉死，不挂 _sync_page_layouts 钩子：通用宽幅同步只拉伸
     网格容器宽度，第 0 列最小宽不受影响，故同步前后位置恒定。
 
 本文件 10 项（纯离线 + offscreen 窗口实测）：
-  1. .ui 里 5 个 label 的 wordWrap 均为 false。
-  2. MDCx.py 里 5 个 label 均为 setWordWrap(False)（与 .ui 同步）。
+  1. .ui 里 6 个 label 的 wordWrap 均为 false。
+  2. MDCx.py 里 6 个 label 均为 setWordWrap(False)（与 .ui 同步）。
   3. 运行时 label_26 与 label_separate_mode 左缘精确对齐（映射到
      scrollAreaWidgetContents_guaxiaomoshi 下比对）。
-  4. 两网格列 stretch 为 0/1，且 5 个 label 运行时 wordWrap 均为 False、
+  4. 两网格列 stretch 为 0/1，且 6 个 label 运行时 wordWrap 均为 False、
      tooltip 非空。
-  5. 窄↔宽两态 + 重复同步，5 个 label 与 label_26 的左缘逐像素不变
+  5. 窄↔宽两态 + 重复同步，6 个 label 与 label_26 的左缘逐像素不变
      （以后不允许再变动位置）。
   6. 同列 4 个复选框（STRM 生成 / STRM 覆盖 / 元数据复用 / 视频模式删除）
      左缘严格一致，窄↔宽往返不变。
@@ -58,9 +58,10 @@ _MODE_CHECKBOXES = (
     "checkBox_sortmode_delpic",
 )
 
-# gridLayout_2 第 1 列 5 个描述 label：正常 / 分离 / 视频 / 更新 / 读取。
+# gridLayout_2 第 1 列 6 个描述 label：正常 / 整理 / 分离 / 视频 / 更新 / 读取。
 _DESC_LABELS = (
     "label_11",
+    "label_organize_mode",
     "label_separate_mode",
     "label_15",
     "label_36",
@@ -142,7 +143,7 @@ def _resize(win, app, width, height):
 
 
 def test_desc_labels_single_line_in_ui():
-    """需求②（静态）：.ui 里 5 个描述 label 的 wordWrap 必须为 false。"""
+    """需求②（静态）：.ui 里 6 个描述 label 的 wordWrap 必须为 false。"""
     tree = ET.parse(UI_PATH)
     missing = []
     for name in _DESC_LABELS:
@@ -164,7 +165,7 @@ def test_desc_labels_single_line_in_ui():
 
 
 def test_desc_labels_single_line_in_py():
-    """需求②（同步）：MDCx.py 里 5 个 label 必须为 setWordWrap(False)。"""
+    """需求②（同步）：MDCx.py 里 6 个 label 必须为 setWordWrap(False)。"""
     text = PY_PATH.read_text(encoding="utf-8")
     for name in _DESC_LABELS:
         assert f"self.{name}.setWordWrap(False)" in text, (

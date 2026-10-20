@@ -1,4 +1,5 @@
 import asyncio
+import json
 import re
 from pathlib import Path
 
@@ -234,30 +235,132 @@ async def get_video_size(file_path: Path, file_number: str = ""):
     elif hd_get == "path":
         height = _detect_height_from_path(file_path, file_number)
 
-    hd_name = manager.config.hd_name
-    if not height:
-        pass
-    elif height >= 4000:
-        definition = "8K" if hd_name == "height" else "UHD8"
-    elif height >= 2000:
-        definition = "4K" if hd_name == "height" else "UHD"
-    elif height >= 1400:
-        definition = "1440P" if hd_name == "height" else "QHD"
-    elif height >= 1000:
-        definition = "1080P" if hd_name == "height" else "FHD"
-    elif height >= 900:
-        definition = "960P" if hd_name == "height" else "HD"
-    elif height >= 700:
-        definition = "720P" if hd_name == "height" else "HD"
-    elif height >= 500:
-        definition = "540P" if hd_name == "height" else "qHD"
-    elif height >= 400:
-        definition = "480P"
-    elif height >= 300:
-        definition = "360P"
-    elif height >= 100:
-        definition = "144P"
+    definition = _definition_from_height(height)
 
+    return definition, codec
+
+
+def _definition_from_height(height: int) -> str:
+    """将视频高度映射为配置对应的清晰度名称。"""
+    if not height:
+        return ""
+    hd_name = manager.config.hd_name
+    if height >= 4000:
+        return "8K" if hd_name == "height" else "UHD8"
+    if height >= 2000:
+        return "4K" if hd_name == "height" else "UHD"
+    if height >= 1400:
+        return "1440P" if hd_name == "height" else "QHD"
+    if height >= 1000:
+        return "1080P" if hd_name == "height" else "FHD"
+    if height >= 900:
+        return "960P" if hd_name == "height" else "HD"
+    if height >= 700:
+        return "720P" if hd_name == "height" else "HD"
+    if height >= 500:
+        return "540P" if hd_name == "height" else "qHD"
+    if height >= 400:
+        return "480P"
+    if height >= 300:
+        return "360P"
+    if height >= 100:
+        return "144P"
+    return ""
+
+
+def _mediainfo_video_height(data) -> int:
+    """从 MediaInfo JSON 中递归查找视频轨高度。"""
+    if isinstance(data, dict):
+        track_type = str(data.get("@type") or data.get("type") or "").lower()
+        if "video" in track_type:
+            for key in ("Height", "height", "Video_Height", "video_height"):
+                value = data.get(key)
+                if value is not None:
+                    match = re.search(r"\d+", str(value).replace(" ", ""))
+                    if match:
+                        return int(match.group())
+        for value in data.values():
+            height = _mediainfo_video_height(value)
+            if height:
+                return height
+    elif isinstance(data, list):
+        for value in data:
+            height = _mediainfo_video_height(value)
+            if height:
+                return height
+    return 0
+
+
+def _mediainfo_codec(data) -> str:
+    """从 MediaInfo JSON 中提取常见视频编码。"""
+    codec_map = {
+        "avc": "H264",
+        "h264": "H264",
+        "hevc": "HEVC",
+        "h265": "HEVC",
+        "vp9": "VP9",
+        "av1": "AV1",
+        "mpeg4": "MPEG4",
+    }
+    text = json.dumps(data, ensure_ascii=False)
+    match = re.search(r'"Format"\s*:\s*"([^"]+)"', text)
+    if match:
+        return codec_map.get(match.group(1).strip().lower(), "")
+    return ""
+
+
+async def _get_mediainfo_size(file_path: Path) -> tuple[str, str]:
+    """读取同目录 <文件名>-mediainfo.json，返回清晰度与编码。"""
+    mediainfo_path = file_path.with_name(f"{file_path.stem}-mediainfo.json")
+    if not await aiofiles.os.path.isfile(mediainfo_path):
+        return "", ""
+    try:
+        async with aiofiles.open(mediainfo_path, encoding="utf-8") as f:
+            content = await f.read()
+        data = json.loads(content)
+    except (OSError, ValueError):
+        return "", ""
+    height = _mediainfo_video_height(data)
+    if not height:
+        match = re.search(r'"(?:Height|height)"\s*:\s*"?([0-9 ]+)"?', content)
+        if match:
+            height = int(match.group(1).replace(" ", ""))
+    return _definition_from_height(height), _mediainfo_codec(data)
+
+
+async def get_video_size_for_file(file_path: Path, file_number: str = "") -> tuple[str, str]:
+    """获取视频/STRM 的清晰度与编码。
+
+    STRM 本身不是视频，优先读取其指向的本地视频；无法访问时（网盘链接、
+    URL 等）退回到 STRM 文件名/路径中的分辨率标记，最后读取同名
+    ``-mediainfo.json``。整理模式只移动文件、不联网，因此该链路不回退到刮削。
+    """
+    target_path = file_path
+    if file_path.suffix.lower() == ".strm":
+        try:
+            async with aiofiles.open(file_path, encoding="utf-8-sig") as f:
+                content = await f.read()
+            for line in content.splitlines():
+                target_text = line.strip()
+                if not target_text or target_text.startswith("#"):
+                    continue
+                if "://" not in target_text:
+                    target = Path(target_text)
+                    if not target.is_absolute():
+                        target = file_path.parent / target
+                    if await aiofiles.os.path.exists(target):
+                        target_path = target
+                break
+        except OSError:
+            pass
+
+    definition, codec = await get_video_size(target_path, file_number)
+    if not definition:
+        mediainfo_definition, mediainfo_codec = await _get_mediainfo_size(file_path)
+        definition = mediainfo_definition
+        codec = codec or mediainfo_codec
+    if not definition:
+        definition = _definition_from_height(_detect_height_from_path(file_path, file_number))
     return definition, codec
 
 

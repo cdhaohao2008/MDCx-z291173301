@@ -14,6 +14,7 @@ from ..base.file import (
     get_movie_list,
     move_bif,
     move_file_to_failed_folder,
+    move_mediainfo,
     move_other_file,
     move_torrent,
     newtdisk_creat_symlink,
@@ -33,6 +34,7 @@ from ..config.enums import (
     TagInclude,
 )
 from ..config.extend import (
+    ORGANIZE_MAIN_MODE,
     SEPARATE_MAIN_MODE,
     eff_del_empty_folder,
     eff_success_file_move,
@@ -81,6 +83,7 @@ from .utils import (
     add_definition_tag,
     deal_some_field,
     get_video_size,
+    get_video_size_for_file,
     replace_special_word,
     replace_word,
     show_movie_info,
@@ -320,9 +323,9 @@ class Scraper:
             signal.show_log_text("\n ⏰ Start time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
         # 断点续刮：过滤掉已完成且 mtime 未变的文件；恢复上次失败的未超限文件（跨会话重试）
-        # 读取模式（main_mode==5）本质是读已有结果，不参与断点续刮的跳过/恢复逻辑，
-        # 否则会导致读取模式只能看到「mtime 变化」的文件，且读完即被标记 done 导致下次读不到。
-        if cache.is_usable() and manager.config.main_mode != 5:
+        # 读取模式（5）/整理模式（6）本质是读已有结果，不参与断点续刮的跳过/恢复逻辑，
+        # 否则会导致只能看到「mtime 变化」的文件，且读完即被标记 done 导致下次读不到。
+        if cache.is_usable() and manager.config.main_mode not in (5, 6):
             try:
                 existing = set(movie_list)
                 # 只有全量扫描拿到的才是完整媒体库集合，才有资格做全库清理；
@@ -393,11 +396,15 @@ class Scraper:
             Flags.count_claw = await Flags.increment("count_claw")
             if manager.config.main_mode == 5:
                 signal.show_log_text(f" 🕷 当前为读取模式，并发数（{thread_number}），线程延时（0）秒...")
+            elif manager.config.main_mode == ORGANIZE_MAIN_MODE:
+                signal.show_log_text(
+                    f" 🕷 当前为整理模式（不刮削、不下载，仅读取 nfo 整理文件），并发数（{thread_number}）..."
+                )
             else:
                 if task_count < thread_number:
                     thread_number = task_count
                 signal.show_log_text(f" 🕷 开启异步并发，并发数（{thread_number}），线程延时（{thread_time}）秒...")
-            if Switch.REST_SCRAPE in manager.config.switch_on and manager.config.main_mode != 5:
+            if Switch.REST_SCRAPE in manager.config.switch_on and manager.config.main_mode not in (5, 6):
                 signal.show_log_text(
                     f'<font color="brown"> 🍯 间歇刮削 已启用，连续刮削 {manager.config.rest_count} 个文件后，将自动休息 {Flags.rest_time_convert} 秒...</font>'
                 )
@@ -554,7 +561,7 @@ class Scraper:
 
         # 处理间歇任务
         while (
-            manager.config.main_mode != 5
+            manager.config.main_mode not in (5, 6)
             and Switch.REST_SCRAPE in manager.config.switch_on
             and count - Flags.rest_now_begin_count > manager.config.rest_count
         ):
@@ -565,7 +572,7 @@ class Scraper:
         Flags.scrape_starting = await Flags.increment("scrape_starting")
         count = Flags.scrape_starting
         thread_time = manager.config.thread_time
-        if count == 1 or thread_time == 0 or manager.config.main_mode == 5:
+        if count == 1 or thread_time == 0 or manager.config.main_mode in (5, 6):
             Flags.next_start_time = time.time()
             signal.show_log_text(f" 🕷 {get_current_time()} 开始刮削：{Flags.scrape_starting}/{count_all} {show_name}")
             thread_time = 0
@@ -614,7 +621,11 @@ class Scraper:
 
         # 如果指定了单一网站，进行提示
         website_single = manager.config.website_single
-        if manager.config.scrape_like == "single" and file_mode != FileMode.Single and manager.config.main_mode != 5:
+        if (
+            manager.config.scrape_like == "single"
+            and file_mode != FileMode.Single
+            and manager.config.main_mode not in (5, 6)
+        ):
             LogBuffer.log().write(
                 f"\n 😸 [Note] You specified 「 {website_single} 」, some videos may not have results! "
             )
@@ -626,7 +637,7 @@ class Scraper:
         try:
             json_data, other = await self._process_one_file(file_info, file_mode)
             if json_data and other:
-                if manager.config.main_mode == 5:
+                if manager.config.main_mode in (5, ORGANIZE_MAIN_MODE):
                     number = json_data.number
                 async with Flags._json_get_lock:
                     Flags.json_data_dic[number] = ScrapeResult(file_info, json_data, other)
@@ -670,7 +681,7 @@ class Scraper:
                 signal.show_list_name("succ", show_data, number)
                 # 读取模式不写缓存：读取模式只读已有 NFO/结果，不应标记文件为 done，
                 # 否则下次读取模式或普通模式会被断点续刮跳过。
-                if self._state_cache and self._state_cache.is_usable() and manager.config.main_mode != 5:
+                if self._state_cache and self._state_cache.is_usable() and manager.config.main_mode not in (5, 6):
                     try:
                         summary = {
                             "number": number,
@@ -719,7 +730,7 @@ class Scraper:
                     Flags.failed_list.append((fail_file_path, error_msg))
                 await self._failed_file_info_show(str(Flags.fail_count), fail_file_path, error_msg)
                 signal.view_failed_list_settext.emit(f"失败 {Flags.fail_count}")
-                if self._state_cache and self._state_cache.is_usable() and manager.config.main_mode != 5:
+                if self._state_cache and self._state_cache.is_usable() and manager.config.main_mode not in (5, 6):
                     try:
                         self._state_cache.set_failed(
                             fail_file_path,  # 移动后路径：文件已被移到 failed_folder
@@ -783,7 +794,7 @@ class Scraper:
 
         # 处理间歇刮削
         try:
-            if manager.config.main_mode != 5 and Switch.REST_SCRAPE in manager.config.switch_on:
+            if manager.config.main_mode not in (5, 6) and Switch.REST_SCRAPE in manager.config.switch_on:
                 async with self._rest_lock:
                     time_note = f" 🏖 已累计刮削 {count}/{count_all}，已连续刮削 {count - Flags.rest_now_begin_count}/{manager.config.rest_count}..."
                     signal.show_log_text(time_note)
@@ -937,9 +948,10 @@ class Scraper:
         is_nfo_existed = False
         res = CrawlersResult.empty()  # todo 保证所有路径上均有 res 值
         file_classification = None
-        # 读取模式
+        organize_mode = manager.config.main_mode == ORGANIZE_MAIN_MODE
+        # 读取模式 / 整理模式：都从同目录 nfo 读取已有字段
         file_can_download = True
-        if manager.config.main_mode == 5:
+        if manager.config.main_mode in (5, ORGANIZE_MAIN_MODE):
             nfo_data, info = await get_nfo_data(file_path, movie_number)
             if nfo_data:  # 有nfo
                 is_nfo_existed = True
@@ -948,26 +960,36 @@ class Scraper:
                 file_info.shared_number = movie_number  # 供释放方释放共享番号双键
                 file_classification = classify_existing_scrape_result(file_info.crawl_task(), res, manager.config)
 
-                has_nfo_update = ReadMode.HAS_NFO_UPDATE in read_mode
-                should_update_nfo = ReadMode.READ_UPDATE_NFO in read_mode
-                redownload = ReadMode.READ_DOWNLOAD_AGAIN in read_mode
-                if not has_nfo_update and not should_update_nfo and not redownload:  # 都不勾才跳过
-                    show_result(res, start_time)
-                    show_movie_info(file_info, nfo_data)
-                    LogBuffer.log().write(f"\n 🙉 [Movie] {file_path}")
-                    await save_success_list(file_path, file_path)
-                    return nfo_data, info
-
-                if not redownload:
+                if organize_mode:
+                    # 整理模式完全离线：只读 nfo 字段并移动/重命名已有文件
                     file_can_download = False
+                else:
+                    has_nfo_update = ReadMode.HAS_NFO_UPDATE in read_mode
+                    should_update_nfo = ReadMode.READ_UPDATE_NFO in read_mode
+                    redownload = ReadMode.READ_DOWNLOAD_AGAIN in read_mode
+                    if not has_nfo_update and not should_update_nfo and not redownload:  # 都不勾才跳过
+                        show_result(res, start_time)
+                        show_movie_info(file_info, nfo_data)
+                        LogBuffer.log().write(f"\n 🙉 [Movie] {file_path}")
+                        await save_success_list(file_path, file_path)
+                        return nfo_data, info
+
+                    if not redownload:
+                        file_can_download = False
             else:
+                if organize_mode:
+                    LogBuffer.error().write("整理模式需要同目录同名 nfo 文件，未找到有效 nfo，已跳过该文件")
+                    return None, None
                 if "no_nfo_scrape" not in read_mode:  # 无 nfo 且未勾选「本地没有nfo的文件重新刮削」
                     return None, None
 
         # 判断是否write_nfo
         update_nfo = True
+        # 整理模式只读 nfo，绝不生成/更新 nfo
+        if organize_mode:
+            update_nfo = False
         # 不写nfo的情况：
-        if manager.config.main_mode == 3 and Switch.SORT_DEL in manager.config.switch_on:
+        elif manager.config.main_mode == 3 and Switch.SORT_DEL in manager.config.switch_on:
             # 3模式勾选“删除本地已下载的nfo文件”（暂无效，会直接return）
             update_nfo = False
         elif manager.config.main_mode in [1, 2, 3, 4] or (
@@ -1107,7 +1129,8 @@ class Scraper:
         # "" 会被注册为共享键——同批两个此类文件第二个直接复用第一个影片的数据，
         # NFO/重命名张冠李戴——全库审查 A4）
         enable_shared_json = (
-            bool(movie_number)
+            not organize_mode
+            and bool(movie_number)
             and "." not in movie_number
             and file_classification.scraping_type != FixedScrapingType.GUOCHAN
         )
@@ -1211,6 +1234,10 @@ class Scraper:
         # 显示json_data结果或日志
         show_result(res, start_time)
 
+        # 整理模式：nfo 中的马赛克字段决定 {mosaic} 命名变量
+        if organize_mode and res.mosaic:
+            file_info.mosaic = res.mosaic
+
         # 映射或翻译
         # 无已刮削数据时执行；演员/标签等映射服务于命名变量（{actor}/{tag} 等），与是否写 NFO 解耦
         if not pre_data:
@@ -1230,8 +1257,11 @@ class Scraper:
             translate_info(res, file_info.has_sub)  # 映射输出标签等信息
             replace_word(res)
 
-        # 更新视频分辨率
-        definition, codec = await get_video_size(file_path, file_info.number)
+        # 更新视频分辨率（整理模式需解析 STRM 指向的视频或 mediainfo.json）
+        if organize_mode:
+            definition, codec = await get_video_size_for_file(file_path, file_info.number)
+        else:
+            definition, codec = await get_video_size(file_path, file_info.number)
         file_info.definition, file_info.codec = definition, codec
         add_definition_tag(res, definition, codec)
 
@@ -1405,6 +1435,46 @@ class Scraper:
                 return res, other
             # 返回MDCx1_1main, 继续处理下一个文件
             return None, None
+
+        # 整理模式：只使用 nfo 字段和已有图片，按命名规则重新组织/移动文件。
+        # 不下载图片、不生成 nfo、不打水印。
+        if organize_mode:
+            await deal_old_files(
+                res.number,
+                other,
+                folder_old_path,
+                meta_folder,
+                file_path,
+                thumb_new_path_with_filename,
+                poster_new_path_with_filename,
+                fanart_new_path_with_filename,
+                nfo_new_path,
+                poster_final_path,
+                thumb_final_path,
+                fanart_final_path,
+                naming_rule,
+            )
+            if eff_success_file_move():
+                if file_info.has_sub:
+                    await move_sub(folder_old_path, folder_new_path, file_name, sub_list, naming_rule)
+                await move_torrent(folder_old_path, folder_new_path, file_name, movie_number, naming_rule)
+                await move_bif(folder_old_path, folder_new_path, file_name, naming_rule)
+                await move_other_file(res.number, folder_old_path, folder_new_path, file_name, naming_rule, meta_folder)
+                await move_mediainfo(folder_old_path, folder_new_path, file_name, naming_rule)
+                if not await move_movie(other, file_info, file_path, file_new_path):
+                    return None, None
+            await save_success_list(file_path, file_new_path)
+
+            if poster_final_path is not None:
+                if await aiofiles.os.path.exists(poster_final_path):
+                    other.poster_path = poster_final_path
+                if await aiofiles.os.path.exists(fanart_final_path):
+                    other.fanart_path = fanart_final_path
+                if await aiofiles.os.path.exists(thumb_final_path):
+                    other.thumb_path = thumb_final_path
+                elif other.fanart_path is not None:
+                    other.thumb_path = other.fanart_path
+            return res, other
 
         # 清理旧的thumb、poster、fanart、extrafanart、nfo
         pic_final_catched = False
@@ -1707,7 +1777,7 @@ async def move_sub(
     copy_flag = False
 
     # 更新模式 或 读取模式：只更新文件名且重命名关时，跳过字幕处理
-    if manager.config.main_mode > 3:
+    if manager.config.main_mode in (4, 5):
         if manager.config.update_mode == "c" and not eff_success_file_rename():
             return
 

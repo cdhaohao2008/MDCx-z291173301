@@ -144,6 +144,56 @@ async def move_other_file(
                 LogBuffer.log().write(f"\n 🍀 Move {old_file} done!")
 
 
+async def move_mediainfo(
+    folder_old_path: Path,
+    folder_new_path: Path,
+    file_name: str,
+    naming_rule: str,
+) -> None:
+    """随视频同步移动同名 ``-mediainfo.json``，并按新文件名重命名。
+
+    整理模式不下载、不刮削，只整理已有文件；``move_other_file`` 在同目录时
+    会直接返回，且移动其他文件时不会改名，因此 Mediainfo 需要单独处理。
+    """
+    if manager.config.soft_link != 0:
+        return
+    if not (eff_success_file_move() or eff_success_file_rename()):
+        return
+
+    old_stem = Path(file_name).stem.lower()
+    target = folder_new_path / f"{naming_rule}-mediainfo.json"
+    search_dirs = [folder_old_path]
+    if folder_new_path != folder_old_path:
+        search_dirs.append(folder_new_path)
+
+    for search_dir in search_dirs:
+        if not await aiofiles.os.path.isdir(search_dir):
+            continue
+        try:
+            names = await aiofiles.os.listdir(search_dir)
+        except OSError:
+            continue
+        exact = f"{old_stem}-mediainfo.json"
+        candidates = [name for name in names if name.lower() == exact]
+        if not candidates:
+            candidates = [
+                name for name in names if name.lower().startswith(old_stem) and name.lower().endswith("-mediainfo.json")
+            ]
+        for name in candidates:
+            source = search_dir / name
+            if source == target:
+                return
+            if await aiofiles.os.path.exists(target):
+                LogBuffer.log().write(f"\n 🍀 Mediainfo 已存在，跳过: {target.name}")
+                return
+            try:
+                await move_file_async(source, target)
+                LogBuffer.log().write(f"\n 🍀 Move {name} -> {target.name} done!")
+            except Exception as e:
+                LogBuffer.error().write(f"移动 Mediainfo 失败: {source} ({e!s})")
+            return
+
+
 async def copy_trailer_to_theme_videos(folder_new_path: Path, naming_rule: str) -> None:
     start_time = time.time()
     download_files = manager.config.download_files
@@ -458,11 +508,16 @@ def get_success_list() -> None:
     ui_hooks.view_success_file_settext(f"查看 ({success_total})")
 
 
-async def movie_lists(ignore_dirs: list[Path], media_type: list[str], movie_path: Path) -> list[Path]:
+async def movie_lists(
+    ignore_dirs: list[Path],
+    media_type: list[str],
+    movie_path: Path,
+    include_success: bool = False,
+) -> list[Path]:
     start_time = time.time()
     total = []
     skip_list = ["skip", ".skip", ".ignore"]
-    not_skip_success = NoEscape.SKIP_SUCCESS_FILE not in manager.config.no_escape
+    not_skip_success = include_success or NoEscape.SKIP_SUCCESS_FILE not in manager.config.no_escape
 
     log_console.show_traceback_log("🔎 遍历待刮削目录....")
 
@@ -571,15 +626,21 @@ async def get_movie_list(file_mode: FileMode, movie_path: Path, ignore_dirs: lis
             log_console.log_text(f" 🖥 Movie path: {movie_path}")
             log_console.log_text(" 🔎 Searching all videos, Please wait...")
             ui_hooks.set_label_file_path(f"正在遍历待刮削视频目录中的所有视频，请等待...\n {movie_path}")
-            if (
-                NoEscape.FOLDER in manager.config.no_escape
-                or manager.config.main_mode == 4
-                or manager.config.main_mode == 5
-            ):
+            if NoEscape.FOLDER in manager.config.no_escape or manager.config.main_mode in (4, 5, 6):
                 ignore_dirs = []
+            media_type = list(manager.config.media_type)
+            organize_mode = manager.config.main_mode == 6
+            # 整理模式需要扫描已刮削成功的文件，并处理 STRM 链接文件
+            if organize_mode and ".strm" not in (ext.lower() for ext in media_type):
+                media_type.append(".strm")
             try:
                 # 获取所有需要刮削的影片列表
-                movie_list = await movie_lists(ignore_dirs, manager.config.media_type, movie_path)
+                movie_list = await movie_lists(
+                    ignore_dirs,
+                    media_type,
+                    movie_path,
+                    include_success=organize_mode,
+                )
             except Exception:
                 log_console.show_traceback_log(traceback.format_exc())
                 log_console.log_text(traceback.format_exc())
@@ -784,7 +845,8 @@ async def check_file(file_path: Path, file_escape_size: float) -> bool:
     if not await aiofiles.os.path.exists(file_path):
         LogBuffer.error().write("文件不存在")
         return False
-    if NoEscape.NO_SKIP_SMALL_FILE not in manager.config.no_escape:
+    # STRM 只是链接文本，不能用视频文件大小阈值过滤
+    if file_path.suffix.lower() != ".strm" and NoEscape.NO_SKIP_SMALL_FILE not in manager.config.no_escape:
         try:
             file_size = await aiofiles.os.path.getsize(file_path) / float(1024 * 1024)
         except OSError:
@@ -851,7 +913,7 @@ async def move_bif(old_dir: Path, new_dir: Path, file_name: str, naming_rule: st
 async def move_trailer_video(old_dir: Path, new_dir: Path, file_name: str, naming_rule: str) -> None:
     if manager.config.main_mode < 2 and not eff_success_file_move() and not eff_success_file_rename():
         return
-    if manager.config.main_mode > 3:
+    if manager.config.main_mode in (4, 5):
         update_mode = manager.config.update_mode
         if update_mode == "c" and not eff_success_file_rename():
             return
