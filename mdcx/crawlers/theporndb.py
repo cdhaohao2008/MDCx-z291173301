@@ -124,6 +124,12 @@ def _normalize_date(value) -> str:
     return str(value).strip()[:10]
 
 
+def _site_dict(data: dict) -> dict:
+    """安全取出 site 对象；缺失或类型异常时返回空字典。"""
+    site = data.get("site")
+    return site if isinstance(site, dict) else {}
+
+
 def get_real_url(res_search, file_path, series_ex, date, kind: TheporndbKind):
     search_data = res_search.get("data") if isinstance(res_search, dict) else None
     if not isinstance(search_data, list) or not search_data:
@@ -150,7 +156,7 @@ def get_real_url(res_search, file_path, series_ex, date, kind: TheporndbKind):
             if not slug:
                 continue
             res_id_url = f"https://api.theporndb.net/{kind}/{slug}"
-            site = each.get("site") if isinstance(each.get("site"), dict) else {}
+            site = _site_dict(each)
             res_series = str(site.get("short_name") or "")
             # 站点 slug 里的连字符不参与比较（TeamSkeet -> team-skeet.com）。
             res_url = str(site.get("url") or "").lower().replace("-", "")
@@ -340,7 +346,7 @@ class ThepornDBCrawler(BaseCrawler):
             slug = each.get("slug")
             if not slug or slug in seen:
                 continue
-            site = each.get("site") if isinstance(each.get("site"), dict) else {}
+            site = _site_dict(each)
             site_name = str(site.get("short_name") or "").lower()
             site_url = str(site.get("url") or "").lower()
             # 同样忽略站点名/域名里的连字符，避免 TeamSkeet 与 team-skeet.com 对不上。
