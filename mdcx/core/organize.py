@@ -8,7 +8,7 @@ import aiofiles.os
 
 from ..config.manager import manager
 from ..models.log_buffer import LogBuffer
-from ..utils.file import copy_then_delete_file, elevated_move_file, move_file_async
+from ..utils.file import elevated_move_file, move_file_async
 
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 _ORGANIZE_BACKUP_MARK = ".mdcx_organize_backup_"
@@ -60,8 +60,9 @@ class OrganizePlanError(Exception):
 class OrganizeTransaction:
     """整理模式的移动事务：任一文件失败则把已移动文件全部退回原位置。"""
 
-    def __init__(self) -> None:
+    def __init__(self, *, elevated: bool = False) -> None:
         self._ops: list[tuple[str, Path, Path]] = []
+        self._elevated = elevated
 
     async def _exists(self, path: Path) -> bool:
         try:
@@ -82,22 +83,18 @@ class OrganizeTransaction:
             return False
 
     async def _move_once(self, src: Path, dst: Path) -> tuple[bool, str]:
-        """普通移动失败后，先管理员重试一次，再用复制+删除兜底网络盘。"""
+        """整理只做直接移动；管理员重试只在整个任务队列结束后统一执行。"""
         if not await self._ensure_parent(dst):
             return False, f"无法创建目标目录: {dst.parent}"
+        if self._elevated:
+            elevated_ok, elevated_error = await elevated_move_file(src, dst)
+            if elevated_ok and await self._exists(dst) and not await self._exists(src):
+                return True, ""
+            return False, f"管理员移动失败: {elevated_error or '未完成'}"
         result, error = await move_file_async(src, dst, overwrite=True)
         if result and await self._exists(dst) and not await self._exists(src):
             return True, ""
-        elevated_ok, elevated_error = await elevated_move_file(src, dst)
-        if elevated_ok:
-            return True, ""
-        # WebDAV / 部分网盘映射盘不支持 rename；复制成功后再删除源文件。
-        copy_ok, copy_error = await copy_then_delete_file(src, dst)
-        if copy_ok:
-            return True, ""
-        return False, (
-            f"普通移动失败: {error or '未完成'}; 管理员重试失败: {elevated_error}; 复制后删除失败: {copy_error}"
-        )
+        return False, f"直接移动失败: {error or '未完成'}"
 
     async def move_file(self, src: str | Path, dst: str | Path) -> tuple[bool, str]:
         src = Path(src)
@@ -475,10 +472,12 @@ async def organize_files(
     poster_final_path: Path,
     thumb_final_path: Path,
     fanart_final_path: Path,
+    elevated: bool = False,
 ) -> tuple[bool, str]:
     """按命名规则原子地整理当前番号的视频/STRM 及其全部伴生文件。
 
     返回 ``(成功, 错误信息)``。失败时会回滚已移动文件，源文件保持在原目录。
+    ``elevated=True`` 用于所有其他番号处理完成后，对失败番号统一做一次管理员重试。
     """
     try:
         plan = await _build_plan(
@@ -504,7 +503,7 @@ async def organize_files(
     if not plan:
         return True, ""
 
-    transaction = OrganizeTransaction()
+    transaction = OrganizeTransaction(elevated=elevated)
     try:
         for src, dst in plan:
             ok, error = await transaction.move_file(src, dst)

@@ -177,7 +177,7 @@ def test_organize_mode_ui_texts():
     assert label is not None
     assert (
         label.findtext("property[@name='text']/string")
-        == "执行：刮削->整理文件->重命名->移动文件操作，适合需要海报墙的情况"
+        == "执行：刮削->整理文件->重命名->移动文件全部操作，适合需要海报墙的情况"
     )
 
 
@@ -237,15 +237,7 @@ async def test_organize_files_rolls_back_when_video_move_fails(monkeypatch: pyte
             return False, "mock move failure"
         return await real_move_file_async(src, dst, overwrite=overwrite)
 
-    async def failed_elevated(_src, _dst):
-        return False, "mock elevated failure"
-
-    async def failed_copy(_src, _dst):
-        return False, "mock copy failure"
-
     monkeypatch.setattr(organize_module, "move_file_async", flaky_move)
-    monkeypatch.setattr(organize_module, "elevated_move_file", failed_elevated)
-    monkeypatch.setattr(organize_module, "copy_then_delete_file", failed_copy)
 
     old_folder = tmp_path / "old"
     new_folder = tmp_path / "new"
@@ -432,23 +424,27 @@ async def test_organize_commit_removes_overwritten_backup(monkeypatch: pytest.Mo
 
 
 @pytest.mark.asyncio
-async def test_organize_copy_fallback_moves_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+async def test_organize_transaction_uses_elevated_only_in_retry_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    from mdcx.utils.file import move_file_async as real_move_file_async
+
     async def failed_move(_src, _dst, *, overwrite: bool = False):
         return False, "mock move failure"
 
-    async def failed_elevated(_src, _dst):
-        return False, "mock elevated failure"
+    async def elevated_move(src, dst):
+        return await real_move_file_async(src, dst, overwrite=True)
 
     monkeypatch.setattr(organize_module, "move_file_async", failed_move)
-    monkeypatch.setattr(organize_module, "elevated_move_file", failed_elevated)
+    monkeypatch.setattr(organize_module, "elevated_move_file", elevated_move)
 
     source = tmp_path / "source.jpg"
     target = tmp_path / "target.jpg"
     source.write_bytes(b"image")
-    transaction = organize_module.OrganizeTransaction()
 
-    ok, error = await transaction._move_once(source, target)
+    ok, _error = await organize_module.OrganizeTransaction()._move_once(source, target)
+    assert ok is False
+    assert source.exists()
 
+    ok, error = await organize_module.OrganizeTransaction(elevated=True)._move_once(source, target)
     assert ok, error
     assert target.read_bytes() == b"image"
     assert not source.exists()
@@ -535,6 +531,25 @@ async def test_organize_batch_stops_when_file_list_is_shorter_than_task_count(
     await asyncio.wait_for(scraper._run_tasks_with_limit(files, 5, 2), timeout=1)
 
     assert sorted(processed) == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_run_tasks_triggers_deferred_organize_retry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    scraper = Scraper(object())  # type: ignore[arg-type]
+    retried: list[bool] = []
+
+    async def fake_process(_file_info):
+        scraper._pending_organize_retries.append(object())  # type: ignore[arg-type]
+
+    async def fake_retry() -> None:
+        retried.append(True)
+
+    monkeypatch.setattr(scraper, "process_one_file", fake_process)
+    monkeypatch.setattr(scraper, "_retry_pending_organize_files", fake_retry)
+
+    await scraper._run_tasks_with_limit([tmp_path / "1.mp4"], 1, 1)
+
+    assert retried == [True]
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import time
 import traceback
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -134,6 +135,28 @@ class StopScrape(Exception): ...
 class UnexpectedScrapeCancellation(Exception): ...
 
 
+@dataclass(slots=True)
+class _OrganizeRetryTask:
+    """整理移动失败的番号，等全部任务结束后统一做一次管理员重试。"""
+
+    file_path: Path
+    file_new_path: Path
+    folder_old_path: Path
+    folder_new_path: Path
+    nfo_new_path: Path
+    naming_rule: str
+    number: str
+    sub_list: list[str]
+    poster_final_path: Path
+    thumb_final_path: Path
+    fanart_final_path: Path
+    file_info: FileInfo
+    res: CrawlersResult
+    other: OtherInfo
+    show_name: str
+    error: str
+
+
 def append_unique_paths(target: list[Path], extras: list[Path]) -> list[Path]:
     """把 extras 里不在 target 中的路径追加进 target，返回本次新增的部分。
 
@@ -172,8 +195,12 @@ class Scraper:
         self._rest_lock = asyncio.Lock()
         self._state_cache: ScrapeStateCache | None = None
         self._organize_batch_size = 0
+        self._pending_organize_retries: list[_OrganizeRetryTask] = []
+        self._deferred_organize_paths: set[Path] = set()
 
     async def _run_tasks_with_limit(self, movie_list: list[Path], task_count: int, thread_number: int) -> None:
+        self._pending_organize_retries.clear()
+        self._deferred_organize_paths.clear()
         task_iter = iter(enumerate(movie_list, 1))
         running_tasks: set[asyncio.Task[None]] = set()
         batch_size = self._organize_batch_size if self._organize_batch_size > 0 else task_count
@@ -259,6 +286,104 @@ class Scraper:
             if running_tasks:
                 await asyncio.gather(*running_tasks, return_exceptions=True)
             raise
+
+        if self._pending_organize_retries:
+            await self._retry_pending_organize_files()
+
+    async def _retry_pending_organize_files(self) -> None:
+        """其他番号全部处理完后，对整理失败的番号统一做一次管理员重试。"""
+        tasks = self._pending_organize_retries
+        if not tasks:
+            return
+        signal.show_log_text(f" 🛠 其他番号已处理完成，开始用管理员权限统一重试 {len(tasks)} 个整理失败的番号...")
+        for index, task in enumerate(tasks):
+            if signal.stop or Flags.stop_requested:
+                for pending in tasks[index:]:
+                    self._deferred_organize_paths.discard(pending.file_path)
+                    await self._record_organize_failure(pending, "用户停止，未执行管理员重试")
+                break
+            self._deferred_organize_paths.discard(task.file_path)
+            signal.set_label_file_path.emit(f"管理员重试整理：{task.file_path}")
+            LogBuffer.new_root()
+            try:
+                moved, error = await organize_files(
+                    file_path=task.file_path,
+                    file_new_path=task.file_new_path,
+                    folder_old_path=task.folder_old_path,
+                    folder_new_path=task.folder_new_path,
+                    nfo_new_path=task.nfo_new_path,
+                    naming_rule=task.naming_rule,
+                    number=task.number,
+                    sub_list=task.sub_list,
+                    poster_final_path=task.poster_final_path,
+                    thumb_final_path=task.thumb_final_path,
+                    fanart_final_path=task.fanart_final_path,
+                    elevated=True,
+                )
+            except Exception as e:
+                moved, error = False, str(e)
+            finally:
+                LogBuffer.clear_task()
+            if moved:
+                await self._record_organize_success(task)
+            else:
+                await self._record_organize_failure(task, error)
+        self._pending_organize_retries.clear()
+        signal.label_result.emit(f" 整理完成 成功：{Flags.succ_count} 失败：{Flags.fail_count}")
+
+    async def _record_organize_success(self, task: _OrganizeRetryTask) -> None:
+        if await aiofiles.os.path.exists(task.file_new_path):
+            task.file_info.file_path = task.file_new_path
+        await save_success_list(task.file_path, task.file_new_path)
+        if await aiofiles.os.path.exists(task.poster_final_path):
+            task.other.poster_path = task.poster_final_path
+        if await aiofiles.os.path.exists(task.fanart_final_path):
+            task.other.fanart_path = task.fanart_final_path
+        if await aiofiles.os.path.exists(task.thumb_final_path):
+            task.other.thumb_path = task.thumb_final_path
+        elif task.other.fanart_path is not None:
+            task.other.thumb_path = task.other.fanart_path
+
+        show_data = ShowData.empty()
+        show_data.file_info = task.file_info
+        show_data.data = task.res
+        show_data.other = task.other
+        Flags.succ_count = await Flags.increment("succ_count")
+        show_data.show_name = (
+            str(Flags.count_claw)
+            + "-"
+            + str(Flags.succ_count)
+            + "."
+            + task.show_name
+            + ("-" if task.file_info.definition else "")
+            + task.file_info.definition
+        )
+        signal.show_list_name("succ", show_data, task.number)
+        signal.show_log_text(f" 🍀 管理员重试整理成功：{task.file_path} -> {task.file_new_path}")
+
+    async def _record_organize_failure(self, task: _OrganizeRetryTask, error: str) -> None:
+        Flags.fail_count = await Flags.increment("fail_count")
+        show_data = ShowData.empty()
+        show_data.file_info = task.file_info
+        show_data.data = task.res
+        show_data.other = task.other
+        show_data.show_name = (
+            str(Flags.count_claw)
+            + "-"
+            + str(Flags.fail_count)
+            + "."
+            + task.show_name
+            + ("-" if task.file_info.definition else "")
+            + task.file_info.definition
+        )
+        signal.show_list_name("fail", show_data, task.number)
+        error_msg = error or task.error or "未知错误"
+        LogBuffer.log().write(f"\n 🔴 [整理失败] Reason: {error_msg}")
+        with Flags.guarded():
+            Flags.failed_list.append((task.file_path, error_msg))
+        await self._failed_file_info_show(str(Flags.fail_count), task.file_path, error_msg)
+        signal.view_failed_list_settext.emit(f"失败 {Flags.fail_count}")
+        signal.show_log_text(f" 🔴 管理员重试整理失败，相关文件已保留在原目录：{task.file_path}")
 
     async def run(self, file_mode: FileMode, movie_list: list[Path] | None) -> None:
         try:
@@ -735,6 +860,9 @@ class Scraper:
                         )
                     except Exception:
                         pass
+            elif manager.config.main_mode == ORGANIZE_MAIN_MODE and file_path in self._deferred_organize_paths:
+                # 首次直接移动失败：不计失败，等全部番号处理完再统一管理员重试。
+                LogBuffer.log().write("\n 🟡 整理失败已排队，等待全部番号处理完成后统一管理员重试。")
             else:
                 Flags.fail_count = await Flags.increment("fail_count")
                 show_data.show_name = (
@@ -1492,6 +1620,28 @@ class Scraper:
             )
             if not moved:
                 LogBuffer.error().write(error)
+                self._deferred_organize_paths.add(file_path)
+                self._pending_organize_retries.append(
+                    _OrganizeRetryTask(
+                        file_path=file_path,
+                        file_new_path=organize_file_path,
+                        folder_old_path=folder_old_path,
+                        folder_new_path=organize_folder,
+                        nfo_new_path=nfo_new_path,
+                        naming_rule=naming_rule,
+                        number=movie_number or res.number,
+                        sub_list=list(sub_list),
+                        poster_final_path=poster_final_path,
+                        thumb_final_path=thumb_final_path,
+                        fanart_final_path=fanart_final_path,
+                        file_info=file_info,
+                        res=res,
+                        other=other,
+                        show_name=file_info.file_show_name,
+                        error=error or "未知错误",
+                    )
+                )
+                LogBuffer.log().write("\n 🟡 整理移动失败，已加入统一管理员重试队列；相关文件已回滚并保留在原目录。")
                 return None, None
             if await aiofiles.os.path.exists(organize_file_path):
                 file_info.file_path = organize_file_path

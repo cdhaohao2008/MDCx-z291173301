@@ -481,41 +481,6 @@ async def elevated_move_file(old: str | Path, new: str | Path) -> tuple[bool, st
     return False, f"提权移动失败: {old} -> {new}"
 
 
-async def copy_then_delete_file(old: str | Path, new: str | Path) -> tuple[bool, str]:
-    """复制后删除源文件，作为网络盘/WebDAV 不支持重命名时的移动兜底。"""
-    old = Path(old)
-    new = Path(new)
-    try:
-        await asyncio.to_thread(new.parent.mkdir, parents=True, exist_ok=True)
-        await asyncio.to_thread(_copy_then_delete_sync, old, new)
-    except Exception as e:
-        return False, f"复制后删除失败: {old} -> {new}; {e}"
-    if await aiofiles.os.path.exists(new) and not await aiofiles.os.path.exists(old):
-        return True, ""
-    return False, f"复制后删除未完成: {old} -> {new}"
-
-
-def _copy_then_delete_sync(old: Path, new: Path) -> None:
-    """用 copyfile 代替 rename，兼容 WebDAV/SMB 等不支持原子重命名的存储。"""
-    try:
-        shutil.copyfile(old, new)
-        try:
-            old_size = old.stat().st_size
-            new_size = new.stat().st_size
-        except OSError:
-            old_size = new_size = -1
-        if old_size >= 0 and new_size >= 0 and old_size != new_size:
-            raise OSError(f"复制后大小不一致: {old_size} != {new_size}")
-        old.unlink()
-    except BaseException:
-        # 复制失败时清理半成品，源文件保持不动。
-        try:
-            new.unlink(missing_ok=True)
-        except OSError:
-            pass
-        raise
-
-
 async def copy_file_async(old: str | Path, new: str | Path):
     """异步复制文件"""
     old = Path(old)
