@@ -10,18 +10,31 @@
     1. 两条动作永远排在「复制站点」之前，按当前状态互斥置灰；
     2. 默认没有禁用站点，点「禁用站点」后候选区与启用列表同时灰显；
     3. 再点「启用站点」恢复；
-    4. 灰显只影响绘制，项目仍可选中、拖拽、右键（只是不参与检测/刮削）。
+    4. 灰显只影响绘制，项目仍可选中、拖拽、右键（只是不参与检测/刮削）；
+    5. 启用/禁用立即通知调用方保存，不等窗口最下方的「保存」。
 """
+
+import sys
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
 pytest.importorskip("PyQt6.QtWidgets")
 
 from PyQt6.QtCore import QPoint, Qt  # noqa: E402
-from PyQt6.QtWidgets import QApplication, QMenu, QStyle, QStyleOptionViewItem  # noqa: E402
+from PyQt6.QtWidgets import (  # noqa: E402
+    QApplication,
+    QDialog,
+    QLineEdit,
+    QMenu,
+    QStyle,
+    QStyleOptionViewItem,
+    QWidget,
+)
 
-from mdcx.config.enums import Website  # noqa: E402
+from mdcx.config.enums import FixedScrapingType, Website  # noqa: E402
 from mdcx.config.models import Config  # noqa: E402
+from mdcx.controllers.main_window import site_priority_dialog  # noqa: E402
 from mdcx.controllers.main_window.site_priority_dialog import (  # noqa: E402
     SITE_DISABLED_ROLE,
     SiteListEditorDialog,
@@ -91,6 +104,58 @@ def _toggle(dlg, list_widget, site: Website, action_text: str, monkeypatch) -> N
 
 def test_default_config_has_no_disabled_sites():
     assert Config().website_disabled == []
+
+
+def test_toggle_site_disabled_notifies_immediately(qt_app):
+    changed: list[list[Website]] = []
+    dlg = SiteListEditorDialog(
+        "t",
+        [Website.DMM],
+        SITES,
+        None,
+        on_disabled_sites_changed=lambda sites: changed.append(list(sites)),
+    )
+    try:
+        _shown(dlg)
+        dlg._toggle_site_disabled(Website.DMM, True)
+        assert changed == [[Website.DMM]]
+
+        dlg._toggle_site_disabled(Website.DMM, False)
+        assert changed == [[Website.DMM], []]
+    finally:
+        dlg.deleteLater()
+
+
+def test_open_site_editor_saves_disabled_site_without_accept(qt_app, monkeypatch):
+    """点「禁用站点」当场写配置；随后点取消也不会把这份禁用状态回滚。"""
+    window = QWidget()
+    window._type_website_ui = {
+        FixedScrapingType.YOUMA: SimpleNamespace(title="有码", line_edit=QLineEdit("DMM")),
+    }
+    config = Config()
+    saves: list[list[Website]] = []
+    fake_manager = SimpleNamespace(config=config, save=lambda: saves.append(list(config.website_disabled)))
+    fake_manager_module = ModuleType("mdcx.config.manager")
+    fake_manager_module.manager = fake_manager
+    monkeypatch.setitem(sys.modules, "mdcx.config.manager", fake_manager_module)
+    monkeypatch.setattr(
+        site_priority_dialog,
+        "get_registered_crawler_site_values",
+        lambda: [Website.DMM.value, Website.MGSTAGE.value],
+    )
+
+    def fake_exec(dialog):
+        dialog._toggle_site_disabled(Website.DMM, True)
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(SiteListEditorDialog, "exec", fake_exec)
+    try:
+        site_priority_dialog._open_site_editor(window, FixedScrapingType.YOUMA)
+    finally:
+        window.deleteLater()
+
+    assert config.website_disabled == [Website.DMM]
+    assert saves == [[Website.DMM]]
 
 
 def test_disabled_actions_are_above_copy_and_follow_state(qt_app, monkeypatch):

@@ -1,5 +1,5 @@
 # mypy: ignore-errors
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING
@@ -1075,6 +1075,7 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         parent: QWidget | None = None,
         *,
         disabled_sites: list[Website] | None = None,
+        on_disabled_sites_changed: Callable[[list[Website]], None] | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -1086,6 +1087,9 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         # 禁用是全局状态：同一个站点在七个类型组里共用一份名单，打开哪个类型的
         # 编辑窗口都读同一份 website_disabled。
         self._disabled_sites = list(dict.fromkeys(disabled_sites or []))
+        # 启用/禁用立即落盘：用户要求不点「保存」也记住，因此每次切换后通知调用方
+        # 写回 config.json；其余站点增删与排序仍由窗口最下方的「保存」统一提交。
+        self._on_disabled_sites_changed = on_disabled_sites_changed
         # 可用网站（网址源）的候选区：先排六个类型分组标题，紧跟着按组铺全部站点
         # （见 grouped_palette_groups / palette_site_order）。_all_sites 的原序仍然保留着：
         # 它是「全部添加」写入启用列表的顺序，也是拖拽插入时的落点参照，都属于用户
@@ -1127,8 +1131,8 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
             "双击一个标题即加入该组全部网站，"
             "后面紧跟全部可用网站（按名称 A-Z 排序、每个站只出现一次）。"
             "右键站点可启用/禁用或复制该站点，右键标题复制本组名单、空白处复制整张列表，"
-            "最下方另有「加入列表：启用网站」。禁用后的站点整体变灰，"
-            "网络检测、字段刮削、图片下载等环节全部跳过"
+            "最下方另有「加入列表：启用网站」。启用/禁用会立即保存，不需要点保存按钮。"
+            "禁用后的站点整体变灰，网络检测、字段刮削、图片下载等环节全部跳过"
         )
         copy_hint.setWordWrap(True)
         copy_hint.setStyleSheet(f"color: {get_theme_tokens(self._dark)['text_muted']};")
@@ -1194,7 +1198,7 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         return list(self._disabled_sites)
 
     def _toggle_site_disabled(self, site: Website, disabled: bool) -> None:
-        """启用/禁用站点：候选区与启用列表同步灰显，取消对话框则整体不落盘。"""
+        """启用/禁用站点：同步灰显并立即通知调用方保存，不等对话框点「保存」。"""
         site = Website(site)
         if disabled:
             if site not in self._disabled_sites:
@@ -1205,6 +1209,8 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         for list_widget in (self.available_list, self.selected_list):
             list_widget.disabled_sites = disabled_set
         self._refresh_lists()
+        if self._on_disabled_sites_changed is not None:
+            self._on_disabled_sites_changed(self.disabled_sites())
 
     def _sync_selected_from_list(self) -> None:
         self._selected_sites = self.selected_sites()
@@ -1599,12 +1605,17 @@ def _open_site_editor(window: "MyMAinWindow", scraping_type: FixedScrapingType) 
     all_sites = list(dict.fromkeys(selected_sites + registered_sites))
     from mdcx.config.manager import manager
 
+    def _save_disabled_sites(sites: list[Website]) -> None:
+        manager.config.website_disabled = list(sites)
+        manager.save()
+
     dialog = SiteListEditorDialog(
         f"编辑{info.title}网站源",
         selected_sites,
         all_sites,
         window,
         disabled_sites=manager.config.website_disabled,
+        on_disabled_sites_changed=_save_disabled_sites,
     )
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return
