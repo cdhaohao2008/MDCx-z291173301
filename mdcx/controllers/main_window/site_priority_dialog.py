@@ -5,7 +5,7 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QPoint, Qt, QTimer
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -293,6 +293,7 @@ def _site_priority_colors(dark: bool) -> dict[str, str]:
             "surface_muted": "#202B37",
             "surface_hover": "#263442",
             "surface_pressed": "#303D4B",
+            "surface_disabled": "#303D4B",
             "text": tokens["text"],
             "text_muted": tokens["text_muted"],
             "border": tokens["border"],
@@ -304,6 +305,7 @@ def _site_priority_colors(dark: bool) -> dict[str, str]:
         "surface_muted": "#F8FAFC",
         "surface_hover": "#F3F4F6",
         "surface_pressed": "#E5E7EB",
+        "surface_disabled": "#E5E7EB",
         "text": tokens["text"],
         "text_muted": tokens["text_muted"],
         "border": tokens["border"],
@@ -340,17 +342,43 @@ SITE_DISABLED_ROLE = Qt.ItemDataRole.UserRole + 3
 
 
 class _SiteItemDelegate(QStyledItemDelegate):
-    """让禁用站点走 QSS 的 `:disabled` 分支，同时保留选中、拖拽与右键能力。
+    """禁用站点画成灰底，同时保留选中、拖拽与右键能力。
 
     直接摘掉 ItemIsEnabled 会让站点既不能再选中也不能拖出去，和「只是不再参与
-    网络检测/刮削」的语义不符；这里只在绘制时清掉 State_Enabled，项目本身的
-    flags 不动。
+    网络检测/刮削」的语义不符；但保留 flags 又不会命中 QSS 的 `:disabled` 分支，
+    所以灰底由本委托自己画。状态只改绘制，项目 flags 一律不动。
     """
+
+    def __init__(self, parent=None, *, background: str, border: str, text: str):
+        super().__init__(parent)
+        self._background = QColor(background)
+        self._border = QColor(border)
+        self._text = QColor(text)
 
     def initStyleOption(self, option, index) -> None:  # noqa: N802
         super().initStyleOption(option, index)
         if bool(index.data(SITE_DISABLED_ROLE)):
             option.state &= ~QStyle.StateFlag.State_Enabled
+
+    def paint(self, painter, option, index) -> None:
+        if not bool(index.data(SITE_DISABLED_ROLE)):
+            super().paint(painter, option, index)
+            return
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        # 与 QSS 的 item 圆角/边距保持一致：margin 3px、圆角 7px、左右内边距 9px。
+        rect = option.rect.adjusted(3, 3, -3, -3)
+        painter.setPen(QPen(self._border, 1))
+        painter.setBrush(self._background)
+        painter.drawRoundedRect(rect, 7, 7)
+        painter.setPen(self._text)
+        painter.setFont(option.font)
+        painter.drawText(
+            rect.adjusted(9, 0, -9, 0),
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            str(index.data(Qt.ItemDataRole.DisplayRole) or ""),
+        )
+        painter.restore()
 
 
 def _make_site_item(site: Website, *, disabled: bool = False) -> QListWidgetItem:
@@ -568,16 +596,16 @@ def _style_site_list(list_widget: QListWidget, min_height: int, dark: bool = Fal
             border: 1px solid {colors["border_active"]};
             background: {colors["surface_pressed"]};
         }}
-        QListWidget::item:disabled,
-        QListWidget::item:disabled:hover,
-        QListWidget::item:disabled:selected {{
-            color: {colors["text_muted"]};
-            border: 1px solid {colors["border"]};
-            background: {colors["surface_muted"]};
-        }}
         """
     )
-    list_widget.setItemDelegate(_SiteItemDelegate(list_widget))
+    list_widget.setItemDelegate(
+        _SiteItemDelegate(
+            list_widget,
+            background=colors["surface_disabled"],
+            border=colors["border"],
+            text=colors["text_muted"],
+        )
+    )
     # 右键：点在某个站点上复制该站点，点在空白处（或分组标题上）复制整张列表。
     # 复制出的文本用逗号分隔，和设置页输入框里的格式一致，粘回去就能被 _parse_sites 认出来。
     list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

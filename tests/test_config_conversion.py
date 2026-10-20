@@ -426,6 +426,22 @@ def test_legacy_main_mode_remapped_exactly_once():
     assert data["main_mode"] == 3
 
 
+def test_website_disabled_old_config_defaults_and_never_bumps_version():
+    """旧配置缺 website_disabled 时默认全部启用；写回 JSON 时版本号仍是 2。"""
+    data = {"config_version": CURRENT_CONFIG_VERSION}
+
+    Config.update(data)
+
+    assert data["config_version"] == CURRENT_CONFIG_VERSION
+    config = Config.model_validate(data)
+    assert config.website_disabled == []
+
+    config.website_disabled = [Website.DMM]
+    dumped = json.loads(config.model_dump_json())
+    assert dumped["website_disabled"] == ["DMM"]
+    assert dumped["config_version"] == CURRENT_CONFIG_VERSION
+
+
 def test_config_version_frozen_at_two_everywhere():
     """config_version 统一为 2（用户 2026-10-19 定规），三个版本点必须一致。"""
     assert CURRENT_CONFIG_VERSION == 2

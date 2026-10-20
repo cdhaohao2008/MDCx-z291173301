@@ -25,6 +25,7 @@ from mdcx.config.models import Config  # noqa: E402
 from mdcx.controllers.main_window.site_priority_dialog import (  # noqa: E402
     SITE_DISABLED_ROLE,
     SiteListEditorDialog,
+    _site_priority_colors,
     _SiteItemDelegate,
 )
 
@@ -53,6 +54,14 @@ def _item_of(list_widget, site: Website):
 
 def _center(list_widget, item) -> QPoint:
     return list_widget.visualItemRect(item).center()
+
+
+def _background(list_widget, item) -> str:
+    """取站点框内部靠上的一个像素，避开文字，验证实际绘制出来的底色。"""
+    QApplication.processEvents()
+    rect = list_widget.visualItemRect(item)
+    color = list_widget.viewport().grab().toImage().pixelColor(rect.center().x(), rect.top() + 5)
+    return color.name()
 
 
 def _menu_actions(list_widget, point, monkeypatch) -> list:
@@ -106,6 +115,9 @@ def test_disable_and_enable_site_keeps_palette_and_enabled_list_in_sync(qt_app, 
     dlg = SiteListEditorDialog("t", [Website.DMM, Website.MGSTAGE], SITES, None)
     try:
         _shown(dlg)
+        colors = {key: value.lower() for key, value in _site_priority_colors(dlg._dark).items()}
+        for list_widget in (dlg.available_list, dlg.selected_list):
+            assert _background(list_widget, _item_of(list_widget, Website.DMM)) == colors["surface_muted"]
 
         _toggle(dlg, dlg.available_list, Website.DMM, "禁用站点：DMM", monkeypatch)
 
@@ -114,12 +126,15 @@ def test_disable_and_enable_site_keeps_palette_and_enabled_list_in_sync(qt_app, 
             item = _item_of(list_widget, Website.DMM)
             assert item.data(SITE_DISABLED_ROLE) is True
             assert bool(item.flags() & Qt.ItemFlag.ItemIsEnabled)
+            assert _background(list_widget, item) == colors["surface_disabled"]
 
         _toggle(dlg, dlg.selected_list, Website.DMM, "启用站点：DMM", monkeypatch)
 
         assert dlg.disabled_sites() == []
         for list_widget in (dlg.available_list, dlg.selected_list):
-            assert _item_of(list_widget, Website.DMM).data(SITE_DISABLED_ROLE) is False
+            item = _item_of(list_widget, Website.DMM)
+            assert item.data(SITE_DISABLED_ROLE) is False
+            assert _background(list_widget, item) == colors["surface_muted"]
     finally:
         dlg.deleteLater()
 
