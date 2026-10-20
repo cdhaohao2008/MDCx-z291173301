@@ -387,7 +387,7 @@ def _make_site_item(site: Website, *, disabled: bool = False) -> QListWidgetItem
     item.setData(SITE_DISABLED_ROLE, disabled)
     tooltip = _site_capability_caption(site) or site.value
     if disabled:
-        tooltip = f"{tooltip}\n已禁用：网络检测、字段刮削、图片下载均跳过"
+        tooltip = f"{tooltip}\n已禁用：自动刮削、网络检测、图片兜底跳过；指定网站/单文件/重新刮削仍可用"
     item.setToolTip(tooltip)
     item.setFlags(
         item.flags() | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable

@@ -807,8 +807,15 @@ class FileScraper:
         res.all_actors = list(dict.fromkeys(chain(res.all_actors, web_data_json.actors)))
         return res
 
-    async def _call_specific_crawler(self, task_input: CrawlerInput, website: Website) -> CrawlersResult | None:
-        if _is_site_disabled(self.config, website):
+    async def _call_specific_crawler(
+        self, task_input: CrawlerInput, website: Website, *, allow_disabled: bool = False
+    ) -> CrawlersResult | None:
+        """请求单个站点。
+
+        禁用名单只约束自动刮削；用户明确指定网站（指定网站模式、单文件、重新刮削）时
+        传 allow_disabled=True，即使该站已被禁用也照常请求。
+        """
+        if not allow_disabled and _is_site_disabled(self.config, website):
             LogBuffer.log().write(f"站点 {website.value} 已被禁用，跳过刮削")
             return None
         file_number = task_input.number
@@ -910,7 +917,9 @@ class FileScraper:
                 res = await self._call_crawlers(task_input, classification)
         else:
             classification = classify_scrape_task(task_input, self.config, use_fixed_type=False)
-            res = await self._call_specific_crawler(task_input, website)
+            # 明确指定网站时不受禁用名单影响：全自动刮削与指定网站刮削是两条不同路径，
+            # 禁用只用于把站点排除出自动刮削。
+            res = await self._call_specific_crawler(task_input, website, allow_disabled=True)
 
         # ================================================网站请求结束================================================
         # ======================================超时或未找到返回

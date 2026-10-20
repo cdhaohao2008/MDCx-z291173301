@@ -640,7 +640,8 @@ async def test_call_crawlers_all_sites_disabled_returns_none(monkeypatch: pytest
 
 
 @pytest.mark.asyncio
-async def test_call_specific_crawler_skips_disabled_site():
+async def test_call_specific_crawler_skips_disabled_site_for_auto_route():
+    """自动路由命中禁用站时仍然跳过；只有用户明确指定才放行。"""
     records: list[tuple[str, str]] = []
     provider = _RecordingCrawlerProvider({Website.JAVDB: _RecordingCrawler(Website.JAVDB, records)})
     config = Config(website_disabled=[Website.JAVDB])
@@ -652,6 +653,45 @@ async def test_call_specific_crawler_skips_disabled_site():
 
     assert result is None
     assert records == []
+
+
+@pytest.mark.asyncio
+async def test_auto_forced_route_still_skips_disabled_site():
+    """MyWife 等自动强制单站路由仍属于自动刮削，禁用后必须继续跳过。"""
+    records: list[tuple[str, str]] = []
+    provider = _RecordingCrawlerProvider({Website.MYWIFE: _RecordingCrawler(Website.MYWIFE, records)})
+    config = Config(website_disabled=[Website.MYWIFE])
+    scraper = FileScraper(config, provider)
+    task_input = CrawlTask.empty()
+    task_input.number = "MYWIFE-1500"
+    task_input.file_path = Path("D:/test/mywife/MYWIFE-1500.mp4")
+
+    result = await scraper._crawl(task_input, None)
+
+    assert result is None
+    assert records == []
+
+
+@pytest.mark.asyncio
+async def test_specified_site_still_scrapes_when_site_disabled():
+    """禁用只排除自动刮削；指定网站模式选中的禁用站仍要正常请求并返回结果。"""
+    records: list[tuple[str, str]] = []
+    provider = _RecordingCrawlerProvider({Website.JAVDB: _RecordingCrawler(Website.JAVDB, records)})
+    config = Config(
+        scrape_like="single",
+        website_single=Website.JAVDB,
+        website_disabled=[Website.JAVDB],
+    )
+    scraper = FileScraper(config, provider)
+    task_input = CrawlTask.empty()
+    task_input.number = "SCUTE-1354"
+
+    result = await scraper.run(task_input, FileMode.Default)
+
+    assert result is not None
+    assert result.title == "ok"
+    assert result.field_sources[CrawlerResultFields.TITLE] == Website.JAVDB.value
+    assert records == [(Website.JAVDB.value, "SCUTE-1354")]
 
 
 @pytest.mark.asyncio
