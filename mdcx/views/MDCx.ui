@@ -6261,7 +6261,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   <string notr="true">color: rgb(8, 128, 128);</string>
                                 </property>
                                 <property name="text">
-                                  <string>不勾选，不删除已下载的图片和信息文件</string>
+                                  <string>不勾选，不删除已下载图片和信息文件</string>
                                 </property>
                               </widget>
                             </item>
