@@ -2,12 +2,13 @@
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, override
 from urllib.parse import urljoin
 
 from lxml import etree
 
-from .base import Context, CrawlerData, CrawlerException, get_year
+from ..config.enums import Website
+from .base import BaseCrawler, Context, CrawlerData, CrawlerException, get_year
 
 UncensoredOfficialSite = Literal["caribbeancom", "heyzo", "1pondo", "pacopacomama", "10musume"]
 
@@ -232,8 +233,23 @@ def json_url_for_uncensored_official(site: UncensoredOfficialSite, movie_id: str
     return f"{spec.json_base_url}/dyn/phpauto/movie_details/movie_id/{movie_id}.json"
 
 
-async def crawl_uncensored_official(ctx: Context, client, number: str) -> CrawlerData | None:
-    site = route_uncensored_official(number)
+async def crawl_uncensored_official(
+    ctx: Context,
+    client,
+    number: str,
+    *,
+    forced_site: UncensoredOfficialSite | None = None,
+) -> CrawlerData | None:
+    routed_site = route_uncensored_official(number)
+    site: UncensoredOfficialSite | None
+    if forced_site is not None:
+        # 独立站只抓自己那一家：番号不属于本站时直接不返回数据，
+        # 避免在 HEYZO 条目下抓出 Caribbeancom 的片子。
+        if routed_site != forced_site:
+            return None
+        site = forced_site
+    else:
+        site = routed_site
     if site is None:
         return None
 
@@ -543,3 +559,90 @@ async def _crawl_json_site(ctx: Context, client, site: UncensoredOfficialSite, m
         wanted="",
         source=spec.source,
     )
+
+
+class _OfficialUncensoredCrawler(BaseCrawler):
+    """五个无码官网的公共实现：固定本站抓取，不按番号漂到别家。"""
+
+    _skip_auto_register = True
+    source: UncensoredOfficialSite
+    description = "官网：无码"
+
+    @classmethod
+    def site(cls) -> Website:
+        raise NotImplementedError
+
+    @classmethod
+    def base_url_(cls) -> str:
+        return UNCENSORED_OFFICIAL_SITES[cls.source].base_url
+
+    async def _run(self, ctx: Context):
+        spec = UNCENSORED_OFFICIAL_SITES[self.source]
+        data = await crawl_uncensored_official(
+            ctx,
+            self.async_client,
+            ctx.input.number,
+            forced_site=self.source,
+        )
+        if data is None:
+            raise CrawlerException(f"番号不属于 {spec.studio} 官网")
+        ctx.debug(f"official uncensored data success: {spec.studio}")
+        return data.to_result()
+
+    # 本站重写 _run，搜索/详情解析不会走到；BaseCrawler 的抽象方法仍需给出实现。
+    @override
+    async def _generate_search_url(self, ctx: Context) -> list[str] | str | None:
+        return None
+
+    @override
+    async def _parse_search_page(self, ctx: Context, html, search_url: str) -> list[str] | str | None:
+        return None
+
+    @override
+    async def _parse_detail_page(self, ctx: Context, html, detail_url: str) -> CrawlerData | None:
+        return None
+
+
+class Official10MusumeCrawler(_OfficialUncensoredCrawler):
+    source = "10musume"
+    probe_number = UNCENSORED_OFFICIAL_SITES["10musume"].probe_number
+
+    @classmethod
+    def site(cls) -> Website:
+        return Website.OFFICIAL_10MUSUME
+
+
+class Official1PondoCrawler(_OfficialUncensoredCrawler):
+    source = "1pondo"
+    probe_number = UNCENSORED_OFFICIAL_SITES["1pondo"].probe_number
+
+    @classmethod
+    def site(cls) -> Website:
+        return Website.OFFICIAL_1PONDO
+
+
+class OfficialCaribbeancomCrawler(_OfficialUncensoredCrawler):
+    source = "caribbeancom"
+    probe_number = UNCENSORED_OFFICIAL_SITES["caribbeancom"].probe_number
+
+    @classmethod
+    def site(cls) -> Website:
+        return Website.OFFICIAL_CARIBBEANCOM
+
+
+class OfficialHeyzoCrawler(_OfficialUncensoredCrawler):
+    source = "heyzo"
+    probe_number = UNCENSORED_OFFICIAL_SITES["heyzo"].probe_number
+
+    @classmethod
+    def site(cls) -> Website:
+        return Website.OFFICIAL_HEYZO
+
+
+class OfficialPacopacomamaCrawler(_OfficialUncensoredCrawler):
+    source = "pacopacomama"
+    probe_number = UNCENSORED_OFFICIAL_SITES["pacopacomama"].probe_number
+
+    @classmethod
+    def site(cls) -> Website:
+        return Website.OFFICIAL_PACOPACOMAMA

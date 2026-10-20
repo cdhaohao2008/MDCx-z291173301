@@ -248,66 +248,6 @@ def _resolve_site_url(value: str) -> str:
     return url
 
 
-# official 无码官网子站行的下拉展示名（仅展示用；抓取落盘的 studio 仍用 spec.studio，
-# 见 official_uncensored.py 的 studio 回退值，未列出的站名原样显示）
-_OFFICIAL_STUDIO_DISPLAY: dict[str, str] = {
-    "Caribbeancom": "加勒比",
-    "1Pondo": "一本道",
-    "Pacopacomama": "Paco",
-}
-
-
-def _append_official_subsite_rows(combo: QComboBox, *, remove_base_row: bool = True) -> None:
-    """站点下拉：把 official 旗下 5 个无码官网拆成独立行（Official·Studio + 各自网址），Official 本行按需保留或撤下.
-
-    两个下拉都调它：网络页「当前网站」与刮削网站页「指定网站」——后者此前只有一行
-    笼统的 Official，五个无码官网站点一个都选不到（用户 2026-10-18 提出）。
-
-    行 UserRole 仍存 Official（选中走 official 爬虫，各消费端的 Website 防护不受影响）：
-    official 本身就是按番号前缀路由，这五行只是把那层路由显式摆到界面上，不改判定。
-    真实网址存显式角色，刷新徽章时不被重算覆盖。
-
-    状态圆点与悬停提示按**检测项名**（`Official·厂牌`）各取各的：五站逐站检测、各自探测自己
-    那家官网，一站失败不该把另外四行一起染红；缓存里没有子键（检测早于该存储，或用户自定义过
-    Official URL 只跑一条检测项）时回退 Official 聚合值，与拆分子行前一致。检测键另存
-    _SITE_CHECK_KEY_ROLE，供 refresh_network_check_badges 刷新徽标时重新取。
-
-    remove_base_row：是否撤掉 official 本行（只留五个子站行）。网络页「当前网站」传 True
-    ——那里选的是执行刮削的站点，五个子站行都落到 official 爬虫，藏起本行免得同一份
-    能力摆两遍；刮削网站页「指定网站」传 False——那里选的是「这批番号交给哪个站」，
-    official 本行（有码+无码自动按番号前缀路由）与其它综合站并列，是正常选项、必须能
-    选（用户 2026-10-18 提出）。本行保留时读回 website_single 取第一个 Official 即本行
-    （子站行都插在 anchor 之后），落在本行语义正确。
-    """
-    try:
-        from mdcx.core.network_check import OFFICIAL_SUBSITE_PREFIX
-        from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
-    except Exception:
-        return
-    cache = _load_check_cache()
-    official_entry = cache.get("Official")
-    anchor = -1
-    for i in range(combo.count()):
-        if (combo.itemData(i, Qt.ItemDataRole.UserRole) or "") == "Official":
-            anchor = i
-    insert_at = anchor + 1 if anchor >= 0 else combo.count()
-    for offset, (name, spec) in enumerate(sorted(UNCENSORED_OFFICIAL_SITES.items())):
-        url = spec.base_url.rstrip("/") + "/"
-        description = f"无码：{_OFFICIAL_STUDIO_DISPLAY.get(spec.studio, spec.studio)}"
-        check_key = f"{OFFICIAL_SUBSITE_PREFIX}{spec.studio}"
-        entry = cache.get(check_key) or official_entry
-        icon = _site_status_icon(entry.get("status", ""), combo) if entry else QIcon()
-        row = insert_at + offset
-        combo.insertItem(row, icon, f"Official·{spec.studio} {description}", "Official")
-        combo.setItemData(row, check_key, _SITE_CHECK_KEY_ROLE)
-        combo.setItemData(row, url, _SITE_URL_ROLE)
-        combo.setItemData(row, url, _SITE_URL_EXPLICIT_ROLE)
-        combo.setItemData(row, _site_combo_item_tooltip(check_key, "Official"), Qt.ItemDataRole.ToolTipRole)
-    # 撤 official 本行（可选）：子站行都插在 anchor 之后，anchor 下标此时仍有效
-    if remove_base_row and anchor >= 0:
-        combo.removeItem(anchor)
-
-
 class _SiteUrlItemDelegate(QStyledItemDelegate):
     """站点下拉双列绘制：左侧站点名，右侧当前网址；网址列各行同一起点（左对齐）。"""
 
@@ -913,12 +853,7 @@ def Init_Ui(self: "MyMAinWindow"):
     self.Ui.comboBox_website_all.clear()
     self.Ui.comboBox_custom_website.clear()
     _populate_site_combo(self.Ui.comboBox_website_all, supported_websites)
-    _append_official_subsite_rows(
-        self.Ui.comboBox_website_all,
-        remove_base_row=False,  # 指定网站：official 本行（有码+无码总路由）是正常选项，与五个子站行并存
-    )
     _populate_site_combo(self.Ui.comboBox_custom_website, supported_websites)
-    _append_official_subsite_rows(self.Ui.comboBox_custom_website)  # 当前网站：official 拆 5 个无码官网子行
     # 初始化使用代理网站下拉框
     self.Ui.comboBox_no_proxy_sites.clear()
     self.Ui.comboBox_no_proxy_sites.addItem("选择网站...", "")

@@ -214,7 +214,12 @@ TYPE_DEFAULT_SITES: dict[FixedScrapingType, tuple[Website, ...]] = {
         # 官网 / 厂牌 / 官方接口
         Website.AVSOX,
         Website.AVENTERTAINMENTS,
-        Website.OFFICIAL,
+        # Official 五个无码官网各自独立，禁用其中一站不影响另外四站
+        Website.OFFICIAL_10MUSUME,
+        Website.OFFICIAL_1PONDO,
+        Website.OFFICIAL_CARIBBEANCOM,
+        Website.OFFICIAL_HEYZO,
+        Website.OFFICIAL_PACOPACOMAMA,
         # 第三方 / 聚合站
         Website.JAVDB,
         Website.JAVDB_API,
@@ -299,6 +304,11 @@ DEFAULT_FIELD_SITE_PRIORITY = [
     Website.AVHEAT,
     Website.DMM,
     Website.OFFICIAL,
+    Website.OFFICIAL_10MUSUME,
+    Website.OFFICIAL_1PONDO,
+    Website.OFFICIAL_CARIBBEANCOM,
+    Website.OFFICIAL_HEYZO,
+    Website.OFFICIAL_PACOPACOMAMA,
     Website.LIBREDMM,
     Website.MGSTAGE,
     Website.PRESTIGE,
@@ -422,6 +432,9 @@ class Config(BaseModel):
     model_config = ConfigDict()
     # region: General Settings
     config_version: int = Field(default=2, title="配置版本")
+    # 一次性迁移标记：旧配置里 WUMA 的 Official 代表五个无码官网，
+    # 拆分后需把 Official 换成五个独立站。config_version 已冻结，故单列标记。
+    official_uncensored_split_migrated: bool = Field(default=True, title="Official 无码站拆分迁移")
     media_path: str = Field(default="./media", title="媒体路径")
     data_path: str = Field(default="", title="数据存放目录")
     softlink_path: str = Field(default="softlink", title="软链接路径")

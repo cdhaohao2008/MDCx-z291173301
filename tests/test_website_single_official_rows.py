@@ -1,26 +1,19 @@
-"""软件设置-刮削网站「指定网站」下拉框既要 Official 本行、也要 Official 旗下 5 个无码官网。
+"""软件设置-刮削网站「指定网站」下拉框里 Official 与五个无码官网各占一行。
 
-用户反馈（两轮，2026-10-18）：
+历史（2026-10-18）：五个无码官网曾以 `Official·{厂牌}` 的「虚拟子行」补在下拉里，
+UserRole 全写 `Official`，靠 `_append_official_subsite_rows` 在填充后二次拼接。
+2026-10-20 起五个站成为真实注册站点（各自 `Website` 枚举、各自爬虫类），本文件
+据此把这几条链路钉死：
 
-1. 「指定网站」下拉框只有一行笼统的 Official，五个无码官网站点一个都选不到。
-2. 补上五个子站行后，Official 本行被一并撤掉，连「整批番号都交给 Official（有码+无码
-   自动按番号前缀路由）」这个正常选项也选不到了。
-
-本文件把两处口径钉死，并连带钉住三条不能漂的链路：
-
-1. **五行都在**：站名 = `Official·{spec.studio}`，仍按 `spec` 的 key 排序（10musume / 1pondo /
-   caribbeancom / heyzo / pacopacomama，即用户报缺失时的排列），显示文本带「无码：…」定位；
-2. **Official 本行保留**（本轮改动）：`comboBox_website_all` 里 Official 值共 6 行（1 本行 +
-   5 子站行），本行排在子站行之前；网络页「当前网站」`comboBox_custom_website` 维持原口径
-   （本行撤下，只留 5 个子站行）——那里选的是执行刮削的站点，五个子站行都落到 official
-   爬虫，同一份能力不必摆两遍；
-3. **存取两端仍通**：行的 UserRole 存 `Official`（`save_config` 用 `currentData()` 转枚举、
-   `load_config` 用 UserRole 列表反查下标），所以本行与五行任一行都能存进 `website_single`
-   并被读回；读回落在本行（子站行都插在本行之后，`list.index` 取第一个 Official）。
+1. **六行都在**：Official 本行 + `Official·10Musume` / `Official·1Pondo` /
+   `Official·Caribbeancom` / `Official·HEYZO` / `Official·Pacopacomama`，两两相邻；
+2. **身份真实**：每行 UserRole 是本站自己的枚举值，网址各取 `base_url_()`；
+   `_SITE_CHECK_KEY_ROLE` 不再需要（检测键就是站点值本身）；
+3. **存取两端仍通**：`website_single` 直接存/取对应站点值，选中哪行就落哪行；
+4. **徽标各显各的**：缓存以站点值为键，一站红不染另外四站；没有自己那份缓存时
+   不回退 Official 聚合值（独立站不该借用别人的检测结果）。
 """
 
-import inspect
-import re
 import sys
 
 import pytest
@@ -29,26 +22,24 @@ from PyQt6.QtWidgets import QApplication, QComboBox
 
 from mdcx.config.enums import Website
 from mdcx.controllers.main_window.init import (
-    _SITE_CHECK_KEY_ROLE,
     _SITE_STATUS_DOT_PX,
-    _SITE_URL_EXPLICIT_ROLE,
     _SITE_URL_ROLE,
     Init_Ui,
-    _append_official_subsite_rows,
     _populate_site_combo,
     refresh_network_check_badges,
 )
-from mdcx.crawlers import get_registered_crawler_site_values
+from mdcx.crawlers import get_crawler, get_registered_crawler_site_values
 from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
 
-# 用户报缺失时给出的五行顺序（= spec key 排序结果）
-_EXPECTED_LABELS = [
-    "Official·10Musume",
-    "Official·1Pondo",
-    "Official·Caribbeancom",
-    "Official·HEYZO",
-    "Official·Pacopacomama",
+# 用户报缺失时给出的顺序（与 `_site_types` / A-Z 排序一致）
+_OFFICIAL_SUBSITE_VALUES = [
+    Website.OFFICIAL_10MUSUME.value,
+    Website.OFFICIAL_1PONDO.value,
+    Website.OFFICIAL_CARIBBEANCOM.value,
+    Website.OFFICIAL_HEYZO.value,
+    Website.OFFICIAL_PACOPACOMAMA.value,
 ]
+_EXPECTED_LABELS = [Website.OFFICIAL.value, *_OFFICIAL_SUBSITE_VALUES]
 
 _app: QApplication | None = None
 
@@ -73,117 +64,108 @@ def _labels(combo: QComboBox) -> list[str]:
     return [text.split(" ")[0].split("（")[0].strip() for text in _row_texts(combo)]
 
 
+def _official_rows(combo: QComboBox) -> dict[str, int]:
+    """行首站名 → 行下标（只收 Official 与五个无码站）。"""
+    return {label: i for i, label in enumerate(_labels(combo)) if label in _EXPECTED_LABELS}
+
+
 @pytest.fixture(scope="module")
 def app():
     return _ensure_app()
 
 
-def _build_combo(*, remove_base_row: bool) -> QComboBox:
-    """按 Init_Ui 的真实次序填一个下拉框：先站点清单，再补 Official 五个子行。"""
+def _build_combo() -> QComboBox:
+    """按 Init_Ui 的真实次序填一个下拉框：全部真实注册站点，无二次拼接。"""
     box = QComboBox()
     _populate_site_combo(box, sorted(get_registered_crawler_site_values()))
-    _append_official_subsite_rows(box, remove_base_row=remove_base_row)
     return box
 
 
 @pytest.fixture()
 def combo(app) -> QComboBox:
-    """刮削网站页「指定网站」框：官方本行保留（Init_Ui 传 remove_base_row=False）。"""
-    box = _build_combo(remove_base_row=False)
+    """刮削网站页「指定网站」框。"""
+    box = _build_combo()
     yield box
     box.deleteLater()
 
 
 @pytest.fixture()
 def network_combo(app) -> QComboBox:
-    """网络页「当前网站」框：官方本行撤下，只留五个子站行。"""
-    box = _build_combo(remove_base_row=True)
+    """网络页「当前网站」框：与指定网站同源填充。"""
+    box = _build_combo()
     yield box
     box.deleteLater()
 
 
-def test_five_official_uncensored_rows_exist_in_single_website_combo(combo):
+def test_official_and_five_subsites_exist_once_in_combo(combo):
     labels = _labels(combo)
     for expected in _EXPECTED_LABELS:
-        assert expected in labels, f"指定网站下拉缺少 {expected}"
-    # 顺序与网络页一致（spec key 排序），五行相邻
+        assert expected in labels, f"下拉缺少 {expected}"
+    # 五站与 Official 相邻，不与其他站交错；每个值全局只出现一次（去掉旧虚拟拼接后不应重复）
     positions = [labels.index(expected) for expected in _EXPECTED_LABELS]
     assert positions == list(range(positions[0], positions[0] + len(_EXPECTED_LABELS)))
+    values = _row_values(combo)
+    for expected in _EXPECTED_LABELS:
+        assert values.count(expected) == 1, f"{expected} 在真实站点下拉里应只出现一次"
 
 
-def test_each_row_carries_its_own_uncensored_caption(combo):
-    texts = _row_texts(combo)
-    display = dict(zip(_labels(combo), texts, strict=True))
-    # 展示名沿用网络页那份映射（加勒比/一本道/Paco），未列出的原样显示厂牌名
-    assert display["Official·Caribbeancom"] == "Official·Caribbeancom 无码：加勒比"
-    assert display["Official·1Pondo"] == "Official·1Pondo 无码：一本道"
-    assert display["Official·Pacopacomama"] == "Official·Pacopacomama 无码：Paco"
-    assert display["Official·HEYZO"] == "Official·HEYZO 无码：HEYZO"
-    assert display["Official·10Musume"] == "Official·10Musume 无码：10Musume"
+def test_each_official_row_carries_its_own_caption(combo):
+    texts = dict(zip(_labels(combo), _row_texts(combo), strict=True))
+    assert texts[Website.OFFICIAL.value].endswith("官网：有码"), texts[Website.OFFICIAL.value]
+    for label in _OFFICIAL_SUBSITE_VALUES:
+        assert texts[label].endswith("官网：无码"), texts[label]
 
 
-def test_rows_store_official_as_value_with_own_url(combo):
-    """UserRole 存 Official（存取两端的 Website 防护不受影响），网址存各自官网地址。"""
+def test_rows_store_their_own_site_value_with_own_url(combo):
+    """每行 UserRole 是本站枚举值；五个无码站各自带自己的官网地址。"""
     urls = {}
     for i, label in enumerate(_labels(combo)):
-        if not label.startswith("Official·"):
+        if label not in _EXPECTED_LABELS:
             continue
-        assert combo.itemData(i, Qt.ItemDataRole.UserRole) == Website.OFFICIAL.value
-        assert Website(combo.itemData(i, Qt.ItemDataRole.UserRole)) is Website.OFFICIAL
-        urls[label] = str(combo.itemData(i, _SITE_URL_ROLE) or "")
-        # 刷新检测徽章时网址不被重算覆盖（否则会被 official 的空地址冲掉）
-        assert combo.itemData(i, _SITE_URL_EXPLICIT_ROLE) == urls[label]
+        value = Website(combo.itemData(i, Qt.ItemDataRole.UserRole))
+        assert value.value == label
+        if label != Website.OFFICIAL.value:
+            urls[label] = str(combo.itemData(i, _SITE_URL_ROLE) or "")
     assert urls == {
         f"Official·{spec.studio}": spec.base_url.rstrip("/") + "/" for spec in UNCENSORED_OFFICIAL_SITES.values()
     }
 
 
-def test_bare_official_row_kept_before_the_five_subsites(combo):
-    """本轮改动：指定网站框里 Official 本行要留着，且排在五个子站行之前。"""
-    labels = _labels(combo)
-    values = _row_values(combo)
-    assert values.count(Website.OFFICIAL.value) == 6, "Official 应当由本行 + 五个子行代表"
-    assert labels.count(Website.OFFICIAL.value) == 1, "其中不带「·厂牌」的只有本行一行"
-    assert labels.index(Website.OFFICIAL.value) < labels.index(_EXPECTED_LABELS[0]), "本行应排在子站行之前"
-    # 其它站点一个不多一个不少
-    registered = set(get_registered_crawler_site_values()) - {Website.OFFICIAL.value}
-    assert set(values) == registered | {Website.OFFICIAL.value}
+def test_five_subsites_are_registered_with_own_crawler():
+    registered = set(get_registered_crawler_site_values())
+    assert set(_EXPECTED_LABELS) <= registered
+    from mdcx.crawlers.official_uncensored import (
+        Official1PondoCrawler,
+        Official10MusumeCrawler,
+        OfficialCaribbeancomCrawler,
+        OfficialHeyzoCrawler,
+        OfficialPacopacomamaCrawler,
+    )
 
-
-def test_bare_official_row_still_hidden_in_network_page_combo(network_combo):
-    """网络页「当前网站」框维持原口径：五个子站行已经代表 official，本行撤下。"""
-    labels = _labels(network_combo)
-    assert _row_values(network_combo).count(Website.OFFICIAL.value) == 5, "网络页应恰好由五个子行代表 Official"
-    assert not any(label == Website.OFFICIAL.value for label in labels)
+    assert get_crawler(Website.OFFICIAL_10MUSUME) is Official10MusumeCrawler
+    assert get_crawler(Website.OFFICIAL_1PONDO) is Official1PondoCrawler
+    assert get_crawler(Website.OFFICIAL_CARIBBEANCOM) is OfficialCaribbeancomCrawler
+    assert get_crawler(Website.OFFICIAL_HEYZO) is OfficialHeyzoCrawler
+    assert get_crawler(Website.OFFICIAL_PACOPACOMAMA) is OfficialPacopacomamaCrawler
 
 
 def test_selected_row_round_trips_through_website_single(combo):
-    """选定本行或任一子行 → 存进 config 的值都是 Official → 读回落回本行。"""
+    """选中哪站 → 存进 config 的就是哪站 → 读回仍落在同一行。"""
     labels = _labels(combo)
-    for i, label in enumerate(labels):
-        if label != Website.OFFICIAL.value and not label.startswith("Official·"):
-            continue
-        combo.setCurrentIndex(i)
+    for label in _EXPECTED_LABELS:
+        index = labels.index(label)
+        combo.setCurrentIndex(index)
         saved = Website(combo.currentData())  # save_config 的写法
-        assert saved is Website.OFFICIAL
-        assert saved in _row_values(combo), "读回时找不到对应行（会落进 UI 列表之外的兜底分支）"
-        index = _row_values(combo).index(saved.value)  # load_config 的写法
-        # 子站行都插在本行之后，index() 取到的第一个 Official 即本行
-        assert labels[index] == Website.OFFICIAL.value
+        assert saved.value == label
+        assert saved.value in _row_values(combo), "读回时找不到对应行（会落进 UI 列表之外的兜底分支）"
+        assert labels[_row_values(combo).index(saved.value)] == label
 
 
-def test_init_ui_calls_append_official_subsite_rows_for_both_combos():
-    """运行期接线：Init_Ui 必须对「指定网站」「当前网站」两框都调，且两处口径不同。
-
-    口径钉死：指定网站传 remove_base_row=False（留 Official 本行），当前网站用默认
-    True（撤本行）。写成源码级断言，是防将来有人「顺手统一」两处又改回去。
-    """
-    calls = re.findall(r"_append_official_subsite_rows\(([^)]*)\)", inspect.getsource(Init_Ui))
-    assert len(calls) == 2, f"Init_Ui 应恰好有两处调用，实际 {len(calls)} 处"
-    assert "self.Ui.comboBox_website_all" in calls[0], "指定网站框未补 Official 子行"
-    assert "remove_base_row=False" in calls[0], "指定网站框应保留 Official 本行"
-    assert "self.Ui.comboBox_custom_website" in calls[1], "当前网站框未补 Official 子行"
-    assert "remove_base_row" not in calls[1], "当前网站框应撤下 Official 本行（用默认值即可）"
+def test_init_ui_no_longer_appends_virtual_official_rows():
+    """运行期接线：旧虚拟拼接函数已删除，Init_Ui 不再二次插行。"""
+    source = __import__("inspect").getsource(Init_Ui)
+    assert "_append_official_subsite_rows" not in source
+    assert "_OFFICIAL_STUDIO_DISPLAY" not in source
 
 
 @pytest.fixture()
@@ -207,41 +189,30 @@ def win(app, monkeypatch, tmp_path):
     app.processEvents()
 
 
-def test_real_main_window_single_website_combo_has_the_five_rows(win):
-    """真实主窗口里「指定网站」框确实摆着本行 + 五个子行（上面几项验的是函数层，这里验接线结果）。"""
-    box = win.Ui.comboBox_website_all
-    labels = _labels(box)
-    assert all(expected in labels for expected in _EXPECTED_LABELS), f"实际下拉里缺行：{labels}"
-    assert _row_values(box).count("Official") == 6, "指定网站框应保留 Official 本行（1 本行 + 5 子行）"
-    # 网络页「当前网站」框同口径列子站行、本行撤下：子站行数量与顺序两边必须一致
-    network_combo = win.Ui.comboBox_custom_website
-    network_labels = _labels(network_combo)
-    assert [label for label in network_labels if label.startswith("Official·")] == [
-        label for label in labels if label.startswith("Official·")
-    ]
-    assert "Official" not in network_labels
+def test_real_main_window_both_combos_have_official_and_five_subsites(win):
+    """真实主窗口两个站点下拉都直接摆着六个真实条目，且各自只出现一次。"""
+    for box in (win.Ui.comboBox_website_all, win.Ui.comboBox_custom_website):
+        values = _row_values(box)
+        for expected in _EXPECTED_LABELS:
+            assert values.count(expected) == 1, f"{expected} 在真实下拉里应只出现一次，实际 {values.count(expected)}"
+        labels = _labels(box)
+        positions = [labels.index(expected) for expected in _EXPECTED_LABELS]
+        assert positions == list(range(positions[0], positions[0] + len(_EXPECTED_LABELS)))
 
 
-# ---- 检测徽标（状态圆点 + 悬停提示）：五个子行各显各的那站 ----
+# ---- 检测徽标（状态圆点 + 悬停提示）：六行各显各的那站 ----
 #   用户 2026-10-19 实测「Official·10Musume 等五行的网络检测全部通过，红点却不变」。
-#   两层原因各有回归：① 缓存合并（merge_site_check_cache，见 tests/test_network_check.py）
-#   把某轮 fail 当成历史值参与比较，后续全绿的轮次翻不回来；② 五个子行共用 Official 的
-#   聚合徽标，一站失败五行一起红、用户看不出是哪家。下面这组盯第 ② 层。
+#   旧实现五行共用 Official 的聚合徽标，一站失败五行一起红；现在每行的键就是本站值。
 
 
 def _cache_with_one_bad_subsite() -> dict:
     """五站里只有 HEYZO 不通，其余全绿（HEYZO 挡风控，真实跑测里最常见的那一种）。"""
     cache = {
-        "Official": {"status": "fail", "route": "proxy", "checked_at": "2026-10-19T21:00:00"},
+        "Official": {"status": "ok", "route": "proxy", "checked_at": "2026-10-19T21:00:00"},
     }
-    for studio, status in (
-        ("10Musume", "ok"),
-        ("1Pondo", "ok"),
-        ("Caribbeancom", "ok"),
-        ("HEYZO", "fail"),
-        ("Pacopacomama", "ok"),
-    ):
-        cache[f"Official·{studio}"] = {"status": status, "route": "proxy", "checked_at": "2026-10-19T21:00:00"}
+    for label in _OFFICIAL_SUBSITE_VALUES:
+        status = "fail" if label == Website.OFFICIAL_HEYZO.value else "ok"
+        cache[label] = {"status": status, "route": "proxy", "checked_at": "2026-10-19T21:00:00"}
     return cache
 
 
@@ -252,11 +223,6 @@ def _install_cache(monkeypatch, cache: dict) -> None:
 
     monkeypatch.setattr(nc_mod, "load_site_check_cache", lambda: dict(cache))
     init_mod.invalidate_check_cache()
-
-
-def _subsite_rows(combo: QComboBox) -> dict[str, int]:
-    """行首站名 → 行下标（只收五个子站行）。"""
-    return {label: i for i, label in enumerate(_labels(combo)) if label.startswith("Official·")}
 
 
 def _dot_rgb(box: QComboBox, row: int) -> tuple[int, ...]:
@@ -271,73 +237,72 @@ def _dot_rgb(box: QComboBox, row: int) -> tuple[int, ...]:
 
 _GREEN = (67, 160, 71)
 _RED = (229, 57, 53)
-_OK_SUBSITES = ("Official·10Musume", "Official·1Pondo", "Official·Caribbeancom", "Official·Pacopacomama")
+_OK_SUBSITES = [label for label in _OFFICIAL_SUBSITE_VALUES if label != Website.OFFICIAL_HEYZO.value]
 
 
 @pytest.fixture()
 def cached_combo(app, monkeypatch) -> QComboBox:
-    """带检测缓存的「当前网站」框：五行子站行各带自己的检测键与状态。"""
+    """带检测缓存的「当前网站」框：六行各带自己那站的检测结果。"""
     _install_cache(monkeypatch, _cache_with_one_bad_subsite())
-    return _build_combo(remove_base_row=True)
+    return _build_combo()
 
 
-def test_subsite_rows_carry_own_check_key_equal_to_their_label(cached_combo):
-    """检测键必须逐字等于检测报告里那一行的名字（= 行首站名），否则徽标取不到自己那站的结果。"""
-    rows = _subsite_rows(cached_combo)
+def test_subsite_rows_take_badge_from_their_own_site_value(cached_combo):
+    rows = _official_rows(cached_combo)
     assert sorted(rows) == sorted(_EXPECTED_LABELS)
-    for label, row in rows.items():
-        assert cached_combo.itemData(row, _SITE_CHECK_KEY_ROLE) == label
-        # UserRole 仍是 Official（选中语义不变），检测键另存角色
-        assert cached_combo.itemData(row, Qt.ItemDataRole.UserRole) == Website.OFFICIAL.value
-
-
-def test_one_bad_subsite_does_not_paint_the_other_four_rows_red(cached_combo):
-    """只有 HEYZO 那一行是红点，另外四行必须是绿点（聚合徽标会把五行一起染红）。"""
-    rows = _subsite_rows(cached_combo)
-    assert _dot_rgb(cached_combo, rows["Official·HEYZO"]) == _RED
+    assert _dot_rgb(cached_combo, rows[Website.OFFICIAL.value]) == _GREEN
+    assert _dot_rgb(cached_combo, rows[Website.OFFICIAL_HEYZO.value]) == _RED
     for label in _OK_SUBSITES:
         assert _dot_rgb(cached_combo, rows[label]) == _GREEN, f"{label} 不该跟着 HEYZO 一起变红"
 
 
 def test_subsite_tooltip_reports_own_site_result(cached_combo):
-    """悬停提示同样各报各的：HEYZO 那行写「❌连不通」，其余四行写「✅可连通」。"""
-    rows = _subsite_rows(cached_combo)
+    rows = _official_rows(cached_combo)
     tips = {label: str(cached_combo.itemData(row, Qt.ItemDataRole.ToolTipRole) or "") for label, row in rows.items()}
-    assert tips["Official·HEYZO"].startswith("上次检测：2026-10-19 21:00")
-    assert "❌连不通" in tips["Official·HEYZO"]
+    assert tips[Website.OFFICIAL_HEYZO.value].startswith("上次检测：2026-10-19 21:00")
+    assert "❌连不通" in tips[Website.OFFICIAL_HEYZO.value]
     for label in _OK_SUBSITES:
         assert "✅可连通" in tips[label], f"{label} 的提示被 HEYZO 的失败结果污染了：{tips[label]}"
 
 
-def test_subsite_rows_fall_back_to_official_aggregate_without_sub_keys(app, monkeypatch):
-    """缓存里没有子键（旧缓存/自定义过 Official URL）时回退 Official 聚合值，不退回空白圆点。"""
+def test_subsites_do_not_fall_back_to_official_aggregate(app, monkeypatch):
+    """只有 Official 有缓存时，五个独立站不借它的结果：没有自己那份就保持空白圆点。"""
     _install_cache(monkeypatch, {"Official": {"status": "ok", "route": "proxy", "checked_at": "2026-10-19T21:00:00"}})
-    box = _build_combo(remove_base_row=True)
-    for label, row in _subsite_rows(box).items():
-        assert _dot_rgb(box, row) == _GREEN, f"{label} 没有回退到 Official 聚合状态"
-        assert "✅可连通" in str(box.itemData(row, Qt.ItemDataRole.ToolTipRole) or "")
+    box = _build_combo()
+    rows = _official_rows(box)
+    assert _dot_rgb(box, rows[Website.OFFICIAL.value]) == _GREEN
+    for label in _OFFICIAL_SUBSITE_VALUES:
+        assert box.itemIcon(rows[label]).isNull(), f"{label} 不应回退 Official 聚合状态"
 
 
-def test_refresh_badges_recolors_subsite_rows_per_site(app, monkeypatch):
-    """检测完成后刷新徽标：仍按子站行的检测键取色，HEYZO 红、其余绿，不被 Official 聚合值覆盖。"""
-    box = _build_combo(remove_base_row=True)
+def test_refresh_badges_recolors_each_site_independently(app, monkeypatch):
+    """检测完成后刷新徽标：按各站自己的键取色，HEYZO 红、其余绿，不被 Official 聚合值覆盖。"""
+    box = _build_combo()
     other = QComboBox()
-    _populate_site_combo(other, sorted(get_registered_crawler_site_values()))  # 无子站行的普通框
+    _populate_site_combo(other, sorted(get_registered_crawler_site_values()))
     win = type("_Win", (), {})()
     win.Ui = type("_Ui", (), {})()
     win.Ui.comboBox_website_all = box
     win.Ui.comboBox_custom_website = box
     win.Ui.comboBox_no_proxy_sites = other
 
-    # 先用「全红」缓存填出五行红点（只有 Official 聚合值，子站行回退到它）
-    _install_cache(monkeypatch, {"Official": {"status": "fail", "route": "proxy", "checked_at": "2026-10-19T20:00:00"}})
+    # 先用「全红」缓存填出六行红点
+    all_red = {
+        Website.OFFICIAL.value: {"status": "fail", "route": "proxy", "checked_at": "2026-10-19T20:00:00"},
+        **{
+            label: {"status": "fail", "route": "proxy", "checked_at": "2026-10-19T20:00:00"}
+            for label in _OFFICIAL_SUBSITE_VALUES
+        },
+    }
+    _install_cache(monkeypatch, all_red)
     refresh_network_check_badges(win)
-    assert all(_dot_rgb(box, row) == _RED for row in _subsite_rows(box).values())
+    assert all(_dot_rgb(box, row) == _RED for row in _official_rows(box).values())
 
     # 刷新成「只有 HEYZO 红」：这正是检测通过后用户看到的那一幕
     _install_cache(monkeypatch, _cache_with_one_bad_subsite())
     refresh_network_check_badges(win)
-    rows = _subsite_rows(box)
-    assert _dot_rgb(box, rows["Official·HEYZO"]) == _RED
+    rows = _official_rows(box)
+    assert _dot_rgb(box, rows[Website.OFFICIAL.value]) == _GREEN
+    assert _dot_rgb(box, rows[Website.OFFICIAL_HEYZO.value]) == _RED
     for label in _OK_SUBSITES:
         assert _dot_rgb(box, rows[label]) == _GREEN, f"{label} 刷新后仍未翻绿"

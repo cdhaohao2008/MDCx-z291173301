@@ -115,7 +115,11 @@ USER_SITE_LISTS = {
     FixedScrapingType.WUMA: [
         "AVSOX",
         "AVEntertainments",
-        "Official",
+        "Official·10Musume",
+        "Official·1Pondo",
+        "Official·Caribbeancom",
+        "Official·HEYZO",
+        "Official·Pacopacomama",
         "JavDB",
         "JavDB_API",
         "JavDB_APP",

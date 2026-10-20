@@ -10,7 +10,6 @@ from ..number import get_number_letters
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException, get_year
 from .dahlia import DahliaCrawler
 from .faleno import FalenoCrawler
-from .official_uncensored import crawl_uncensored_official
 from .prestige import PrestigeCrawler
 
 # DLDSS/FNS/JIMMY 未登记在 ManualConfig.OFFICIAL 的前缀表里，Official 无法通过
@@ -115,9 +114,8 @@ def split_csv(value: str) -> list[str]:
 
 
 class OfficialCrawler(BaseCrawler):
-    # 指定网站下拉框只展示短定位（与其他站点“综合：有码+无码”一致），
-    # 原长描述（有码30家/无码5站/检测范围）因下拉过宽已移除，详细路由见类实现与文档。
-    description = "综合：有码+无码"
+    # Official 本部只负责有码官网；五个无码官网已拆成独立站点，各自启停与检测。
+    description = "官网：有码"
 
     @classmethod
     @override
@@ -137,12 +135,6 @@ class OfficialCrawler(BaseCrawler):
     @override
     async def _run(self, ctx: Context):
         number = ctx.input.number
-        uncensored_data = await crawl_uncensored_official(ctx, self.async_client, number)
-        if uncensored_data is not None:
-            result = uncensored_data.to_result()
-            ctx.debug("official uncensored data success")
-            return result
-
         number_letters = get_number_letters(number)
         official_crawler_cls = cast("type[BaseCrawler]", OFFICIAL_CRAWLER_BY_PREFIX.get(number_letters.upper()))
         if official_crawler_cls is not None:

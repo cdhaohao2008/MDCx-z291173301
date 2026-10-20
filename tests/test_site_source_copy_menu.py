@@ -2,7 +2,7 @@
 
 用户需求原文（四轮）：
     1.「鼠标右键点击时可以复制站点列表，单个站点鼠标右键点击也可以复制」
-    2.「有码、无码、素人、FC2、欧美、国产右键复制不是复制全部39个站点，
+    2.「有码、无码、素人、FC2、欧美、国产右键复制不是复制全部44个站点，
         是复制它们各自包含的站点」
     3.「有码、无码、素人、FC2、欧美、国产后面不要标深色，和其他站点一样纯白背景就行，
         不要空着啊，继续排列DMM、DMM_API、LibreDMM等站点」
@@ -168,7 +168,7 @@ def test_add_action_sits_at_the_bottom_of_the_palette_menu(qt_app, monkeypatch):
         _shown(dlg)
         palette = dlg.available_list
         texts = _right_click(palette, _title_center(palette, "有码"), monkeypatch, "复制本组")
-        assert texts == ["复制本组：28个站点", "", "复制列表：39个站点", "", ADD_ACTION]
+        assert texts == ["复制本组：28个站点", "", "复制列表：44个站点", "", ADD_ACTION]
         assert texts[-1] == ADD_ACTION, ADD_ACTION
     finally:
         dlg.deleteLater()
@@ -339,7 +339,7 @@ def test_copied_list_is_readable_back_by_the_parser(qt_app, monkeypatch):
 
 
 def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
-    """点在分组标题上：复制的是这一组自己的名单，不是整张 39 站列表。
+    """点在分组标题上：复制的是这一组自己的名单，不是整张 44 站列表。
 
     这是「辛辛苦苦分类」的意义所在——六个类型是六份不同的名单，复制整张等于分类白做。
     """
@@ -350,7 +350,7 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
         _shown(dlg)
         palette = dlg.available_list
         texts = _right_click(palette, _title_center(palette, "有码"), monkeypatch, "复制本组")
-        assert texts == ["复制本组：28个站点", "", "复制列表：39个站点", "", "加入列表：启用网站"]
+        assert texts == ["复制本组：28个站点", "", "复制列表：44个站点", "", "加入列表：启用网站"]
         copied = app.clipboard().text().split(",")
         assert copied[:3] == ["DMM", "DMM_API", "LibreDMM"]
         assert len(copied) == 28 == len(set(copied))
@@ -365,7 +365,7 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
     ("title", "count"),
     [
         ("有码", 28),
-        ("无码", 15),
+        ("无码", 19),
         ("个摄", 12),
         ("欧美", 10),
         ("传媒", 10),
@@ -374,7 +374,7 @@ def test_right_click_group_title_copies_that_group_only(qt_app, monkeypatch):
     ],
 )
 def test_each_group_title_copies_its_own_list(qt_app, monkeypatch, title, count):
-    """七个标题各自复制各自那份名单，互不相等，也不会复制成 39 站。"""
+    """七个标题各自复制各自那份名单，互不相等，也不会复制成 44 站。"""
     app = qt_app
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
@@ -421,7 +421,7 @@ def test_right_click_gap_between_titles_copies_the_whole_list(qt_app, monkeypatc
         )
         assert blank is not None, "首行末尾没有空白处可测"
         texts = _right_click(palette, QPoint(blank, top), monkeypatch, "复制列表")
-        assert texts == ["复制列表：39个站点", "", "加入列表：启用网站"]
+        assert texts == ["复制列表：44个站点", "", "加入列表：启用网站"]
     finally:
         dlg.deleteLater()
 

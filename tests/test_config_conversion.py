@@ -178,7 +178,11 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
     assert config.website_wuma == [
         Website.AVSOX,
         Website.AVENTERTAINMENTS,
-        Website.OFFICIAL,
+        Website.OFFICIAL_10MUSUME,
+        Website.OFFICIAL_1PONDO,
+        Website.OFFICIAL_CARIBBEANCOM,
+        Website.OFFICIAL_HEYZO,
+        Website.OFFICIAL_PACOPACOMAMA,
         Website.JAVDB,
         Website.JAVDB_API,
         Website.JAVDB_APP,
@@ -239,8 +243,16 @@ def test_config_default_site_priorities_follow_current_frontend_defaults():
     # 加进这三组只会给每条影片白挂一次无效请求，故三组一律不含 Official。
     for group in (config.website_guochan, config.website_oumei, config.website_fc2):
         assert Website.OFFICIAL not in group
-    for group in (config.website_youma, config.website_wuma):
-        assert Website.OFFICIAL in group
+    assert Website.OFFICIAL in config.website_youma
+    assert Website.OFFICIAL not in config.website_wuma
+    for group in (config.website_wuma,):
+        assert {
+            Website.OFFICIAL_10MUSUME,
+            Website.OFFICIAL_1PONDO,
+            Website.OFFICIAL_CARIBBEANCOM,
+            Website.OFFICIAL_HEYZO,
+            Website.OFFICIAL_PACOPACOMAMA,
+        } <= set(group)
     # 短剧组只有 JavDay：官方站按番号前缀路由，短剧没有番号，路由不过去
     assert Website.OFFICIAL not in config.website_suren
     assert config.get_field_config(CrawlerResultFields.TITLE).site_prority == DEFAULT_FIELD_SITE_PRIORITY

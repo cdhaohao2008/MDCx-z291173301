@@ -881,8 +881,10 @@ class SitePaletteList(_SiteListBase):
         removable_source=None,
         dark: bool = False,
         grouped: bool = False,
+        disabled_sites: set[Website] | list[Website] | None = None,
     ):
         super().__init__(parent)
+        self.disabled_sites = set(disabled_sites or ())
         self._removable_source = removable_source
         self.on_removed = None
         self.setFlow(QListWidget.Flow.LeftToRight)
@@ -1129,9 +1131,9 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         copy_hint = QLabel(
             "开头的七个加粗标题是有码/无码/个摄/欧美/传媒/短剧/动漫，"
             "双击一个标题即加入该组全部网站，"
-            "后面紧跟全部可用网站（按名称 A-Z 排序、每个站只出现一次）。"
-            "右键站点可启用/禁用或复制该站点，右键标题复制本组名单、空白处复制整张列表，"
-            "最下方另有「加入列表：启用网站」。启用/禁用会立即保存，不需要点保存按钮。"
+            "后面紧跟全部可用网站，按名称 A-Z 排序、每个站只出现一次，"
+            "右键：站点上复制该站点、标题上复制本组名单、空白处复制整张列表，"
+            "最下方另有「加入列表：启用网站」，启用/禁用站点会立即保存，不需要点保存按钮，"
             "禁用后的站点整体变灰，网络检测、字段刮削、图片下载等环节全部跳过"
         )
         copy_hint.setWordWrap(True)
@@ -1341,6 +1343,8 @@ class FieldPriorityDialog(CenterOnFirstShowMixin, QDialog):
         type_sites: list[Website],
         field_configs: dict[CrawlerResultFields, FieldPriorityConfig],
         parent: QWidget | None = None,
+        *,
+        disabled_sites: set[Website] | list[Website] | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -1349,6 +1353,7 @@ class FieldPriorityDialog(CenterOnFirstShowMixin, QDialog):
         _style_dialog(self, self._dark)
         self._scraping_type = scraping_type
         self._type_sites = list(dict.fromkeys(type_sites))
+        self._disabled_sites = set(disabled_sites or ())
         self._field_configs = field_configs
         self._field_lists: dict[CrawlerResultFields, QListWidget] = {}
         self._skip_checks: dict[CrawlerResultFields, QCheckBox] = {}
@@ -1386,6 +1391,7 @@ class FieldPriorityDialog(CenterOnFirstShowMixin, QDialog):
             label.setMinimumWidth(88)
             label.setStyleSheet(f"color: {get_theme_tokens(self._dark)['text']};")
             list_widget = PrioritySiteList(self._type_sites, FIELD_ROW_HEIGHT, self, self._dark)
+            list_widget.disabled_sites = set(self._disabled_sites)
             existing_config = self._field_configs.get(field, FieldPriorityConfig())
             configured = existing_config.site_prority
             sites = [site for site in configured if site in self._type_sites]
@@ -1473,7 +1479,14 @@ class FieldPriorityDialog(CenterOnFirstShowMixin, QDialog):
         label = QLabel("可用网站（拖到下方字段中；字段内从左到右优先级递减）")
         label.setStyleSheet(f"font-weight: bold; color: {get_theme_tokens(self._dark)['text']};")
         panel_layout.addWidget(label)
-        panel_layout.addWidget(SitePaletteList(self._type_sites, self, dark=self._dark))
+        panel_layout.addWidget(
+            SitePaletteList(
+                self._type_sites,
+                self,
+                dark=self._dark,
+                disabled_sites=self._disabled_sites,
+            )
+        )
         return panel
 
     def _remove_from_field(self, field: CrawlerResultFields) -> None:
@@ -1661,6 +1674,7 @@ def _open_priority_editor(window: "MyMAinWindow", scraping_type: FixedScrapingTy
         type_sites,
         manager.config.type_field_configs.get(scraping_type, {}),
         window,
+        disabled_sites=manager.config.website_disabled,
     )
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return

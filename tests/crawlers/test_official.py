@@ -158,5 +158,5 @@ def test_official_description_three_tier_and_check_scope():
     from mdcx.crawlers.official import OfficialCrawler
 
     desc = OfficialCrawler.site_description()
-    assert desc == "综合：有码+无码"
+    assert desc == "官网：有码"
     assert "按番号前缀自动路由官网" not in desc

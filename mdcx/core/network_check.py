@@ -1106,32 +1106,6 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
                 default_url = ""
 
         base_url, customized = _configured_or_default_url(site, default_url or "")
-        # 议题 #129: Official 是无码官网五站统一路由(Caribbeancom/HEYZO/1Pondo/
-        # Pacopacomama/10Musume), 各站域名固定——逐站生成子检测(报告每站一行),
-        # 下拉徽标由 merge_site_check_cache 按"五站取最差"聚合; 用户自定义过
-        # Official URL 时按单站检测处理。
-        if site == Website.OFFICIAL and not (customized and base_url):
-            from ..crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
-
-            for src, official_spec in UNCENSORED_OFFICIAL_SITES.items():
-                specs.append(
-                    NetworkCheckSpec(
-                        name=f"Official·{official_spec.studio}",
-                        group="站点检测",
-                        url=official_spec.base_url,
-                        site=Website.OFFICIAL,
-                        use_proxy=True,
-                        # 五站官网同样过 CF/地区风控，连通性检测要和普通站点
-                        # 一样允许 CF Bypass 兜底（议题 #133）
-                        enable_cf_bypass=True,
-                        # 每行必须探测「自己那家」官网的真实番号：Official 爬虫
-                        # 按番号前缀路由，不给前缀就会落到 manager.computed
-                        # .official_websites 的别家官网（如 SSNI → s1s1s1.com），
-                        # 那家被挡时五行一起误报失败（议题 #133）
-                        probe_number=official_spec.probe_number,
-                    )
-                )
-            continue
         if not base_url:
             specs.append(
                 NetworkCheckSpec(
@@ -1262,6 +1236,7 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
                 headers=headers,
                 cookies=cookies,
                 enable_cf_bypass=True,
+                probe_number=getattr(crawler_cls, "probe_number", ""),
             )
         )
 

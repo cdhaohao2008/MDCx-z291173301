@@ -70,10 +70,18 @@ def _center(list_widget, item) -> QPoint:
 
 
 def _background(list_widget, item) -> str:
-    """取站点框内部靠上的一个像素，避开文字，验证实际绘制出来的底色。"""
+    """取站点框内部靠上的一个像素，避开文字，验证实际绘制出来的底色。
+
+    `visualItemRect()` 给的是逻辑坐标，而 `viewport().grab()` 拿到的是设备像素图：
+    125% 缩放下后者的 `devicePixelRatio()` 是 1.25，直接拿逻辑坐标去读会落到左边
+    另一格上（候选区首行全是标题 chip，读到的恒为那一格的 surface_muted），断言便
+    永远看不出禁用后的灰底。取像素前先把坐标乘回设备像素比例。
+    """
     QApplication.processEvents()
     rect = list_widget.visualItemRect(item)
-    color = list_widget.viewport().grab().toImage().pixelColor(rect.center().x(), rect.top() + 5)
+    image = list_widget.viewport().grab().toImage()
+    ratio = image.devicePixelRatio()
+    color = image.pixelColor(round(rect.center().x() * ratio), round((rect.top() + 5) * ratio))
     return color.name()
 
 

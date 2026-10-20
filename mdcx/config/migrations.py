@@ -1,7 +1,7 @@
 import re
 from typing import Any
 
-from .enums import DownloadableFile, HDPicSource, Website
+from .enums import DownloadableFile, FixedScrapingType, HDPicSource, Website
 
 # 配置版本号固定为 2（用户 2026-10-19 定规）：以后无论新增配置项、新增列表
 # 枚举值、给旧配置补缺键，还是真的动了大配置框架，都**不再**改它——版本号一格
@@ -178,6 +178,116 @@ def _migrate_site_list(value: Any) -> Any:
     return value
 
 
+# Official 五个无码官网从 Official 拆出后的独立站点值。
+_OFFICIAL_UNCENSORED_SITES = (
+    Website.OFFICIAL_10MUSUME.value,
+    Website.OFFICIAL_1PONDO.value,
+    Website.OFFICIAL_CARIBBEANCOM.value,
+    Website.OFFICIAL_HEYZO.value,
+    Website.OFFICIAL_PACOPACOMAMA.value,
+)
+
+
+def _is_official_value(value: Any) -> bool:
+    """旧配置里可能还是小写 official：先按迁移表改名再比较。"""
+    return _rename_site(str(_enum_value(value))) == Website.OFFICIAL.value
+
+
+def _replace_official_with_uncensored(sites: list[Any]) -> list[str]:
+    """把列表里的 Official 展开成五个无码站；已含任一独立站时不重复展开。"""
+    values = [str(_enum_value(site)) for site in sites]
+    if any(value in _OFFICIAL_UNCENSORED_SITES for value in values):
+        return values
+    expanded: list[str] = []
+    for value in values:
+        if _is_official_value(value):
+            expanded.extend(_OFFICIAL_UNCENSORED_SITES)
+        else:
+            expanded.append(value)
+    return list(dict.fromkeys(expanded))
+
+
+def _add_uncensored_after_official(sites: list[Any]) -> list[str]:
+    """字段优先级里保留 Official，并在其后补五个无码站（已有则不动）。"""
+    values = [str(_enum_value(site)) for site in sites]
+    if any(value in _OFFICIAL_UNCENSORED_SITES for value in values):
+        return values
+    expanded: list[str] = []
+    for value in values:
+        expanded.append(value)
+        if _is_official_value(value):
+            expanded.extend(_OFFICIAL_UNCENSORED_SITES)
+    return list(dict.fromkeys(expanded))
+
+
+def _migrate_official_uncensored_split(data: dict[str, Any]) -> str | None:
+    """旧配置迁移：WUMA 的 Official 拆成五个独立无码站。
+
+    config_version 固定为 2，不能用版本号判断，故用独立标记键。
+    只迁移 WUMA：YOUMA 的 Official 仍代表有码官网。
+    """
+    if data.get("official_uncensored_split_migrated") is True:
+        return None
+
+    changed = False
+
+    wuma = data.get("website_wuma")
+    if isinstance(wuma, str):
+        values = _str_to_list(wuma, ",")
+        new_values = _replace_official_with_uncensored(values)
+        if new_values != values:
+            data["website_wuma"] = new_values
+            changed = True
+    elif isinstance(wuma, list | set | tuple):
+        new_values = _replace_official_with_uncensored(list(wuma))
+        if new_values != [str(_enum_value(site)) for site in wuma]:
+            data["website_wuma"] = new_values
+            changed = True
+
+    if isinstance(field_configs := data.get("field_configs"), dict):
+        for value in field_configs.values():
+            if not isinstance(value, dict):
+                continue
+            sites = value.get("site_prority")
+            if isinstance(sites, list):
+                new_sites = _add_uncensored_after_official(sites)
+                if new_sites != [str(_enum_value(site)) for site in sites]:
+                    value["site_prority"] = new_sites
+                    changed = True
+
+    if isinstance(type_field_configs := data.get("type_field_configs"), dict):
+        wuma_fields = type_field_configs.get(FixedScrapingType.WUMA.value)
+        if isinstance(wuma_fields, dict):
+            for value in wuma_fields.values():
+                if not isinstance(value, dict):
+                    continue
+                sites = value.get("site_prority")
+                if isinstance(sites, list):
+                    new_sites = _replace_official_with_uncensored(sites)
+                    if new_sites != [str(_enum_value(site)) for site in sites]:
+                        value["site_prority"] = new_sites
+                        changed = True
+
+    disabled = data.get("website_disabled")
+    if isinstance(disabled, str):
+        disabled_values = _str_to_list(disabled, ",")
+        if any(_is_official_value(value) for value in disabled_values):
+            data["website_disabled"] = list(dict.fromkeys([*disabled_values, *_OFFICIAL_UNCENSORED_SITES]))
+            changed = True
+    elif isinstance(disabled, list | set | tuple):
+        disabled_values = [str(_enum_value(site)) for site in disabled]
+        if any(_is_official_value(value) for value in disabled_values):
+            new_values = list(dict.fromkeys([*disabled_values, *_OFFICIAL_UNCENSORED_SITES]))
+            if new_values != disabled_values:
+                data["website_disabled"] = new_values
+                changed = True
+
+    data["official_uncensored_split_migrated"] = True
+    if not changed:
+        return None
+    return "[迁移] Official 五个无码官网已拆成独立站点：WUMA 的 Official 已替换为五个独立站，可分别启用/禁用"
+
+
 def _migrate_field_config_sites(value: Any) -> None:
     if not isinstance(value, dict):
         return
@@ -313,6 +423,8 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
         warnings.append("[迁移] 已移除配置项「严格校验 Amazon 图片」：ASIN 库命中即信任，软校验仅用于新 ASIN 入库")
     _migrate_builtin_naming_templates(data)
     _migrate_removed_hd_pic_sources(data)
+    if message := _migrate_official_uncensored_split(data):
+        warnings.append(message)
 
     single = data.get("website_single")
     if isinstance(single, str):

@@ -488,6 +488,13 @@ class Website(Enum):
     XCITY = "Xcity"
 
     OFFICIAL = "Official"
+    # Official 旗下五个无码官网独立成站：各自启停、各自检测、各自计优先级。
+    # Official 本部只保留有码官网路由，不再统管这五站。
+    OFFICIAL_10MUSUME = "Official·10Musume"
+    OFFICIAL_1PONDO = "Official·1Pondo"
+    OFFICIAL_CARIBBEANCOM = "Official·Caribbeancom"
+    OFFICIAL_HEYZO = "Official·HEYZO"
+    OFFICIAL_PACOPACOMAMA = "Official·Pacopacomama"
 
     @classmethod
     def _missing_(cls, value):

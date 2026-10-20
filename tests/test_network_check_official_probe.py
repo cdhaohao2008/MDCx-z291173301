@@ -44,6 +44,7 @@ class FakeConfig:
     theporndb_api_token = ""
     proxy_sites = ""
     direct_sites = ""
+    website_disabled = []
 
     def proxy_hosts_list(self):
         return []
@@ -132,27 +133,26 @@ def test_official_probe_numbers_route_back_to_their_own_site():
 async def test_official_subsite_specs_enable_cf_bypass_and_probe_own_site(monkeypatch: pytest.MonkeyPatch):
     """五个子检测项都要开 CF Bypass，并带上能路由回本站的探测番号。"""
 
-    class DummyOfficialCrawler:
-        @classmethod
-        def base_url_(cls):
-            return ""
-
-    monkeypatch.setattr(
-        "mdcx.crawlers.get_registered_crawler_sites",
-        lambda include_hidden=False: [Website.OFFICIAL],
-    )
-    monkeypatch.setattr("mdcx.crawlers.get_crawler", lambda site: DummyOfficialCrawler)
+    site_to_source = {
+        Website.OFFICIAL_10MUSUME: "10musume",
+        Website.OFFICIAL_1PONDO: "1pondo",
+        Website.OFFICIAL_CARIBBEANCOM: "caribbeancom",
+        Website.OFFICIAL_HEYZO: "heyzo",
+        Website.OFFICIAL_PACOPACOMAMA: "pacopacomama",
+    }
 
     specs = await nc._build_site_specs()
+    official_specs = [spec for spec in specs if spec.site in site_to_source]
 
-    assert specs, "应生成 Official 子检测项"
-    assert len(specs) == len(UNCENSORED_OFFICIAL_SITES)
-    for spec in specs:
-        assert spec.site is Website.OFFICIAL
+    assert len(official_specs) == len(UNCENSORED_OFFICIAL_SITES)
+    for spec in official_specs:
+        source = site_to_source[spec.site]
+        official_spec = UNCENSORED_OFFICIAL_SITES[source]
+        assert spec.name == spec.site.value
+        assert spec.url == official_spec.base_url
         assert spec.enable_cf_bypass is True, f"{spec.name} 未开 CF Bypass"
-        assert spec.probe_number, f"{spec.name} 缺探测番号"
-        source = route_uncensored_official(spec.probe_number)
-        assert UNCENSORED_OFFICIAL_SITES[source].studio in spec.name
+        assert spec.probe_number == official_spec.probe_number
+        assert route_uncensored_official(spec.probe_number) == source
 
 
 @pytest.mark.anyio

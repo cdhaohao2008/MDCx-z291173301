@@ -45,6 +45,13 @@ from .missav import MissavCrawler
 from .missav_api import MissavApiCrawler
 from .mywife import MyWifeCrawler
 from .official import OfficialCrawler
+from .official_uncensored import (
+    Official1PondoCrawler,
+    Official10MusumeCrawler,
+    OfficialCaribbeancomCrawler,
+    OfficialHeyzoCrawler,
+    OfficialPacopacomamaCrawler,
+)
 from .prestige import PrestigeCrawler
 from .r18dev import R18DevCrawler
 from .thejavdb import TheJavDBCrawler
@@ -85,6 +92,11 @@ register_crawler(MyWifeCrawler)
 register_crawler(JavLibraryCrawler)
 register_crawler(JavLibraryMirrorCrawler)
 register_crawler(OfficialCrawler)
+register_crawler(Official10MusumeCrawler)
+register_crawler(Official1PondoCrawler)
+register_crawler(OfficialCaribbeancomCrawler)
+register_crawler(OfficialHeyzoCrawler)
+register_crawler(OfficialPacopacomamaCrawler)
 register_crawler(ThepornDBCrawler)
 # Dahlia / Faleno 官网已独立成站（2026-10-17），Official 仍保留前缀回退
 register_crawler(DahliaCrawler)

@@ -231,8 +231,16 @@ async def test_build_network_check_specs_skips_disabled_sites(monkeypatch: pytes
 
 
 @pytest.mark.anyio
-async def test_build_network_check_specs_skips_disabled_official_children(monkeypatch: pytest.MonkeyPatch):
-    """禁用 Official 后五个子站整体跳过，不生成任何 Official· 检测项。"""
+async def test_build_network_check_specs_skips_disabled_official_only(monkeypatch: pytest.MonkeyPatch):
+    """禁用 Official 只跳过 Official 本行，五个无码官网拆出的独立站点不受影响。"""
+
+    five_sites = [
+        Website.OFFICIAL_10MUSUME,
+        Website.OFFICIAL_1PONDO,
+        Website.OFFICIAL_CARIBBEANCOM,
+        Website.OFFICIAL_HEYZO,
+        Website.OFFICIAL_PACOPACOMAMA,
+    ]
 
     class DisabledConfig(FakeConfig):
         website_disabled = [Website.OFFICIAL]
@@ -241,22 +249,47 @@ async def test_build_network_check_specs_skips_disabled_official_children(monkey
         config = DisabledConfig()
         computed = None
 
-    class DynamicCrawler:
-        @classmethod
-        def base_url_(cls):
-            return "https://example.test"
+    from mdcx.crawlers import get_crawler as real_get_crawler
 
-    fake_crawlers = SimpleNamespace(
-        get_registered_crawler_sites=lambda include_hidden=False: [Website.OFFICIAL],
-        get_crawler=lambda site: DynamicCrawler,
+    monkeypatch.setattr(
+        "mdcx.crawlers.get_registered_crawler_sites",
+        lambda include_hidden=False: list(five_sites),
     )
-    monkeypatch.setitem(sys.modules, "mdcx.crawlers", fake_crawlers)
+    monkeypatch.setattr("mdcx.crawlers.get_crawler", real_get_crawler)
     monkeypatch.setattr("mdcx.core.network_check._manager", lambda: DisabledManager())
 
     specs = await build_network_check_specs()
 
     assert all(spec.site != Website.OFFICIAL for spec in specs)
-    assert not any(spec.name.startswith("Official·") for spec in specs)
+    assert [spec.site for spec in specs if spec.site in five_sites] == five_sites
+
+
+@pytest.mark.anyio
+async def test_build_network_check_specs_skips_one_disabled_uncensored_site(monkeypatch: pytest.MonkeyPatch):
+    """禁用某个无码官网只隐藏它自己，其余四站与 Official 本行照旧。"""
+
+    class DisabledConfig(FakeConfig):
+        website_disabled = [Website.OFFICIAL_HEYZO]
+
+    class DisabledManager:
+        config = DisabledConfig()
+        computed = None
+
+    from mdcx.crawlers import get_crawler as real_get_crawler
+
+    monkeypatch.setattr(
+        "mdcx.crawlers.get_registered_crawler_sites",
+        lambda include_hidden=False: [Website.OFFICIAL, Website.OFFICIAL_10MUSUME, Website.OFFICIAL_HEYZO],
+    )
+    monkeypatch.setattr("mdcx.crawlers.get_crawler", real_get_crawler)
+    monkeypatch.setattr("mdcx.core.network_check._manager", lambda: DisabledManager())
+
+    specs = await build_network_check_specs()
+    sites = [spec.site for spec in specs]
+
+    assert Website.OFFICIAL_HEYZO not in sites
+    assert Website.OFFICIAL_10MUSUME in sites
+    assert Website.OFFICIAL in sites
 
 
 @pytest.mark.anyio
@@ -2348,37 +2381,27 @@ def test_official_subsite_prefix_keys_cover_five_sites():
 
 
 @pytest.mark.anyio
-async def test_official_generates_five_sub_specs(monkeypatch):
-    """official 未自定义 URL 时逐站生成 5 个子检测(报告每站一行)。"""
+async def test_official_generates_five_independent_site_specs(monkeypatch):
+    """official 五个无码官网拆成独立站点后，检测报告每站各一行、各用自己官网地址。"""
     from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
 
-    class OfficialCrawler:
-        @classmethod
-        def base_url_(cls):
-            return ""
-
-    class NoCustomConfig(FakeConfig):
-        def get_site_url(self, site, default=""):
-            return ""
-
-    class Mgr:
-        config = NoCustomConfig()
-        computed = None
-
-    fake_crawlers = SimpleNamespace(
-        get_registered_crawler_sites=lambda include_hidden=False: [Website.OFFICIAL],
-        get_crawler=lambda site: OfficialCrawler,
-    )
-    monkeypatch.setitem(sys.modules, "mdcx.crawlers", fake_crawlers)
-    monkeypatch.setattr("mdcx.core.network_check._manager", lambda: Mgr())
+    site_to_source = {
+        Website.OFFICIAL_10MUSUME: "10musume",
+        Website.OFFICIAL_1PONDO: "1pondo",
+        Website.OFFICIAL_CARIBBEANCOM: "caribbeancom",
+        Website.OFFICIAL_HEYZO: "heyzo",
+        Website.OFFICIAL_PACOPACOMAMA: "pacopacomama",
+    }
 
     specs = await build_network_check_specs()
-    official_specs = [s for s in specs if s.site == Website.OFFICIAL]
+    official_specs = [s for s in specs if s.site in site_to_source]
+
     assert len(official_specs) == len(UNCENSORED_OFFICIAL_SITES) == 5
-    assert {s.name for s in official_specs} == {
-        f"Official·{spec.studio}" for spec in UNCENSORED_OFFICIAL_SITES.values()
-    }
-    assert all(s.url and s.url.startswith("https://") for s in official_specs)
+    for spec in official_specs:
+        official_spec = UNCENSORED_OFFICIAL_SITES[site_to_source[spec.site]]
+        assert spec.name == spec.site.value
+        assert spec.url == official_spec.base_url
+        assert spec.probe_number == official_spec.probe_number
 
 
 def test_theporndb_token_spec_binds_site_without_token():

@@ -1,8 +1,8 @@
 ================================================================================================================
 MDCx 刮削网站类型汇总表
-更新日期：2026-10-17     仓库：D:\@Data\MDCx
+更新日期：2026-10-20     仓库：D:\@Data\MDCx
 数据来源：逐站实访官网/站点导航文案 + MDCx 爬虫 mosaic / site_description 判定
-覆盖范围：MDCx 已注册 38 个刮削网站；另附 Official 聚合入口下的 5 个无码官网（可路由但未单列为 Website）
+覆盖范围：MDCx 已注册 44 个刮削网站（含 Official 与五个独立无码官网）
 名单口径：本表第一部分的六组清单 = 用户认定的最终口径，与 docs/Features.md「各类型默认网站源」表一致
 ================================================================================================================
 
@@ -22,7 +22,7 @@ MDCx 刮削网站类型汇总表
     Faleno            https://faleno.jp                 Faleno 厂牌官网。FNS/FLN/JIMMY 前缀自动锁定本站
     LibreDMM          https://www.libredmm.com          LibreFanza，DMM/FANZA 开源镜像
     MGStage           https://www.mgstage.com           MGS 厂牌官网。菜单含 素人ホイホイ / はめちゃん。/ SODクリエイト
-    Official                                            官网聚合入口。30 家有码片商官网 + 5 家无码官网 JSON 直连；按番号前缀路由
+    Official                                            官网聚合入口。30 家有码片商官网，按番号前缀路由；无固定检测入口
     Prestige          https://www.prestige-av.com       PRESTIGE 厂牌官网。MDCx 站点描述「有码+素人」
     Xcity             https://tc.xcity.jp               XCITY 日系有码综合会员站（JS 渲染，导航不可读）
 
@@ -47,12 +47,16 @@ MDCx 刮削网站类型汇总表
     TheJavDB          https://thejavdb.net              thejavdb.net 网页版，取数走它自己的免 CF 接口
 
 ================================================================================================================
-【无码番号（无修正 / 流出）】  合计 15 站   （官网 2 + 第三方 13）
+【无码番号（无修正 / 流出）】  合计 19 站   （官网 5 + 第三方 14）
 ================================================================================================================
-  ── 官网 / 厂牌 / 官方接口 (2) ──
-    Official                                            官网聚合入口。30 家有码片商官网 + 5 家无码官网 JSON 直连；按番号前缀路由
+  ── 官网 / 厂牌 / 官方接口 (5) ──
+    Official·10Musume    https://www.10musume.com           「天然むすめ - 素人専門アダルト動画」
+    Official·1Pondo      https://www.1pondo.tv              一本道 D2Pass。导航含 素人 / ムラムラってくる素人 / パコパコママ
+    Official·Caribbeancom https://www.caribbeancom.com      「カリビアンコム」。导航 ムラムラってくる素人 / パコパコママ
+    Official·HEYZO       https://www.heyzo.com              「HEYZO | 無修正 オールジャンル」
+    Official·Pacopacomama https://www.pacopacomama.com      「パコパコママ - 人妻・熟女専門アダルト動画」
 
-  ── 第三方 / 聚合站 (13) ──
+  ── 第三方 / 聚合站 (14) ──
     7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     Airav.cc          https://airav.io                  airav.io。分类磁贴含 素人 / 無碼，按分类切换有码/无码
     AVSOX             https://avsox.click               avsox.click。与 avmoo/avheat 同 tellme.pw AIO 平台，纯无码
@@ -130,21 +134,20 @@ MDCx 刮削网站类型汇总表
                                                     按标题相似度挑最接近的详情页（见 docs/Changelog.md 2.6.0）
 
 ================================================================================================================
-【附注】Official 内挂的 5 个无码官网（无独立 Website 枚举值，按番号前缀经 Official 路由）
+【附注】五个独立无码官网（各有 Website 枚举、爬虫与官网地址）
 ================================================================================================================
-    1pondo            https://www.1pondo.tv                   一本道 D2Pass。导航含 素人 / ムラムラってくる素人 / パコパコママ
-    10musume          https://www.10musume.com                「天然むすめ - 素人専門アダルト動画」
-    Caribbeancom      https://www.caribbeancom.com            「カリビアンコム」。导航 ムラムラってくる素人 / パコパコママ
-    HEYZO             https://www.heyzo.com                   「HEYZO | 無修正 オールジャンル」
-    PacopacoMama      https://www.pacopacomama.com            「パコパコママ - 人妻・熟女専門アダルト動画」
+    Official·10Musume     https://www.10musume.com            探测番号 10musume-072625_01
+    Official·1Pondo       https://www.1pondo.tv              探测番号 1pondo-072625_001
+    Official·Caribbeancom https://www.caribbeancom.com        探测番号 caribbeancom-082226-001
+    Official·HEYZO        https://www.heyzo.com               探测番号 heyzo-3935
+    Official·Pacopacomama https://www.pacopacomama.com        探测番号 pacopacomama-072625_100
 
-    注：这五站没有各自的 Website 枚举值，但在**站点下拉里各占一行**——软件设置 → 刮削网站 →
-        「指定网站」（下拉框 comboBox_website_all）与软件设置 → 网络 → 「当前网站」
-        （comboBox_custom_website）里都是 Official·10Musume／Official·1Pondo／
-        Official·Caribbeancom／Official·HEYZO／Official·Pacopacomama 五行，冒号后带
-        「无码：10Musume／一本道／加勒比／HEYZO／Paco」定位；「指定网站」框里笼统的 Official 本行仍在（排在五个子行之前，选它＝整批番号交给 Official、有码/无码按番号前缀自动路由），「当前网站」框里本行不单列。
-        行的值仍存 Official（选中后走 official 爬虫，官方那层按番号前缀的路由原样生效），
-        故这里只是把那层路由显式摆到界面上，不改变判定；「不走代理的网站」下拉不含这五行。
+    注：这五站各自有独立的 Website 枚举值与专属爬虫，已注册为独立站点。软件设置 →
+        刮削网站 →「指定网站」与软件设置 → 网络 →「当前网站」两个下拉都各占一行；
+        「编辑网站」候选区也可单独加入/移除。启用或禁用其中一站不会影响其他四站，
+        也不会影响 Official。五站默认只进无码番号组；Official 不再路由它们。
+        五站各自用自己的官网地址与探测番号做网络检测，不再是 Official 的一条子检测项。
+        「不走代理的网站」下拉不含这些站。
 
 ================================================================================================================
 【动漫里番（里番 / 同人 / 书籍 / 动漫，MDCx 内置 dongman 类型组）】  合计 4 站
@@ -200,7 +203,12 @@ MGStage           有码：有码+素人           有码+素人                
 Missav            综合：有码+无码           有码+无码+素人                    https://missav.ws                       
 Missav_API        综合：有码+无码           有码+无码+素人                    https://missav.ws                       
 MyWife            有码：MyWife             不进任何类型组（单独指定）        https://mywife.cc                       mywife-2306
-Official          综合：有码+无码           有码+无码                                                                 
+Official          官网：有码                 有码
+Official·10Musume 官网：无码                 无码                              https://www.10musume.com                10musume-072625_01
+Official·1Pondo   官网：无码                 无码                              https://www.1pondo.tv                  1pondo-072625_001
+Official·Caribbeancom 官网：无码             无码                              https://www.caribbeancom.com           caribbeancom-082226-001
+Official·HEYZO    官网：无码                 无码                              https://www.heyzo.com                   heyzo-3935
+Official·Pacopacomama 官网：无码             无码                              https://www.pacopacomama.com           pacopacomama-072625_100
 Prestige          有码：有码+素人           有码+素人                         https://www.prestige-av.com             ABW-130
 R18.dev           有码：仅限有码            有码                              https://r18.dev                         
 TheJavDB          有码：仅限有码            有码                              https://thejavdb.net             
@@ -215,12 +223,13 @@ Xcity             有码：仅限有码            有码                       
 # 第三部分   调度机制：字段优先级 / 联动组 / 排除项 / 强制单站路由
 ################################################################################################################
 
-■ 默认字段抓取优先级   DEFAULT_FIELD_SITE_PRIORITY（17 站，真正决定请求先后）
+■ 默认字段抓取优先级   DEFAULT_FIELD_SITE_PRIORITY（22 站，真正决定请求先后）
     ThepornDB             AVheat                DMM                   Official
-    LibreDMM              MGStage               Prestige              AVBase
-    JavDB                 JavBus                IQQTV                 FreeJavBT
-    Missav                AVSOX                 AVMOO                 FC2
-    FC2PPVDB
+    Official·10Musume     Official·1Pondo       Official·Caribbeancom Official·HEYZO
+    Official·Pacopacomama LibreDMM              MGStage               Prestige
+    AVBase                JavDB                 JavBus                IQQTV
+    FreeJavBT             Missav                AVSOX                 AVMOO
+    FC2                   FC2PPVDB
 
     ！ classification.sites 只是白名单过滤器，实际请求顺序取自各字段的 site_prority；
       想让某站被优先请求，必须改本表，或在 classify_scrape_task 里用 website= 强制单站。
@@ -245,7 +254,8 @@ Xcity             有码：仅限有码            有码                       
     番号 DLDSS                    →  Dahlia        （官网厂牌，2026-10-17 起独立成站）
     番号 FNS / FLN / JIMMY        →  Faleno        （官网厂牌，2026-10-17 起独立成站）
     番号 1pondo / caribbeancom / 10musume / heyzo / pacopacomama
-                                    →  Official 内挂的无码官网分支
+                                    →  对应的独立无码官网爬虫
+                                       （Official·1Pondo / Caribbeancom / 10Musume / HEYZO / Pacopacomama）
 
 ■ 编辑对话框 UI（软件设置 → 刮削网站 → 类型刮削网站 → 编辑网站）
     可用网站候选区  开头七个加粗标题（有码｜无码｜个摄｜欧美｜传媒｜短剧｜动漫），紧接着右边
