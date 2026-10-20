@@ -5237,9 +5237,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 <height>30</height>
                               </size>
                             </property>
-                            <property name="styleSheet">
-                              <string notr="true">color: rgb(8, 128, 128); padding-left: 20px;</string>
-                            </property>
                             <property name="text">
                               <string>整理模式</string>
                             </property>
@@ -5259,7 +5256,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   <string notr="true">color: rgb(8, 128, 128);</string>
                                 </property>
                                 <property name="text">
-                                  <string>执行：刮削-&gt;整理文件-&gt;重命名-&gt;打水印等全部操作，适合需要海报墙的情况</string>
+                                  <string>执行：刮削-&gt;整理文件-&gt;重新命名-&gt;等操作不打水印，适合需要海报墙的情况</string>
                                 </property>
                                 <property name="wordWrap">
                                   <bool>false</bool>

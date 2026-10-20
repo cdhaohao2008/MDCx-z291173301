@@ -14,7 +14,6 @@ from ..base.file import (
     get_movie_list,
     move_bif,
     move_file_to_failed_folder,
-    move_mediainfo,
     move_other_file,
     move_torrent,
     newtdisk_creat_symlink,
@@ -77,6 +76,7 @@ from .file_crawler import FileScraper, classify_existing_scrape_result, classify
 from .image import add_mark, replace_thumb_fanart_with_poster
 from .media_resource import MediaResourceContext
 from .nfo import get_nfo_data, write_nfo
+from .organize import organize_files
 from .super_resolution import maybe_upscale_poster
 from .translate import translate_actor, translate_info, translate_title_outline
 from .utils import (
@@ -171,12 +171,19 @@ class Scraper:
         self.crawler_provider = crawler_provider
         self._rest_lock = asyncio.Lock()
         self._state_cache: ScrapeStateCache | None = None
+        self._organize_batch_size = 0
 
     async def _run_tasks_with_limit(self, movie_list: list[Path], task_count: int, thread_number: int) -> None:
         task_iter = iter(enumerate(movie_list, 1))
         running_tasks: set[asyncio.Task[None]] = set()
+        batch_size = self._organize_batch_size if self._organize_batch_size > 0 else task_count
+        remaining_in_batch = min(batch_size, task_count)
+        submitted_total = 0
 
         def _submit_next_task() -> bool:
+            nonlocal remaining_in_batch, submitted_total
+            if remaining_in_batch <= 0:
+                return False
             try:
                 index, each_file = next(task_iter)
             except StopIteration:
@@ -185,51 +192,61 @@ class Scraper:
             running_tasks.add(
                 asyncio.create_task(self.process_one_file((each_file, index, task_count)), name=task_name)
             )
+            remaining_in_batch -= 1
+            submitted_total += 1
             return True
 
-        for _ in range(min(thread_number, task_count)):
+        for _ in range(min(thread_number, remaining_in_batch)):
             _submit_next_task()
 
         try:
-            while running_tasks:
-                done, pending = await asyncio.wait(running_tasks, return_when=asyncio.FIRST_COMPLETED)
-                running_tasks = set(pending)
+            while True:
+                while running_tasks:
+                    done, pending = await asyncio.wait(running_tasks, return_when=asyncio.FIRST_COMPLETED)
+                    running_tasks = set(pending)
 
-                stop_requested = False
-                fatal_error: Exception | None = None
-                done_count = 0
-                for done_task in done:
-                    done_count += 1
-                    try:
-                        done_task.result()
-                    except StopScrape:
-                        if signal.stop or Flags.stop_requested:
-                            stop_requested = True
-                        elif fatal_error is None:
-                            fatal_error = UnexpectedScrapeCancellation(
-                                f"刮削任务异常停止：{done_task.get_name()}，但未检测到手动停止标识"
-                            )
-                    except asyncio.CancelledError:
-                        if signal.stop or Flags.stop_requested:
-                            stop_requested = True
-                        elif fatal_error is None:
-                            fatal_error = UnexpectedScrapeCancellation(
-                                f"刮削任务被异常取消：{done_task.get_name()}，但未检测到手动停止标识"
-                            )
-                    except Exception as e:
-                        if fatal_error is None:
-                            fatal_error = e
+                    stop_requested = False
+                    fatal_error: Exception | None = None
+                    done_count = 0
+                    for done_task in done:
+                        done_count += 1
+                        try:
+                            done_task.result()
+                        except StopScrape:
+                            if signal.stop or Flags.stop_requested:
+                                stop_requested = True
+                            elif fatal_error is None:
+                                fatal_error = UnexpectedScrapeCancellation(
+                                    f"刮削任务异常停止：{done_task.get_name()}，但未检测到手动停止标识"
+                                )
+                        except asyncio.CancelledError:
+                            if signal.stop or Flags.stop_requested:
+                                stop_requested = True
+                            elif fatal_error is None:
+                                fatal_error = UnexpectedScrapeCancellation(
+                                    f"刮削任务被异常取消：{done_task.get_name()}，但未检测到手动停止标识"
+                                )
+                        except Exception as e:
+                            if fatal_error is None:
+                                fatal_error = e
 
-                if stop_requested or fatal_error is not None:
-                    for pending_task in running_tasks:
-                        pending_task.cancel()
-                    if running_tasks:
-                        await asyncio.gather(*running_tasks, return_exceptions=True)
-                    if fatal_error is not None:
-                        raise fatal_error
-                    return
+                    if stop_requested or fatal_error is not None:
+                        for pending_task in running_tasks:
+                            pending_task.cancel()
+                        if running_tasks:
+                            await asyncio.gather(*running_tasks, return_exceptions=True)
+                        if fatal_error is not None:
+                            raise fatal_error
+                        return
 
-                for _ in range(done_count):
+                    for _ in range(done_count):
+                        _submit_next_task()
+
+                if submitted_total >= task_count:
+                    break
+                # 连续刮削配置开启时：当前批次全部完成后再投喂下一批。
+                remaining_in_batch = min(batch_size, task_count - submitted_total)
+                for _ in range(min(thread_number, remaining_in_batch)):
                     _submit_next_task()
         except asyncio.CancelledError:
             for pending_task in running_tasks:
@@ -386,6 +403,9 @@ class Scraper:
 
         task_count = len(movie_list)
         Flags.total_count = task_count
+        self._organize_batch_size = 0
+        if manager.config.main_mode == ORGANIZE_MAIN_MODE and Switch.REST_SCRAPE in manager.config.switch_on:
+            self._organize_batch_size = max(1, int(manager.config.rest_count))
 
         # 进度速率估算（纯呈现层：滑动窗口速率 → 预计剩余时间）
         from .scrape_progress import ScrapeRateEstimator
@@ -400,6 +420,10 @@ class Scraper:
                 signal.show_log_text(
                     f" 🕷 当前为整理模式（不刮削、不下载，仅读取 nfo 整理文件），并发数（{thread_number}）..."
                 )
+                if self._organize_batch_size:
+                    signal.show_log_text(
+                        f" 🍯 分批整理已启用，每批 {self._organize_batch_size} 个文件，整理完一批后再继续下一批..."
+                    )
             else:
                 if task_count < thread_number:
                     thread_number = task_count
@@ -1437,33 +1461,33 @@ class Scraper:
             return None, None
 
         # 整理模式：只使用 nfo 字段和已有图片，按命名规则重新组织/移动文件。
-        # 不下载图片、不生成 nfo、不打水印。
+        # 不下载图片、不生成 nfo、不打水印；全部伴生文件作为一次事务处理。
         if organize_mode:
-            await deal_old_files(
-                res.number,
-                other,
-                folder_old_path,
-                meta_folder,
-                file_path,
-                thumb_new_path_with_filename,
-                poster_new_path_with_filename,
-                fanart_new_path_with_filename,
-                nfo_new_path,
-                poster_final_path,
-                thumb_final_path,
-                fanart_final_path,
-                naming_rule,
+            organize_folder = folder_new_path if eff_success_file_move() else folder_old_path
+            organize_file_path = (
+                file_new_path if eff_success_file_move() else organize_folder / (naming_rule + file_ex.lower())
             )
-            if eff_success_file_move():
-                if file_info.has_sub:
-                    await move_sub(folder_old_path, folder_new_path, file_name, sub_list, naming_rule)
-                await move_torrent(folder_old_path, folder_new_path, file_name, movie_number, naming_rule)
-                await move_bif(folder_old_path, folder_new_path, file_name, naming_rule)
-                await move_other_file(res.number, folder_old_path, folder_new_path, file_name, naming_rule, meta_folder)
-                await move_mediainfo(folder_old_path, folder_new_path, file_name, naming_rule)
-                if not await move_movie(other, file_info, file_path, file_new_path):
+            if eff_success_file_move() or eff_success_file_rename():
+                moved, error = await organize_files(
+                    file_path=file_path,
+                    file_new_path=organize_file_path,
+                    folder_old_path=folder_old_path,
+                    folder_new_path=organize_folder,
+                    nfo_new_path=nfo_new_path,
+                    naming_rule=naming_rule,
+                    file_name=file_name,
+                    number=res.number,
+                    sub_list=sub_list,
+                    poster_final_path=poster_final_path,
+                    thumb_final_path=thumb_final_path,
+                    fanart_final_path=fanart_final_path,
+                )
+                if not moved:
+                    LogBuffer.error().write(error)
                     return None, None
-            await save_success_list(file_path, file_new_path)
+                if await aiofiles.os.path.exists(organize_file_path):
+                    file_info.file_path = organize_file_path
+            await save_success_list(file_path, organize_file_path)
 
             if poster_final_path is not None:
                 if await aiofiles.os.path.exists(poster_final_path):

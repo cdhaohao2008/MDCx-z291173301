@@ -5,9 +5,12 @@
 - core.utils.get_video_size_for_file（STRM 本地目标解析、mediainfo.json 兜底）
 - base.file.move_mediainfo（同名 mediainfo 随视频移动并重命名、不覆盖）
 - base.file.get_movie_list 在整理模式下扫描 .strm（其他模式不扫描）
+- core.organize 事务整理（全部伴生文件移动、失败回滚）
+- 连续刮削数量控制分批调度
 - MDCx.ui 中整理模式单选项与说明文案
 """
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -16,6 +19,9 @@ import pytest
 from mdcx.base.file import get_movie_list, move_mediainfo
 from mdcx.config.extend import ORGANIZE_MAIN_MODE, is_organize_mode
 from mdcx.config.manager import manager
+from mdcx.core import organize as organize_module
+from mdcx.core.organize import organize_files
+from mdcx.core.scraper import Scraper
 from mdcx.core.utils import get_video_size_for_file
 from mdcx.models.enums import FileMode
 
@@ -157,10 +163,145 @@ def test_organize_mode_ui_texts():
     radio = root.find(".//widget[@name='radioButton_mode_organize']")
     assert radio is not None
     assert radio.findtext("property[@name='text']/string") == "整理模式"
+    # 与正常模式同为第 0 列、无额外缩进/染色，保证左边缘严格对齐。
+    assert radio.find("property[@name='styleSheet']") is None
+    organize_item = radio.getparent()
+    common_radio = root.find(".//widget[@name='radioButton_mode_common']")
+    assert common_radio is not None
+    common_item = common_radio.getparent()
+    assert organize_item is not None and common_item is not None
+    assert organize_item.get("column") == "0"
+    assert common_item.get("column") == "0"
 
     label = root.find(".//widget[@name='label_organize_mode']")
     assert label is not None
     assert (
         label.findtext("property[@name='text']/string")
-        == "执行：刮削->整理文件->重命名->打水印等全部操作，适合需要海报墙的情况"
+        == "执行：刮削->整理文件->重新命名->等操作不打水印，适合需要海报墙的情况"
     )
+
+
+@pytest.mark.asyncio
+async def test_organize_files_moves_all_companions(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setattr(manager.config, "subtitle_add_chs", False)
+    monkeypatch.setattr(manager.config, "sub_type", [".srt", ".ass"])
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "trailer_simple_name", True)
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart_copy")
+
+    old_folder = tmp_path / "old"
+    new_folder = tmp_path / "new"
+    old_folder.mkdir()
+    new_folder.mkdir()
+    video = old_folder / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    (old_folder / "ABS-040.nfo").write_text("<movie><title>ABS-040</title></movie>", encoding="utf-8")
+    (old_folder / "ABS-040-poster.jpg").write_bytes(b"poster")
+    (old_folder / "ABS-040-mediainfo.json").write_text("{}", encoding="utf-8")
+    (old_folder / "ABS-040.zh.srt").write_text("subtitle", encoding="utf-8")
+    (old_folder / "extrafanart").mkdir()
+    (old_folder / "extrafanart" / "a.jpg").write_bytes(b"extra")
+    (old_folder / "ABS-040.torrent").write_bytes(b"torrent")
+
+    moved, error = await organize_files(
+        file_path=video,
+        file_new_path=new_folder / "ABS-040.mp4",
+        folder_old_path=old_folder,
+        folder_new_path=new_folder,
+        nfo_new_path=new_folder / "ABS-040.nfo",
+        naming_rule="ABS-040",
+        file_name="ABS-040",
+        number="ABS-040",
+        sub_list=[".zh.srt"],
+        poster_final_path=new_folder / "poster.jpg",
+        thumb_final_path=new_folder / "thumb.jpg",
+        fanart_final_path=new_folder / "fanart.jpg",
+    )
+
+    assert moved, error
+    assert not any(path.exists() for path in old_folder.iterdir() if path.is_file())
+    assert (new_folder / "ABS-040.mp4").exists()
+    assert (new_folder / "ABS-040.nfo").exists()
+    assert (new_folder / "poster.jpg").exists()
+    assert (new_folder / "ABS-040-mediainfo.json").exists()
+    assert (new_folder / "ABS-040.zh.srt").exists()
+    assert (new_folder / "ABS-040.torrent").exists()
+    assert (new_folder / "extrafanart" / "a.jpg").exists()
+
+
+@pytest.mark.asyncio
+async def test_organize_files_rolls_back_when_video_move_fails(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    from mdcx.utils.file import move_file_async as real_move_file_async
+
+    async def flaky_move(src, dst, *, overwrite: bool = False):
+        if Path(dst).name == "ABS-040.mp4":
+            return False, "mock move failure"
+        return await real_move_file_async(src, dst, overwrite=overwrite)
+
+    async def failed_elevated(_src, _dst):
+        return False, "mock elevated failure"
+
+    monkeypatch.setattr(organize_module, "move_file_async", flaky_move)
+    monkeypatch.setattr(organize_module, "elevated_move_file", failed_elevated)
+
+    old_folder = tmp_path / "old"
+    new_folder = tmp_path / "new"
+    old_folder.mkdir()
+    new_folder.mkdir()
+    video = old_folder / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    (old_folder / "ABS-040.nfo").write_text("<movie><title>ABS-040</title></movie>", encoding="utf-8")
+    (old_folder / "ABS-040-poster.jpg").write_bytes(b"poster")
+    (old_folder / "ABS-040-mediainfo.json").write_text("{}", encoding="utf-8")
+
+    moved, error = await organize_files(
+        file_path=video,
+        file_new_path=new_folder / "ABS-040.mp4",
+        folder_old_path=old_folder,
+        folder_new_path=new_folder,
+        nfo_new_path=new_folder / "ABS-040.nfo",
+        naming_rule="ABS-040",
+        file_name="ABS-040",
+        number="ABS-040",
+        sub_list=[],
+        poster_final_path=new_folder / "poster.jpg",
+        thumb_final_path=new_folder / "thumb.jpg",
+        fanart_final_path=new_folder / "fanart.jpg",
+    )
+
+    assert moved is False
+    assert "回滚" in error
+    # 已移动的 nfo/图片/json 必须全部退回原目录。
+    assert video.exists()
+    assert (old_folder / "ABS-040.nfo").exists()
+    assert (old_folder / "ABS-040-poster.jpg").exists()
+    assert (old_folder / "ABS-040-mediainfo.json").exists()
+    assert not (new_folder / "ABS-040.nfo").exists()
+    assert not (new_folder / "poster.jpg").exists()
+
+
+@pytest.mark.asyncio
+async def test_organize_batch_waits_for_previous_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    scraper = Scraper(object())  # type: ignore[arg-type]
+    scraper._organize_batch_size = 2
+    events: list[str] = []
+    active = 0
+
+    async def fake_process(file_info):
+        nonlocal active
+        index = file_info[1]
+        active += 1
+        events.append(f"start-{index}")
+        await asyncio.sleep(0.01)
+        active -= 1
+        events.append(f"end-{index}")
+
+    monkeypatch.setattr(scraper, "process_one_file", fake_process)
+    files = [tmp_path / f"{index}.mp4" for index in range(1, 6)]
+
+    await scraper._run_tasks_with_limit(files, len(files), 2)
+
+    third_start = events.index("start-3")
+    assert events.index("end-1") < third_start
+    assert events.index("end-2") < third_start
+    assert active <= 2

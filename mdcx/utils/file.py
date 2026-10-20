@@ -408,6 +408,79 @@ async def move_file_async(old: str | Path, new: str | Path, *, overwrite: bool =
         return False, error_info
 
 
+def _elevated_move_windows(old: Path, new: Path) -> bool:
+    """通过 UAC 提权执行一次 move，等待完成后由调用方核验结果。"""
+    import ctypes
+    from ctypes import wintypes
+
+    class SHELLEXECUTEINFOW(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", wintypes.DWORD),
+            ("fMask", ctypes.c_ulong),
+            ("hwnd", wintypes.HWND),
+            ("lpVerb", wintypes.LPCWSTR),
+            ("lpFile", wintypes.LPCWSTR),
+            ("lpParameters", wintypes.LPCWSTR),
+            ("lpDirectory", wintypes.LPCWSTR),
+            ("nShow", ctypes.c_int),
+            ("hInstApp", wintypes.HINSTANCE),
+            ("lpIDList", ctypes.c_void_p),
+            ("lpClass", wintypes.LPCWSTR),
+            ("hkeyClass", wintypes.HKEY),
+            ("dwHotKey", wintypes.DWORD),
+            ("hIcon", wintypes.HANDLE),
+            ("hProcess", wintypes.HANDLE),
+        ]
+
+    sei = SHELLEXECUTEINFOW()
+    sei.cbSize = ctypes.sizeof(SHELLEXECUTEINFOW)
+    sei.fMask = 0x40  # SEE_MASK_NOCLOSEPROCESS
+    sei.lpVerb = "runas"
+    sei.lpFile = "cmd.exe"
+    sei.lpParameters = f'/c move /Y "{old}" "{new}"'
+    sei.nShow = 0
+    if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(sei)):
+        return False
+    try:
+        ctypes.windll.kernel32.WaitForSingleObject(sei.hProcess, 60000)
+        ctypes.windll.kernel32.CloseHandle(sei.hProcess)
+    except Exception:
+        return False
+    return True
+
+
+async def elevated_move_file(old: str | Path, new: str | Path) -> tuple[bool, str]:
+    """管理员权限重试移动一次；仅在普通移动失败后调用。
+
+    Windows 通过 ``runas`` 触发 UAC；POSIX 使用免交互 ``sudo -n``。
+    最终以文件系统结果为准（目标存在且源不存在）。
+    """
+    old = Path(old)
+    new = Path(new)
+    if not await aiofiles.os.path.exists(old):
+        if await aiofiles.os.path.exists(new):
+            return True, ""
+        return False, f"源文件不存在: {old}"
+    try:
+        await asyncio.to_thread(new.parent.mkdir, parents=True, exist_ok=True)
+        if IS_WINDOWS:
+            await asyncio.to_thread(_elevated_move_windows, old, new)
+        else:
+            result = await asyncio.to_thread(
+                subprocess.run,
+                ["sudo", "-n", "mv", "-f", "--", str(old), str(new)],
+                capture_output=True,
+                timeout=60,
+            )
+            if result.returncode != 0:
+                return False, result.stderr.decode(errors="ignore")
+    except Exception as e:
+        return False, str(e)
+    if await aiofiles.os.path.exists(new) and not await aiofiles.os.path.exists(old):
+        return True, ""
+    return False, f"提权移动失败: {old} -> {new}"
+
+
 async def copy_file_async(old: str | Path, new: str | Path):
     """异步复制文件"""
     old = Path(old)
