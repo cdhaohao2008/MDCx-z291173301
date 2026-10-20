@@ -749,7 +749,12 @@ class Scraper:
                         "\n 🔴 该问题为权限问题：请尝试以管理员身份运行，同时关闭其他正在运行的Python脚本！"
                     )
                 failed_folder = get_movie_path_setting(file_path).failed_folder
-                fail_file_path = await move_file_to_failed_folder(failed_folder, file_path, folder_old_path)
+                if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+                    # 整理失败已在事务中回滚，保持全部文件在原目录不动。
+                    fail_file_path = file_path
+                    LogBuffer.log().write("\n 🟡 整理失败，相关文件已保留在原目录。")
+                else:
+                    fail_file_path = await move_file_to_failed_folder(failed_folder, file_path, folder_old_path)
                 with Flags.guarded():
                     Flags.failed_list.append((fail_file_path, error_msg))
                 await self._failed_file_info_show(str(Flags.fail_count), fail_file_path, error_msg)
@@ -1463,30 +1468,28 @@ class Scraper:
         # 整理模式：只使用 nfo 字段和已有图片，按命名规则重新组织/移动文件。
         # 不下载图片、不生成 nfo、不打水印；全部伴生文件作为一次事务处理。
         if organize_mode:
-            organize_folder = folder_new_path if eff_success_file_move() else folder_old_path
-            organize_file_path = (
-                file_new_path if eff_success_file_move() else organize_folder / (naming_rule + file_ex.lower())
+            # 整理模式始终按命名规则整理到目标目录，不受普通模式移动/重命名开关影响。
+            organize_folder = folder_new_path
+            organize_file_path = file_new_path
+            moved, error = await organize_files(
+                file_path=file_path,
+                file_new_path=organize_file_path,
+                folder_old_path=folder_old_path,
+                folder_new_path=organize_folder,
+                nfo_new_path=nfo_new_path,
+                naming_rule=naming_rule,
+                file_name=file_name,
+                number=res.number,
+                sub_list=sub_list,
+                poster_final_path=poster_final_path,
+                thumb_final_path=thumb_final_path,
+                fanart_final_path=fanart_final_path,
             )
-            if eff_success_file_move() or eff_success_file_rename():
-                moved, error = await organize_files(
-                    file_path=file_path,
-                    file_new_path=organize_file_path,
-                    folder_old_path=folder_old_path,
-                    folder_new_path=organize_folder,
-                    nfo_new_path=nfo_new_path,
-                    naming_rule=naming_rule,
-                    file_name=file_name,
-                    number=res.number,
-                    sub_list=sub_list,
-                    poster_final_path=poster_final_path,
-                    thumb_final_path=thumb_final_path,
-                    fanart_final_path=fanart_final_path,
-                )
-                if not moved:
-                    LogBuffer.error().write(error)
-                    return None, None
-                if await aiofiles.os.path.exists(organize_file_path):
-                    file_info.file_path = organize_file_path
+            if not moved:
+                LogBuffer.error().write(error)
+                return None, None
+            if await aiofiles.os.path.exists(organize_file_path):
+                file_info.file_path = organize_file_path
             await save_success_list(file_path, organize_file_path)
 
             if poster_final_path is not None:
