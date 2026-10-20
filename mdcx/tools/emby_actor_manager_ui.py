@@ -5,6 +5,7 @@ import concurrent.futures
 import math
 import re
 import threading
+import time
 import weakref
 from pathlib import Path
 from typing import cast
@@ -31,6 +32,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -252,14 +254,11 @@ class _FlushLogTextEdit(QPlainTextEdit):
 
 
 DEFAULT_CLEAN_RULES = clean_rules.DEFAULT_CLEAN_RULES
-"""内置**出厂**默认替换规则: 置顶两条 minnano 占位文案(半角/全角逗号)替换为空,
-外加四条 wiki 源英文身份文案译为中文, 始终保留。
+"""内置**出厂**默认替换规则: 四条 wiki 源英文身份文案译为中文, 始终保留。
 
+两条 minnano 占位文案规则自 v2.7.2 起不再是默认规则, 不在本列表里。
 「恢复默认」按钮填的是 `load_default_clean_rules()` 的返回值——用户点过「保存默认」
 就填用户保存的那份, 没点过才等于这里这份。"""
-
-PINNED_CLEAN_RULES = clean_rules.PINNED_CLEAN_RULES
-"""永远置顶的两条 minnano 占位规则; 保存默认时即使用户删了也会补回并排到最前两条。"""
 
 
 def _ensure_default_clean_rules(
@@ -288,8 +287,8 @@ def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
 def load_default_clean_rules() -> list[tuple[str, str]]:
     """「恢复默认」按钮该填的规则: 用户点过「保存默认」就是他保存的那份, 否则内置出厂。
 
-    结果恒含置顶两条 minnano 占位规则(排最前)与内置英文身份四条, 用户保存过的那份
-    即便把它们删了也会在保存时被补回。
+    结果恒含内置英文身份四条(缺失自动补齐); 两条 minnano 占位规则自 v2.7.2 起
+    不再是默认规则, 用户删掉后既不会补回也不会置顶。
     """
     return clean_rules.load_default_clean_rules(manager.config)
 
@@ -306,16 +305,17 @@ def save_default_clean_rules(rules: object) -> list[tuple[str, str]]:
 def load_clean_rules() -> list[tuple[str, str]]:
     """读出上次保存的清洗替换规则; 无配置/非法时返回默认规则, 缺失的默认条目自动补齐。
 
-    数据清洗窗口弹出时默认加载本函数返回值, 故首开即见全部默认规则(占位两条
-    + 英文身份四条)。老配置存盘只有占位两条时, 英文四条自动补齐追加到末尾。
+    数据清洗窗口弹出时默认加载本函数返回值, 首开即见内置英文身份四条; 缺失的
+    默认条目自动补齐。两条 minnano 占位规则自 v2.7.2 起不再参与补齐。
     """
     return clean_rules.load_clean_rules(manager.config)
 
 
 def save_clean_rules(rules: object) -> list[tuple[str, str]]:
-    """持久化用户确认的清洗替换规则, 返回归一化后的规则。失败时静默返回归一化结果。
+    """持久化清洗替换规则, 返回归一化后的规则。失败时静默返回归一化结果。
 
-    保存时自动补齐缺失的默认规则, 保证默认规则(占位两条 + 英文身份四条)始终保留。
+    保存时自动补齐缺失的默认规则(内置英文身份四条); 两条 minnano 占位规则自
+    v2.7.2 起不再自动补回。
     """
     return clean_rules.save_clean_rules(rules, manager)
 
@@ -1031,18 +1031,27 @@ class DetailSyncThread(_CancellableWorkerThread):
 
 
 class ActorCleanRulesDialog(QDialog):
-    """数据清洗规则编辑窗: 全局 (原始数值 → 替换数值) 字面替换表, 确定后才实际清洗。
+    """数据清洗规则编辑窗: 全局 (原始数值 → 替换数值) 字面替换表, 确定后实际清洗。
 
     独立顶层窗口(与演员管理器互不影响): 无父级、非模态, 可与管理器并存操作;
     最小化/关闭/移动不再级联影响对方。每次点击「数据清洗」都弹出本窗
     (含无待清洗数据时), 打开时装载上次保存的规则; 用户可编辑单元格、添加行、
-    删除选中行, 窗口可拉伸缩小; 点确定则保存规则并关闭, 调用方据此执行实际清洗,
-    点取消则不做任何改动。
+    删除选中行, 窗口可拉伸缩小; 点确定则保存规则并关闭, 调用方据此执行实际清洗。
+
+    快速编辑: 在最后一条规则下方空白处左键单击或双击即自动追加一行并进入
+    编辑; 单元格编辑完成(单击别处/回车)即自动写回 `actor_clean_rules`, 无需再点
+    「确定」; 右键任意规则行可删除该行。因为编辑会即时落盘, 「取消」只关闭窗口,
+    不回滚已经自动保存的内容。
 
     「恢复默认」填入默认规则(用户点过「保存默认」就是他保存的那份, 否则内置
     出厂),「保存默认」把当前表格存成默认规则、只改下次恢复默认的底座而不改本次
-    生效的规则; 两条 minnano 占位规则在保存默认时即使用户删了也会补回并置顶。
+    生效的规则。两条 minnano 占位规则自 v2.7.2 起不再属于默认规则, 也不会在
+    保存/恢复默认时补回。
     """
+
+    #: 双击会在第一次单击(已新增一行)后紧跟一个 DblClick 事件, 用它去重,
+    #: 避免一次双击加出两行。取 500ms, 大于系统默认双击间隔。
+    _BLANK_DBLCLICK_GUARD_S = 0.5
 
     def __init__(self, actors: list[ActorInfo] | None = None, parent=None):
         # 独立顶层窗口: parent 参数仅为兼容旧调用而保留, 不再传入——管理器
@@ -1064,11 +1073,18 @@ class ActorCleanRulesDialog(QDialog):
         self.setStyleSheet(f"QWidget {{ font-size: {_ui_font_pt()}; }}")
         self._centered_once = False
         self._actors = list(actors or [])
+        # 程序化写表(装载/恢复默认/新增空行)期间关掉自动保存, 避免把中间状态
+        # 写进配置; 只在用户编辑单元格(单击别处/回车提交)时落盘。
+        self._suspend_autosave = True
+        # 空白区双击去重: 第一次单击已经加过行, 紧跟的 DblClick 不再重复加。
+        self._last_blank_add = 0.0
         layout = QVBoxLayout(self)
 
         hint = QLabel(
             "每行一条替换规则: 详情、标签中出现「原始数值」时替换为「替换数值」"
             "，替换为空即删除该片段，内置占位/非法生日清洗始终生效, 此处规则叠加其上。"
+            " 在最后一条规则下方单击或双击可新增一行; 编辑完单击别处或按回车即自动保存;"
+            " 右键规则行可删除。"
         )
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -1087,6 +1103,12 @@ class ActorCleanRulesDialog(QDialog):
             | QAbstractItemView.EditTrigger.AnyKeyPressed
         )
         self.table.verticalHeader().setVisible(False)  # type: ignore[union-attr]
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._on_table_context_menu)
+        # 空白区(最后一行下方)左键单击/双击直接新增规则行并进入编辑。
+        viewport = self.table.viewport()
+        assert viewport is not None
+        viewport.installEventFilter(self)
         layout.addWidget(self.table, 1)
 
         self.status_label = QLabel("")
@@ -1098,13 +1120,12 @@ class ActorCleanRulesDialog(QDialog):
         del_btn = QPushButton("删除选中")
         del_btn.clicked.connect(self._on_delete_selected)
         default_btn = QPushButton("恢复默认")
-        default_btn.setToolTip("填入默认规则: 内置的占位文案清理 + 英文身份译名; 点过「保存默认」则填你保存的那份")
+        default_btn.setToolTip("填入默认规则: 内置的英文身份译名; 点过「保存默认」则填你保存的那份")
         default_btn.clicked.connect(self._on_restore_default)
         save_default_btn = QPushButton("保存默认")
         save_default_btn.setToolTip(
             "把当前表格里的规则存成默认规则, 下次点「恢复默认」即用这份。\n"
-            "两条 minnano 占位规则即使用户删了也会补回并置顶到最前两条, "
-            "内置英文身份译名缺失也会补齐"
+            "内置英文身份译名缺失会自动补齐; 两条 minnano 占位规则不再作为默认规则补回"
         )
         save_default_btn.clicked.connect(self._on_save_default)
         row.addWidget(add_btn)
@@ -1123,38 +1144,75 @@ class ActorCleanRulesDialog(QDialog):
         layout.addLayout(row)
 
         self.set_rules(load_clean_rules())
+        self._suspend_autosave = False
         try:
-            self.table.itemChanged.disconnect(self._refresh_status)
+            self.table.itemChanged.disconnect(self._on_item_changed)
         except (TypeError, RuntimeError):
             pass
-        self.table.itemChanged.connect(self._refresh_status)
+        self.table.itemChanged.connect(self._on_item_changed)
         self._refresh_status()
 
     def _hold_refresh(self):
-        """批量改表时暂停 itemChanged → 状态刷新, 返回重连函数。"""
+        """批量改表时暂停 itemChanged → 状态刷新/自动保存, 返回重连函数。"""
         try:
-            self.table.itemChanged.disconnect(self._refresh_status)
+            self.table.itemChanged.disconnect(self._on_item_changed)
         except (TypeError, RuntimeError):
             pass
 
     def _resume_refresh(self):
         try:
-            self.table.itemChanged.disconnect(self._refresh_status)
+            self.table.itemChanged.disconnect(self._on_item_changed)
         except (TypeError, RuntimeError):
             pass
-        self.table.itemChanged.connect(self._refresh_status)
+        self.table.itemChanged.connect(self._on_item_changed)
         self._refresh_status()
 
-    def _on_add_row(self):
-        self._hold_refresh()
+    def eventFilter(self, obj, event):
+        """最后一条规则下方的空白区: 左键单击/双击即追加一行并进入编辑。"""
         try:
-            row = self.table.rowCount()
+            if obj is self.table.viewport():
+                etype = event.type()
+                if (
+                    etype in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonDblClick)
+                    and event.button() == Qt.MouseButton.LeftButton
+                ):
+                    pos = event.position().toPoint()
+                    if not self.table.indexAt(pos).isValid():
+                        # 双击序列已由第一次单击加过一行, 忽略紧随其后的 DblClick。
+                        if (
+                            etype == QEvent.Type.MouseButtonDblClick
+                            and time.monotonic() - self._last_blank_add < self._BLANK_DBLCLICK_GUARD_S
+                        ):
+                            return True
+                        self._append_rule_row()
+                        self._last_blank_add = time.monotonic()
+                        return True
+        except (RuntimeError, AttributeError, TypeError, ValueError):
+            pass
+        except Exception:
+            pass
+        return super().eventFilter(obj, event)
+
+    def _append_rule_row(self) -> int:
+        """在表格末尾追加一条空规则行并立即进入「原始数值」编辑。"""
+        row = self.table.rowCount()
+        previous = self._suspend_autosave
+        self._suspend_autosave = True
+        try:
             self.table.insertRow(row)
             self.table.setItem(row, 0, QTableWidgetItem(""))
             self.table.setItem(row, 1, QTableWidgetItem(""))
-            self.table.editItem(self.table.item(row, 0))
         finally:
-            self._resume_refresh()
+            self._suspend_autosave = previous
+        self.table.scrollToBottom()
+        item = self.table.item(row, 0)
+        self.table.setCurrentCell(row, 0)
+        if item is not None:
+            self.table.editItem(item)
+        return row
+
+    def _on_add_row(self):
+        self._append_rule_row()
 
     def _on_delete_selected(self):
         rows = sorted({i.row() for i in self.table.selectedIndexes()}, reverse=True)
@@ -1168,6 +1226,54 @@ class ActorCleanRulesDialog(QDialog):
                 self.table.removeRow(r)
         finally:
             self._resume_refresh()
+        self._auto_save_rules()
+
+    def _delete_rule_row(self, row: int) -> None:
+        """删除右键命中的规则行并立即自动保存。"""
+        if not 0 <= row < self.table.rowCount():
+            return
+        self._hold_refresh()
+        try:
+            self.table.removeRow(row)
+        finally:
+            self._resume_refresh()
+        self._auto_save_rules()
+
+    def _on_table_context_menu(self, pos) -> None:
+        """右键规则行: 弹出「删除规则」菜单; 空白区不弹。"""
+        index = self.table.indexAt(pos)
+        if not index.isValid():
+            return
+        row = index.row()
+        viewport = self.table.viewport()
+        if viewport is None:
+            return
+        menu = QMenu(self)
+        delete_action = menu.addAction("删除规则")
+        if delete_action is None:
+            return
+        delete_action.setToolTip("删除光标所在的这一条替换规则")
+        chosen = menu.exec(viewport.mapToGlobal(pos))
+        if chosen is delete_action:
+            self._delete_rule_row(row)
+
+    def _on_item_changed(self, *_args):
+        """用户提交单元格编辑(单击别处/回车): 刷新状态并自动保存生效规则。"""
+        if self._suspend_autosave:
+            return
+        self._refresh_status()
+        self._auto_save_rules()
+
+    def _auto_save_rules(self) -> None:
+        """把当前表格规则立即写回 `actor_clean_rules`; 失败时只提示、不弹窗。"""
+        if self._suspend_autosave:
+            return
+        try:
+            saved = save_clean_rules(self.rules())
+        except Exception:
+            self._apply_status("自动保存失败。")
+            return
+        self._apply_status(f"已自动保存 {len(saved)} 条规则。")
 
     def _on_restore_default(self):
         """填入默认规则: 用户点过「保存默认」就是他保存的那份, 否则内置出厂。"""
@@ -1176,9 +1282,9 @@ class ActorCleanRulesDialog(QDialog):
     def _on_save_default(self):
         """把当前表格的规则存成默认规则, 下次「恢复默认」即用这份。
 
-        存的是归一化后的结果(两条 minnano 占位规则补回并置顶、内置英文身份译名
-        补齐), 故把归一化结果回填给用户看, 免得表格里看着没生效。只改默认, 不动
-        当前生效的规则——点「确定」才会拿它去清洗。
+        存的是归一化后的结果(内置英文身份译名补齐), 故把归一化结果回填给用户看,
+        免得表格里看着没生效。只改默认, 不动当前生效的规则——生效规则由编辑完成
+        时的自动保存或点「确定」写入。两条 minnano 占位规则不再补回/置顶。
         """
         saved = save_default_clean_rules(self.rules())
         self.set_rules(saved)
@@ -1215,7 +1321,7 @@ class ActorCleanRulesDialog(QDialog):
         self._apply_status()
 
     def _apply_status(self, prefix: str = ""):
-        """刷新底部状态行; `prefix` 用于在「保存默认」后补一句提示, 失败时静默。"""
+        """刷新底部状态行; `prefix` 用于补一句保存提示, 失败时静默。"""
         text = ""
         try:
             count = len(scan_actor_data_noise(self._actors, self.rules()))
@@ -3383,9 +3489,10 @@ class EmbyActorManagerDialog(QDialog):
 
         规则窗与管理器互相独立: 无父级、非模态, 可与管理器并存操作,
         最小化/关闭/移动互不级联。单例复用——已存在则提前台。
-        对话框打开时默认加载上次保存的规则(缺省时为内置默认: 占位两条 + 英文身份四条);
-        点确定经 finished 回调保存用户编辑后的规则并回调用本函数执行,
-        点取消/X 则直接返回。按当前规则无待清洗数据时仅提示, 不启动线程(规则已保存)。
+        对话框打开时默认加载上次保存的规则(缺省时为内置默认: 英文身份四条);
+        单元格编辑完成即自动保存, 点确定经 finished 回调按最新规则执行清洗;
+        点取消/X 只关闭窗口, 不回滚已自动保存的编辑。按当前规则无待清洗数据时
+        仅提示, 不启动线程(规则已保存)。
         """
         if rules is None:
             if not self._actors:
@@ -3464,10 +3571,11 @@ class EmbyActorManagerDialog(QDialog):
         self._clean_thread.start()
 
     def _on_clean_rules_finished(self, result):
-        """独立规则窗 finished 回调: 确定则保存规则并回切清洗执行, 取消则丢弃。
+        """独立规则窗 finished 回调: 确定则保存最新规则并执行清洗, 取消只关闭窗口。
 
-        规则窗已独立于管理器——管理器先关导致 UI 已销毁时, 仅持久化规则不再起线程,
-        避免撞上已销毁的 C++ 对象。
+        规则编辑完成时已自动保存, 取消不回滚; 这里仅在确定时再按表格最新内容保存
+        一次并启动清洗。规则窗已独立于管理器——管理器先关导致 UI 已销毁时, 仅
+        持久化规则不再起线程, 避免撞上已销毁的 C++ 对象。
         """
         try:
             dialog = self._clean_rules_dialog

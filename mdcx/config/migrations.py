@@ -14,6 +14,35 @@ from .enums import DownloadableFile, FixedScrapingType, HDPicSource, Website
 # 都恒为假，会让「只迁一次」的逻辑每次启动重跑一遍。
 CURRENT_CONFIG_VERSION = 2
 
+# v2.7.2: 两条 minnano 占位文案规则不再作为演员数据清洗的默认规则。
+# 只清理「原始数值=占位文案、替换数值=空」的出厂形态；用户主动改过替换值的
+# 同名规则保留，避免误删用户自定义内容。
+_LEGACY_MINNANO_CLEAN_RULES = {
+    ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
+    ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
+}
+
+
+def _migrate_actor_clean_rules(data: dict[str, Any]) -> None:
+    """从存量配置的生效规则/默认规则里摘掉两条已退役的 minnano 占位规则。"""
+    for key in ("actor_clean_rules", "actor_clean_rules_default"):
+        value = data.get(key)
+        if not isinstance(value, list):
+            continue
+        kept: list[Any] = []
+        for item in value:
+            try:
+                original, replacement = item
+            except (TypeError, ValueError):
+                kept.append(item)
+                continue
+            if isinstance(original, str) and isinstance(replacement, str):
+                if (original, replacement) in _LEGACY_MINNANO_CLEAN_RULES:
+                    continue
+            kept.append(item)
+        if len(kept) != len(value):
+            data[key] = kept
+
 
 def _str_to_list(v: str | list[Any] | None, sep: str = ",", unique: bool = True) -> list[str]:
     if v is None:
@@ -423,6 +452,7 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
         warnings.append("[迁移] 已移除配置项「严格校验 Amazon 图片」：ASIN 库命中即信任，软校验仅用于新 ASIN 入库")
     _migrate_builtin_naming_templates(data)
     _migrate_removed_hd_pic_sources(data)
+    _migrate_actor_clean_rules(data)
     if message := _migrate_official_uncensored_split(data):
         warnings.append(message)
 

@@ -884,8 +884,6 @@ class Config(BaseModel):
     actor_count_mode: int = Field(default=0, title="演员计数方式 0=原始条目数 1=唯一名字数")
     actor_clean_rules: list[list[str]] = Field(
         default_factory=lambda: [
-            ["无维基百科信息, 从 minnano-av 数据库补全女优信息", ""],
-            ["无维基百科信息，从 minnano-av 数据库补全女优信息", ""],
             ["Japanese AV actress", "日本AV女优"],
             ["American pornographic actress", "美国色情女演员"],
             ["American pornographic performer", "美国色情演员"],
@@ -899,8 +897,6 @@ class Config(BaseModel):
     # 依赖 config 层，import 会成环；tests 里有断言锁住两份不漂移)。
     actor_clean_rules_default: list[list[str]] = Field(
         default_factory=lambda: [
-            ["无维基百科信息, 从 minnano-av 数据库补全女优信息", ""],
-            ["无维基百科信息，从 minnano-av 数据库补全女优信息", ""],
             ["Japanese AV actress", "日本AV女优"],
             ["American pornographic actress", "美国色情女演员"],
             ["American pornographic performer", "美国色情演员"],

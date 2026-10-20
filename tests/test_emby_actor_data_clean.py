@@ -352,7 +352,7 @@ def test_actress_db_no_longer_writes_placeholder():
 
 
 class TestDefaultCleanRules:
-    """内置默认规则: 两条占位文案(删噪声) + 四条英文身份文案(译名)。"""
+    """内置默认规则只有四条英文身份译名; 两条 minnano 占位规则自 v2.7.2 起退役。"""
 
     #: 用户 2026-10-17 指定的四条英文身份译文, 逐条锁定防漂移。
     ENGLISH_IDENTITY_RULES = [
@@ -362,48 +362,41 @@ class TestDefaultCleanRules:
         ("Brazilian pornographic actress", "巴西色情女演员"),
     ]
 
-    def test_defaults_contain_placeholder_and_english_identity(self):
+    def test_defaults_are_only_english_identity(self):
         from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES
 
-        assert DEFAULT_CLEAN_RULES[:2] == [
-            ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
-            ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
-        ]
-        assert DEFAULT_CLEAN_RULES[2:] == self.ENGLISH_IDENTITY_RULES
+        assert DEFAULT_CLEAN_RULES == self.ENGLISH_IDENTITY_RULES
+        assert not any("minnano" in original for original, _ in DEFAULT_CLEAN_RULES)
 
-    def test_config_model_default_matches_constant(self):
-        """模型默认值必须与常量一致, 否则新装用户和常量兜底看到的规则不同。"""
+    def test_config_model_defaults_match_constant(self):
+        """生效/默认两个字段的模型默认值都必须与常量一致。"""
         from mdcx.config.models import Config
         from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES
 
-        assert Config().actor_clean_rules == [list(rule) for rule in DEFAULT_CLEAN_RULES]
+        expected = [list(rule) for rule in DEFAULT_CLEAN_RULES]
+        assert Config().actor_clean_rules == expected
+        assert Config().actor_clean_rules_default == expected
 
     def test_ensure_appends_missing_to_existing_config(self):
-        """老配置存盘只有占位两条时, 英文四条补齐追加到末尾, 已有条目顺序与改过的替换值不变。"""
+        """老配置只有部分规则时, 英文四条缺失项追加到末尾, 已有顺序与改过的替换值不变。"""
         from mdcx.tools.emby_actor_clean_rules import _ensure_default_clean_rules
 
         stored = [
-            ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
-            ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
+            ("noise", "噪声"),
             ("Japanese AV actress", "用户自己改的译名"),
         ]
         result = _ensure_default_clean_rules(stored)
         # 用户改过的替换值不被默认值覆盖回去, 且仍在原位
         assert result[0] == stored[0]
-        assert result[1] == stored[1]
-        assert result[2] == ("Japanese AV actress", "用户自己改的译名")
+        assert result[1] == ("Japanese AV actress", "用户自己改的译名")
         # 其余三条缺失默认追加到末尾
-        assert result[3:] == self.ENGLISH_IDENTITY_RULES[1:]
+        assert result[2:] == self.ENGLISH_IDENTITY_RULES[1:]
 
     def test_defaults_are_always_restored_after_deletion(self):
-        """用户把默认规则全删掉, 也会被补回(兜底语义)。"""
+        """用户把默认规则全删掉, 内置英文四条仍会被补回(兜底语义)。"""
         from mdcx.tools.emby_actor_clean_rules import _ensure_default_clean_rules
 
-        assert _ensure_default_clean_rules([]) == [
-            ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
-            ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
-            *self.ENGLISH_IDENTITY_RULES,
-        ]
+        assert _ensure_default_clean_rules([]) == self.ENGLISH_IDENTITY_RULES
 
     def test_english_identity_rules_translate_overview_and_taglines(self):
         """四条默认规则同时作用于简介与标签(Taglines), 是译名而非删噪声。"""
@@ -444,10 +437,58 @@ class TestDefaultCleanRules:
         assert fix_birth is False
 
 
-_PINNED = [
+_LEGACY_MINNANO = [
     ("无维基百科信息, 从 minnano-av 数据库补全女优信息", ""),
     ("无维基百科信息，从 minnano-av 数据库补全女优信息", ""),
 ]
+
+
+class TestActorCleanRulesMigration:
+    """v2.7.2 配置迁移: 只摘掉出厂形态的 minnano 占位规则, 不动用户自定义内容。"""
+
+    def test_strips_legacy_pairs_from_both_fields(self):
+        from mdcx.config.migrations import migrate_config_data
+
+        data = {
+            "actor_clean_rules": [[*_LEGACY_MINNANO[0]], [*_LEGACY_MINNANO[1]], ["noise", "噪声"]],
+            "actor_clean_rules_default": [["自定义", "替换"], [*_LEGACY_MINNANO[0]]],
+        }
+        migrate_config_data(data)
+
+        assert data["actor_clean_rules"] == [["noise", "噪声"]]
+        assert data["actor_clean_rules_default"] == [["自定义", "替换"]]
+
+    def test_keeps_user_edited_minnano_replacement(self):
+        """同名规则若用户改过替换值, 迁移必须保留, 不能误删用户内容。"""
+        from mdcx.config.migrations import migrate_config_data
+
+        edited = [_LEGACY_MINNANO[0][0], "用户改的替换值"]
+        data = {
+            "actor_clean_rules": [edited],
+            "actor_clean_rules_default": [edited],
+        }
+        migrate_config_data(data)
+
+        assert data["actor_clean_rules"] == [edited]
+        assert data["actor_clean_rules_default"] == [edited]
+
+    def test_keeps_malformed_entries(self):
+        from mdcx.config.migrations import migrate_config_data
+
+        malformed = ["不是二元组", ["只有一条"], 42]
+        data = {"actor_clean_rules": malformed}
+        migrate_config_data(data)
+
+        assert data["actor_clean_rules"] == malformed
+
+    def test_non_list_values_are_left_untouched(self):
+        from mdcx.config.migrations import migrate_config_data
+
+        data = {"actor_clean_rules": None, "actor_clean_rules_default": "不是列表"}
+        migrate_config_data(data)
+
+        assert data["actor_clean_rules"] is None
+        assert data["actor_clean_rules_default"] == "不是列表"
 
 
 class _FakeManager:
@@ -469,14 +510,9 @@ class _FakeManager:
 class TestSavedDefaultCleanRules:
     """规则窗「保存默认」/「恢复默认」: 用户保存的那份取代内置出厂成为默认规则。
 
-    规则分三层层层兜底: 生效规则 ⊇ 用户默认 ⊇ 内置出厂。
+    规则分三层层层兜底: 生效规则 ⊇ 用户默认 ⊇ 内置出厂。两条 minnano 占位规则
+    自 v2.7.2 起不在任何一层默认里, 用户删掉后不会被补回。
     """
-
-    def test_pinned_constant_is_first_two_of_builtin_defaults(self):
-        from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES, PINNED_CLEAN_RULES
-
-        assert PINNED_CLEAN_RULES == _PINNED
-        assert DEFAULT_CLEAN_RULES[:2] == _PINNED
 
     def test_config_default_field_matches_builtin_default(self):
         """新配置项的出厂默认必须与常量一致, 否则新装用户和常量兜底看到的规则不同。"""
@@ -500,46 +536,40 @@ class TestSavedDefaultCleanRules:
             assert load_default_clean_rules(mgr.config) == DEFAULT_CLEAN_RULES, bad
 
     def test_saved_rules_become_the_default(self):
-        """保存自定义规则后, 恢复默认读到的是用户那份。"""
+        """保存自定义规则后, 恢复默认读到的是用户那份, 且没有 minnano 占位规则。"""
         from mdcx.tools.emby_actor_clean_rules import load_default_clean_rules, save_default_clean_rules
 
         mgr = _FakeManager()
-        save_default_clean_rules([*_PINNED, ("noise", "噪声")], mgr)
+        save_default_clean_rules([("noise", "噪声")], mgr)
         rules = load_default_clean_rules(mgr.config)
-        assert rules[:2] == _PINNED
+        assert rules[0] == ("noise", "噪声")
         assert ("noise", "噪声") in rules
+        assert not any("minnano" in original for original, _ in rules)
         assert mgr.save_calls == 1
 
-    def test_pinned_rules_restored_to_front_even_if_user_deleted_them(self):
-        """用户把两条占位规则删光, 保存时仍补回并排最前两条(需求硬约束)。"""
+    def test_deleted_minnano_rules_are_not_restored_on_save(self):
+        """用户把两条 minnano 规则删光, 保存默认时不再补回, 更不会置顶。"""
         from mdcx.tools.emby_actor_clean_rules import save_default_clean_rules
 
         saved = save_default_clean_rules([("noise", "噪声")], _FakeManager())
-        assert saved[:2] == _PINNED
-        assert ("noise", "噪声") in saved
+        assert saved[0] == ("noise", "噪声")
+        assert not any("minnano" in original for original, _ in saved), saved
 
-    def test_pinned_keeps_user_edited_replacement(self):
-        """置顶只挪位置不覆盖内容: 用户改过的替换值仍在最前两条。"""
+    def test_user_edited_minnano_replacement_is_kept(self):
+        """用户改过替换值的同名规则属于自定义内容, 保存默认时原样保留。"""
         from mdcx.tools.emby_actor_clean_rules import save_default_clean_rules
 
-        saved = save_default_clean_rules([("我自造的占位", "x"), (_PINNED[1][0], "用户改的替换值")], _FakeManager())
-        assert saved[0] == _PINNED[0]
-        assert saved[1] == (_PINNED[1][0], "用户改的替换值")
-
-    def test_pinned_order_is_canonical_regardless_of_table_order(self):
-        """表格里把全角那条拖到半角前面, 保存后仍按半角→全角的既定顺序置顶。"""
-        from mdcx.tools.emby_actor_clean_rules import save_default_clean_rules
-
-        saved = save_default_clean_rules([_PINNED[1], _PINNED[0]], _FakeManager())
-        assert saved[:2] == _PINNED
+        edited = (_LEGACY_MINNANO[0][0], "用户改的替换值")
+        saved = save_default_clean_rules([edited], _FakeManager())
+        assert saved[0] == edited
 
     def test_builtin_english_rules_are_re_added(self):
         """内置英文身份译名缺失也补齐, 追加在用户自定义规则之后。"""
         from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES, save_default_clean_rules
 
-        saved = save_default_clean_rules([*_PINNED, ("noise", "噪声")], _FakeManager())
-        assert saved[2] == ("noise", "噪声"), "用户自定义规则保持原相对顺序"
-        assert saved[3:] == DEFAULT_CLEAN_RULES[2:]
+        saved = save_default_clean_rules([("noise", "噪声")], _FakeManager())
+        assert saved[0] == ("noise", "噪声"), "用户自定义规则保持原相对顺序"
+        assert saved[1:] == DEFAULT_CLEAN_RULES
 
     def test_duplicate_originals_collapse_in_saved_default(self):
         from mdcx.tools.emby_actor_clean_rules import save_default_clean_rules
@@ -561,7 +591,7 @@ class TestSavedDefaultCleanRules:
         from mdcx.tools.emby_actor_clean_rules import load_clean_rules, save_clean_rules, save_default_clean_rules
 
         mgr = _FakeManager()
-        save_default_clean_rules([*_PINNED, ("noise", "噪声")], mgr)
+        save_default_clean_rules([("noise", "噪声")], mgr)
         mgr.config.actor_clean_rules = []
         assert ("noise", "噪声") in load_clean_rules(mgr.config)
         # 「确定」保存同样以用户默认为底座
@@ -574,10 +604,12 @@ class TestSavedDefaultCleanRules:
 
         mgr = _FakeManager()
         mgr.config.actor_clean_rules = []
-        assert load_clean_rules(mgr.config) == DEFAULT_CLEAN_RULES
+        rules = load_clean_rules(mgr.config)
+        assert rules == DEFAULT_CLEAN_RULES
+        assert not any("minnano" in original for original, _ in rules)
 
     def test_deleting_custom_rows_returns_to_builtin_defaults(self):
-        """把自定义规则删光再保存默认 = 回到内置出厂那六条(用户想回退的路径)。"""
+        """把自定义规则删光再保存默认 = 回到内置出厂那四条(用户想回退的路径)。"""
         from mdcx.tools.emby_actor_clean_rules import DEFAULT_CLEAN_RULES, save_default_clean_rules
 
         assert save_default_clean_rules([], _FakeManager()) == DEFAULT_CLEAN_RULES
@@ -590,5 +622,6 @@ class TestSavedDefaultCleanRules:
         assert save_default_clean_rules(["不是二元组", ("   ", "x")], _FakeManager()) == DEFAULT_CLEAN_RULES
 
 
-# 规则窗的按钮行为(保存默认/恢复默认)在 tests/test_actor_clean_rules_dialog.py:
-# 构造 QDialog 必须先有 QApplication, 与本文件的纯函数用例分开以免带进 Qt 依赖。
+# 规则窗的按钮行为(保存默认/恢复默认/空白区新增/右键删除/自动保存)在
+# tests/test_actor_clean_rules_dialog.py: 构造 QDialog 必须先有 QApplication,
+# 与本文件的纯函数用例分开以免带进 Qt 依赖。
