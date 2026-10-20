@@ -122,14 +122,14 @@ class NetCheckMixin:
             signal_qt.show_net_info("✅ 上次检测没有失败/警告项，无需重试")
             return
         try:
-            signal_qt.show_net_info(f"\n⛑ 重试 {len(failed_specs)} 个失败/警告项...")
+            signal_qt.show_net_info(f"\n⛑ 重试{len(failed_specs)}个失败/警告项...")
             cancel_event = threading.Event()
             self.network_check_cancel_event = cancel_event
             self._net_check_lines = []
             self._net_live_results = []
             # 议题 #118：探测超时递进已移进单轮内部（30s/45s 最多两次），
             # 「重试失败项」回归纯重测——价值在于用户改完代理/CF 配置后再给一次机会
-            signal_qt.show_net_info(f"⏱ 单站刮削探测自动递进重试，超时阶梯 {scrape_probe_ladder_text()}")
+            signal_qt.show_net_info(f"⏱ 单站刮削探测自动递进重试，超时阶梯{scrape_probe_ladder_text()}")
 
             def progress(line):
                 self._net_check_lines.append(line)
