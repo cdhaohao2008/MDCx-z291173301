@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 import os.path
 import re
+from datetime import date as date_cls
+from datetime import timedelta
 from difflib import SequenceMatcher
 from typing import Literal, override
+from urllib.parse import quote, urlencode
 
 import oshash
 
@@ -30,8 +33,9 @@ def get_number(series, release, title):
 
 def read_data(data, kind: TheporndbKind):
     title = data.get("title") or ""
-    outline = data.get("description")
-    outline = "" if not outline else outline.replace("＜p＞", "").replace("＜/p＞", "")
+    outline = data.get("description") or ""
+    # 描述里常见的 HTML 段落标签一并去掉；兼容旧接口返回的全角尖括号。
+    outline = re.sub(r"</?p>|＜/?p＞", "", outline, flags=re.IGNORECASE)
     release = data.get("date") or ""
     trailer = data.get("trailer") or ""
     try:
@@ -45,39 +49,45 @@ def read_data(data, kind: TheporndbKind):
         poster = data.get("poster")
     poster = poster or ""
     try:
-        runtime = str(int(int(data.get("duration")) / 60))
-    except Exception:
+        # duration 可能是 int，也可能是 "7200.0" 这类浮点字符串。
+        runtime = str(int(float(data.get("duration") or 0) / 60))
+    except (TypeError, ValueError):
         runtime = ""
     try:
-        series = data["site"]["name"]
+        series = data["site"]["name"] or ""
     except Exception:
         series = ""
     try:
-        studio = data["site"]["network"]["name"]
+        studio = data["site"]["network"]["name"] or ""
     except Exception:
         studio = ""
     publisher = studio
     try:
-        director = data["director"]["name"]
+        director = data["director"]["name"] or ""
     except Exception:
         director = ""
     tag_list = []
-    try:
-        for each in data["tags"]:
-            tag_list.append(each["name"])
-    except Exception:
-        pass
+    for each in data.get("tags") or []:
+        name = each.get("name") if isinstance(each, dict) else None
+        if name:
+            tag_list.append(name)
     slug = data.get("slug") or ""
     real_url = f"https://api.theporndb.net/{kind}/{slug}" if slug else ""
     all_actor_list = []
     actor_list = []
-    try:
-        for each in data["performers"]:
-            all_actor_list.append(each["name"])
+    # 逐条解析：单个 performer 缺 parent/gender 不能让后面的演员全部丢失。
+    for each in data.get("performers") or []:
+        if not isinstance(each, dict):
+            continue
+        name = each.get("name")
+        if not name:
+            continue
+        all_actor_list.append(name)
+        try:
             if each["parent"]["extras"]["gender"] != "Male":
-                actor_list.append(each["name"])
-    except Exception:
-        pass
+                actor_list.append(name)
+        except (KeyError, TypeError):
+            pass
     number = get_number(series, release, title)
     return CrawlerData(
         number=number,
@@ -107,80 +117,101 @@ def read_data(data, kind: TheporndbKind):
     )
 
 
+def _normalize_date(value) -> str:
+    """ThePornDB 的日期是 YYYY-MM-DD；容忍带时间或空值的候选。"""
+    if not value:
+        return ""
+    return str(value).strip()[:10]
+
+
 def get_real_url(res_search, file_path, series_ex, date, kind: TheporndbKind):
-    search_data = res_search.get("data")
+    search_data = res_search.get("data") if isinstance(res_search, dict) else None
+    if not isinstance(search_data, list) or not search_data:
+        return False
     file_name = os.path.split(file_path)[1].lower()
     new_file_name = re.findall(r"[\.-_]\d{2}\.\d{2}\.\d{2}(.+)", file_name)
     new_file_name = new_file_name[0] if new_file_name else file_name
     actor_number = len(new_file_name.replace(".and.", "&").split("&"))
-    temp_file_path_space = re.sub(r"[\W_]", " ", file_path.lower()).replace("  ", " ").replace("  ", " ")
+    # 只拿文件名参与匹配：目录名（如「欧美转移」）只会引入噪声。
+    temp_file_path_space = re.sub(r"[\W_]", " ", file_name).strip()
     temp_file_path_nospace = temp_file_path_space.replace(" ", "")
     # 多候选裁决的相似度基准用去扩展名的文件名（不含目录）——目录名只会引入噪声
     similarity_target = re.sub(r"[\W_]", " ", os.path.splitext(file_name)[0]).strip()
-    try:
-        if search_data:
-            res_date_list = []
-            res_title_list = []
-            res_actor_list = []
-            for each in search_data:
-                res_id_url = f"https://api.theporndb.net/{kind}/{each['slug']}"
-                try:
-                    res_series = each["site"]["short_name"]
-                except Exception:
-                    res_series = ""
-                try:
-                    res_url = each["site"]["url"].replace("-", "")
-                except Exception:
-                    res_url = ""
-                res_date = each["date"]
-                res_title_space = re.sub(r"[\W_]", " ", each["title"].lower())
-                res_title_nospace = res_title_space.replace(" ", "")
-                actor_list_space = []
-                actor_list_nospace = []
-                for a in each["performers"]:
-                    ac = re.sub(r"[\W_]", " ", a["name"].lower())
+
+    res_date_list = []
+    res_title_list = []
+    res_actor_list = []
+    for each in search_data:
+        # 逐条解析并捕获异常：单条候选缺字段时不能让整批搜索结果一起作废。
+        if not isinstance(each, dict):
+            continue
+        try:
+            slug = each.get("slug")
+            if not slug:
+                continue
+            res_id_url = f"https://api.theporndb.net/{kind}/{slug}"
+            site = each.get("site") if isinstance(each.get("site"), dict) else {}
+            res_series = str(site.get("short_name") or "")
+            # 站点 slug 里的连字符不参与比较（TeamSkeet -> team-skeet.com）。
+            res_url = str(site.get("url") or "").lower().replace("-", "")
+            res_date = _normalize_date(each.get("date"))
+            res_title = str(each.get("title") or "")
+            res_title_space = re.sub(r"[\W_]", " ", res_title.lower())
+            res_title_nospace = res_title_space.replace(" ", "")
+            actor_list_space = []
+            actor_list_nospace = []
+            performers = each.get("performers")
+            if isinstance(performers, list):
+                for a in performers:
+                    if not isinstance(a, dict):
+                        continue
+                    name = a.get("name")
+                    if not name:
+                        continue
+                    ac = re.sub(r"[\W_]", " ", str(name).lower())
                     actor_list_space.append(ac)
                     actor_list_nospace.append(ac.replace(" ", ""))
-                res_actor_title_space = (" ".join(actor_list_space) + " " + res_title_space).replace("  ", " ")
-                # 番号里带的日期与候选条目日期矛盾时, 本候选一律不可用。
-                # 只挡下面两条弱证据分支(站点名对不上的标题子串 / scenes 无条件兜底):
-                # 搜索词退化成纯系列名时(如 "Deeper.26.06.17" 的第二关键词就是 "Deeper "),
-                # ThePornDB 会把同名的其它作品捞回来, 标题去空格后正好是文件名归一化串的
-                # 子串("deeper" in "deeper260617"), 于是 2016 年的 SketchySex.16.10.19
-                # 「Deeper!」被当成 2026-06-17 的目标。日期矛盾是硬证据, 必须挡掉。
-                date_conflict = bool(date) and bool(res_date) and res_date != date
+            res_actor_title_space = re.sub(r"\s+", " ", " ".join(actor_list_space) + " " + res_title_space).strip()
+            # 番号里带的日期与候选条目日期矛盾时, 本候选一律不可用。
+            # 只挡下面两条弱证据分支(站点名对不上的标题子串 / scenes 无条件兜底):
+            # 搜索词退化成纯系列名时(如 "Deeper.26.06.17" 的第二关键词就是 "Deeper "),
+            # ThePornDB 会把同名的其它作品捞回来, 标题去空格后正好是文件名归一化串的
+            # 子串("deeper" in "deeper260617"), 于是 2016 年的 SketchySex.16.10.19
+            # 「Deeper!」被当成 2026-06-17 的目标。日期矛盾是硬证据, 必须挡掉。
+            date_conflict = bool(date) and bool(res_date) and res_date != date
+            title_hit = bool(res_title_nospace) and res_title_nospace in temp_file_path_nospace
+            series_match = bool(series_ex) and (series_ex == res_series.lower() or series_ex in res_url)
 
-                if series_ex:
-                    if series_ex == res_series or series_ex in res_url:
-                        if res_title_nospace in temp_file_path_nospace:
-                            res_title_list.append([res_id_url, res_actor_title_space])
-                        elif date and res_date == date:
-                            res_date_list.append([res_id_url, res_actor_title_space])
-                        elif actor_list_nospace and len(actor_list_nospace) >= actor_number:
-                            for a in actor_list_nospace:
-                                if a not in temp_file_path_nospace:
-                                    break
-                            else:
-                                res_actor_list.append([res_id_url, res_actor_title_space])
-                    elif res_title_nospace in temp_file_path_nospace:
-                        # 站点名对不上但标题精确含在文件名里（如厂牌 slug 与实际站点归属不同，议题 #94）
-                        if not date_conflict:
-                            res_title_list.append([res_id_url, res_actor_title_space])
-                elif (kind == "scenes" or res_title_nospace in temp_file_path_nospace) and not date_conflict:
+            if series_match:
+                if title_hit:
                     res_title_list.append([res_id_url, res_actor_title_space])
+                elif date and res_date == date:
+                    res_date_list.append([res_id_url, res_actor_title_space])
+                elif actor_list_nospace and len(actor_list_nospace) >= actor_number:
+                    for a in actor_list_nospace:
+                        if a not in temp_file_path_nospace:
+                            break
+                    else:
+                        res_actor_list.append([res_id_url, res_actor_title_space])
+            elif title_hit:
+                # 站点名对不上但标题精确含在文件名里（如厂牌 slug 与实际站点归属不同，议题 #94）
+                if not date_conflict:
+                    res_title_list.append([res_id_url, res_actor_title_space])
+            elif not series_ex and (kind == "scenes" or title_hit) and not date_conflict:
+                res_title_list.append([res_id_url, res_actor_title_space])
+        except Exception:
+            continue
 
-            # 采纳顺序：标题/演员精确命中 > 日期桶。日期桶证据最弱（同日多部作品常态，
-            # 议题 #94 张冠李戴实证），须经相似度裁决，与文件名毫无重合时视为未命中，
-            # 留给下一搜索词或其它站点，宁可未找到也不硬配
-            for candidate_list in (res_title_list, res_actor_list, res_date_list):
-                if not candidate_list:
-                    continue
-                best = max(candidate_list, key=lambda each: similarity(each[1], similarity_target))
-                if candidate_list is res_date_list and similarity(best[1], similarity_target) < 0.35:
-                    continue
-                return best[0]
-    except Exception:
-        return False
+    # 采纳顺序：标题/演员精确命中 > 日期桶。日期桶证据最弱（同日多部作品常态，
+    # 议题 #94 张冠李戴实证），须经相似度裁决，与文件名毫无重合时视为未命中，
+    # 留给下一搜索词或其它站点，宁可未找到也不硬配
+    for candidate_list in (res_title_list, res_actor_list, res_date_list):
+        if not candidate_list:
+            continue
+        best = max(candidate_list, key=lambda each: similarity(each[1], similarity_target))
+        if candidate_list is res_date_list and similarity(best[1], similarity_target) < 0.35:
+            continue
+        return best[0]
     return False
 
 
@@ -189,7 +220,12 @@ def get_search_keyword(file_path):
     file_name = os.path.basename(file_path.replace("\\", "/")).replace(",", ".")
     file_name = os.path.splitext(file_name)[0]
 
-    temp_number = re.findall(r"(([A-Z0-9-\.]{2,})[-_\. ]{1}2?0?(\d{2}[-\.]\d{2}[-\.]\d{2}))", file_path)
+    # 只看文件名，避免目录名里的番号被误当成目标；IGNORECASE 兼容小写文件名。
+    temp_number = re.findall(
+        r"(([A-Z0-9-\.]{2,})[-_\. ]{1}2?0?(\d{2}[-\.]\d{2}[-\.]\d{2}))",
+        file_name,
+        re.IGNORECASE,
+    )
     keyword_list = []
     series_ex = ""
     date = ""
@@ -197,14 +233,30 @@ def get_search_keyword(file_path):
         full_number, series_ex, date = temp_number[0]
         series_ex = long_name(series_ex.lower().replace("-", "").replace(".", ""))
         date = "20" + date.replace(".", "-")
-        keyword_list.append(series_ex + " " + date)
-        temp_title = re.sub(r"[-_&\.]", " ", file_name.replace(full_number, "")).strip()
-        temp_title_list = []
-        [temp_title_list.append(i) for i in temp_title.split(" ") if i and i != series_ex]
-        keyword_list.append(series_ex + " " + " ".join(temp_title_list[:2]))
+        # 第一个搜索词：系列 + 日期，精确召回。
+        keyword_list.append(f"{series_ex} {date}".strip())
+        # 第二个搜索词：系列 + 标题前两词；标题为空时退化为纯系列名（保留召回手段），
+        # 但必须 strip，不能再拼出带尾空格的 "Deeper "。
+        temp_title = re.sub(
+            r"[-_&\.]", " ", re.sub(re.escape(full_number), "", file_name, count=1, flags=re.IGNORECASE)
+        ).strip()
+        temp_title_list = [i for i in temp_title.split(" ") if i and i.casefold() != series_ex.casefold()]
+        keyword_list.append(" ".join([series_ex, *temp_title_list[:2]]).strip() or series_ex)
     else:
-        keyword_list.append(" ".join(file_name.split(".")[:2]).replace("-", " "))
-    return keyword_list, series_ex, date
+        keyword_list.append(" ".join(file_name.split(".")[:2]).replace("-", " ").strip())
+
+    # 去重并按原顺序保留；空搜索词直接丢弃。
+    deduped = []
+    seen = set()
+    for keyword in keyword_list:
+        keyword = keyword.strip()
+        if not keyword:
+            continue
+        key = keyword.casefold()
+        if key not in seen:
+            seen.add(key)
+            deduped.append(keyword)
+    return deduped, series_ex, date
 
 
 class ThepornDBCrawler(BaseCrawler):
@@ -243,10 +295,82 @@ class ThepornDBCrawler(BaseCrawler):
             }
         raise CrawlerException("请添加 API Token 后刮削！（「软件设置」-「网络」-「API Token」）")
 
+    async def _nearest_site_candidates(
+        self,
+        ctx: Context,
+        kind: TheporndbKind,
+        series_ex: str,
+        date: str,
+        headers: dict,
+    ) -> list[str]:
+        """裸番号失败时查同站点相邻日期，只用于把「最近有什么」告诉用户。
+
+        结果只进错误提示，不参与匹配：裸番号没有标题/演员证据，跨日自动采纳
+        仍可能张冠李戴。这里限定系列 slug 为纯字母数字，避免把带空格的系列名
+        当成站点参数。
+        """
+        if not series_ex or not date or not re.fullmatch(r"[a-z0-9]+", series_ex):
+            return []
+        try:
+            center = date_cls.fromisoformat(date)
+        except ValueError:
+            return []
+        start = (center - timedelta(days=1)).isoformat()
+        params = {
+            "site": series_ex,
+            "date": start,
+            "date_operation": ">=",
+            "orderBy": "former_released",
+            "per_page": 100,
+        }
+        url = f"{self.base_url}/{kind}?{urlencode(params, quote_via=quote)}"
+        ctx.debug(f"未命中，查询同站点相邻日期: {url}")
+        ctx.debug_info.search_urls = [*(ctx.debug_info.search_urls or []), url]
+        res, error = await self.async_client.get_json(url, headers=headers)
+        if not isinstance(res, dict):
+            if error:
+                ctx.debug(f"相邻日期查询失败: {error}")
+            return []
+        allowed = {(center + timedelta(days=offset)).isoformat() for offset in (-1, 0, 1)}
+        labels = []
+        seen = set()
+        for each in res.get("data") or []:
+            if not isinstance(each, dict):
+                continue
+            slug = each.get("slug")
+            if not slug or slug in seen:
+                continue
+            site = each.get("site") if isinstance(each.get("site"), dict) else {}
+            site_name = str(site.get("short_name") or "").lower()
+            site_url = str(site.get("url") or "").lower()
+            # 同样忽略站点名/域名里的连字符，避免 TeamSkeet 与 team-skeet.com 对不上。
+            site_match = series_ex in f"{site_name} {site_url}".replace("-", "")
+            if not site_match:
+                continue
+            res_date = _normalize_date(each.get("date"))
+            if res_date not in allowed:
+                continue
+            seen.add(slug)
+            title = str(each.get("title") or slug)
+            labels.append(f"{res_date}《{title}》")
+            if len(labels) >= 3:
+                break
+        return labels
+
     @override
     async def _run(self, ctx: Context):
         errors = []
-        for kind in ("scenes", "movies"):
+        # 指定网址已经写明了 scenes/movies 时只走对应类型，避免先向另一类型
+        # 发一个注定 404 的请求（旧逻辑会把 /movies/ 强行替换成 /scenes/）。
+        kinds: tuple[TheporndbKind, ...] = ("scenes", "movies")
+        appoint_url = (ctx.input.appoint_url or "").lower()
+        if "/movies/" in appoint_url:
+            kinds = ("movies",)
+        elif "/scenes/" in appoint_url:
+            kinds = ("scenes",)
+        # Token 只校验一次，避免缺失时把同一条提示在 scenes/movies 各报一遍。
+        self._headers(ctx)
+        for kind in kinds:
             try:
                 data = await self._scrape_kind(ctx, kind)
                 result = data.to_result()
@@ -261,8 +385,11 @@ class ThepornDBCrawler(BaseCrawler):
     async def _scrape_kind(self, ctx: Context, kind: TheporndbKind) -> CrawlerData:
         headers = self._headers(ctx)
         file_path = str(ctx.input.file_path or f"{ctx.input.number}.mp4")
-        real_url = ctx.input.appoint_url.replace("//theporndb", "//api.theporndb")
-        real_url = real_url.replace("/scenes/", f"/{kind}/").replace("/movies/", f"/{kind}/") if real_url else ""
+        real_url = ctx.input.appoint_url or ""
+        if real_url:
+            # 同时兼容 theporndb.net / www.theporndb.net，且只替换一次路径类型。
+            real_url = re.sub(r"//(?:www\.)?theporndb\.net/", "//api.theporndb.net/", real_url)
+            real_url = re.sub(r"/(?:scenes|movies)/", f"/{kind}/", real_url, count=1)
         hash_data = None
 
         if not real_url:
@@ -279,7 +406,7 @@ class ThepornDBCrawler(BaseCrawler):
                             raise CrawlerException("ThePornDB 返回 401，请检查 API Token 是否正确（设置-网络中填写）")
                         ctx.debug(f"Hash 请求失败，继续文件名搜索: {error}")
                         hash_search = {}
-                    hash_data = hash_search.get("data")
+                    hash_data = hash_search.get("data") if isinstance(hash_search, dict) else None
                     if hash_data:
                         return read_data(hash_data, kind)
                 except CrawlerException:
@@ -288,10 +415,15 @@ class ThepornDBCrawler(BaseCrawler):
                     pass
 
             search_keyword_list, series_ex, date = get_search_keyword(file_path)
+            if not search_keyword_list:
+                raise CrawlerException("未生成搜索关键词")
             last_search_url = ""
+            matched = False
             for search_keyword in search_keyword_list:
-                query = "parse" if kind == "scenes" else "q"
-                last_search_url = f"{self.base_url}/{kind}?{query}={search_keyword}&per_page=100"
+                # scenes/movies 都支持 parse（官方 Jellyfin 插件同样用 parse），
+                # 查询参数统一百分号转义：空格 %20、& %26，日志里看到的即实际发出的 URL。
+                params = {"parse": search_keyword, "per_page": 100}
+                last_search_url = f"{self.base_url}/{kind}?{urlencode(params, quote_via=quote)}"
                 ctx.debug(f"请求地址: {last_search_url}")
                 ctx.debug_info.search_urls = [*(ctx.debug_info.search_urls or []), last_search_url]
                 res_search, error = await self.async_client.get_json(last_search_url, headers=headers)
@@ -302,9 +434,20 @@ class ThepornDBCrawler(BaseCrawler):
 
                 real_url = get_real_url(res_search, file_path, series_ex, date, kind)
                 if real_url:
+                    matched = True
                     break
-            else:
-                raise CrawlerException(f"未找到匹配的内容: {last_search_url}")
+            if not matched:
+                hint = ""
+                # 裸番号（第二个搜索词退化成纯系列名）才查相邻日期；有标题/演员
+                # 证据的文件不应被这条诊断带偏。
+                bare_number = len(search_keyword_list) == 1 or (
+                    search_keyword_list[1].casefold() == series_ex.casefold()
+                )
+                if bare_number:
+                    nearest = await self._nearest_site_candidates(ctx, kind, series_ex, date, headers)
+                    if nearest:
+                        hint = f"；同站点相邻日期候选: {'；'.join(nearest)}（未自动采用）"
+                raise CrawlerException(f"未找到匹配的内容: {last_search_url}{hint}")
 
         ctx.debug(f"番号地址: {real_url}")
         ctx.debug_info.detail_urls = [*(ctx.debug_info.detail_urls or []), real_url]
@@ -314,7 +457,7 @@ class ThepornDBCrawler(BaseCrawler):
                 raise CrawlerException("ThePornDB 返回 401，请检查 API Token 是否正确（设置-网络中填写）")
             raise CrawlerException(f"请求错误:{error}")
 
-        real_data = res_real.get("data")
+        real_data = res_real.get("data") if isinstance(res_real, dict) else None
         if not real_data:
             raise CrawlerException(f"未获取正确数据: {real_url}")
         return read_data(real_data, kind)

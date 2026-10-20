@@ -4,7 +4,6 @@ from re import Pattern
 from mdcx.models.model_types import CrawlerDebugInfo, CrawlerInput, CrawlerResult
 from mdcx.models.mosaic import normalize_mosaic
 from mdcx.utils.dataclass import update_valid
-from mdcx.utils.url_display import decode_url_escapes
 
 
 class XPath(str): ...
@@ -85,8 +84,8 @@ class Context:
     def debug(self, message: str):
         """添加调试消息.
 
-        调试消息是给人读的，而爬虫拼的搜索 URL 一律带百分号转义（Getchu 系
-        EUC-JP、JavBus/JavDB UTF-8），原样入日志就是 `btnWordSearch=%B8%A1%BA%F7`
-        这种机器形态。这里统一还原一次——只动展示，发出去的请求仍用原始 URL。
+        请求 URL 保留百分号转义原样入日志：日志是排查请求拼接问题的第一现场，
+        `%20`、`%26`、尾随空格必须一眼可见；报告侧仍由 `decode_url_escapes()`
+        转成人类可读文本，两者分工不同。
         """
-        self.debug_info.logs.append(decode_url_escapes(message))
+        self.debug_info.logs.append(message)

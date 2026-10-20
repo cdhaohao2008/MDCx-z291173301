@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit, urlunsplit
 
 import aiofiles
 import aiofiles.os
@@ -1573,6 +1573,16 @@ class AsyncWebClient:
 
         return mirror_headers
 
+    @staticmethod
+    def _escape_url_for_log(url: str) -> str:
+        """把展示用的 URL 统一成百分号转义形态。
+
+        只编码空白、引号、尖括号、非 ASCII 等不能直接出现在 URL 里的字符；
+        `:/?#[]@!$&'()*+,;=%` 保持原样，已有 `%XX` 不会被二次编码。这样日志里
+        看到的链接就是请求实际使用的形态，尾随空格之类的问题会显示成 `%20`。
+        """
+        return quote(url or "", safe=":/?#[]@!$&'()*+,;=%")
+
     def _sanitize_url(self, url: str) -> tuple[str, bool]:
         cleaned = (url or "").strip()
         if not cleaned:
@@ -2117,7 +2127,8 @@ class AsyncWebClient:
             original_url = url
             url, sanitized = self._sanitize_url(url)
             if sanitized:
-                self._log(f"⚠️ 检测到异常 URL，已清理: {original_url} -> {url}")
+                original_display = self._escape_url_for_log(original_url)
+                self._log(f"⚠️ 检测到异常 URL，已清理: {original_display} -> {url}")
 
             u = httpx.URL(url)
             host = u.host or ""

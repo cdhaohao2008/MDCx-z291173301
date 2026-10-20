@@ -4,12 +4,21 @@ import pytest
 from mdcx.config.enums import Language, Switch, Website
 from mdcx.config.manager import manager
 from mdcx.crawlers.base import get_crawler
-from mdcx.crawlers.theporndb import ThepornDBCrawler, get_real_url
+from mdcx.crawlers.theporndb import (
+    ThepornDBCrawler,
+    get_real_url,
+    get_search_keyword,
+    read_data,
+)
 from mdcx.models.model_types import CrawlerInput
 
 
 class FakeTheporndbClient:
+    def __init__(self):
+        self.urls: list[str] = []
+
     async def get_json(self, url, **kwargs):
+        self.urls.append(url)
         if url == "https://api.theporndb.net/scenes/test-scene":
             return {"data": _api_data("test-scene", "scenes")}, ""
         if url == "https://api.theporndb.net/scenes/test-movie":
@@ -23,7 +32,7 @@ class FakeTheporndbSearchClient:
     async def get_json(self, url, **kwargs):
         if url == "https://api.theporndb.net/scenes/hash/fakehash":
             return None, "HTTP 404"
-        if url == "https://api.theporndb.net/scenes?parse=nurumassage 2026-02-23&per_page=100":
+        if url == "https://api.theporndb.net/scenes?parse=nurumassage%202026-02-23&per_page=100":
             return {"data": [_api_data("nurumassage-ellie-nova", "scenes", title="Ellie Nova", date="2026-02-23")]}, ""
         if url == "https://api.theporndb.net/scenes/nurumassage-ellie-nova":
             return {"data": _api_data("nurumassage-ellie-nova", "scenes", title="Ellie Nova", date="2026-02-23")}, ""
@@ -125,11 +134,13 @@ async def test_theporndb_appoint_url_works_without_api_token():
 
 
 @pytest.mark.asyncio
-async def test_theporndb_crawler_falls_back_to_movies():
+async def test_theporndb_appoint_movie_url_does_not_probe_scenes():
+    """指定网址已写明 /movies/ 时不应先向 /scenes/ 发一个注定 404 的请求。"""
     old_token = manager.config.theporndb_api_token
     manager.config.theporndb_api_token = "token"
+    client = FakeTheporndbClient()
     try:
-        crawler = ThepornDBCrawler(client=FakeTheporndbClient())
+        crawler = ThepornDBCrawler(client=client)
         res = await crawler.run(_input("https://theporndb.net/movies/test-movie"))
     finally:
         manager.config.theporndb_api_token = old_token
@@ -138,6 +149,7 @@ async def test_theporndb_crawler_falls_back_to_movies():
     assert res.data is not None
     assert res.data.title == "movies title"
     assert res.data.external_id == "https://api.theporndb.net/movies/test-movie"
+    assert client.urls == ["https://api.theporndb.net/movies/test-movie"]
 
 
 @pytest.mark.asyncio
@@ -159,7 +171,7 @@ async def test_theporndb_crawler_continues_search_when_hash_misses(monkeypatch: 
     assert res.data.title == "Ellie Nova"
     assert res.debug_info.search_urls == [
         "https://api.theporndb.net/scenes/hash/fakehash",
-        "https://api.theporndb.net/scenes?parse=nurumassage 2026-02-23&per_page=100",
+        "https://api.theporndb.net/scenes?parse=nurumassage%202026-02-23&per_page=100",
     ]
 
 
@@ -210,6 +222,26 @@ def test_get_real_url_prefers_title_hit_over_date_bucket():
     assert (
         got == "https://api.theporndb.net/scenes/hobbyporncomatozze-fucking-my-big-tit-best-friend-friendship-is-over"
     )
+
+
+def test_get_real_url_matches_hyphenated_site_url():
+    """站点 URL 里的连字符不应影响系列匹配（TeamSkeet -> team-skeet.com）。"""
+    from mdcx.crawlers.theporndb import get_real_url
+
+    payload = {
+        "data": [
+            _scene_hit(
+                "teamskeet-some-title",
+                "Some Title",
+                "2026-01-01",
+                "TeamSkeet",
+                "https://www.team-skeet.com",
+                [],
+            )
+        ]
+    }
+    got = get_real_url(payload, "TeamSkeet.26.01.01.Some.Title.mp4", "teamskeet", "2026-01-01", "scenes")
+    assert got == "https://api.theporndb.net/scenes/teamskeet-some-title"
 
 
 def test_get_real_url_date_bucket_rejects_low_similarity_candidates():
@@ -311,7 +343,7 @@ async def test_theporndb_search_falls_through_when_date_bucket_mismatches(monkey
         async def get_json(self, url, **kwargs):
             if url == "https://api.theporndb.net/scenes/hash/fakehash":
                 return None, "HTTP 404"
-            if url == "https://api.theporndb.net/scenes?parse=faphouse 2025-06-28&per_page=100":
+            if url == "https://api.theporndb.net/scenes?parse=faphouse%202025-06-28&per_page=100":
                 return {
                     "data": [
                         _scene_hit(
@@ -324,7 +356,7 @@ async def test_theporndb_search_falls_through_when_date_bucket_mismatches(monkey
                         )
                     ]
                 }, ""
-            if url == "https://api.theporndb.net/scenes?parse=faphouse COMATOZZE FUCKING&per_page=100":
+            if url == "https://api.theporndb.net/scenes?parse=faphouse%20COMATOZZE%20FUCKING&per_page=100":
                 return {
                     "data": [
                         _scene_hit(
@@ -422,4 +454,180 @@ def test_get_real_url_no_date_in_filename_keeps_scenes_shortcut():
             "scenes",
         )
         == "https://api.theporndb.net/scenes/sketchysex-deeper"
+    )
+
+
+def test_get_search_keyword_lowercase_bare_number_has_no_trailing_space():
+    """小写文件名也要能识别番号；裸番号的退化搜索词不能再带尾空格。"""
+    keywords, series_ex, date = get_search_keyword(r"D:\Media\deeper.26.06.17.mp4")
+
+    assert keywords == ["deeper 2026-06-17", "deeper"]
+    assert series_ex == "deeper"
+    assert date == "2026-06-17"
+
+
+def test_get_search_keyword_uses_basename_and_excludes_series_from_title():
+    """目录名里的日期不能抢先匹配；标题词过滤系列名时要忽略大小写。"""
+    keywords, series_ex, date = get_search_keyword(r"D:\Media\Deeper.25.01.01\Deeper.26.06.17.Break.In.mp4")
+
+    # remove_escape_string() 会统一转成大写，这是既有行为，不在本次改动范围内。
+    assert keywords == ["deeper 2026-06-17", "deeper BREAK IN"]
+    assert series_ex == "deeper"
+    assert date == "2026-06-17"
+
+
+def test_get_real_url_skips_malformed_candidate_instead_of_dropping_all():
+    """单条候选缺字段只跳过该条，不能让整批搜索结果一起作废。"""
+    file_path = (
+        r"U:\Service\欧美转移\FapHouse.25.06.28.Comatozze.Fucking.My.Big.Tit.Best.Friend.Friendship.Is.Over.strm"
+    )
+    payload = {
+        "data": [
+            {"slug": "broken-candidate"},
+            _scene_hit(
+                "hobbyporncomatozze-fucking-my-big-tit-best-friend-friendship-is-over",
+                "Fucking My Big Tit Best Friend - Friendship Is Over",
+                "2025-06-28",
+                "HobbyPorn",
+                "https://hobbyporn.com",
+                ["Comatozze"],
+            ),
+        ]
+    }
+
+    assert (
+        get_real_url(payload, file_path, "faphouse", "2025-06-28", "scenes")
+        == "https://api.theporndb.net/scenes/hobbyporncomatozze-fucking-my-big-tit-best-friend-friendship-is-over"
+    )
+
+
+def test_read_data_keeps_actors_when_one_performer_lacks_parent():
+    """单个演员缺 parent/gender 不能让后面的演员全部丢失，也不能阻断时长解析。"""
+    data = _api_data("test-scene", "scenes")
+    data["duration"] = "7200.9"
+    data["performers"] = [
+        {"name": "Actor A", "parent": {"extras": {"gender": "Female"}}},
+        {"name": "Actor B"},
+        {"name": "Actor C", "parent": {"extras": {}}},
+    ]
+
+    result = read_data(data, "scenes")
+
+    assert result.all_actors == ["Actor A", "Actor B", "Actor C"]
+    assert result.actors == ["Actor A"]
+    assert result.runtime == "120"
+
+
+@pytest.mark.asyncio
+async def test_theporndb_search_urls_are_percent_encoded_and_movies_use_parse(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """搜索 URL 统一百分号转义；movies 也用 parse，不再出现 ?q= 与裸空格。"""
+    monkeypatch.setattr(oshash, "oshash", lambda file_path: "fakehash")
+    old_token = manager.config.theporndb_api_token
+    old_switch_on = list(manager.config.switch_on)
+    manager.config.theporndb_api_token = "token"
+    manager.config.switch_on = [switch for switch in manager.config.switch_on if switch != Switch.THEPORNDB_NO_HASH]
+
+    candidate = _api_data("movie-break-in", "movies", title="Break In", date="2025-06-28")
+    candidate["site"] = {
+        "name": "Blacked",
+        "short_name": "Blacked",
+        "url": "https://blacked.com",
+        "network": {"name": "Blacked"},
+    }
+    seen_urls: list[str] = []
+
+    class EncodingClient:
+        async def get_json(self, url, **kwargs):
+            seen_urls.append(url)
+            if "/hash/" in url:
+                return None, "HTTP 404"
+            if "/scenes?" in url:
+                return {"data": []}, ""
+            if "/movies?" in url:
+                return {"data": [candidate]}, ""
+            if url == "https://api.theporndb.net/movies/movie-break-in":
+                return {"data": candidate}, ""
+            return None, f"unexpected url: {url}"
+
+    data = _input("")
+    data.number = "Blacked.25.06.28"
+    data.short_number = "Blacked.25.06.28"
+    data.file_path = "D:/Media/Blacked.25.06.28.Break.In.mp4"
+    try:
+        crawler = ThepornDBCrawler(client=EncodingClient())
+        res = await crawler.run(data)
+    finally:
+        manager.config.theporndb_api_token = old_token
+        manager.config.switch_on = old_switch_on
+
+    assert res.debug_info.error is None
+    assert res.data is not None
+    assert res.data.title == "Break In"
+    assert "https://api.theporndb.net/scenes?parse=blacked%202025-06-28&per_page=100" in seen_urls
+    assert "https://api.theporndb.net/scenes?parse=blacked%20BREAK%20IN&per_page=100" in seen_urls
+    assert "https://api.theporndb.net/movies?parse=blacked%202025-06-28&per_page=100" in seen_urls
+    assert all(" " not in url for url in seen_urls)
+    assert all("?q=" not in url for url in seen_urls)
+    # ctx.debug 也不能再把 %20 还原成空格，否则日志里又看不出尾随空格。
+    assert any("parse=blacked%202025-06-28" in log for log in res.debug_info.logs)
+    assert not any("parse=blacked 2025-06-28" in log for log in res.debug_info.logs)
+
+
+@pytest.mark.asyncio
+async def test_theporndb_bare_number_failure_reports_nearest_site_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """裸番号搜不到时只提示相邻日期的同站点条目，不自动采纳。"""
+    monkeypatch.setattr(oshash, "oshash", lambda file_path: "fakehash")
+    old_token = manager.config.theporndb_api_token
+    old_switch_on = list(manager.config.switch_on)
+    manager.config.theporndb_api_token = "token"
+    manager.config.switch_on = [switch for switch in manager.config.switch_on if switch != Switch.THEPORNDB_NO_HASH]
+
+    nearest = _api_data("deeper-break-in", "scenes", title="Break In", date="2026-06-18")
+    nearest["site"] = {
+        "name": "Deeper",
+        "short_name": "Deeper",
+        "url": "https://deeper.com",
+        "network": {"name": "Deeper"},
+    }
+
+    class HintClient:
+        async def get_json(self, url, **kwargs):
+            if "/hash/" in url:
+                return None, "HTTP 404"
+            if "site=deeper&" in url and "/scenes?" in url:
+                return {"data": [nearest]}, ""
+            if "/scenes?" in url or "/movies?" in url:
+                return {"data": []}, ""
+            return None, f"unexpected url: {url}"
+
+    data = _input("")
+    data.number = "Deeper.26.06.17"
+    data.short_number = "Deeper.26.06.17"
+    data.file_path = "D:/Media/Deeper.26.06.17.mp4"
+    try:
+        res = await ThepornDBCrawler(client=HintClient()).run(data)
+    finally:
+        manager.config.theporndb_api_token = old_token
+        manager.config.switch_on = old_switch_on
+
+    assert res.data is None
+    message = str(res.debug_info.error)
+    assert "2026-06-18《Break In》" in message
+    assert "未自动采用" in message
+
+
+def test_url_log_display_encodes_spaces_and_non_ascii():
+    from mdcx.web_async import AsyncWebClient
+
+    assert (
+        AsyncWebClient._escape_url_for_log("https://api.theporndb.net/movies?q=deeper &per_page=100")
+        == "https://api.theporndb.net/movies?q=deeper%20&per_page=100"
+    )
+    assert (
+        AsyncWebClient._escape_url_for_log("https://example.test/a%20b?q=中文")
+        == "https://example.test/a%20b?q=%E4%B8%AD%E6%96%87"
     )

@@ -164,12 +164,12 @@ def test_probe_transient_markers_survive_decoding():
 # --------------------------------------------------------------------------- #
 # 爬虫调试日志
 # --------------------------------------------------------------------------- #
-def test_context_debug_decodes_url_escapes():
-    """爬虫调试消息里的搜索 URL 还原（`DL Getchu 搜索地址: …` 走的正是这条路）。"""
+def test_context_debug_keeps_url_escapes_encoded():
+    """爬虫调试消息里的请求 URL 保留百分号转义，便于直接核对实际发出去的地址。"""
     ctx = Context(input=CrawlerInput.empty())
     ctx.debug(f"DL Getchu 搜索地址: {_GETCHU_SEARCH_URL}")
 
-    assert ctx.debug_info.logs == [f"DL Getchu 搜索地址: {_GETCHU_SEARCH_URL_DECODED}"]
+    assert ctx.debug_info.logs == [f"DL Getchu 搜索地址: {_GETCHU_SEARCH_URL}"]
 
 
 def test_context_debug_keeps_plain_messages_untouched():
