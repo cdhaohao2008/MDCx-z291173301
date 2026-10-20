@@ -776,7 +776,7 @@ def test_wide_nav_row_survives_deferred_stage_one(win, app, width, height):
 
     lead = ui.checkBox_auto_start
     original = lead.text()
-    lead.setText(original + "自动启动后自动开始刮削并立即进入无人值守守候模式")
+    lead.setText(original + "自动启动后自动开始刮削并立即进入无人值守守候模式" * 2)
     try:
         _resize(win, app, width, height)
         anchor_x = _abs(ui, ui.checkBox_auto_exit) - host_x
@@ -840,10 +840,26 @@ def test_narrow_never_moves_anchors(win, app, monkeypatch, width, height):
     win._sync_page_layouts()
     app.processEvents()
 
-    for name in _REFS + _FOLLOWERS:
+    for name in _REFS:
         assert _snapshot(ui)[name] == base[name], (
             f"窄态 {width} 宽下参照件「{name}」被带偏: 基线={base[name]} 实际={_snapshot(ui)[name]}"
         )
+    # 「仅隐藏入口…」是隐藏入口行的末位从动项，不是固定参照件：nfo 被钉回
+    # sizeHint 后，它必须左移并吸收释放出来的宽度。这里断言真正跨环境成立的性质——
+    # 右缘仍贴住行右缘、宽度不被压到 sizeHint 以下、左缘紧贴 nfo 右缘。
+    hint_name = _FOLLOWERS[0]
+    hint_x, hint_w = _snapshot(ui)[hint_name]
+    base_x, base_w = base[hint_name]
+    assert hint_x + hint_w == base_x + base_w, (
+        f"窄态 {width} 宽下从动项「{hint_name}」右缘被带偏: 基线右缘={base_x + base_w} 实际右缘={hint_x + hint_w}"
+    )
+    assert hint_w >= max(base_w, ui.label_nav_hide_hint.sizeHint().width()), (
+        f"窄态 {width} 宽下从动项「{hint_name}」宽度={hint_w}，"
+        f"基线={base_w} sizeHint={ui.label_nav_hide_hint.sizeHint().width()}"
+    )
+    assert hint_x == (
+        _abs(ui, ui.checkBox_hide_nfo_nav) + ui.checkBox_hide_nfo_nav.width() + ui.horizontalLayout_nav_hide.spacing()
+    ), f"窄态 {width} 宽下从动项「{hint_name}」没有紧贴 nfo 右缘"
     for name in _REFS_X_ONLY:
         assert _snapshot(ui)[name][0] == base[name][0], (
             f"窄态 {width} 宽下搬运工/容器「{name}」左缘被带偏: 基线={base[name]} 实际={_snapshot(ui)[name]}"

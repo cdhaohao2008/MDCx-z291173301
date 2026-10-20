@@ -14628,7 +14628,7 @@ class Ui_MDCx(object):
                 "<p>网站下拉框由已注册的爬虫自动生成，可按需选用全部网站或指定网站；下列八组即「软件设置→刮削网站」里各类型的默认名单，组内顺序即优先级，从高到低，可在设置中自行增删与调序：</p>\n"
                 "<ul>\n"
                 "<li><b>有码番号</b>：DMM、DMM_API、LibreDMM、Dahlia、Faleno、MGStage、Prestige、Official、AVBase、AVMOO、JavDB、JavDB_API、JavDB_APP、JavBus、JavDay、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API、R18.dev、Xcity、TheJavDB、JavLibrary、Javlibrary·镜像</li>\n"
-                "<li><b>无码番号</b>：AVSOX、AVEntertainments、Official、JavDB、JavDB_API、JavDB_APP、JavBus、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API</li>\n"
+                "<li><b>无码番号</b>：AVSOX、AVEntertainments、Official·10Musume、Official·1Pondo、Official·Caribbeancom、Official·HEYZO、Official·Pacopacomama、JavDB、JavDB_API、JavDB_APP、JavBus、JavFree、7mmtv、Airav.cc、FreeJavBT、IQQTV、Lulubar、Missav、Missav_API</li>\n"
                 "<li><b>个摄番号：</b>FC2、FC2PPVDB、AVSOX、JavDB、JavDB_API、JavDB_APP、JavBus、JavFree、7mmtv、IQQTV、Missav、Missav_API</li>\n"
                 "<li><b>欧美视频</b>：ThepornDB、AVheat、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、Missav、Missav_API、IQQTV</li>\n"
                 "<li><b>国产传媒</b>：Madou.club、Madouqu、JavDB、JavDB_API、JavDB_APP、JavBus、7mmtv、IQQTV、Missav、Missav_API</li>\n"
