@@ -13461,8 +13461,8 @@ class Ui_MDCx(object):
         self.label_15.setText(
             _translate("MDCx", "执行：刮削->重命名，仅整理本地视频，不下载图片，适合不要海报墙的情况")
         )
-        self.checkBox_sortmode_delpic.setText(_translate("MDCx", "删除本地已下载的图片和nfo文件"))
-        self.label_27.setText(_translate("MDCx", "不勾选，则不删除已下载的图片nfo文件"))
+        self.checkBox_sortmode_delpic.setText(_translate("MDCx", "删除本地已下载的图片和信息文件"))
+        self.label_27.setText(_translate("MDCx", "不勾选，不删除已下载的图片和信息文件"))
         self.label_11.setText(
             _translate("MDCx", "执行：刮削->下载封面->重命名->打水印等全部操作，适合需要海报墙的情况")
         )

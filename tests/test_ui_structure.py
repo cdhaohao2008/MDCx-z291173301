@@ -432,7 +432,7 @@ _READ_MODE_UI_TEXTS = {
     "label_347": "将按设置 -「下载」更新",
     "checkBox_read_no_nfo_scrape": "本地没有NFO的文件，按正常模式规则重新刮削",
     "checkBox_nfo_merge_strategy": "本地NFO合并及策略",
-    "checkBox_sortmode_delpic": "删除本地已下载的图片和nfo文件",
+    "checkBox_sortmode_delpic": "删除本地已下载的图片和信息文件",
 }
 
 # 马赛克命名规则四条说明（忽略 XML 缩进换行空白差异）。
