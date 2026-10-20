@@ -12,6 +12,8 @@ from mdcx.config.models import (
 )
 from mdcx.core.file_crawler import (
     FileScraper,
+    _crawl_cache,
+    _crawl_cache_key,
     _deal_res,
     classify_existing_scrape_result,
     classify_scrape_task,
@@ -974,3 +976,51 @@ async def test_unrecorded_site_retried_for_later_fields(monkeypatch: pytest.Monk
     assert result is not None
     assert result.title == "t"
     assert result.actors == ["a"]
+
+
+def test_crawl_cache_key_separates_sites_mode_and_type():
+    task_input = CrawlerInput.empty()
+    task_input.file_path = Path("/tmp/mdcx-cache-key.mp4")
+    task_input.number = "SCUTE-1354"
+    common = {"sites": [Website.AVBASE, Website.JAVDB], "mode": "full", "scraping_type": FixedScrapingType.YOUMA}
+    key = _crawl_cache_key(task_input, **common)
+    assert key is not None
+    assert key == _crawl_cache_key(task_input, **common)
+
+    assert key != _crawl_cache_key(task_input, **{**common, "sites": [Website.AVBASE]})
+    assert key != _crawl_cache_key(task_input, **{**common, "mode": "speed"})
+    assert key != _crawl_cache_key(task_input, **{**common, "scraping_type": FixedScrapingType.GUOCHAN})
+
+
+@pytest.mark.asyncio
+async def test_crawl_cache_not_reused_after_site_disabled():
+    """禁用站点后不能命中禁用前的缓存，否则会继续使用该站字段和图片候选。"""
+    _crawl_cache.clear()
+    records: list[tuple[str, str]] = []
+    provider = _RecordingCrawlerProvider(
+        {
+            Website.AVBASE: _RecordingCrawler(Website.AVBASE, records),
+            Website.JAVDB: _RecordingCrawler(Website.JAVDB, records),
+        }
+    )
+    config = Config(website_youma=[Website.AVBASE, Website.JAVDB], website_disabled=[])
+    config.set_field_sites(CrawlerResultFields.RUNTIME, [Website.JAVDB, Website.AVBASE])
+    scraper = FileScraper(config, provider)
+    task_input = CrawlerInput.empty()
+    task_input.file_path = Path("/tmp/mdcx-cache-disabled.mp4")
+    task_input.number = "SCUTE-1354"
+
+    try:
+        first = await scraper._call_crawlers(task_input, [Website.AVBASE, Website.JAVDB])
+        assert first is not None
+        assert {site for site, _ in records} == {Website.AVBASE.value, Website.JAVDB.value}
+
+        config.website_disabled = [Website.JAVDB]
+        records.clear()
+        second = await scraper._call_crawlers(task_input, [Website.AVBASE, Website.JAVDB])
+
+        assert second is not None
+        assert records
+        assert {site for site, _ in records} == {Website.AVBASE.value}
+    finally:
+        _crawl_cache.clear()

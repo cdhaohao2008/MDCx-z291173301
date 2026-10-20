@@ -45,11 +45,12 @@ MULTI_LANGUAGE_WEBSITES = [  # 支持多语言, language 参数有意义
 _CRAWLER_BATCH_TIMEOUT = 60.0
 
 # 同番号刮削结果的 TTL 缓存（秒）：同批次中相同番号的文件（如多 CD、重复文件）直接复用结果，
-# 避免对同一番号重复请求所有站点。缓存键包含文件路径，避免不同来源的同番号文件互相污染。
-# 借鉴 jav-pack-api aggregator 的按番号缓存设计。
+# 避免对同一番号重复请求所有站点。缓存键除文件路径外还带上「这次实际参与请求的站点、
+# 完整/速度模式与刮削类型」：否则启用/禁用切换后 90 秒内会命中旧结果，把已被禁用的站点数据
+# 又带回来，也会让速度优先与完整刮削的结果互相冒用。借鉴 jav-pack-api aggregator 的按番号缓存设计。
 _CRAWL_CACHE_TTL = 90.0
 _CRAWL_CACHE_MAX_ENTRIES = 512
-_crawl_cache: dict[tuple[str, str], tuple[float, CrawlersResult]] = {}
+_crawl_cache: dict[tuple[str, str, str], tuple[float, CrawlersResult]] = {}
 _crawl_cache_lock: asyncio.Lock = asyncio.Lock()
 SPECIFIC_CRAWLER_TITLE_LANGUAGE_SITES = {
     Website.AIRAV_CC,
@@ -101,16 +102,29 @@ def _normalize_release_value(value: object) -> str:
         return ""
 
 
-def _crawl_cache_key(task_input: CrawlerInput) -> tuple[str, str] | None:
-    """生成同番号刮削缓存键, 无文件路径或番号时返回 None（不缓存）."""
+def _crawl_cache_key(
+    task_input: CrawlerInput,
+    *,
+    sites: list[Website] | None = None,
+    mode: str = "",
+    scraping_type: FixedScrapingType | str = "",
+) -> tuple[str, str, str] | None:
+    """生成同番号刮削缓存键, 无文件路径或番号时返回 None（不缓存）.
+
+    `sites` 是这次实际参与请求的站点顺序（已剔除禁用站），`mode` 区分
+    "full"/"speed"，再加上刮削类型；任何一项变化都会得到不同的键，禁用、
+    重新启用或切换刮削方式后不会命中旧缓存。
+    """
     number = task_input.number or ""
     file_path = task_input.file_path
     if not number or not file_path:
         return None
-    return str(file_path), number
+    sites_signature = ",".join(site.value for site in (sites or ()))
+    type_value = getattr(scraping_type, "value", scraping_type)
+    return str(file_path), number, f"{mode}|{type_value}|{sites_signature}"
 
 
-async def _crawl_cache_get(key: tuple[str, str]) -> CrawlersResult | None:
+async def _crawl_cache_get(key: tuple[str, str, str]) -> CrawlersResult | None:
     """读取缓存, 命中且未过期时返回深拷贝, 否则返回 None."""
     async with _crawl_cache_lock:
         entry = _crawl_cache.get(key)
@@ -123,7 +137,7 @@ async def _crawl_cache_get(key: tuple[str, str]) -> CrawlersResult | None:
         return deepcopy(result)
 
 
-async def _crawl_cache_put(key: tuple[str, str], result: CrawlersResult) -> None:
+async def _crawl_cache_put(key: tuple[str, str, str], result: CrawlersResult) -> None:
     """写入缓存（深拷贝存储, 避免外部修改污染缓存；锁保护防止淘汰逻辑迭代时 dict 变化）."""
     async with _crawl_cache_lock:
         _crawl_cache[key] = (time.monotonic(), deepcopy(result))
@@ -395,8 +409,11 @@ class FileScraper:
                 )
             return None
         # 同番号缓存命中：同批次相同番号文件直接复用结果，跳过整批站点请求。
-        # 放在禁用过滤之后：全员禁用时不应把之前缓存的数据又取回来。
-        cache_key = _crawl_cache_key(task_input)
+        # 放在禁用过滤之后：全员禁用时不应把之前缓存的数据又取回来；
+        # 键里带上 type_sites（已剔除禁用站）与模式/类型，禁用切换后不会命中旧结果。
+        cache_key = _crawl_cache_key(
+            task_input, sites=type_sites, mode="full", scraping_type=classification.scraping_type
+        )
         if cache_key:
             cached = await _crawl_cache_get(cache_key)
             if cached is not None:
@@ -828,8 +845,9 @@ class FileScraper:
             if all_sites:
                 LogBuffer.log().write(f"刮削类型 {classification.scraping_type} 的全部站点均已禁用，跳过刮削")
             return None
-        # 与完整刮削一致：先过滤再读缓存，避免全员被禁用时又拿回旧结果。
-        cache_key = _crawl_cache_key(task_input)
+        # 与完整刮削一致：先过滤再读缓存，避免全员被禁用时又拿回旧结果；
+        # 键里带上过滤后的站点与 speed 模式，和完整刮削/禁用切换互不冒用缓存。
+        cache_key = _crawl_cache_key(task_input, sites=sites, mode="speed", scraping_type=classification.scraping_type)
         if cache_key:
             cached = await _crawl_cache_get(cache_key)
             if cached is not None:

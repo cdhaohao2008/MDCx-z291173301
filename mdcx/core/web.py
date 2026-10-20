@@ -456,6 +456,9 @@ async def _load_dmm_official_reference(number: str, media_context: MediaResource
     number = (number or "").strip()
     if not number:
         return None
+    if Website.DMM in (getattr(manager.config, "website_disabled", None) or ()):
+        # DMM 被禁用后不再直构 DMM CDN 参考图，Amazon 校验只能用爬虫已返回的图
+        return None
     from mdcx.crawlers.dmm_direct import build_aws_cover_candidates, build_aws_poster_candidates, is_uncensored_number
 
     if is_uncensored_number(number):
@@ -1146,6 +1149,9 @@ async def _build_dmm_poster_candidates(result) -> list[PosterCandidate]:
     """
     number = (result.number or "").strip()
     if not number:
+        return []
+    if Website.DMM in (getattr(manager.config, "website_disabled", None) or ()):
+        # DMM 被禁用后不再补 DMM 官方 ps 海报候选，避免选优阶段访问 DMM CDN
         return []
     from mdcx.crawlers.dmm_direct import generate_image_candidates, is_uncensored_number
 

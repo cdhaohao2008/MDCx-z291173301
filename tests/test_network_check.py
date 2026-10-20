@@ -231,6 +231,59 @@ async def test_build_network_check_specs_skips_disabled_sites(monkeypatch: pytes
 
 
 @pytest.mark.anyio
+async def test_build_network_check_specs_skips_disabled_official_children(monkeypatch: pytest.MonkeyPatch):
+    """禁用 Official 后五个子站整体跳过，不生成任何 Official· 检测项。"""
+
+    class DisabledConfig(FakeConfig):
+        website_disabled = [Website.OFFICIAL]
+
+    class DisabledManager:
+        config = DisabledConfig()
+        computed = None
+
+    class DynamicCrawler:
+        @classmethod
+        def base_url_(cls):
+            return "https://example.test"
+
+    fake_crawlers = SimpleNamespace(
+        get_registered_crawler_sites=lambda include_hidden=False: [Website.OFFICIAL],
+        get_crawler=lambda site: DynamicCrawler,
+    )
+    monkeypatch.setitem(sys.modules, "mdcx.crawlers", fake_crawlers)
+    monkeypatch.setattr("mdcx.core.network_check._manager", lambda: DisabledManager())
+
+    specs = await build_network_check_specs()
+
+    assert all(spec.site != Website.OFFICIAL for spec in specs)
+    assert not any(spec.name.startswith("Official·") for spec in specs)
+
+
+@pytest.mark.anyio
+async def test_run_network_check_retry_skips_sites_disabled_after_failure(monkeypatch: pytest.MonkeyPatch):
+    """重试旧失败项时按当前禁用名单过滤，不再请求刚被禁用的站。"""
+
+    class DisabledConfig(FakeConfig):
+        website_disabled = [Website.JAVDB]
+
+    class DisabledManager:
+        config = DisabledConfig()
+        computed = None
+
+    monkeypatch.setattr("mdcx.core.network_check._manager", lambda: DisabledManager())
+    spec = NetworkCheckSpec(name="JavDB", group="站点检测", url="https://javdb.com", site=Website.JAVDB)
+
+    results = await run_network_check(
+        specs=[spec],
+        client=FakeClient(),
+        emit_header=False,
+        concurrency=1,
+    )
+
+    assert results == []
+
+
+@pytest.mark.anyio
 async def test_probe_crawler_strips_special_check_path_from_base_url(monkeypatch: pytest.MonkeyPatch):
     """议题 #77：spec.url 拼有 SPECIAL_CHECK_PATHS 探测路径时，探测构造爬虫必须剥回主站根 URL。
 

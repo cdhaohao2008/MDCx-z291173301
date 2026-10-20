@@ -1,5 +1,7 @@
 import pytest
 
+from mdcx.config.enums import Website
+from mdcx.config.manager import manager
 from mdcx.crawlers.dmm_direct import generate_cid_candidates, generate_image_candidates
 
 
@@ -326,3 +328,36 @@ async def test_find_valid_dmm_cover_skips_uncensored(monkeypatch):
     monkeypatch.setattr("mdcx.base.web.check_url", _counting_ok)
     monkeypatch.setattr("mdcx.base.web.get_imgsize", _hd_size)
     assert await find_valid_dmm_cover("FC2-PPV-1234567") is None
+
+
+@pytest.mark.asyncio
+async def test_upgrade_dmm_cover_skips_when_dmm_disabled(monkeypatch):
+    from mdcx.crawlers.dmm_direct import upgrade_dmm_cover
+
+    async def _must_not_probe(url):
+        raise AssertionError(f"DMM 已禁用，不应探测 {url}")
+
+    monkeypatch.setattr("mdcx.base.web.check_url", _must_not_probe)
+    manager.config.website_disabled = [Website.DMM]
+    try:
+        cover, poster = await upgrade_dmm_cover(_FakeCtx(), "SSIS-001", "old_cover.jpg", "old_poster.jpg")
+    finally:
+        manager.config.website_disabled = []
+
+    assert cover == "old_cover.jpg"
+    assert poster == "old_poster.jpg"
+
+
+@pytest.mark.asyncio
+async def test_find_valid_dmm_cover_skips_when_dmm_disabled(monkeypatch):
+    from mdcx.crawlers.dmm_direct import find_valid_dmm_cover
+
+    async def _must_not_probe(url):
+        raise AssertionError(f"DMM 已禁用，不应探测 {url}")
+
+    monkeypatch.setattr("mdcx.base.web.check_url", _must_not_probe)
+    manager.config.website_disabled = [Website.DMM]
+    try:
+        assert await find_valid_dmm_cover("SSIS-001") is None
+    finally:
+        manager.config.website_disabled = []

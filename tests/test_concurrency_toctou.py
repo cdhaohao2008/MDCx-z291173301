@@ -205,7 +205,7 @@ async def test_crawl_cache_concurrent_put_eviction():
         n = 50
 
         async def _put_one(i: int) -> None:
-            await _fc._crawl_cache_put((f"/path/vol{i}.mp4", f"ABC-{i:03d}"), empty_result)
+            await _fc._crawl_cache_put((f"/path/vol{i}.mp4", f"ABC-{i:03d}", ""), empty_result)
 
         await asyncio.gather(*[_put_one(i) for i in range(n)])
         assert len(cache) == _fc._CRAWL_CACHE_MAX_ENTRIES

@@ -447,17 +447,27 @@ def build_aws_poster_candidates(number: str) -> list[str]:
     return [url for orient, url in generate_image_candidates(number) if orient == "portrait"]
 
 
+def _dmm_site_disabled() -> bool:
+    """全局禁用名单里是否包含 DMM；读不到配置时按未禁用处理。"""
+    try:
+        from mdcx.config.enums import Website
+        from mdcx.config.manager import manager
+    except ImportError:
+        return False
+    return Website.DMM in (getattr(manager.config, "website_disabled", None) or ())
+
+
 async def find_valid_dmm_cover(number: str) -> str | None:
     """尝试为番号找到一张可用的 DMM 高清横版封面（pl.jpg）.
 
     全部站点图源失败时作兜底：按番号直构 DMM CDN 候选，逐个校验存在且为高清。
-    无码番号或候选全部失效时返回 None。
+    无码番号、DMM 已被禁用或候选全部失效时返回 None。
 
     复用 check_url（DMM 图自动走 GET 验证）+ _is_dmm_hd_image（分辨率过滤缩略图占位图）。
     """
     from mdcx.base.web import check_url
 
-    if not number or is_uncensored_number(number):
+    if not number or is_uncensored_number(number) or _dmm_site_disabled():
         return None
     for url in build_aws_cover_candidates(number):
         if await check_url(url) and await _is_dmm_hd_image(url):
@@ -509,7 +519,7 @@ async def upgrade_dmm_cover(ctx, number: str, cover_url: str, poster_url: str) -
     """尝试将爬虫低清/水印图升级为 DMM 高清 ps/pl，返回 (cover, poster).
 
     复用 dmm_direct 生成 awsimgsrc 高清候选，check_url 验证成功后覆盖，
-    失败回退原图。无码番号直接跳过。
+    失败回退原图。无码番号或 DMM 已被禁用时直接返回原图，不再访问 DMM CDN。
 
     探测结果按规范化番号进程内 TTL 缓存（成功缓存高清 URL，失败缓存 None），
     并对同事件循环的并发调用做 in-flight 合并，避免 javbus/javdb/r18dev 等
@@ -518,7 +528,7 @@ async def upgrade_dmm_cover(ctx, number: str, cover_url: str, poster_url: str) -
     from mdcx.base.web import check_url
 
     number = (number or "").strip()
-    if not number or is_uncensored_number(number):
+    if not number or is_uncensored_number(number) or _dmm_site_disabled():
         return cover_url, poster_url
     norm = _normalize_dmm_number(number)
     now = time.monotonic()
