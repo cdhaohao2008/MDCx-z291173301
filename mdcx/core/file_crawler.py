@@ -73,6 +73,11 @@ BRAND_PREFIX_SITES: dict[str, Website] = {
 }
 
 
+def _is_site_disabled(config: "Config", site: Website) -> bool:
+    """站点是否被用户禁用；旧配置/测试桩没有该字段时按全部启用处理。"""
+    return site in (getattr(config, "website_disabled", None) or ())
+
+
 def sprint_source(website: Website, language: Language) -> str:
     if language == Language.UNDEFINED:
         return f"{website.value}"
@@ -376,21 +381,26 @@ class FileScraper:
         use_type_field_config = isinstance(classification, ScrapeClassification)
         if not isinstance(classification, ScrapeClassification):
             classification = ScrapeClassification(FixedScrapingType.AUTO, "compat", sites=classification)
-        # 同番号缓存命中：同批次相同番号文件直接复用结果，跳过整批站点请求
+        all_type_sites = list(classification.sites or [])
+        type_sites = [site for site in all_type_sites if not _is_site_disabled(self.config, site)]
+        if not type_sites:
+            if all_type_sites:
+                LogBuffer.log().write(f"刮削类型 {classification.scraping_type} 的全部站点均已禁用，跳过刮削")
+            else:
+                # 名单为空时原来会静默走完全部字段（f_sites 全空直接 continue），
+                # 虽最终因 all_res 为空返回 None，但报错信息未指向真正原因。
+                # 此处提前明确报错，引导用户检查该类型的站点优先级设置。
+                LogBuffer.error().write(
+                    f"刮削类型 {classification.scraping_type} 的站点名单为空，未发起任何请求！请检查该类型的站点优先级设置"
+                )
+            return None
+        # 同番号缓存命中：同批次相同番号文件直接复用结果，跳过整批站点请求。
+        # 放在禁用过滤之后：全员禁用时不应把之前缓存的数据又取回来。
         cache_key = _crawl_cache_key(task_input)
         if cache_key:
             cached = await _crawl_cache_get(cache_key)
             if cached is not None:
                 return cached
-        type_sites = list(classification.sites or [])
-        if not type_sites:
-            # 名单为空时原来会静默走完全部字段（f_sites 全空直接 continue），
-            # 虽最终因 all_res 为空返回 None，但报错信息未指向真正原因。
-            # 此处提前明确报错，引导用户检查该类型的站点优先级设置。
-            LogBuffer.error().write(
-                f"刮削类型 {classification.scraping_type} 的站点名单为空，未发起任何请求！请检查该类型的站点优先级设置"
-            )
-            return None
         type_site_set = set(type_sites)
         all_res: dict[tuple[Website, Language], CrawlerResult] = {}
         failed: set[tuple[Website, Language]] = set()  # 记录失败的网站
@@ -781,6 +791,9 @@ class FileScraper:
         return res
 
     async def _call_specific_crawler(self, task_input: CrawlerInput, website: Website) -> CrawlersResult | None:
+        if _is_site_disabled(self.config, website):
+            LogBuffer.log().write(f"站点 {website.value} 已被禁用，跳过刮削")
+            return None
         file_number = task_input.number
         short_number = task_input.short_number
 
@@ -809,13 +822,20 @@ class FileScraper:
         """
         速度优先：按影片类型的网站顺序逐站尝试，首个返回数据的网站直接作为最终结果。
         """
+        all_sites = list(classification.sites or [])
+        sites = [site for site in all_sites if not _is_site_disabled(self.config, site)]
+        if not sites:
+            if all_sites:
+                LogBuffer.log().write(f"刮削类型 {classification.scraping_type} 的全部站点均已禁用，跳过刮削")
+            return None
+        # 与完整刮削一致：先过滤再读缓存，避免全员被禁用时又拿回旧结果。
         cache_key = _crawl_cache_key(task_input)
         if cache_key:
             cached = await _crawl_cache_get(cache_key)
             if cached is not None:
                 return cached
         failed_info: list[str] = []
-        for website in list(classification.sites or []):
+        for website in sites:
             title_language, org_language = self._get_specific_crawler_language(website)
             task_input.language = title_language
             task_input.org_language = org_language

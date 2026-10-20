@@ -1086,8 +1086,13 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
     # GitHub Raw / 通用HTTPS 都迟迟不显示。改为并发解析 + 单项限时后，
     # 整段从"各站耗时之和"降为"最慢的那一站（且封顶）"，检测项顺序与内容不变。
     plans: list[tuple[Website, Any, str, bool]] = []
+    disabled_sites = set(getattr(manager.config, "website_disabled", None) or ())
     for site in get_registered_crawler_sites(include_hidden=False):
         if site == Website.THEPORNDB:
+            continue
+        # 禁用站点连检测项都不生成：没有请求、报告里也不占一行。
+        # Official 被禁用时，下面五个子站一并不再生成。
+        if site in disabled_sites:
             continue
         crawler_cls = get_crawler(site)
         if crawler_cls is None:
@@ -1267,6 +1272,7 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
 
 def _build_static_specs() -> list[NetworkCheckSpec]:
     manager = _manager()
+    disabled_sites = set(getattr(manager.config, "website_disabled", None) or ())
     specs = [
         NetworkCheckSpec(
             name="GitHub Raw",
@@ -1338,7 +1344,9 @@ def _build_static_specs() -> list[NetworkCheckSpec]:
         )
 
     api_token = manager.config.theporndb_api_token.strip()
-    if api_token:
+    if Website.THEPORNDB in disabled_sites:
+        pass
+    elif api_token:
         specs.append(
             NetworkCheckSpec(
                 name="ThePornDB Token",
@@ -1731,8 +1739,10 @@ async def run_network_check(
     # 都不显示。改为：静态项立刻开跑，站点 specs 丢后台并发构建，等真要跑到后面
     # 的分组时再 join——第一组结果几秒内就出来。
     site_specs_task: asyncio.Task[list[NetworkCheckSpec]] | None = None
+    disabled_sites = set(getattr(_manager().config, "website_disabled", None) or ())
     if specs is not None:
-        check_specs: list[NetworkCheckSpec] = list(specs)
+        # 「重试失败项」传进来的是上一轮的结果集，过滤一次，避免禁用后又把旧项捡回来。
+        check_specs: list[NetworkCheckSpec] = [spec for spec in specs if spec.site not in disabled_sites]
     else:
         check_specs = _build_static_specs()
 

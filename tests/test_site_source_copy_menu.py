@@ -300,7 +300,14 @@ def test_right_click_site_copies_only_that_site(qt_app, monkeypatch):
     try:
         item = dlg.selected_list.item(1)  # CUSTOM_ORDER[1] = MGStage
         texts = _right_click(dlg.selected_list, _center(dlg.selected_list, item), monkeypatch, "复制站点")
-        assert texts == ["复制站点：MGStage", "", "复制列表：4个站点"]
+        assert texts == [
+            "启用站点：MGStage",
+            "禁用站点：MGStage",
+            "",
+            "复制站点：MGStage",
+            "",
+            "复制列表：4个站点",
+        ]
         assert app.clipboard().text() == "MGStage"
     finally:
         dlg.deleteLater()
@@ -542,7 +549,7 @@ def test_right_click_still_copies_the_pressed_site(qt_app, monkeypatch):
         _right_press(dlg.selected_list, point)
         assert dlg.selected_list.item(_row_of(dlg.selected_list, "MGStage")).isSelected() is False, "右键选中了"
         texts = _right_click(dlg.selected_list, point, monkeypatch, "复制站点")
-        assert texts[0] == "复制站点：MGStage"
+        assert "复制站点：MGStage" in texts
         assert app.clipboard().text() == "MGStage"
     finally:
         dlg.deleteLater()

@@ -557,14 +557,17 @@ def test_group_titles_are_not_painted_as_dark_chips(qt_app):
     """第 5 条需求的另一半：标题不再有自定义深色底。
 
     「不要标深色，和其他站点一样纯白背景」的实现方式就是**不给标题单独的绘制**——
-    没有专门的 delegate、没有 accent 底色/边框，标题只靠 `setFont` 加粗区分。
+    没有标题专用的 delegate、没有 accent 底色/边框，标题只靠 `setFont` 加粗区分。
+    站点禁用态另有一个 `_SiteItemDelegate`（只清 `State_Enabled`），它不参与标题绘制。
     """
     assert not hasattr(spd, "SiteGroupDelegate"), "又冒出给标题自绘深色块的 delegate 了"
     dlg = SiteListEditorDialog("t", [], ALL_SITES, None)
     try:
         palette = _laid_out(dlg, qt_app)
         delegate = palette.itemDelegate()
-        assert type(delegate).__name__ == "QStyledItemDelegate", f"候选区装了自定义 delegate：{type(delegate).__name__}"
+        assert type(delegate).__name__ in {"QStyledItemDelegate", "_SiteItemDelegate"}, (
+            f"候选区装了意外 delegate：{type(delegate).__name__}"
+        )
         for title, row in _title_rows(dlg).items():
             item = palette.item(row)
             assert item.background().style() == Qt.BrushStyle.NoBrush, f"「{title}」带了自定义底色"

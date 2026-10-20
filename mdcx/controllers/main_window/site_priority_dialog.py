@@ -22,6 +22,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QStyle,
+    QStyledItemDelegate,
     QVBoxLayout,
     QWidget,
 )
@@ -334,10 +336,31 @@ def _selected_sites(list_widget: QListWidget) -> list[Website]:
     ]
 
 
-def _make_site_item(site: Website) -> QListWidgetItem:
+SITE_DISABLED_ROLE = Qt.ItemDataRole.UserRole + 3
+
+
+class _SiteItemDelegate(QStyledItemDelegate):
+    """让禁用站点走 QSS 的 `:disabled` 分支，同时保留选中、拖拽与右键能力。
+
+    直接摘掉 ItemIsEnabled 会让站点既不能再选中也不能拖出去，和「只是不再参与
+    网络检测/刮削」的语义不符；这里只在绘制时清掉 State_Enabled，项目本身的
+    flags 不动。
+    """
+
+    def initStyleOption(self, option, index) -> None:  # noqa: N802
+        super().initStyleOption(option, index)
+        if bool(index.data(SITE_DISABLED_ROLE)):
+            option.state &= ~QStyle.StateFlag.State_Enabled
+
+
+def _make_site_item(site: Website, *, disabled: bool = False) -> QListWidgetItem:
     item = QListWidgetItem(site.value)
     item.setData(Qt.ItemDataRole.UserRole, site.value)
-    item.setToolTip(_site_capability_caption(site) or site.value)
+    item.setData(SITE_DISABLED_ROLE, disabled)
+    tooltip = _site_capability_caption(site) or site.value
+    if disabled:
+        tooltip = f"{tooltip}\n已禁用：网络检测、字段刮削、图片下载均跳过"
+    item.setToolTip(tooltip)
     item.setFlags(
         item.flags() | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
     )
@@ -469,15 +492,16 @@ def _setup_site_list(list_widget: QListWidget, sites: Iterable[Website], *, grou
     优先级序列，任何排序都不能掺进来；候选区才用 grouped=True。
     """
     list_widget.clear()
+    disabled_sites = set(getattr(list_widget, "disabled_sites", set()) or ())
     if not grouped:
         for site in sites:
-            list_widget.addItem(_make_site_item(site))
+            list_widget.addItem(_make_site_item(site, disabled=site in disabled_sites))
         return
     for title, group in grouped_palette_groups(sites):
         if title:  # 无标题的末组（MyWife 等）不另起标题，站点照样铺出来
             list_widget.addItem(_make_group_item(title, group))
     for site in palette_site_order(sites):
-        list_widget.addItem(_make_site_item(site))
+        list_widget.addItem(_make_site_item(site, disabled=site in disabled_sites))
     # 填完清掉当前项：Qt 会把第一行设成当前项，于是第一个标题被套上聚焦框、比别的
     # 站点多一圈边框（用户不要「标题被圈起来」）。清掉之后所有格子长得一模一样。
     list_widget.setCurrentRow(-1)
@@ -544,8 +568,16 @@ def _style_site_list(list_widget: QListWidget, min_height: int, dark: bool = Fal
             border: 1px solid {colors["border_active"]};
             background: {colors["surface_pressed"]};
         }}
+        QListWidget::item:disabled,
+        QListWidget::item:disabled:hover,
+        QListWidget::item:disabled:selected {{
+            color: {colors["text_muted"]};
+            border: 1px solid {colors["border"]};
+            background: {colors["surface_muted"]};
+        }}
         """
     )
+    list_widget.setItemDelegate(_SiteItemDelegate(list_widget))
     # 右键：点在某个站点上复制该站点，点在空白处（或分组标题上）复制整张列表。
     # 复制出的文本用逗号分隔，和设置页输入框里的格式一致，粘回去就能被 _parse_sites 认出来。
     list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -587,6 +619,19 @@ def _site_list_context_menu(list_widget: QListWidget, pos) -> None:
         return
 
     menu = QMenu(list_widget)
+    enable_action: QAction | None = None
+    disable_action: QAction | None = None
+    on_toggle_site_disabled = getattr(list_widget, "on_toggle_site_disabled", None)
+    if site_value is not None and on_toggle_site_disabled is not None:
+        disabled = site_value in (getattr(list_widget, "disabled_sites", set()) or ())
+        # 两条始终都摆出来，按当前状态互斥置灰：一眼就能看出这个站现在能不能用，
+        # 也不用记「已禁用时该点哪一条」。
+        enable_action = menu.addAction(f"启用站点：{site_value}")
+        enable_action.setEnabled(disabled)
+        disable_action = menu.addAction(f"禁用站点：{site_value}")
+        disable_action.setEnabled(not disabled)
+        menu.addSeparator()
+
     primary: QAction | None = None
     primary_text = ""
     primary_message = ""
@@ -611,6 +656,12 @@ def _site_list_context_menu(list_widget: QListWidget, pos) -> None:
             add_action.setEnabled(False)
 
     if (chosen := menu.exec(list_widget.viewport().mapToGlobal(pos))) is None:
+        return
+    if enable_action is not None and chosen is enable_action:
+        on_toggle_site_disabled(Website(site_value), False)
+        return
+    if disable_action is not None and chosen is disable_action:
+        on_toggle_site_disabled(Website(site_value), True)
         return
     if add_action is not None and chosen is add_action:
         on_add_to_enabled(item)
@@ -732,6 +783,12 @@ class _SiteListBase(QListWidget):
         # 不出现这一项——「启用网站」列表和「字段优先级」那几行都没有「启用列表」可言，
         # 只有「编辑网站」对话框的候选区会挂上它（见 SiteListEditorDialog._add_from_palette）。
         self.on_add_to_enabled = None
+        # disabled_sites：本列表里需要灰显的站点集合；由 SiteListEditorDialog 统一下发，
+        # 每次 _setup_site_list 重建时读取，拖拽、增删、刷新都不会把灰态弄丢。
+        self.disabled_sites: set[Website] = set()
+        # on_toggle_site_disabled：右键「启用站点 / 禁用站点」的回调，签名
+        # (site, disabled) -> None；留空时菜单里不出现这两条（字段优先级列表没有全局禁用概念）。
+        self.on_toggle_site_disabled = None
 
     def wheelEvent(self, event) -> None:
         """滚轮只滚本列表；本行滚不动时也照样吃掉，不往上递给外层滚动区。"""
@@ -983,7 +1040,13 @@ class PrioritySiteList(_SiteListBase):
 
 class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
     def __init__(
-        self, title: str, selected_sites: list[Website], all_sites: list[Website], parent: QWidget | None = None
+        self,
+        title: str,
+        selected_sites: list[Website],
+        all_sites: list[Website],
+        parent: QWidget | None = None,
+        *,
+        disabled_sites: list[Website] | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -992,6 +1055,9 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
         _style_dialog(self, self._dark)
         self._all_sites = list(dict.fromkeys(all_sites))
         self._selected_sites = list(dict.fromkeys(selected_sites))
+        # 禁用是全局状态：同一个站点在七个类型组里共用一份名单，打开哪个类型的
+        # 编辑窗口都读同一份 website_disabled。
+        self._disabled_sites = list(dict.fromkeys(disabled_sites or []))
         # 可用网站（网址源）的候选区：先排六个类型分组标题，紧跟着按组铺全部站点
         # （见 grouped_palette_groups / palette_site_order）。_all_sites 的原序仍然保留着：
         # 它是「全部添加」写入启用列表的顺序，也是拖拽插入时的落点参照，都属于用户
@@ -1005,6 +1071,9 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
             self._palette_sites, self, removable_source=self.selected_list, dark=self._dark, grouped=True
         )
         self.available_list.on_removed = self._sync_selected_from_list
+        for list_widget in (self.available_list, self.selected_list):
+            list_widget.disabled_sites = set(self._disabled_sites)
+            list_widget.on_toggle_site_disabled = self._toggle_site_disabled
 
         top_panel = self._build_panel("可用网站（按类型分组）", self.available_list)
         bottom_panel = self._build_panel("", self.selected_list)
@@ -1029,8 +1098,9 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
             "开头的七个加粗标题是有码/无码/个摄/欧美/传媒/短剧/动漫，"
             "双击一个标题即加入该组全部网站，"
             "后面紧跟全部可用网站（按名称 A-Z 排序、每个站只出现一次）。"
-            "右键：站点上复制该站点、标题上复制本组名单、空白处复制整张列表，"
-            "最下方另有「加入列表：启用网站」"
+            "右键站点可启用/禁用或复制该站点，右键标题复制本组名单、空白处复制整张列表，"
+            "最下方另有「加入列表：启用网站」。禁用后的站点整体变灰，"
+            "网络检测、字段刮削、图片下载等环节全部跳过"
         )
         copy_hint.setWordWrap(True)
         copy_hint.setStyleSheet(f"color: {get_theme_tokens(self._dark)['text_muted']};")
@@ -1091,6 +1161,22 @@ class SiteListEditorDialog(CenterOnFirstShowMixin, QDialog):
 
     def selected_sites(self) -> list[Website]:
         return _list_sites(self.selected_list)
+
+    def disabled_sites(self) -> list[Website]:
+        return list(self._disabled_sites)
+
+    def _toggle_site_disabled(self, site: Website, disabled: bool) -> None:
+        """启用/禁用站点：候选区与启用列表同步灰显，取消对话框则整体不落盘。"""
+        site = Website(site)
+        if disabled:
+            if site not in self._disabled_sites:
+                self._disabled_sites.append(site)
+        else:
+            self._disabled_sites = [item for item in self._disabled_sites if item != site]
+        disabled_set = set(self._disabled_sites)
+        for list_widget in (self.available_list, self.selected_list):
+            list_widget.disabled_sites = disabled_set
+        self._refresh_lists()
 
     def _sync_selected_from_list(self) -> None:
         self._selected_sites = self.selected_sites()
@@ -1483,7 +1569,15 @@ def _open_site_editor(window: "MyMAinWindow", scraping_type: FixedScrapingType) 
         except ValueError:
             pass
     all_sites = list(dict.fromkeys(selected_sites + registered_sites))
-    dialog = SiteListEditorDialog(f"编辑{info.title}网站源", selected_sites, all_sites, window)
+    from mdcx.config.manager import manager
+
+    dialog = SiteListEditorDialog(
+        f"编辑{info.title}网站源",
+        selected_sites,
+        all_sites,
+        window,
+        disabled_sites=manager.config.website_disabled,
+    )
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return
     sites = dialog.selected_sites()
@@ -1492,7 +1586,7 @@ def _open_site_editor(window: "MyMAinWindow", scraping_type: FixedScrapingType) 
         return
     info.line_edit.setText(_sites_text(sites))
     _set_site_summary(info.line_edit)
-    from mdcx.config.manager import manager
+    manager.config.website_disabled = dialog.disabled_sites()
 
     manager.config.fill_missing_type_field_configs()
     previous_sites = manager.config.get_type_sites(scraping_type)

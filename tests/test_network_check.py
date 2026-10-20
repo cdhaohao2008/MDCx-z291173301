@@ -98,6 +98,7 @@ class FakeConfig:
     theporndb_api_token = ""
     proxy_sites = ""
     direct_sites = ""
+    website_disabled = []
 
     def proxy_hosts_list(self):
         return [s.strip() for s in (self.proxy_sites or "").split(",") if s.strip()]
@@ -198,6 +199,35 @@ async def test_build_network_check_specs_uses_registered_sites_without_key_error
     specs = await build_network_check_specs()
 
     assert any(spec.site == Website.OFFICIAL and spec.url == "https://custom.example" for spec in specs)
+
+
+@pytest.mark.anyio
+async def test_build_network_check_specs_skips_disabled_sites(monkeypatch: pytest.MonkeyPatch):
+    """被禁用的站点不在检测清单里生成任何一行，连请求都不发。"""
+
+    class DisabledConfig(FakeConfig):
+        website_disabled = [Website.JAVDB]
+
+    class DisabledManager:
+        config = DisabledConfig()
+        computed = None
+
+    class DynamicCrawler:
+        @classmethod
+        def base_url_(cls):
+            return "https://example.test"
+
+    fake_crawlers = SimpleNamespace(
+        get_registered_crawler_sites=lambda include_hidden=False: [Website.AVBASE, Website.JAVDB],
+        get_crawler=lambda site: DynamicCrawler,
+    )
+    monkeypatch.setitem(sys.modules, "mdcx.crawlers", fake_crawlers)
+    monkeypatch.setattr("mdcx.core.network_check._manager", lambda: DisabledManager())
+
+    specs = await build_network_check_specs()
+
+    assert any(spec.site == Website.AVBASE for spec in specs)
+    assert all(spec.site != Website.JAVDB for spec in specs)
 
 
 @pytest.mark.anyio

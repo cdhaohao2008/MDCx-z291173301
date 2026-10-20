@@ -612,6 +612,13 @@ class Config(BaseModel):
     field_priority_try_all_images: bool = Field(default=False, title="字段优先时尝试所有图片")
     # endregion
 
+    @field_validator("website_disabled", mode="before")
+    @classmethod
+    def normalize_disabled_sites(cls, v):
+        if not v:
+            return []
+        return cls.parse_sites(v)
+
     @field_validator("download_hd_pics", mode="before")
     @classmethod
     def filter_removed_hd_pic_sources(cls, v):
@@ -628,6 +635,7 @@ class Config(BaseModel):
         return [item for item in items if (item.value if isinstance(item, HDPicSource) else str(item)) in valid_values]
 
     # region: Website Settings
+    website_disabled: list[Website] = Field(default_factory=list, title="已禁用网站")
     website_single: Website = Field(default=Website.AIRAV_CC, title="单个网站")  # todo 移除
     website_youma: list[Website] = Field(
         default_factory=lambda: list(TYPE_DEFAULT_SITES[FixedScrapingType.YOUMA]),

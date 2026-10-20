@@ -588,6 +588,71 @@ async def test_call_crawlers_runtime_skip_zero(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.mark.asyncio
+async def test_call_crawlers_skips_disabled_sites(monkeypatch: pytest.MonkeyPatch):
+    """禁用站点既不请求、也不进入字段候选；启用站点照常完成刮削。"""
+    monkeypatch.setattr(ManualConfig, "REDUCED_FIELDS", (CrawlerResultFields.RUNTIME,))
+
+    records: list[tuple[str, str]] = []
+    provider = _RecordingCrawlerProvider(
+        {
+            Website.AVBASE: _RecordingCrawler(Website.AVBASE, records),
+            Website.JAVDB: _RecordingCrawler(Website.JAVDB, records),
+        }
+    )
+    config = Config(website_youma=[Website.AVBASE, Website.JAVDB], website_disabled=[Website.JAVDB])
+    config.set_field_sites(CrawlerResultFields.RUNTIME, [Website.JAVDB, Website.AVBASE])
+    scraper = FileScraper(config, provider)
+    task_input = CrawlerInput.empty()
+    task_input.number = "SCUTE-1354"
+
+    result = await scraper._call_crawlers(task_input, {Website.AVBASE, Website.JAVDB})
+
+    assert result is not None
+    assert records == [("AVBase", "SCUTE-1354")]
+    assert "AVBase" in result.site_log
+    assert "JavDB" not in result.site_log
+
+
+@pytest.mark.asyncio
+async def test_call_crawlers_all_sites_disabled_returns_none(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(ManualConfig, "REDUCED_FIELDS", (CrawlerResultFields.TITLE,))
+    LogBuffer.log().clear()
+
+    records: list[tuple[str, str]] = []
+    provider = _RecordingCrawlerProvider(
+        {
+            Website.AVBASE: _RecordingCrawler(Website.AVBASE, records),
+            Website.JAVDB: _RecordingCrawler(Website.JAVDB, records),
+        }
+    )
+    config = Config(website_disabled=[Website.AVBASE, Website.JAVDB])
+    scraper = FileScraper(config, provider)
+    task_input = CrawlerInput.empty()
+    task_input.number = "SCUTE-1354"
+
+    result = await scraper._call_crawlers(task_input, {Website.AVBASE, Website.JAVDB})
+
+    assert result is None
+    assert records == []
+    assert "全部站点均已禁用" in LogBuffer.log().get()
+
+
+@pytest.mark.asyncio
+async def test_call_specific_crawler_skips_disabled_site():
+    records: list[tuple[str, str]] = []
+    provider = _RecordingCrawlerProvider({Website.JAVDB: _RecordingCrawler(Website.JAVDB, records)})
+    config = Config(website_disabled=[Website.JAVDB])
+    scraper = FileScraper(config, provider)
+    task_input = CrawlerInput.empty()
+    task_input.number = "SCUTE-1354"
+
+    result = await scraper._call_specific_crawler(task_input, Website.JAVDB)
+
+    assert result is None
+    assert records == []
+
+
+@pytest.mark.asyncio
 async def test_call_crawlers_records_failure_reasons_when_all_sites_fail(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(ManualConfig, "REDUCED_FIELDS", (CrawlerResultFields.TITLE,))
     LogBuffer.error().clear()

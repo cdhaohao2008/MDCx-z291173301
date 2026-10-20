@@ -28,7 +28,7 @@ from ..base.web import (
     jdbstatic_to_spfcas,
     spfcas_to_jdbstatic,
 )
-from ..config.enums import DownloadableFile, FixedScrapingType, HDPicSource, KeepableFile
+from ..config.enums import DownloadableFile, FixedScrapingType, HDPicSource, KeepableFile, Website
 from ..config.manager import manager
 from ..config.resource_policy import resource_policy
 from ..log_console import log_console
@@ -1039,8 +1039,9 @@ async def thumb_download(
     else:
         LogBuffer.log().write("\n 🟠 Thumb url is empty! ")
 
+    disabled_sites = set(getattr(manager.config, "website_disabled", None) or ())
     # 全部站点图源失败，尝试 DMM 官方 CDN 直构兜底
-    if manager.config.dmm_fallback_enabled:
+    if manager.config.dmm_fallback_enabled and Website.DMM not in disabled_sites:
         from mdcx.crawlers.dmm_direct import find_valid_dmm_cover
 
         dmm_cover_url = await find_valid_dmm_cover(result.number or "")
@@ -1069,7 +1070,8 @@ async def thumb_download(
             else:
                 LogBuffer.log().write("\n 🟠 DMM 兜底封面下载失败，继续降级处理 ")
 
-        # DMM 未命中或下载失败，尝试 MGStage 官方图源直构兜底（素人番号横版大图）
+    # DMM 未命中或下载失败，尝试 MGStage 官方图源直构兜底（素人番号横版大图）
+    if manager.config.dmm_fallback_enabled and Website.MGSTAGE not in disabled_sites:
         from mdcx.crawlers.mgstage_direct import find_valid_mgstage_cover
 
         mg_cover_url = await find_valid_mgstage_cover(result.number or "")
@@ -1474,7 +1476,9 @@ async def poster_download(
                 return True
 
     # 全部候选下载失败，尝试 MGStage 官方图源直构兜底（素人番号竖版海报）
-    if manager.config.dmm_fallback_enabled:
+    if manager.config.dmm_fallback_enabled and Website.MGSTAGE not in (
+        getattr(manager.config, "website_disabled", None) or ()
+    ):
         from mdcx.crawlers.mgstage_direct import find_valid_mgstage_poster
 
         mg_poster_url = await find_valid_mgstage_poster(result.number or "")
