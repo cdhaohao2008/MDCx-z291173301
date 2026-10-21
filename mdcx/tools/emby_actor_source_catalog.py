@@ -43,7 +43,7 @@ IMAGE_RESULT_NAMES: Final[dict[str, str]] = {
     "local": "本地头像目录缓存",
     "minnano": "Minnano-av.com",
     "gfriends": "Gfriends网络头像",
-    "graphis": "Graphis网站头像",
+    "graphis": "Graphis 网站头像",
 }
 INFO_RESULT_NAMES: Final[dict[str, str]] = {
     "minnano": "Minnano-av.com",
