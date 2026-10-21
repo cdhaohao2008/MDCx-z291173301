@@ -6,7 +6,7 @@
   「停止刮削时」自身位置保持不变。
 
 实现：_sync_advanced_page_align 内在弹窗确认行落定后，钉死前导项
-「记住未完成的刮削任务」，使末位「无限次刮削」落到「停止刮削时」实测 x。
+「记住任务，重启续刮」，使末位「无限次刮削」落到「停止刮削时」实测 x。
 只断言「精确落在锚点左缘」，不断言移动方向（离屏无 CJK 字体，方向不可比）。
 
 v2.7.6 需求③：最小化时「无限次刮削」改为与「无按钮」（radioButton_hide_none）
@@ -176,7 +176,7 @@ def test_infinite_aligns_to_stop_or_defers(win, app, width, height):
 
     # 两种情形下两项都不许被压到裁字；目标竖线上的控件自身一律不动。
     assert remain.width() >= remain.sizeHint().width(), (
-        f"{width} 宽下「记住未完成的刮削任务」被压到 {remain.width()}px（sizeHint {remain.sizeHint().width()}），会裁字"
+        f"{width} 宽下「记住任务，重启续刮」被压到 {remain.width()}px（sizeHint {remain.sizeHint().width()}），会裁字"
     )
     assert infinite.width() >= infinite.sizeHint().width(), (
         f"{width} 宽下「无限次刮削」被压到 {infinite.width()}px（sizeHint {infinite.sizeHint().width()}），会裁字"

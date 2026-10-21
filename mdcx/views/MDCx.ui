@@ -24732,7 +24732,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>记住未完成的任务，重启后可继续刮削</string>
+                                  <string>记住任务，重启续刮</string>
                                 </property>
                               </widget>
                             </item>
