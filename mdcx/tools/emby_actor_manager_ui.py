@@ -4746,7 +4746,7 @@ async def _actor_source_test_execute(
                 elif isinstance(result, tuple) and result and Path(result[0]).exists():
                     avatar_path = str(result[0])
             else:
-                logs.append(f"{_IMAGE_RESULT_NAMES.get(src, src)}: ❌ 未命中")
+                logs.append(f"{_IMAGE_RESULT_NAMES.get(src, src)}: 🚫 未命中")
 
     if need_info:
         for src in manager.config.actor_info_sources:
@@ -4766,7 +4766,7 @@ async def _actor_source_test_execute(
                         _detail = ""
                 logs.append(f"{_display}: ✅ 已命中{_detail and f'，{_detail}'}")
             else:
-                logs.append(f"{_display}: ❌ 未命中")
+                logs.append(f"{_display}: 🚫 未命中")
             if ok and data:
                 if info is None:
                     info = data
