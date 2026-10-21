@@ -334,7 +334,8 @@ def format_detail_cell_text(overview: object) -> str:
 # 新列顺序（状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数）下可编辑的列。
 _EDITABLE_COLUMNS = frozenset((1, 4, 5, 6, 7))
 """姓名(1)/出生日期(4)/出生地(5)/详情(6)/标签(7)：双击进编辑器改值、
-右键/Ctrl+C 复制。单击只选中不弹编辑器（防误触），三击开演员详情窗。
+右键弹小菜单（复制内容/编辑内容/查看详情）、Ctrl+C 复制。
+单击只选中不弹编辑器（防误触），三击开演员详情窗。
 简介(3)是 ✅/❌ 状态图标，保持只读。"""
 
 _EDITABLE_FIELD_NAMES = {1: "姓名", 4: "出生日期", 5: "出生地", 6: "详情", 7: "标签"}
@@ -344,6 +345,15 @@ _DUPLICATE_CLICK_GAP = 0.01
 """同一次物理按下被重复上报（Press + DblClick）的去重窗口（秒）。
 
 两次上报间隔小于这个值就当同一次点击，不重复累加连击次数。"""
+
+_CELL_MENU_COPY = "复制内容"
+"""可编辑格右键小菜单项：把本格内容直接复制到剪贴板。"""
+
+_CELL_MENU_EDIT = "编辑内容"
+"""可编辑格右键小菜单项：把本格变成行内可编辑状态（同左键双击）。"""
+
+_CELL_MENU_DETAIL = "查看详情"
+"""可编辑格右键小菜单项：弹演员详情窗（同左键三击）。"""
 
 _SPLIT_RE = re.compile(r"[,，、]")
 
@@ -1693,7 +1703,7 @@ class EmbyActorManagerDialog(QDialog):
         self.btn_sync.setEnabled(False)
         btn_layout.addWidget(self.btn_sync)
         # 说明行末的手势摘要只列三种左键手势（单击选中/双击编辑/三击详情），
-        # 「右键复制」放在表格正上方的统计栏提示里（那里不受单行宽度限制），
+        # 「右键菜单」放在表格正上方的统计栏提示里（那里不受单行宽度限制），
         # 这样本行文字宽度与改版前一致，1920 宽下仍能排成一行。
         self._help_single = "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获取数据→④绿色行=待更新→⑤同步，单击选中、双击编辑、三击详情"
         # 窄态（还原/常规/最小化）固定两行：在「③选择模式获取数据」处断行，
@@ -1812,9 +1822,12 @@ class EmbyActorManagerDialog(QDialog):
         self.txt_search.setMaximumWidth(200)
         self.txt_search.textChanged.connect(self._on_filter_changed)
         stats_layout.addWidget(self.txt_search)
-        hint = QLabel("单击选中 · 双击编辑 · 三击详情 · 右键复制")
+        hint = QLabel("单击选中 · 双击编辑 · 三击详情 · 右键菜单")
         # 同上：不钉死字号，跟随统一放大的字号
         hint.setStyleSheet("color: #888888;")
+        # 右键小菜单的三项说明挂在提示文字的悬浮提示里：提示行宽度受限，
+        # 塞不下全文，而悬浮提示不占布局宽度。
+        hint.setToolTip("右键菜单：复制内容 / 编辑内容 / 查看详情")
         stats_layout.addWidget(hint)
         stats_layout.addStretch()
         stats_layout.addWidget(QLabel("计数方式:"))
@@ -2381,7 +2394,7 @@ class EmbyActorManagerDialog(QDialog):
         另支持表格 Ctrl+C：已选中单元格按行列制表符拼成文本进剪贴板，
         只取可编辑列（姓名/出生日期/出生地/详情/标签），
         与编辑器内的子串复制互补（编辑器打开时走其原生复制，不过滤）。
-        右键复制走 _on_table_right_clicked，直接复制光标下可编辑格的展示文本。
+        右键走 _on_table_right_clicked，弹小菜单（复制内容/编辑内容/查看详情）。
         表格视口的左键按下/双击/松开也在这里接管：数连击次数分派
         单击选中 / 双击进编辑器 / 三击弹详情窗（Qt 连击的第 2 次起报的是
         MouseButtonDblClick，所以两种事件都要数）。
@@ -4092,14 +4105,75 @@ class EmbyActorManagerDialog(QDialog):
             pass
 
     def _on_table_right_clicked(self, pos) -> None:
-        """右键默认复制：光标下是可编辑格就把展示文本写剪贴板，无菜单。"""
+        """右键可编辑格：弹小菜单（复制内容 / 编辑内容 / 查看详情）。
+
+        - 复制内容：把本格内容直接写剪贴板（取 UserRole 里的完整值）；
+        - 编辑内容：与左键双击一致，直接把本格变成行内可编辑状态；
+        - 查看详情：与左键三击一致，弹演员详情窗。
+
+        不可编辑列（状态/头像/简介/影片数）右键不弹菜单。
+        """
+
+        def _run(action, row: int, col: int) -> None:
+            """按选中的菜单项分派（点菜单外关闭则什么都不做）。"""
+            try:
+                if action is None:
+                    return
+                text = action.text()
+                if text == _CELL_MENU_COPY:
+                    self._copy_cell_content(row, col)
+                elif text == _CELL_MENU_EDIT:
+                    self._open_cell_editor(row, col)
+                elif text == _CELL_MENU_DETAIL:
+                    self._open_actor_detail(row)
+            except RuntimeError, AttributeError, ValueError, TypeError:
+                pass
+            except Exception:
+                pass
+
         try:
             table = self.table
-            item = table.itemAt(pos)
-            if item is None or int(item.column()) not in _EDITABLE_COLUMNS:
+            index = table.indexAt(pos)
+            if index is None or not index.isValid():
                 return
-            QGuiApplication.clipboard().setText(item.text())  # type: ignore[union-attr]
-            self.log(f"📋 已复制: {item.text()[:60]}")
+            row = int(index.row())
+            col = int(index.column())
+            if col not in _EDITABLE_COLUMNS:
+                return
+            menu = QMenu(self)
+            menu.addAction(_CELL_MENU_COPY)
+            menu.addAction(_CELL_MENU_EDIT)
+            menu.addAction(_CELL_MENU_DETAIL)
+            viewport = table.viewport()
+            global_pos = viewport.mapToGlobal(pos) if viewport is not None else pos
+            _run(menu.exec(global_pos), row, col)
+        except RuntimeError, AttributeError, ValueError, TypeError:
+            pass
+        except Exception:
+            pass
+
+    def _copy_cell_content(self, row: int, col: int) -> None:
+        """复制内容：把该格的实际内容直接写剪贴板。
+
+        取 UserRole 里存的完整值——详情列的展示文本截断到 80 字、标签列只
+        展示前 2 个，复制半截内容没有意义；没有完整值时退回展示文本。
+        """
+        try:
+            table = self.table
+            item = table.item(int(row), int(col))
+            if item is None:
+                return
+            text = ""
+            try:
+                full = item.data(Qt.ItemDataRole.UserRole)
+            except RuntimeError, AttributeError:
+                full = None
+            if isinstance(full, str) and full:
+                text = full
+            else:
+                text = item.text()
+            QGuiApplication.clipboard().setText(text)  # type: ignore[union-attr]
+            self.log(f"📋 已复制: {text[:60]}")
         except RuntimeError, AttributeError, ValueError, TypeError:
             pass
         except Exception:
@@ -4910,7 +4984,7 @@ async def _actor_source_test_execute(
                 elif isinstance(result, tuple) and result and Path(result[0]).exists():
                     avatar_path = str(result[0])
             else:
-                logs.append(f"{_IMAGE_RESULT_NAMES.get(src, src)}: 🚫 未命中")
+                logs.append(f"{_IMAGE_RESULT_NAMES.get(src, src)}: ❌ 未命中")
 
     if need_info:
         for src in manager.config.actor_info_sources:
@@ -4930,7 +5004,7 @@ async def _actor_source_test_execute(
                         _detail = ""
                 logs.append(f"{_display}: ✅ 已命中{_detail and f'，{_detail}'}")
             else:
-                logs.append(f"{_display}: 🚫 未命中")
+                logs.append(f"{_display}: ❌ 未命中")
             if ok and data:
                 if info is None:
                     info = data

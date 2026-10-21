@@ -268,11 +268,32 @@ def _click_cell(dlg, row: int, col: int, times: int = 1):
         time.sleep(0.03)
 
 
-def test_emby_actor_manager_inline_edit_and_copy(app):
+def _patch_cell_menu(monkeypatch, action_text: str | None = None) -> list:
+    """替换 QMenu.exec（真实 exec 会阻塞离屏事件循环），返回截获到的菜单。
+
+    action_text 非空时让 exec 返回同名菜单项，模拟用户点选。
+    """
+    from PyQt6.QtWidgets import QMenu
+
+    captured: list = []
+
+    def _fake_exec(self, *args, **kwargs):
+        captured.append(self)
+        if action_text:
+            for act in self.actions():
+                if act.text() == action_text:
+                    return act
+        return None
+
+    monkeypatch.setattr(QMenu, "exec", _fake_exec)
+    return captured
+
+
+def test_emby_actor_manager_inline_edit_and_copy(app, monkeypatch):
     """新行为：单击可编辑列只选中（不再误弹编辑器），双击才进行内编辑
     （回车/点别处提交即本地缓存+绿底🔄，仅改过行参与同步），
-    三击弹演员详情窗（先提交编辑器），右键/Ctrl+C 复制可编辑列文本。
-    简介列（状态图标）只读不可编辑。"""
+    三击弹演员详情窗（先提交编辑器），右键弹小菜单（复制内容/编辑内容/查看详情），
+    Ctrl+C 复制可编辑列文本。简介列（状态图标）只读不可编辑。"""
     import math
 
     from PyQt6.QtCore import Qt
@@ -327,11 +348,10 @@ def test_emby_actor_manager_inline_edit_and_copy(app):
         to_sync = [a for a in dlg._actors if getattr(a, "need_update_info", False)]
         assert [a.actor_id for a in to_sync] == ["e1"]
         dlg._actors.pop()
-        # 右键可编辑格：直接复制展示文本。
+        # 右键可编辑格：弹小菜单，选「复制内容」直接复制本格内容。
+        _patch_cell_menu(monkeypatch, "复制内容")
         dlg._on_table_right_clicked(table.visualItemRect(table.item(0, 1)).center())
         assert QGuiApplication.clipboard().text() == "改名演员"
-        dlg._on_table_right_clicked(table.visualItemRect(table.item(0, 3)).center())
-        assert QGuiApplication.clipboard().text() != ""
         # 三击可编辑列：提交编辑器后仍弹详情窗。
         dlg._reset_click_tracking()
         _click_cell(dlg, 0, 4, times=2)  # 双击进行内编辑器
