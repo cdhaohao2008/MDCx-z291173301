@@ -241,14 +241,47 @@ async def test_aventertainments_number_matching():
     await client.close()
 
 
-@pytest.mark.network
+def _stub_fetches(crawler: AVEntertainmentsCrawler, search_html: str, detail_html: str) -> None:
+    """用固定 HTML 替换搜索与详情请求，避免真实网络和站点验证码。"""
+
+    async def fetch_search(ctx, url, use_browser=False):
+        return search_html, ""
+
+    async def fetch_detail(ctx, url, use_browser=False):
+        return detail_html, ""
+
+    crawler._fetch_search = fetch_search  # type: ignore[method-assign]
+    crawler._fetch_detail = fetch_detail  # type: ignore[method-assign]
+
+
 @pytest.mark.asyncio
-async def test_aventertainments_ppv_real_search():
-    """真实网络测试：PPV 番号 082226_001"""
+async def test_aventertainments_ppv_search_flow():
+    """PPV 搜索到详情解析全流程（离线固定页面）。"""
     from mdcx.web_async import AsyncWebClient
+
+    search_html = """
+    <html><body>
+        <a href="/ppv/detail?pro=104440&lang=2&culture=ja-JP&v=1">Detail</a>
+    </body></html>
+    """
+    detail_html = """
+    <html><body>
+        <span class="tag-title">DL1pon_082226_001</span>
+        <h1 class="mb-10">【独占配信】さくらみな 美人妻の誘惑</h1>
+        <a href="/ppv/idoldetail?idol=12345">さくらみな</a>
+        <div class="product-description mt-20">
+            夫の不在中に義父に迫られる人妻の物語。
+        </div>
+        <a href="/ppv/series?series=2088">美人妻シリーズ</a>
+        <img src="https://imgs02.aventertainments.com/vodimages/xlarge/1pon_082226_001.webp" />
+        <strong>配信開始日</strong> 2022/08/26
+        <strong>収録時間</strong> 60分
+    </body></html>
+    """
 
     client = AsyncWebClient(timeout=30)
     crawler = AVEntertainmentsCrawler(client=client, browser=None)
+    _stub_fetches(crawler, search_html, detail_html)
 
     inp = CrawlerInput.empty()
     inp.number = "082226_001"
@@ -257,9 +290,11 @@ async def test_aventertainments_ppv_real_search():
 
     await client.close()
 
-    assert result.data is not None, f"搜索失败: {result.debug_info}"
+    assert result.data is not None, f"解析失败: {result.debug_info}"
+    assert result.debug_info.search_urls
+    assert "/ppv/search" in result.debug_info.search_urls[0]
     assert result.data.number
-    # 应该匹配 1pondo（因为搜索返回顺序中 1pondo 在前）
+    # 1pondo 详情页番号带 1pon 前缀，也允许按日期数字匹配
     assert "1pon" in result.data.number.lower() or "082226" in result.data.number.replace("-", "").replace("_", "")
     assert result.data.actors
     assert result.data.outline
@@ -267,25 +302,44 @@ async def test_aventertainments_ppv_real_search():
     assert result.data.mosaic == "无码"
 
 
-@pytest.mark.network
 @pytest.mark.asyncio
-async def test_aventertainments_ppv_carib_search():
-    """真实网络测试：Caribbeancom PPV 番号 082226-001"""
+async def test_aventertainments_ppv_carib_search_flow():
+    """Caribbeancom PPV 搜索到详情解析全流程（离线固定页面）。"""
     from mdcx.web_async import AsyncWebClient
+
+    search_html = """
+    <html><body>
+        <a href="/ppv/detail?pro=104441&lang=2&culture=ja-JP&v=1">Detail</a>
+    </body></html>
+    """
+    detail_html = """
+    <html><body>
+        <span class="tag-title">DLcarib_082226-001</span>
+        <h1 class="mb-10">Caribbeancom テスト作品</h1>
+        <a href="/ppv/idoldetail?idol=67890">テスト女優</a>
+        <div class="product-description mt-20">Caribbeancom のテスト用あらすじ。</div>
+        <img src="https://imgs02.aventertainments.com/vodimages/xlarge/carib_082226-001.webp" />
+        <strong>配信開始日</strong> 2022/08/26
+    </body></html>
+    """
 
     client = AsyncWebClient(timeout=30)
     crawler = AVEntertainmentsCrawler(client=client, browser=None)
+    _stub_fetches(crawler, search_html, detail_html)
 
     inp = CrawlerInput.empty()
-    inp.number = "082226-001"  # 横杠格式，应只匹配 carib
+    inp.number = "082226-001"
 
     result = await crawler.run(inp)
 
     await client.close()
 
-    assert result.data is not None, f"搜索失败: {result.debug_info}"
+    assert result.data is not None, f"解析失败: {result.debug_info}"
     assert result.data.number
     assert "carib" in result.data.number.lower()
+    assert result.data.actors
+    assert result.data.outline
+    assert result.data.thumb
     assert result.data.mosaic == "无码"
 
 
