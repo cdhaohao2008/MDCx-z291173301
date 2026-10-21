@@ -16,9 +16,20 @@ v2.7.6 需求③：最小化时「无限次刮削」改为与「无按钮」（r
 _sync_advanced_page_tail_align() 之后（「无按钮」的终态 x 是那里钉出来的）；
 宽态仍取「停止刮削时」，逐位不变。
 
+v2.7.6 需求④（最新一条）：最小化时「无限次刮削」改为与「显示字段内容信息」
+（checkBox_show_data_log）严格上下对齐，且「显示字段内容信息」位置保持不变。
+**根因在判态**：这一批需求原先用几何拉伸量（`_scroll_stretch_extra() > 0`）区分
+最大化/还原态，但真机（dpr=1.25、屏幕 1536×864）**还原态**窗口 1085×793 的拉伸
+量已经是 +33 > 0 → 还原态被误判成最大化，「最小化时」那一支根本不执行（用户
+截图：目标纹丝不动）。故判态改成窗口管理器给的「真·最大化」状态
+（`_advanced_page_window_maximized()`：isMaximized()/isFullScreen()）：
+  最大化：目标竖线仍是「停止刮削时」，页面布局、控件、组件、提示词全部不变；
+  还原态：目标竖线是「显示字段内容信息」col_x(src_data)。
+离屏环境里窗口从未 maximized，故默认走还原态那一支；最大化那一支用
+monkeypatch 替换 isMaximized 来覆盖（几何仍是还原态的，但断的是「选哪条竖线」）。
+
 可行性门控（与「隐藏菜单栏图标」行同款手法）：落点落在前导项文本自然宽
-之内时硬钉会裁字，此时整行放弃、保持设计态原样。窄态与全最大化下放得下，
-必须精确对齐；1100/1366 中间带在离屏度量下放不下，走延后分支断言。
+之内时硬钉会裁字，此时整行放弃、保持设计态原样。
 """
 
 import os
@@ -103,18 +114,19 @@ def _resize(win, app, width, height):
     app.processEvents()
 
 
-def _remain_row(ui, wide):
+def _remain_row(ui, maximized):
     """保留任务行的实测可行性（与实现同式）：钉宽放得下才算可行。
 
-    v2.7.6 需求③：窄态的目标竖线从「停止刮削时」换成「无按钮」
-    （radioButton_hide_none）——「无按钮」位置保持不变，「无限次刮削」向右移过去
-    与它严格上下对齐；宽态仍取「停止刮削时」（逐位不变）。
+    v2.7.6 需求④：目标竖线按「窗口是否真·最大化」取（不能用几何拉伸量——真机
+    还原态窗口的拉伸量已经 > 0，会把还原态误判成最大化）：
+      最大化：「停止刮削时」col_x(stop_scrape)（逐位不变）；
+      还原态：「显示字段内容信息」col_x(src_data)（需求点名的那条竖线）。
     """
     host = ui.gridLayoutWidget_20
     content = ui.scrollAreaWidgetContents_gaoji
     host_x = host.mapTo(content, QPoint(0, 0)).x()
     row5_x = _abs(ui, ui.checkBox_remain_task) - host_x
-    target = ui.checkBox_show_dialog_stop_scrape if wide else ui.radioButton_hide_none
+    target = ui.checkBox_show_dialog_stop_scrape if maximized else ui.checkBox_show_data_log
     want = _abs(ui, target) - host_x
     lay = ui.horizontalLayout_89
     col_w = host.width() - row5_x
@@ -135,18 +147,19 @@ _NARROW_SIZES = ((1030, 753), (1000, 700))
 def test_infinite_aligns_to_stop_or_defers(win, app, width, height):
     """放得下就必须精确对齐；放不下就整行放弃（不钉宽、不裁字）。
 
-    目标竖线按态取：宽态「停止刮削时」（逐位不变），窄态「无按钮」（v2.7.6 需求③，
-    且「无按钮」自己不许动）。
+    目标竖线按「窗口是否真·最大化」取（v2.7.6 需求④）：最大化取「停止刮削时」
+    （逐位不变），还原态取「显示字段内容信息」（离屏窗口从未 maximized，故本用例
+    走还原态那一支）。
     """
     ui = win.Ui
     win.show()
     _goto_advanced(win, app)
     _resize(win, app, width, height)
 
-    wide = win._scroll_stretch_extra(win._adv_scroll) > 0
-    row = _remain_row(ui, wide)
+    maximized = win._advanced_page_window_maximized()
+    row = _remain_row(ui, maximized)
     got = _abs(ui, ui.checkBox_infinite_scrape)
-    target = ui.checkBox_show_dialog_stop_scrape if wide else ui.radioButton_hide_none
+    target = ui.checkBox_show_dialog_stop_scrape if maximized else ui.checkBox_show_data_log
     want = _abs(ui, target)
     remain = ui.checkBox_remain_task
     infinite = ui.checkBox_infinite_scrape
@@ -161,12 +174,70 @@ def test_infinite_aligns_to_stop_or_defers(win, app, width, height):
             f"{width} 宽下放弃态里前导项钉宽未解除: min={remain.minimumWidth()} max={remain.maximumWidth()}"
         )
 
-    # 两种情形下两项都不许被压到裁字；「停止刮削时」自身一律不动。
+    # 两种情形下两项都不许被压到裁字；目标竖线上的控件自身一律不动。
     assert remain.width() >= remain.sizeHint().width(), (
         f"{width} 宽下「记住未完成的刮削任务」被压到 {remain.width()}px（sizeHint {remain.sizeHint().width()}），会裁字"
     )
     assert infinite.width() >= infinite.sizeHint().width(), (
         f"{width} 宽下「无限次刮削」被压到 {infinite.width()}px（sizeHint {infinite.sizeHint().width()}），会裁字"
+    )
+
+
+@pytest.mark.parametrize("width,height", _WIDE_SIZES + _NARROW_SIZES)
+def test_infinite_aligns_to_stop_when_window_maximized(win, app, monkeypatch, width, height):
+    """最大化那一支仍取「停止刮削时」——页面布局、控件、组件、提示词全部不变。
+
+    离屏窗口不会真·最大化，故用 monkeypatch 替换 isMaximized 来覆盖这一支
+    （断的是「选哪条竖线」，几何仍是当前尺寸的）。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_advanced(win, app)
+    _resize(win, app, width, height)
+    monkeypatch.setattr(win, "isMaximized", lambda: True)
+    monkeypatch.setattr(win, "isFullScreen", lambda: False)
+    assert win._advanced_page_window_maximized()
+    _resize(win, app, width, height)
+
+    row = _remain_row(ui, True)
+    got = _abs(ui, ui.checkBox_infinite_scrape)
+    want = _abs(ui, ui.checkBox_show_dialog_stop_scrape)
+    if row["feasible"]:
+        assert got == want, f"{width} 宽下最大化态未对齐「停止刮削时」: x={got} 期望={want}"
+    else:
+        assert got > want, f"{width} 宽下最大化态放不下（pin={row['pin']}）本应整行放弃，却对到了 x={got}"
+
+
+@pytest.mark.parametrize("width,height", _WIDE_SIZES + _NARROW_SIZES)
+def test_restored_infinite_lands_on_show_data_log(win, app, width, height):
+    """需求④：还原态「无限次刮削」与「显示字段内容信息」严格上下对齐。
+
+    并且「显示字段内容信息」位置保持不变——本用例连跑两遍同步，断言第二遍不再
+    挪动它（同步是幂等的，且不许动的那一列确实没动）。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_advanced(win, app)
+    _resize(win, app, width, height)
+    assert not win._advanced_page_window_maximized(), f"{width} 宽下离屏窗口应处于还原态"
+
+    data_x = _abs(ui, ui.checkBox_show_data_log)
+    win._sync_page_layouts()
+    app.processEvents()
+    assert _abs(ui, ui.checkBox_show_data_log) == data_x, (
+        f"{width} 宽下「显示字段内容信息」被带偏: {data_x} -> {_abs(ui, ui.checkBox_show_data_log)}"
+    )
+
+    row = _remain_row(ui, False)
+    if row["feasible"]:
+        assert _abs(ui, ui.checkBox_infinite_scrape) == data_x, (
+            f"{width} 宽下还原态「无限次刮削」未与「显示字段内容信息」严格上下对齐: "
+            f"x={_abs(ui, ui.checkBox_infinite_scrape)} 期望={data_x}"
+        )
+    # 离屏环境里「无按钮」与「显示字段内容信息」落在同一条竖线上（间距被布局吸收），
+    # 故它也仍与「无限次刮削」同列。
+    assert _abs(ui, ui.radioButton_hide_none) == data_x, (
+        f"{width} 宽下「无按钮」被带偏: x={_abs(ui, ui.radioButton_hide_none)} 期望={data_x}"
     )
 
 

@@ -525,6 +525,21 @@ class LayoutMasterMixin:
         # 终态，这里不必（也不宜）再递归跑一遍 sync_wide_children_width()。
         self._sync_advanced_page_align(self._adv_scroll, wide_synced=True)
 
+    def _advanced_page_window_maximized(self) -> bool:
+        """高级页：窗口当前是不是真·最大化（决定「最小化态需求」是否生效）。
+
+        判据不能用几何拉伸量（`_scroll_stretch_extra() > 0`）：真机（dpr=1.25、
+        屏幕 1536×864）**还原态**窗口 1085×793 的拉伸量已经是 **+33 > 0**，几何
+        量会把还原态误判成「最大化」，「最小化时」那一支根本不执行（用户截图：
+        目标纹丝不动）。故这里用窗口管理器给的状态位。
+
+        最大化/还原那一拍窗口管理器「先发尺寸、后发状态」，resizeEvent 里
+        isMaximized() 还是旧值；状态位到位后 changeEvent 会
+        `QTimer.singleShot(0, self._sync_page_layouts)` 补一次重排（见
+        window_ops.changeEvent），故最坏只闪一帧、随即归位。
+        """
+        return bool(self.isMaximized() or self.isFullScreen())
+
     def _sync_advanced_page_align(self, adv_scroll=None, wide_synced=False) -> None:
         """设置-高级：六行控件对齐到「显示字段来源信息」同一条竖线（最大化态）。
 
@@ -618,6 +633,13 @@ class LayoutMasterMixin:
           保留任务行的目标竖线在窄态改取 radioButton_hide_none 的实测 x，且本段
           整段挪到 _sync_advanced_page_tail_align() 之后（「无」的终态 x 是那里
           钉出来的）。宽态仍取「停止刮削时」，与本批需求之前逐位相同。
+          （注：③ 的「窄态」判据是几何拉伸量，真机上不成立，已被下面 ④ 取代。）
+        ④ 还原态「无限次刮削」与「显示字段内容信息」严格上下对齐，且「显示字段
+          内容信息」位置保持不变：目标竖线在还原态改取 col_x(src_data)。**判态
+          换成窗口管理器给的「真·最大化」状态**（_advanced_page_window_maximized）：
+          几何拉伸量在真机还原态窗口（1085×793）已经是 +33 > 0，会把还原态误判
+          成最大化、这一支根本不执行（用户截图：目标纹丝不动）。最大化态仍取
+          「停止刮削时」，页面布局、控件、组件、提示词全部保持不变。
         """
         ui = self.Ui
         host = ui.gridLayoutWidget_20
@@ -883,22 +905,28 @@ class LayoutMasterMixin:
 
         # ---- 保留任务行：「无限次刮削」落到目标竖线（两态生效） ----
         # 「无限次刮削」自身的位置由前导项「记住未完成的刮削任务」的钉宽决定，只钉
-        # 前导项即可。目标竖线分两态：
+        # 前导项即可。目标竖线按**窗口是否真·最大化**分两态（不能用几何拉伸量：
+        # 真机还原态窗口 1085×793 的拉伸量已是 +33 > 0，会被误判成最大化，
+        # 「最小化时」那一支根本不执行——见 _advanced_page_window_maximized）：
         #   最大化：仍是「停止刮削时」col_x(stop_scrape)，最大化结果与本批需求之前
-        #     逐位相同；
-        #   还原态（需求③）：取「无」col_x(radioButton_hide_none) —— 需求写的是
-        #     「无限次刮削与无按钮严格上下对齐，且无按钮位置保持不变」。真机上窄态
-        #     的「停止刮削时」钉不上（同行前导项「退出软件时」sizeHint 太大，整行
-        #     放弃后它停在自然位 543），而「无」钉得上（787，正是「显示字段内容
-        #     信息」那条线），故必须换锚点，否则两者永远对不齐。
-        # 本段必须排在 _sync_advanced_page_tail_align() 之后：「无」的终态 x 是那
-        # 里面钉出来的，提前量到的是等分旧值。row5 与 row6 同处 gridLayout_20 的
-        # col1，行左缘天然相等，但仍按实测分开起算，避免布局边距假设。
+        #     逐位相同（页面布局、控件、组件、提示词全部保持不变）；
+        #   还原态（v2.7.6 需求④）：取「显示字段内容信息」col_x(src_data) —— 需求
+        #     原话「最小化时无限次刮削向右移动到与显示字段内容信息严格上下对齐的
+        #     位置，显示字段内容信息位置保持不变」。真机还原态的「停止刮削时」钉
+        #     不上（同行前导项「退出软件时」sizeHint 太大，整行放弃后它停在自然位
+        #     543），而「显示字段内容信息」钉得上（787），故必须换锚点。
+        # 本段必须排在 _sync_advanced_page_tail_align() 之后：下半页那几行会改
+        # gridLayout_20 的列宽，提前量到的是旧列宽下的坐标。row5 与 row6 同处
+        # gridLayout_20 的 col1，行左缘天然相等，但仍按实测分开起算，避免布局
+        # 边距假设。
         lay_r = ui.horizontalLayout_89
         remain_task = ui.checkBox_remain_task
         infinite_scrape = ui.checkBox_infinite_scrape
         row5_x = col_x(remain_task)
-        want_r = col_x(stop_scrape) if wide else col_x(ui.radioButton_hide_none)
+        if self._advanced_page_window_maximized():
+            want_r = col_x(stop_scrape)
+        else:
+            want_r = col_x(src_data)
         col_w_r = host.width() - row5_x
         pin_r = want_r - row5_x - lay_r.spacing()
         ok_r = (

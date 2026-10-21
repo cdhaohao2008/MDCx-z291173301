@@ -527,26 +527,35 @@ def test_narrow_menu_icon_lands_on_dark_mode_when_it_fits(win, app, width, heigh
 
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
-def test_narrow_infinite_scrape_lands_on_hide_none(win, app, width, height):
-    """需求③：窄态「无限次刮削」与「无按钮」严格上下对齐，且「无按钮」位置不动。
+def test_restored_infinite_scrape_lands_on_show_data_log(win, app, width, height):
+    """需求④（v2.7.6 最新一条）：还原态「无限次刮削」与「显示字段内容信息」严格对齐。
 
+    「显示字段内容信息」位置保持不变——它就是目标竖线本身，实现只钉前导项
+    「记住未完成的刮削任务」，不碰它；本用例断言它在同步前后不动。
     「无按钮」的落点由 _sync_advanced_page_tail_align 钉出（「显示字段内容信息」
-    那条竖线），故「无限次刮削」那一段必须排在 tail_align **之后**才量得到终态 x。
+    那条竖线），故「无限次刮削」那一段必须排在 tail_align **之后**才量得到终态 x；
+    离屏环境里两者落在同一条竖线上（间距被布局吸收），故也一并断言。
     """
     ui = win.Ui
     win.show()
     _goto_advanced(win, app)
     _resize(win, app, width, height)
-    assert _extra(win) <= 0, f"{width} 宽下应处于窄态（拉伸量 <= 0）"
+    assert not win._advanced_page_window_maximized(), f"{width} 宽下离屏窗口应处于还原态"
 
-    none_x = _abs(ui, ui.radioButton_hide_none)
+    data_x = _abs(ui, ui.checkBox_show_data_log)
+    win._sync_page_layouts()
+    app.processEvents()
+    assert _abs(ui, ui.checkBox_show_data_log) == data_x, (
+        f"还原态 {width} 宽下「显示字段内容信息」位置变了: {data_x} -> {_abs(ui, ui.checkBox_show_data_log)}"
+    )
+
     infinite_x = _abs(ui, ui.checkBox_infinite_scrape)
-    assert infinite_x == none_x, (
-        f"窄态 {width} 宽下「无限次刮削」未与「无按钮」严格上下对齐: x={infinite_x} 期望={none_x}"
+    assert infinite_x == data_x, (
+        f"还原态 {width} 宽下「无限次刮削」未与「显示字段内容信息」严格上下对齐: x={infinite_x} 期望={data_x}"
     )
     # 「无按钮」自己不许动：它仍落在「显示字段内容信息」那条竖线上
-    assert none_x == _abs(ui, ui.checkBox_show_data_log), (
-        f"窄态 {width} 宽下「无按钮」被带偏: x={none_x} 期望={_abs(ui, ui.checkBox_show_data_log)}"
+    assert _abs(ui, ui.radioButton_hide_none) == data_x, (
+        f"还原态 {width} 宽下「无按钮」被带偏: x={_abs(ui, ui.radioButton_hide_none)} 期望={data_x}"
     )
 
 
