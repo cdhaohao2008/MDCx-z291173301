@@ -1189,7 +1189,7 @@ class RemoteVersion(NamedTuple):
     """GitHub 上的最新 release。
 
     `tag` 是纯数字日期版本号（YYYYMMDD，比较的主依据）；`name` 是展示用标题
-    （发版工作流写入的 `vX.Y.Z (YYYYMMDD)`），仅用于版本号比较与提示文案。
+    （发版工作流写入的 `MDCx X.Y.Z (YYYYMMDD)`），仅用于版本号比较与提示文案。
     """
 
     tag: int
@@ -1205,7 +1205,10 @@ _RELEASE_VERSION_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
 
 def parse_release_version(name: str) -> tuple[int, int, int] | None:
-    """从 release 标题（如 `v2.1.8 (20261001)`）解析展示版本号；解析不出返回 None。"""
+    """从 release 标题（如 `MDCx 2.1.8 (20261001)`）解析展示版本号；解析不出返回 None。
+
+    只搜标题里的 `X.Y.Z` 段，不锚定开头，故标题带不带 `MDCx ` / `v` 前缀都能解析出。
+    """
     matched = _RELEASE_VERSION_RE.search(str(name or ""))
     if matched is None:
         return None
@@ -1217,7 +1220,7 @@ def is_remote_version_newer(remote: RemoteVersion, local_tag: int, local_name: s
 
     - 两侧版本号都能解析：版本号不同则由版本号决出（远端更高即有新版本），**版本号
       相等才比日期**（远端日期更新即有新版本）。
-    - 任一侧版本号解析不出来（标题非 `vX.Y.Z` 形态，如 nightly / 空标题）：退回**只比
+    - 任一侧版本号解析不出来（标题里没有 `X.Y.Z` 段，如 nightly / 空标题）：退回**只比
       日期**。
 
     版本号优先而非日期优先，是为了让「版本号更高」这条真正独立生效——同一天发两版
@@ -1406,7 +1409,7 @@ def parse_release_atom(text: str) -> RemoteVersion | None:
 
     与 API 那条路径同取 **tag 最大**的 entry（而非 feed 第一条）：atom 同样按发布时间
     倒序，补发旧 tag 会把旧版本顶到第一条。标题走 HTML 反转义后作为 `name`，格式仍是
-    `vX.Y.Z (YYYYMMDD)`，故 `parse_release_version` / `display` 的行为与 API 路径完全一致。
+    `MDCx X.Y.Z (YYYYMMDD)`，故 `parse_release_version` / `display` 的行为与 API 路径完全一致。
     """
     remote: RemoteVersion | None = None
     for entry in _ATOM_ENTRY_RE.findall(text or ""):

@@ -262,8 +262,12 @@ def test_asset_names_and_release_title():
     for asset_name in _EXPECTED_ASSETS:
         assert asset_name in text, f"缺少约定的资产名（客户端按此下载）：{asset_name}"
     assert "release_name: ${{ steps.metadata.outputs.name }}" in text, "标题应沿用 metadata 的解析结果"
-    assert 'echo "name=${version_name} (${tag})" >> "$GITHUB_OUTPUT"' in text, (
-        "Release 标题应为 `VERSION_NAME (版本号)`"
+    assert 'release_name="MDCx ${asset_version} (${tag})"' in text, (
+        "Release 标题应为 `MDCx <展示版本号> (<tag>)`（如 `MDCx 2.7.4 (20261021)`）"
+    )
+    assert 'echo "name=$release_name" >> "$GITHUB_OUTPUT"' in text, "标题应写入 metadata 的 name 输出"
+    assert "name=${version_name} (${tag})" not in text, (
+        "标题不应再直接用带 v 前缀的 VERSION_NAME，否则列表里显示的是 `v2.7.4 (20261021)`"
     )
 
 

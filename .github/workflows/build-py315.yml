@@ -27,6 +27,11 @@ name: Build and Release Python3.15
 # 资产名同时出现在 `docs/Development.md`、`DADA/MEMORY.md` 与
 # `tests/test_py315_release_workflow.py::_EXPECTED_ASSETS`，改一处必须同步另两处。
 #
+# Release 标题（`/releases` 列表里显示的那一行）：`MDCx <展示版本号> (<tag>)`，
+# 例如 `MDCx 2.7.4 (20261021)`。客户端同样只读 `tag_name`，`parse_release_version()`
+# 用正则搜标题里的 `X.Y.Z` 段（带不带 `MDCx ` 前缀都能解析出），故标题改名同样不影响
+# 自动更新；标题只给人看，`tests/test_py315_release_workflow.py` 钉住这一格式。
+#
 # 三处护栏（发半成品 Release 比不发更糟）：
 #   1. `build-app` 带 continue-on-error，某平台翻车不阻塞其余平台
 #   2. `publish-release` 用 `!cancelled() && needs.build-app.result == 'success'` 把关
@@ -358,14 +363,19 @@ jobs:
 
           version_name=$(grep -oE 'VERSION_NAME[[:space:]]*=[[:space:]]*"[^"]+"' mdcx/consts.py | grep -oE '"[^"]+"' | tr -d '"')
 
-          # 资产文件名里的展示版本号：VERSION_NAME 去掉 v 前缀（v2.7.4 → 2.7.4）。
+          # 展示版本号：VERSION_NAME 去掉 v 前缀（v2.7.4 → 2.7.4）。
           # 与 tag 是两回事——tag 必须纯数字（check_version 只认 tag_name.isdigit()），
-          # 展示版本号只进文件名，不参与任何版本比较，故不受纯数字约束。
+          # 展示版本号只进 Release 标题与文件名，不参与任何版本比较，故不受纯数字约束。
           asset_version=${version_name#v}
-
-          version_name=${version_name:-MDCx}
-          # 读不到 VERSION_NAME 时退回 tag，保证文件名不会缺一段
+          # 读不到 VERSION_NAME 时退回 tag，保证标题与文件名都不会缺一段
           asset_version=${asset_version:-$tag}
+
+          # Release 标题（/releases 列表里显示的那一行）：`MDCx <展示版本号> (<tag>)`，
+          # 例如 `MDCx 2.7.4 (20261021)`。刻意不写成 `v2.7.4 (20261021)`——列表里一排
+          # `vX.Y.Z` 分不清是本项目的包，带产品名才认得出。客户端只读 tag_name，
+          # `parse_release_version()` 又是用正则搜标题里的 `X.Y.Z` 段（带不带前缀都能
+          # 解析出），所以标题改名不影响自动更新。
+          release_name="MDCx ${asset_version} (${tag})"
 
           prerelease=false
           if [ "${{ github.event_name }}" ] = "workflow_dispatch" ] && [ "$DISPATCH_PRERELEASE" = "true" ]; then
@@ -374,7 +384,7 @@ jobs:
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "asset_version=$asset_version" >> "$GITHUB_OUTPUT"
-          echo "name=${version_name} (${tag})" >> "$GITHUB_OUTPUT"
+          echo "name=$release_name" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
       - name: Download build artifacts

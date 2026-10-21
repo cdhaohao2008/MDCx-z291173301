@@ -711,7 +711,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 
 **① 取 tag 最大的 release，不是列表第一条。** `/releases?per_page=10` 按 `created_at` 倒序返回，**不按 tag 倒序**；而本工作流三个 `Create Release` 步骤用同一 tag + `overwrite: true`（`svenstaro/upload-release-action` 先删后建），任何一次补发/重跑都会把那条 release 的 `created_at` 刷成"当前时间"、顶到第一位。原实现取第一条，于是**手动补发一次旧 tag 就让所有用户从此看不到新版本提示且无任何报错**。修法是遍历全部条目收集所有 `tag_name.isdigit()` 的值取 `max`（`tests/test_version_check_pick_latest.py` 守卫）。tag 必须纯数字这条硬约束不变，非纯数字 tag 照旧跳过。
 
-**② 版本号优先，版本号相等才比日期。** 两侧版本号都能解析时：不同 → 由版本号决出（远端更高即有新版本）；相等 → 比日期（远端更新即有新版本）。任一侧解析不出（标题非 `vX.Y.Z` 形态）→ 退回只比日期。两条并列才覆盖得住：只比日期则"当天发两版、两个 tag 同一天"认不出第二版；只比版本号则"同版本号跨日期补发"会漏判。
+**② 版本号优先，版本号相等才比日期。** 两侧版本号都能解析时：不同 → 由版本号决出（远端更高即有新版本）；相等 → 比日期（远端更新即有新版本）。任一侧解析不出（标题里没有 `X.Y.Z` 段）→ 退回只比日期。两条并列才覆盖得住：只比日期则"当天发两版、两个 tag 同一天"认不出第二版；只比版本号则"同版本号跨日期补发"会漏判。
 
 刻意**不做字面 OR**（不让"日期更新"在版本号更低时也触发）：那会提示用户**降级**，且 `LOCAL_VERSION` 常先于线上发布 bump（源码已 20261002 而线上还是 20261001），开发版会对着已发布的历史版本反复提示「请及时更新」。
 
@@ -737,6 +737,8 @@ uv run build --debug
 ```
 
 正式发版只有一条工作流：`.github/workflows/build-py315.yml`（**Build and Release Python3.15**），三平台矩阵（macOS ARM64 / Windows x86_64 / Linux x86_64）全量构建，创建 tag 为纯数字 `LOCAL_VERSION` 的 Release，资产名 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，例如 `MDCx-2.4.7-20261020-windows-x86_64-<40位sha>.exe`。两个版本段刻意并存：`<展示版本号>` 是 `VERSION_NAME` 去 `v` 前缀（`v2.4.7` → `2.4.7`，由工作流的 `steps.metadata.outputs.asset_version` 提供），只给人看、不参与任何版本比较；`<tag>` 仍是纯数字 `LOCAL_VERSION`，`check_version()` 的 `int(tag_name)` 比的就是它——**新增展示版本号段不影响自动更新，因为客户端只读 `tag_name`、不解析资产名**。**客户端自动更新只看这个 Release，tag 形态（纯数字）与资产名都是对外契约，别动它。**
+
+Release 标题（`/releases` 列表里显示的那一行）是 `MDCx <展示版本号> (<tag>)`，例如 `MDCx 2.4.7 (20261020)`——刻意不写成 `v2.4.7 (20261020)`：列表里一排 `vX.Y.Z` 分不清是本项目的包，带产品名才认得出。标题同样只给人看：客户端 `check_version()` 只读 `tag_name`，`parse_release_version()` 又是用正则搜标题里的 `X.Y.Z` 段（带不带 `MDCx ` / `v` 前缀都能解析出），故标题改名不影响自动更新；格式由 `tests/test_py315_release_workflow.py::test_asset_names_and_release_title` 钉住。
 
 2026-10-20 起 macOS Intel 腿退役：macOS 已放弃 x86_64 架构（GitHub 官方 Intel runner 2027 秋整体退役），矩阵里的 `macos-15-intel` / x86_64 那一条连同它在 `Verify all platform assets present` 里的核对项与 `Create Release - macOS (Intel)` 上传步骤一并删除，矩阵由四平台收敛为三平台。**三处必须同删**：只删矩阵项会让产物核对永远缺 `dist/MDCx-x86_64.dmg` 而 exit 1，把**所有**平台的发版一起卡死；只删矩阵项而留着上传步骤则会让 upload 步骤因文件缺失报错，可能留下半成品 Release（`overwrite: true` 重建语义）。`tests/test_py315_release_workflow.py::test_macos_intel_leg_is_gone` 钉死这三条不得复活。
 
