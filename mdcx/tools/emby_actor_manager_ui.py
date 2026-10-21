@@ -333,13 +333,22 @@ def format_detail_cell_text(overview: object) -> str:
 
 # 新列顺序（状态/姓名/头像/简介/出生日期/出生地/详情/标签/影片数）下可编辑的列。
 _EDITABLE_COLUMNS = frozenset((1, 4, 5, 6, 7))
-"""姓名(1)/出生日期(4)/出生地(5)/详情(6)/标签(7)：双击进编辑器改值、
+"""姓名(1)/出生日期(4)/出生地(5)/详情(6)/标签(7)：再次单击进编辑器改值、
 右键弹小菜单（复制内容/编辑内容/查看详情）、Ctrl+C 复制。
-单击只选中不弹编辑器（防误触），三击开演员详情窗。
+单击只选中不弹编辑器（防误触），快速双击开演员详情窗。
 简介(3)是 ✅/❌ 状态图标，保持只读。"""
 
 _EDITABLE_FIELD_NAMES = {1: "姓名", 4: "出生日期", 5: "出生地", 6: "详情", 7: "标签"}
 """可编辑列号 → 字段中文名（日志/提示用）。"""
+
+_GESTURE_SELECT = "select"
+"""左键手势：首次点某格——只选中（浅蓝底），不弹编辑器。"""
+
+_GESTURE_EDIT = "edit"
+"""左键手势：已选中该格又点一次（两次点击间隔超出双击间隔）——进行内编辑。"""
+
+_GESTURE_DETAIL = "detail"
+"""左键手势：快速双击（两次点击间隔在双击间隔内）——弹演员详情窗。"""
 
 _DUPLICATE_CLICK_GAP = 0.01
 """同一次物理按下被重复上报（Press + DblClick）的去重窗口（秒）。
@@ -381,7 +390,7 @@ _CELL_MENU_EDIT = "编辑内容"
 """可编辑格右键小菜单项：把本格变成行内可编辑状态（同左键双击）。"""
 
 _CELL_MENU_DETAIL = "查看详情"
-"""可编辑格右键小菜单项：弹演员详情窗（同左键三击）。"""
+"""可编辑格右键小菜单项：弹演员详情窗（同左键快速双击）。"""
 
 _SPLIT_RE = re.compile(r"[,，、]")
 
@@ -499,16 +508,13 @@ class _InlineEditor(QLineEdit):
 
 
 class _InlineEditDelegate(QStyledItemDelegate):
-    """可编辑列的行内编辑代理：双击进可编辑 QLineEdit，回车/点别处提交。
+    """可编辑列的行内编辑代理：再次单击进可编辑 QLineEdit，回车/点别处提交。
 
     编辑器初值取单元格 UserRole 存的完整值（详情列展示是截断清洗文本、
     标签列展示只取前 2 个，绝不能拿展示文本当编辑初值，否则存盘即丢数据），
     提交走默认 setModelData 写回 model，再由表格 itemChanged 统一换算进
     ActorInfo（new_* + need_update_info），与详情窗口的同步口径一致。
     非可编辑列返回 None（不进编辑器）。
-    编辑器盖住格子后表格收不到后续点击，故给编辑器装过滤器把左键点击
-    （按下/双击）转调出去，供主窗口续上连击计数（三击开详情窗）；
-    转调时带上事件种类 press/dblclick，便于主窗口给同一次物理按下去重。
 
     编辑状态的外观：纯白底 + 黑字 + 四周一圈蓝边（_INLINE_EDITOR_QSS）。
     编辑器打开时 Qt 会自动全选一次文本，那次全选用白色底（选中态隐形，
@@ -516,10 +522,9 @@ class _InlineEditDelegate(QStyledItemDelegate):
     `_open_cell_editor()` 撤销，光标落在文本末尾。
     """
 
-    def __init__(self, parent=None, editor_changed=None, editor_clicked=None):
+    def __init__(self, parent=None, editor_changed=None):
         super().__init__(parent)
         self._editor_changed = editor_changed
-        self._editor_clicked = editor_clicked
 
     def createEditor(self, parent, option, index):  # noqa: N802
         try:
@@ -530,11 +535,6 @@ class _InlineEditDelegate(QStyledItemDelegate):
             # 默认样式下编辑器会继承系统高亮色，一旦全选文本就变成「白字压
             # 深蓝底」，整格看不清（用户 2026-10-21 反馈），故这里钉死底色。
             edit.setStyleSheet(_INLINE_EDITOR_QSS)
-            # 记下格子位置并给编辑器装过滤器：双击开编辑器后编辑器盖住格子，
-            # 表格收不到第三次点击，编辑器上的左键按下必须在这里转调出去。
-            edit.setProperty("cellRow", int(index.row()))
-            edit.setProperty("cellCol", int(index.column()))
-            edit.installEventFilter(self)
             if self._editor_changed is not None:
                 self._editor_changed(edit)
             return edit
@@ -542,28 +542,6 @@ class _InlineEditDelegate(QStyledItemDelegate):
             return None
         except Exception:
             return None
-
-    def eventFilter(self, obj, event):  # noqa: N802
-        try:
-            if (
-                event is not None
-                and event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonDblClick)
-                and event.button() == Qt.MouseButton.LeftButton
-            ):
-                callback = self._editor_clicked
-                if callback is not None:
-                    row = obj.property("cellRow") if obj is not None else None
-                    col = obj.property("cellCol") if obj is not None else None
-                    if row is not None and col is not None:
-                        # 带上事件种类：Press/DblClick 可能是同一次物理按下的
-                        # 两种报法，靠它去重，双击不会被误算成三击。
-                        kind = "dblclick" if event.type() == QEvent.Type.MouseButtonDblClick else "press"
-                        callback(int(row), int(col), kind)
-        except RuntimeError, AttributeError, ValueError, TypeError:
-            pass
-        except Exception:
-            pass
-        return super().eventFilter(obj, event)
 
     def setEditorData(self, editor, index):  # noqa: N802
         try:
@@ -1560,13 +1538,15 @@ class EmbyActorManagerDialog(QDialog):
         # itemChanged 回调直接返回，避免把程序写表误判成用户编辑。
         self._cell_editor = None
         self._in_table_update = False
-        # 左键连击手势状态：单击选中、双击进编辑器、三击开演员详情窗。
-        # 表格自身不区分三击（Qt 连击只合成双击），故自己按「同一格 + 间隔内」
-        # 的左键按下次数累加计数（Press 与 DblClick 都算一次按下）。
-        self._click_count = 0
+        # 左键手势状态：单击选中、再次单击进编辑器、快速双击开演员详情窗。
+        # 「再次单击」与「快速双击」的区分不靠自己的计数，而靠两件事：
+        # ① 点的是不是上一次点过的那一格（同一格才算「再次」）；
+        # ② 两次点击间隔是否在系统双击间隔内（Qt 在这个间隔内会把第二次
+        #    按下报成 MouseButtonDblClick，即「快速双击」）。
         self._click_cell: tuple[int, int] | None = None
         self._click_time = 0.0
         self._click_kind = ""
+        self._click_gesture = _GESTURE_SELECT
         # 双击待开编辑器的格子：按下时先记账，等松手再开编辑器（编辑器盖住
         # 格子后还压在鼠标下面，提前开会让这一次松手落到编辑器上）。
         self._pending_edit_cell: tuple[int, int] | None = None
@@ -1649,7 +1629,7 @@ class EmbyActorManagerDialog(QDialog):
         QGroupBox {{ font-weight: bold; border: 1px solid #cccccc; border-radius: 4px; margin-top: 4px; padding-top: 8px; }}
         QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
         QTableWidget {{ gridline-color: #e0e0e0; selection-background-color: #bbdefb; }}
-        QTableWidget::item:selected {{ background-color: #42a5f5; color: #ffffff; }}
+        QTableWidget::item:selected {{ background-color: #bbdefb; color: #000000; }}
         QPushButton#btnSync {{ background-color: #2e7d32; color: #ffffff; font-weight: bold; }}
         QPushButton#btnSync:hover {{ background-color: #388e3c; }}
         QPushButton#btnDanger {{ background-color: #c62828; color: #ffffff; }}
@@ -1793,17 +1773,17 @@ class EmbyActorManagerDialog(QDialog):
         self.btn_sync.setObjectName("btnSync")
         self.btn_sync.setEnabled(False)
         btn_layout.addWidget(self.btn_sync)
-        # 说明行末的手势摘要只列三种左键手势（单击选中/双击编辑/三击详情），
+        # 说明行末的手势摘要只列三种左键手势（单击选中/再次单击编辑/双击详情），
         # 「右键菜单」放在表格正上方的统计栏提示里（那里不受单行宽度限制），
         # 这样本行文字宽度与改版前一致，1920 宽下仍能排成一行。
-        self._help_single = "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获取数据→④绿色行=待更新→⑤同步，单击选中、双击编辑、三击详情"
+        self._help_single = "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获取数据→④绿色行=待更新→⑤同步，单击选中、再次单击编辑、双击详情"
         # 窄态（还原/常规/最小化）固定两行：在「③选择模式获取数据」处断行，
         # 两行等长，故窄态按钮行省下的就是「单行宽度 - 两行宽度」这一段，
         # 窗口最小宽度可据此下调（见 _narrow_min_width）。宽态仍用单行原文。
         # 断点按用户指定：第一行结尾「③选择模式获」，第二行以「取数据」开头。
         self._help_narrow = (
             "使用说明：①填写地址和密钥→②连接/获取演员列表→③选择模式获\n"
-            "取数据→④绿色行=待更新→⑤同步，单击选中、双击编辑、三击详情"
+            "取数据→④绿色行=待更新→⑤同步，单击选中、再次单击编辑、双击详情"
         )
         help_label = QLabel(self._help_single)
         self.help_label = help_label
@@ -1913,7 +1893,7 @@ class EmbyActorManagerDialog(QDialog):
         self.txt_search.setMaximumWidth(200)
         self.txt_search.textChanged.connect(self._on_filter_changed)
         stats_layout.addWidget(self.txt_search)
-        hint = QLabel("单击选中 · 双击编辑 · 三击详情 · 右键菜单")
+        hint = QLabel("单击选中 · 再次单击编辑 · 双击详情 · 右键菜单")
         # 同上：不钉死字号，跟随统一放大的字号
         hint.setStyleSheet("color: #888888;")
         # 右键小菜单的三项说明挂在提示文字的悬浮提示里：提示行宽度受限，
@@ -1954,14 +1934,14 @@ class EmbyActorManagerDialog(QDialog):
         assert vertical_header is not None
         vertical_header.setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        # 左键手势自己判：单击只选中（不再自动弹编辑器，防误触）、双击才进
-        # 行内编辑器、三击弹演员详情窗（先提交编辑器）。Qt 只合成双击事件，
-        # 三击靠 _on_viewport_mouse_click 自己数左键按下次数。
+        # 左键手势自己判：单击只选中（浅蓝底，不再自动弹编辑器，防误触）、
+        # 再次单击进行内编辑器、快速双击弹演员详情窗（先提交编辑器）。
+        # 「再次单击」与「快速双击」靠 Qt 报的事件种类区分（双击间隔内的第二次
+        # 按下报的是 MouseButtonDblClick），见 _resolve_click_gesture。
         self.table.setItemDelegate(
             _InlineEditDelegate(
                 self.table,
                 self._track_cell_editor,
-                editor_clicked=self._on_editor_clicked,
             )
         )
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -2486,9 +2466,9 @@ class EmbyActorManagerDialog(QDialog):
         只取可编辑列（姓名/出生日期/出生地/详情/标签），
         与编辑器内的子串复制互补（编辑器打开时走其原生复制，不过滤）。
         右键走 _on_table_right_clicked，弹小菜单（复制内容/编辑内容/查看详情）。
-        表格视口的左键按下/双击/松开也在这里接管：数连击次数分派
-        单击选中 / 双击进编辑器 / 三击弹详情窗（Qt 连击的第 2 次起报的是
-        MouseButtonDblClick，所以两种事件都要数）。
+        表格视口的左键按下/双击/松开也在这里接管：判定手势分派
+        单击选中 / 再次单击进编辑器 / 快速双击弹详情窗（Qt 连击的第 2 次起
+        报的是 MouseButtonDblClick，据此区分「快速双击」与「再次单击」）。
         """
         table = getattr(self, "table", None)
         log = getattr(self, "log_text", None)
@@ -4048,15 +4028,15 @@ class EmbyActorManagerDialog(QDialog):
             return None
 
     # ------------------------------------------------------------------
-    # 左键手势：单击选中 / 双击编辑 / 三击详情
+    # 左键手势：单击选中 / 再次单击编辑 / 快速双击详情
     # ------------------------------------------------------------------
 
     def _click_interval(self) -> float:
-        """连击判定窗口（秒）：取系统双击间隔，下限 200ms。
+        """双击判定窗口（秒）：取系统双击间隔，下限 200ms。
 
-        连续点击按「同一格 + 间隔内」累加：1=单击（只选中）、2=双击（进编辑器）、
-        3 及以上=三击（弹演员详情窗）。用系统双击间隔做窗口，用户拖系统设置
-        改双击速度时手势窗口跟着变。
+        「快速双击」与「再次单击」的分界就用它：两次点击间隔在这个窗口内
+        算双击（弹演员详情窗），超出则算再次单击（进行内编辑）。用系统双击
+        间隔做窗口，用户拖系统设置改双击速度时手势窗口跟着变。
         """
         ms = 400
         try:
@@ -4069,13 +4049,18 @@ class EmbyActorManagerDialog(QDialog):
             ms = 200
         return ms / 1000.0
 
-    def _register_table_click(self, row: int, col: int, kind: str = "press") -> int:
-        """登记一次左键按下，返回连续点击次数（1=单击、2=双击、3+=三击）。
+    def _resolve_click_gesture(self, row: int, col: int, kind: str = "press") -> str:
+        """判定这一次左键按下属于哪种手势（选中 / 再次单击编辑 / 快速双击详情）。
 
-        同一格、且距上次按下不超过连击窗口才算续击，否则重新从 1 起算
-        （点别处再回来点不算连击）。kind 区分事件种类：同一次物理按下
-        可能既报 MouseButtonPress 又报 MouseButtonDblClick（间隔近乎 0），
-        这种重复上报不重复计数，否则双击会被误判成三击。
+        - 点的不是上一次点过的那一格 → 「单击」：只选中，不弹编辑器；
+        - 点的是同一格（该格已处于选中态）、且距上次点击已超出双击间隔
+          → 「再次单击」：可编辑列进行内编辑，只读列不做任何事；
+        - 点的是同一格、且距上次点击还在双击间隔内（Qt 在这个间隔内会把
+          第二次按下报成 MouseButtonDblClick）→ 「快速双击」：弹演员详情窗。
+
+        kind 区分事件种类（press/dblclick）：同一次物理按下可能被既报
+        MouseButtonPress 又报 MouseButtonDblClick（间隔近乎 0），这种重复
+        上报不重复分派，否则一次按下会被当成「单击 + 双击」两个手势。
         """
         try:
             now = time.monotonic()
@@ -4083,43 +4068,48 @@ class EmbyActorManagerDialog(QDialog):
             last_cell = getattr(self, "_click_cell", None)
             last_time = float(getattr(self, "_click_time", 0.0))
             last_kind = getattr(self, "_click_kind", "")
-            same = last_cell == cell
-            if same and kind != last_kind and (now - last_time) <= _DUPLICATE_CLICK_GAP:
-                # 同一次物理按下的重复上报：计数不变，只当一次点击
-                return int(getattr(self, "_click_count", 1))
-            count = (
-                int(getattr(self, "_click_count", 0)) + 1 if same and (now - last_time) <= self._click_interval() else 1
-            )
+            if last_cell == cell and kind != last_kind and (now - last_time) <= _DUPLICATE_CLICK_GAP:
+                # 同一次物理按下的重复上报：沿用上一次的判定，不重复分派
+                return str(getattr(self, "_click_gesture", _GESTURE_SELECT))
+            again = last_cell == cell
+            fast = kind == "dblclick" or (now - last_time) <= self._click_interval()
+            if again and fast:
+                gesture = _GESTURE_DETAIL
+            elif again:
+                gesture = _GESTURE_EDIT
+            else:
+                gesture = _GESTURE_SELECT
             self._click_cell = cell
             self._click_time = now
             self._click_kind = kind
-            self._click_count = count
-            return count
+            self._click_gesture = gesture
+            return gesture
         except RuntimeError, AttributeError, TypeError, ValueError:
-            return 1
+            return _GESTURE_SELECT
         except Exception:
-            return 1
+            return _GESTURE_SELECT
 
     def _reset_click_tracking(self) -> None:
-        """清空连击计数：点到空处、或已分派出手势后重置，避免下次误续击。"""
+        """清空手势记账：点到空处时重置，避免下次误当成「再次单击」。"""
         try:
-            self._click_count = 0
             self._click_cell = None
             self._click_time = 0.0
             self._click_kind = ""
+            self._click_gesture = _GESTURE_SELECT
         except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
 
     def _on_viewport_mouse_click(self, pos, kind: str = "press") -> None:
-        """表格视口左键按下/双击：数连击次数，按 1/2/3 分派选中/编辑/详情。
+        """表格视口左键按下：按「选中 / 再次单击编辑 / 快速双击详情」分派。
 
-        - 1 次：只选中，不动编辑器（单击进编辑器太容易误触）；
-        - 2 次：可编辑列进行内编辑器（等松手再开），其余列直接弹详情窗；
-        - 3 次：弹演员详情窗（先提交行内编辑器，值不丢）。
+        - 首次点某格：只选中（浅蓝底），不动编辑器（单击进编辑器太容易误触）；
+        - 已选中该格又点一次：可编辑列进行内编辑（等松手再开）；
+        - 快速双击：弹演员详情窗（先提交行内编辑器，值不丢）。
 
-        kind 区分事件来源（press/dblclick），只用于同一次物理按下去重。
+        kind 区分事件来源（press/dblclick），只用于同一次物理按下去重与
+        「快速双击」的判定。
         """
         try:
             table = self.table
@@ -4129,23 +4119,23 @@ class EmbyActorManagerDialog(QDialog):
                 return
             row = int(index.row())
             col = int(index.column())
-            count = self._register_table_click(row, col, kind)
-            if count >= 3:
-                # 三击：弹详情窗。延到下一轮事件循环再开，避免在鼠标按下的
+            gesture = self._resolve_click_gesture(row, col, kind)
+            if gesture == _GESTURE_DETAIL:
+                # 快速双击：弹详情窗。延到下一轮事件循环再开，避免在鼠标按下的
                 # 处理途中销毁行内编辑器（编辑器可能正被鼠标抓着）。
-                self._reset_click_tracking()
+                self._pending_edit_cell = None
                 QTimer.singleShot(0, lambda r=row: self._open_actor_detail(r))
                 return
-            if count == 2:
+            if gesture == _GESTURE_EDIT:
                 if col in _EDITABLE_COLUMNS:
-                    # 双击进编辑器：按下时先记账，等松手再开（编辑器会盖住格子，
-                    # 提前开会让这一次松手落到编辑器上、被当成编辑器被点）。
+                    # 再次单击进编辑器：按下时先记账，等松手再开（编辑器会盖住
+                    # 格子，提前开会让这一次松手落到编辑器上、被当成在编辑器里点）。
                     self._pending_edit_cell = (row, col)
                 else:
-                    # 不可编辑列没有编辑器可进，双击直接当详情窗快捷方式。
+                    # 只读列没有编辑器可进，再次单击不做任何事（详情窗留给快速双击）。
                     self._pending_edit_cell = None
-                    QTimer.singleShot(0, lambda r=row: self._open_actor_detail(r))
                 return
+            # 首次点击：只选中，不动编辑器
             self._pending_edit_cell = None
         except RuntimeError, AttributeError, TypeError, ValueError:
             pass
@@ -4153,7 +4143,7 @@ class EmbyActorManagerDialog(QDialog):
             pass
 
     def _on_viewport_mouse_release(self) -> None:
-        """表格视口左键松开：双击（可编辑列）在此时才开行内编辑器。"""
+        """表格视口左键松开：再次单击（可编辑列）在此时才开行内编辑器。"""
         try:
             cell = getattr(self, "_pending_edit_cell", None)
             self._pending_edit_cell = None
@@ -4166,24 +4156,8 @@ class EmbyActorManagerDialog(QDialog):
         except Exception:
             pass
 
-    def _on_editor_clicked(self, row: int, col: int, kind: str = "press") -> None:
-        """行内编辑器上的左键按下：续上连击计数，三击弹演员详情窗。
-
-        双击已把编辑器打开、编辑器盖住格子，第三次点击落在编辑器上、表格
-        收不到，故由行内编辑代理把按下事件转调这里，计数才接得上。
-        """
-        try:
-            count = self._register_table_click(int(row), int(col), kind)
-            if count >= 3:
-                self._reset_click_tracking()
-                QTimer.singleShot(0, lambda r=int(row): self._open_actor_detail(r))
-        except RuntimeError, AttributeError, TypeError, ValueError:
-            pass
-        except Exception:
-            pass
-
     def _open_cell_editor(self, row: int, col: int) -> None:
-        """双击可编辑列：打开行内编辑器（初值取 UserRole 存的完整值）。
+        """再次单击可编辑列：打开行内编辑器（初值取 UserRole 存的完整值）。
 
         表格打开编辑器时会替编辑器自动全选一次文本（Qt 的 openEditor 在
         SelectedClicked / DoubleClicked / EditKeyPressed / AnyKeyPressed 下
@@ -4211,7 +4185,7 @@ class EmbyActorManagerDialog(QDialog):
 
         - 复制内容：把本格内容直接写剪贴板（取 UserRole 里的完整值）；
         - 编辑内容：与左键双击一致，直接把本格变成行内可编辑状态；
-        - 查看详情：与左键三击一致，弹演员详情窗。
+        - 查看详情：与左键快速双击一致，弹演员详情窗。
 
         不可编辑列（状态/头像/简介/影片数）右键不弹菜单。
         """
@@ -4507,8 +4481,8 @@ class EmbyActorManagerDialog(QDialog):
             if actor.movie_titles:
                 mc_item.setToolTip("\n".join(actor.movie_titles[:20]))
             self.table.setItem(row, 8, mc_item)
-            # 可编辑列（姓名/出生日期/出生地/详情/标签）保留 Editable，双击进编辑器改值；
-            # 其余列去掉 Editable，只选中不进编辑器，双击/三击走详情对话框。
+            # 可编辑列（姓名/出生日期/出生地/详情/标签）保留 Editable，再次单击进编辑器改值；
+            # 其余列去掉 Editable，只选中不进编辑器，快速双击走详情对话框。
             for col in range(self.table.columnCount()):
                 _it = self.table.item(row, col)
                 if _it is None:

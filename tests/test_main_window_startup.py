@@ -252,20 +252,32 @@ def test_emby_actor_manager_columns_fit_after_vertical_scrollbar(app):
         app.processEvents()
 
 
-def _click_cell(dlg, row: int, col: int, times: int = 1):
+def _click_cell(dlg, row: int, col: int, times: int = 1, kinds=None):
     """在 (row, col) 格上模拟 times 次左键点击（每次按下+松开）。
 
-    Qt 连击的第 2 次按下报的是 MouseButtonDblClick（不是 MouseButtonPress），
-    这里按真实行为给事件种类；两次点击之间留 30ms 间隔，别被「同一次物理
-    按下的重复上报」去重窗口吃掉。
+    kinds 缺省按 Qt 真实行为给：第 1 次报 press，第 2 次起报 dblclick
+    （Qt 连击的第 2 次按下不再报 MouseButtonPress）。两次点击之间留 30ms
+    间隔，别被「同一次物理按下的重复上报」去重窗口吃掉。
     """
     table = dlg.table
     pos = table.visualItemRect(table.item(row, col)).center()
     for i in range(times):
-        kind = "press" if i == 0 else "dblclick"
+        if kinds is not None:
+            kind = kinds[i] if i < len(kinds) else "press"
+        else:
+            kind = "press" if i == 0 else "dblclick"
         dlg._on_viewport_mouse_click(pos, kind)
         dlg._on_viewport_mouse_release()
         time.sleep(0.03)
+
+
+def _click_cell_again(dlg, row: int, col: int):
+    """在已选中的格上「再次单击」（两次点击间隔超出双击间隔 → 走行内编辑）。"""
+    table = dlg.table
+    pos = table.visualItemRect(table.item(row, col)).center()
+    time.sleep(dlg._click_interval() + 0.05)  # 超出双击间隔：不算快速双击
+    dlg._on_viewport_mouse_click(pos, "press")
+    dlg._on_viewport_mouse_release()
 
 
 def _patch_cell_menu(monkeypatch, action_text: str | None = None) -> list:
@@ -290,9 +302,9 @@ def _patch_cell_menu(monkeypatch, action_text: str | None = None) -> list:
 
 
 def test_emby_actor_manager_inline_edit_and_copy(app, monkeypatch):
-    """新行为：单击可编辑列只选中（不再误弹编辑器），双击才进行内编辑
+    """新行为：单击可编辑列只选中（不再误弹编辑器），再次单击进行内编辑
     （回车/点别处提交即本地缓存+绿底🔄，仅改过行参与同步），
-    三击弹演员详情窗（先提交编辑器），右键弹小菜单（复制内容/编辑内容/查看详情），
+    快速双击弹演员详情窗，右键弹小菜单（复制内容/编辑内容/查看详情），
     Ctrl+C 复制可编辑列文本。简介列（状态图标）只读不可编辑。"""
     import math
 
@@ -334,8 +346,8 @@ def test_emby_actor_manager_inline_edit_and_copy(app, monkeypatch):
         dlg._reset_click_tracking()
         _click_cell(dlg, 0, 1, times=1)
         assert dlg._cell_editor is None, "单击不该弹出行内编辑器"
-        # 双击可编辑列：才进行内编辑，改名后提交：本地缓存 + 绿底 🔄 + 只该行待同步。
-        _click_cell(dlg, 0, 1, times=1)  # 第二次按下即双击
+        # 再次单击（间隔超出双击间隔）：进行内编辑，改名后提交：本地缓存 + 绿底 🔄 + 只该行待同步。
+        _click_cell_again(dlg, 0, 1)
         assert dlg._cell_editor is not None
         editor = dlg._cell_editor
         editor.setText("改名演员")
@@ -352,13 +364,12 @@ def test_emby_actor_manager_inline_edit_and_copy(app, monkeypatch):
         _patch_cell_menu(monkeypatch, "复制内容")
         dlg._on_table_right_clicked(table.visualItemRect(table.item(0, 1)).center())
         assert QGuiApplication.clipboard().text() == "改名演员"
-        # 三击可编辑列：提交编辑器后仍弹详情窗。
+        # 快速双击可编辑列：弹详情窗（不会同时开行内编辑器）。
         dlg._reset_click_tracking()
-        _click_cell(dlg, 0, 4, times=2)  # 双击进行内编辑器
-        assert dlg._cell_editor is not None
-        dlg._on_editor_clicked(0, 4)  # 第三次按下落在编辑器上
+        _click_cell(dlg, 0, 4, times=2)
         app.processEvents()
         assert set(dlg._detail_dialogs) == {"e1"}
+        assert dlg._cell_editor is None, "快速双击不该同时开行内编辑器"
         # 整格 Ctrl+C：只复制可编辑列。
         dlg._populate_table([actor])
         table.clearSelection()
@@ -373,30 +384,23 @@ def test_emby_actor_manager_inline_edit_and_copy(app, monkeypatch):
         app.processEvents()
 
 
-def test_emby_actor_manager_triple_click_opens_detail(app):
-    """三击开详情窗：双击已把编辑器打开、编辑器盖住格子，第三次点击落在
-    QLineEdit 上、表格收不到，必须靠编辑器上的 eventFilter 把左键按下
-    转调出去续上连击计数，再提交编辑器并弹详情窗。"""
+def test_emby_actor_manager_fast_double_click_opens_detail(app):
+    """快速双击开详情窗：第一次按下只选中，第二次按下（Qt 报 dblclick）
+    直接弹演员详情窗，且不会同时开行内编辑器。"""
     from mdcx.tools.emby_actor_manager import ActorInfo
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     dlg = EmbyActorManagerDialog()
     try:
-        actor = ActorInfo(name="三击演员", actor_id="e9", server_id="s")
+        actor = ActorInfo(name="双击演员", actor_id="e9", server_id="s")
         dlg._actors = [actor]
         dlg._populate_table([actor])
-        # 双击进行内编辑器（此时第三次点击只会落到编辑器上，不会到表格）。
+        # 快速双击：第 1 下 press（只选中），第 2 下 dblclick（弹详情窗）。
         dlg._reset_click_tracking()
         _click_cell(dlg, 0, 1, times=2)
-        editor = dlg._cell_editor
-        assert editor is not None
-        editor.setText("三击改名")
-        # 第三次左键按下落在编辑器上：代理转调，连击计数续到 3。
-        dlg._on_editor_clicked(0, 1)
         app.processEvents()
-        # 编辑器先提交（改名进本地缓存），再弹出该演员的详情窗。
-        assert actor.name == "三击改名"
         assert set(dlg._detail_dialogs) == {"e9"}
+        assert dlg._cell_editor is None, "快速双击不该同时开行内编辑器"
         for d in list(dlg._detail_dialogs.values()):
             d.close()
     finally:

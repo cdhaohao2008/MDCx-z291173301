@@ -1,20 +1,27 @@
-"""演员管理器主窗口左键手势回归：单击选中 / 双击编辑 / 三击详情。
+"""演员管理器主窗口左键手势回归：单击选中 / 再次单击编辑 / 快速双击详情。
 
-背景：此前可编辑列（姓名/出生日期/出生地/详情/标签）单击即弹行内编辑器，
+背景：可编辑列（姓名/出生日期/出生地/详情/标签）此前单击即弹行内编辑器，
 误触一次就进入编辑态，用户反馈"太容易误操作"。改成单击只选中后，
-"双击编辑"与"双击打开详情窗"又撞在一起，故约定三击开详情窗。
+"双击编辑"与"双击打开详情窗"又撞在一起，故约定三段式手势。
 
-Qt 自己不区分三击：连击的第 2 次按下报的是 MouseButtonDblClick（不是
-MouseButtonPress），故连击次数由管理器自己数（press/dblclick 都算一次），
-本测试直接驱动管理器内部的连击计数与手势分派函数，验证：
+用户 2026-10-21 再次调整手势：
+- 单击某格 → 只选中（浅蓝底）；
+- 已选中该格、再点一次（两次点击间隔超出双击间隔）→ 进行内编辑；
+- 快速双击（两次点击间隔在双击间隔内，Qt 把第二次按下报成
+  MouseButtonDblClick）→ 弹演员详情窗。
+
+"再次单击"与"快速双击"的区分不靠自己的连击计数，而靠两件事：
+① 点的是不是上一次点过的那一格；② 两次点击的间隔是否在系统双击间隔内。
+
+本测试直接驱动管理器内部的手势判定与分派函数，验证：
 
 - 单击可编辑列只选中，不弹编辑器；
-- 双击可编辑列才进行内编辑，编辑器初值取 UserRole 里的完整值；
-- 三击可编辑列提交编辑器后弹演员详情窗（第三次点击落在盖住格子的编辑器上，
-  靠行内编辑代理把左键按下转调出去续上连击计数）；
-- 不可编辑列双击直接弹详情窗（那里没有编辑器，不存在冲突）；
-- 连击计数按「同一格 + 间隔内」累加，换格即重新计数；
-- 同一次物理按下被重复上报（press + dblclick）只算一次点击。
+- 再次单击可编辑列进行内编辑，编辑器初值取 UserRole 里的完整值；
+- 快速双击可编辑列弹演员详情窗（且不会同时开编辑器）；
+- 不可编辑列快速双击也弹详情窗，再次单击则什么都不做；
+- 换格即重新开始（不会把两格连成一次手势）；
+- 同一次物理按下被重复上报（press + dblclick）只算一次点击；
+- 编辑器里点击不再弹详情窗（详情窗由快速双击在进编辑器之前就分派完了）。
 """
 
 from __future__ import annotations
@@ -68,21 +75,28 @@ def _cell_pos(dlg, row: int, col: int):
     return table.visualItemRect(item).center()
 
 
-def _click(dlg, row: int, col: int, times: int = 1, kinds=None):
-    """模拟在 (row, col) 上连点 times 次左键（每次按下+松开）。
+def _click(dlg, row: int, col: int, kind: str = "press", wait: float = 0.0):
+    """在 (row, col) 上按一次左键（按下+松开）。
 
-    kinds 缺省按 Qt 真实行为给：第 1 次报 press，第 2 次起报 dblclick
-    （Qt 连击的第 2 次按下不再报 MouseButtonPress）。两次点击之间留
-    30ms 间隔，别被「同一次物理按下的重复上报」去重窗口吃掉。
+    kind 缺省 "press"（普通单击）；快速双击的第二下传 "dblclick"（Qt 在双击
+    间隔内就是这么报的）。wait 是本次点击**之前**先等待的秒数，用来控制与
+    上一次点击的间隔（决定算「再次单击」还是「快速双击」）。
     """
+    if wait:
+        time.sleep(wait)
     pos = _cell_pos(dlg, row, col)
-    if kinds is None:
-        kinds = ["press"] + ["dblclick"] * (times - 1)
-    for i in range(times):
-        kind = kinds[i] if i < len(kinds) else "press"
-        dlg._on_viewport_mouse_click(pos, kind)
-        dlg._on_viewport_mouse_release()
-        time.sleep(0.03)
+    dlg._on_viewport_mouse_click(pos, kind)
+    dlg._on_viewport_mouse_release()
+
+
+def _slow_gap(dlg) -> float:
+    """「再次单击」的间隔：超过系统双击间隔（这种第二次点击走行内编辑）。"""
+    return dlg._click_interval() + 0.05
+
+
+def _fast_gap() -> float:
+    """「快速双击」的间隔：在双击间隔内、但大于重复上报去重窗口（10ms）。"""
+    return 0.05
 
 
 def test_single_click_only_selects_no_editor(app):
@@ -91,25 +105,26 @@ def test_single_click_only_selects_no_editor(app):
     try:
         _click(dlg, 0, 1)
         assert dlg._cell_editor is None, "单击不该弹出行内编辑器"
-        # 选中由表格自身处理，这里只确认没有编辑器被打开。
-        assert dlg._click_count == 1
+        assert dlg._click_gesture == "select", "首次点击应是「选中」手势"
     finally:
         dlg.close()
         dlg.deleteLater()
         app.processEvents()
 
 
-def test_double_click_opens_inline_editor(app):
-    """双击可编辑列进行内编辑，编辑器初值取 UserRole 里的完整值。"""
+def test_second_click_opens_inline_editor(app):
+    """已选中的格子再次单击：进行内编辑，初值取 UserRole 里的完整值。"""
     long_tags = ["标签一", "标签二", "标签三"]
     dlg = _manager([_make_actor(existing_taglines=long_tags)])
     try:
         table = dlg.table
         # 展示只取前 2 个标签，完整值在 UserRole 里。
         assert table.item(0, 7).text() == "标签一, 标签二"
-        _click(dlg, 0, 7, times=2)
+        _click(dlg, 0, 7)  # 第一次：只选中
+        assert dlg._cell_editor is None
+        _click(dlg, 0, 7, wait=_slow_gap(dlg))  # 第二次（慢）：进行内编辑
         editor = dlg._cell_editor
-        assert editor is not None, "双击应打开行内编辑器"
+        assert editor is not None, "再次单击应打开行内编辑器"
         assert editor.text() == "标签一, 标签二, 标签三", "编辑器初值应是完整标签，不是展示文本"
     finally:
         dlg.close()
@@ -117,20 +132,16 @@ def test_double_click_opens_inline_editor(app):
         app.processEvents()
 
 
-def test_triple_click_opens_detail_window(app):
-    """三击可编辑列：提交编辑器后弹演员详情窗。"""
-    actor = _make_actor(name="三击演员", actor_id="e9")
+def test_fast_double_click_opens_detail_window(app):
+    """快速双击可编辑列：弹演员详情窗，且不会同时开行内编辑器。"""
+    actor = _make_actor(name="双击演员", actor_id="e9")
     dlg = _manager([actor])
     try:
-        _click(dlg, 0, 1, times=2)  # 双击进行内编辑器
-        editor = dlg._cell_editor
-        assert editor is not None
-        editor.setText("三击改名")
-        # 第三次点击落在盖住格子的编辑器上，表格收不到，由代理转调。
-        dlg._on_editor_clicked(0, 1)
+        _click(dlg, 0, 1)  # 第一下：只选中
+        _click(dlg, 0, 1, kind="dblclick", wait=_fast_gap())  # 第二下：快速双击
         app.processEvents()
-        assert actor.name == "三击改名", "弹详情窗前应先提交行内编辑器"
-        assert set(dlg._detail_dialogs) == {"e9"}
+        assert set(dlg._detail_dialogs) == {"e9"}, "快速双击应弹演员详情窗"
+        assert dlg._cell_editor is None, "快速双击不该同时开行内编辑器"
         for d in list(dlg._detail_dialogs.values()):
             d.close()
     finally:
@@ -139,28 +150,13 @@ def test_triple_click_opens_detail_window(app):
         app.processEvents()
 
 
-def test_triple_click_on_viewport_opens_detail_window(app):
-    """编辑器没盖住点击点时，三击也走表格视口路径弹详情窗。"""
-    actor = _make_actor(name="视口三击", actor_id="e10")
-    dlg = _manager([actor])
-    try:
-        _click(dlg, 0, 1, times=3)
-        app.processEvents()
-        assert set(dlg._detail_dialogs) == {"e10"}
-        for d in list(dlg._detail_dialogs.values()):
-            d.close()
-    finally:
-        dlg.close()
-        dlg.deleteLater()
-        app.processEvents()
-
-
-def test_double_click_non_editable_column_opens_detail(app):
-    """不可编辑列（状态/头像/简介/影片数）双击直接弹详情窗：那里没有编辑器，不冲突。"""
+def test_fast_double_click_on_readonly_column_opens_detail(app):
+    """不可编辑列（状态/头像/简介/影片数）快速双击也弹详情窗。"""
     actor = _make_actor(name="只读列", actor_id="e11")
     dlg = _manager([actor])
     try:
-        _click(dlg, 0, 0, times=2)
+        _click(dlg, 0, 0)
+        _click(dlg, 0, 0, kind="dblclick", wait=_fast_gap())
         app.processEvents()
         assert set(dlg._detail_dialogs) == {"e11"}
         for d in list(dlg._detail_dialogs.values()):
@@ -171,42 +167,32 @@ def test_double_click_non_editable_column_opens_detail(app):
         app.processEvents()
 
 
-def test_click_count_resets_when_cell_changes(app):
-    """连击按「同一格 + 间隔内」累加：换格即重新计数，不会把两格连成三击。"""
-    actor = _make_actor(name="换格", actor_id="e12")
+def test_second_click_on_readonly_column_does_nothing(app):
+    """只读列没有编辑器可进：再次单击（慢）什么都不做，详情窗留给快速双击。"""
+    actor = _make_actor(name="只读列2", actor_id="e13")
     dlg = _manager([actor])
     try:
-        _click(dlg, 0, 1)  # 第一格第 1 次
-        _click(dlg, 0, 4)  # 换格 → 重新从 1 起算
-        assert dlg._click_count == 1
-        assert dlg._cell_editor is None
-        _click(dlg, 0, 4)  # 第二格第 2 次 → 双击进行内编辑器
-        assert dlg._cell_editor is not None
+        _click(dlg, 0, 0)
+        _click(dlg, 0, 0, wait=_slow_gap(dlg))
+        app.processEvents()
+        assert dlg._cell_editor is None, "只读列不该有行内编辑器"
+        assert dlg._detail_dialogs == {}, "只读列的再次单击不该弹详情窗"
     finally:
         dlg.close()
         dlg.deleteLater()
         app.processEvents()
 
 
-def test_delegate_forwards_editor_click_to_manager(app):
-    """行内编辑代理把编辑器上的左键按下/双击转调给管理器（行/列/种类）。
-
-    第三次点击落在盖住格子的编辑器上，表格收不到，得靠代理把事件转调
-    出去续上连击计数；种类 press/dblclick 一起带上，主窗口才能给
-    「同一次物理按下的重复上报」去重。
-    """
-    from mdcx.tools.emby_actor_manager_ui import _InlineEditDelegate
-
-    seen: list[tuple[int, int, str]] = []
-    delegate = _InlineEditDelegate(None, None, editor_clicked=lambda r, c, k: seen.append((r, c, k)))
+def test_click_on_another_cell_starts_over(app):
+    """换格即重新开始：不会把两格连成一次「再次单击」。"""
     dlg = _manager([_make_actor()])
     try:
-        _click(dlg, 0, 4, times=2)
-        editor = dlg._cell_editor
-        assert editor is not None
-        delegate.eventFilter(editor, _left_press_event())
-        delegate.eventFilter(editor, _left_dblclick_event())
-        assert seen == [(0, 4, "press"), (0, 4, "dblclick")]
+        _click(dlg, 0, 1)  # 第一格第 1 次：只选中
+        _click(dlg, 0, 4)  # 换格 → 又是一次「选中」
+        assert dlg._cell_editor is None
+        assert dlg._click_gesture == "select"
+        _click(dlg, 0, 4, wait=_slow_gap(dlg))  # 第二格第 2 次 → 行内编辑器
+        assert dlg._cell_editor is not None
     finally:
         dlg.close()
         dlg.deleteLater()
@@ -216,7 +202,7 @@ def test_delegate_forwards_editor_click_to_manager(app):
 def test_same_physical_press_reported_twice_counts_once(app):
     """同一次物理按下既报 press 又报 dblclick 时只算一次点击。
 
-    否则双击会被误算成三击：双击就弹详情窗、编辑器都进不去。
+    否则一次按下会被当成「单击 + 快速双击」两个手势：既弹详情窗又进编辑器。
     """
     dlg = _manager([_make_actor()])
     try:
@@ -224,35 +210,55 @@ def test_same_physical_press_reported_twice_counts_once(app):
         dlg._on_viewport_mouse_click(pos, "press")
         dlg._on_viewport_mouse_click(pos, "dblclick")  # 同一物理按下的重复上报
         dlg._on_viewport_mouse_release()
-        assert dlg._click_count == 1, "重复上报不该累加连击次数"
+        app.processEvents()
+        assert dlg._click_gesture == "select", "重复上报不该被当成快速双击"
         assert dlg._cell_editor is None, "只算一次点击就不该弹编辑器"
+        assert dlg._detail_dialogs == {}, "只算一次点击就不该弹详情窗"
     finally:
         dlg.close()
         dlg.deleteLater()
         app.processEvents()
 
 
-def _left_press_event():
+def test_selected_cell_uses_light_blue_background(app):
+    """选中的格子用浅蓝底 + 黑字（不再是深蓝底 #42a5f5 配白字，看不清）。"""
+    dlg = _manager([_make_actor()])
+    try:
+        style = dlg.styleSheet()
+        assert "QTableWidget::item:selected { background-color: #bbdefb; color: #000000; }" in style, (
+            "选中态应为浅蓝底 + 黑字"
+        )
+        assert "#42a5f5" not in style, "选中态不应再用深蓝底"
+    finally:
+        dlg.close()
+        dlg.deleteLater()
+        app.processEvents()
+
+
+def test_click_inside_editor_does_not_open_detail(app):
+    """编辑器里点击只挪光标，不弹详情窗（详情窗由快速双击在进编辑器前分派）。"""
     from PyQt6.QtCore import QEvent, QPointF, Qt
     from PyQt6.QtGui import QMouseEvent
+    from PyQt6.QtWidgets import QApplication
 
-    return QMouseEvent(
-        QEvent.Type.MouseButtonPress,
-        QPointF(5.0, 5.0),
-        Qt.MouseButton.LeftButton,
-        Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
-
-
-def _left_dblclick_event():
-    from PyQt6.QtCore import QEvent, QPointF, Qt
-    from PyQt6.QtGui import QMouseEvent
-
-    return QMouseEvent(
-        QEvent.Type.MouseButtonDblClick,
-        QPointF(5.0, 5.0),
-        Qt.MouseButton.LeftButton,
-        Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
+    actor = _make_actor(name="编辑中", actor_id="e14")
+    dlg = _manager([actor])
+    try:
+        _click(dlg, 0, 1)
+        _click(dlg, 0, 1, wait=_slow_gap(dlg))  # 再次单击 → 进编辑器
+        editor = dlg._cell_editor
+        assert editor is not None
+        press = QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            QPointF(3.0, 3.0),
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        QApplication.sendEvent(editor, press)  # 编辑器里点一下（挪光标）
+        app.processEvents()
+        assert dlg._detail_dialogs == {}, "编辑器里点击不该弹详情窗"
+    finally:
+        dlg.close()
+        dlg.deleteLater()
+        app.processEvents()
