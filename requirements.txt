@@ -1,19 +1,20 @@
 # 从 pyproject.toml [project].dependencies 提取，适用于 pip install -r requirements.txt
-# requires-python >=3.14
+# requires-python >=3.13.4（Python 3.13 / 3.14 / 3.15 均已实测可安装）
+# 版本下限已抬到「首个提供 Python 3.15（cp315 / abi3）可用 wheel」的版本。
 aiofiles>=25.1.0
-aiohttp>=3.14.3
+aiohttp>=3.14.4
 aiolimiter>=1.2.1
-av>=15.1.0
+av>=17.0.0
 beautifulsoup4>=4.13.4
 curl-cffi>=0.15.0
 httpx[socks]>=0.28.1
 httpx2>=2.15.1
 httpcore>=1.0.9
-lxml>=6.1.0
+lxml>=6.1.2
 openai>=1.91.0
 oshash>=0.1.1
 parsel>=1.10.0
-pillow>=12.2.0
+pillow>=12.3.0
 pydantic-settings>=2.14.2
 pyqt6>=6.11.0
 tenacity>=9.0.0
@@ -27,9 +28,9 @@ uvicorn>=0.15.0
 # 先安装主依赖，再安装开发依赖
 altgraph>=0.17.5
 ipykernel>=6.30.1
-numpy>=2.4.3
+numpy>=2.5.2
 pre-commit>=4.2.0
-pyinstaller>=6.16.0
+pyinstaller>=6.21.0
 pyright>=1.1.400
 pytest>=9.0.3
 tornado>=6.5.8
