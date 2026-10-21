@@ -1,15 +1,19 @@
-"""Python 3.14 依赖下限守卫（配合 `.github/workflows/build-py314.yml`）。
+"""Python 3.14/3.15 依赖下限守卫（配合 `.github/workflows/build-py314.yml`）。
 
 背景：3.14 流水线靠 `python-version: 3.14` + `uv sync --locked` 验证兼容性，
-其中三处依赖下限是被 3.14 核对抬上来的，回退会让该流水线硬失败：
+其中几处依赖下限是被 3.14/3.15 核对抬上来的，回退会让该流水线硬失败：
 
 - `pyinstaller`：`6.14.2` 的元数据是 `requires-python = ">=3.8,<3.14"`，3.14 上装不上；
+  `6.16.0~6.20.0` 声明 `<3.15`，3.15 上装不上；`6.21.0` 起才放宽到 `<3.16`；
 - `av`：`15.0.0` 只有 cp39~cp313 的 wheel，3.14 上会退回源码编译（需 FFmpeg 开发库）；
-- `aiofiles`：`25.1.0` 起上游才测试并支持 3.14（`24.1.0` 早于 3.14）。
+  `17.0.0` 起改发 abi3 wheel（`19.0.2` 为 cp312-abi3），3.15 通用；
+- `aiofiles`：`25.1.0` 起上游才测试并支持 3.14（`24.1.0` 早于 3.14）；
+- `aiohttp`/`lxml`/`pillow`/`numpy`：从 `3.14.4`/`6.1.2`/`12.3.0`/`2.5.2` 起才发 cp315
+  wheel，更早的版本在 3.15 上只能源码编译（需 MSVC 等编译工具链）。
 
 同时校验 `pyproject.toml` 与 `uv.lock` 的依赖声明不脱节：`uv sync --locked` 在
 CI 里强校验 lock 是否与 manifest 一致，改依赖后忘了 `uv lock` 会直接 exit 1。
-其余依赖（`pyqt6` cp310-abi3、`opencv-contrib-python-headless` cp37-abi3、
+其余依赖（`pyqt6` cp39-abi3、`opencv-contrib-python-headless` cp37-abi3、
 `curl-cffi` cp310-abi3、`oshash`/`zhconv` 纯 Python 等）无需设下限，见
 `docs/Development.md`「构建」段。
 """
@@ -20,17 +24,25 @@ from pathlib import Path
 
 _ROOT = Path(__file__).parent.parent
 
-# 包名 -> 必须保持的版本声明（回退即视为 3.14 不兼容）
+# 包名 -> 必须保持的版本声明（回退即视为 3.14/3.15 不兼容）
 _REQUIRED_SPECIFIERS = {
-    "aiofiles": "==25.1.0",
-    "av": ">=15.1.0",
-    "pyinstaller": ">=6.16.0,<7",
+    "aiofiles": ">=25.1.0",
+    "aiohttp": ">=3.14.5",
+    "av": ">=19.0.2",
+    "lxml": ">=6.1.3",
+    "numpy": ">=2.5.4",
+    "pillow": ">=13.0.0",
+    "pyinstaller": ">=6.22.3,<7",
 }
 
 # 已锁定的解析版本下限（uv.lock 实际 pin 的版本也必须够新）
 _REQUIRED_LOCKED = {
-    "av": (15, 1),
-    "pyinstaller": (6, 16),
+    "aiohttp": (3, 14, 5),
+    "av": (19, 0),
+    "lxml": (6, 1, 3),
+    "numpy": (2, 5, 4),
+    "pillow": (13, 0, 0),
+    "pyinstaller": (6, 22, 3),
 }
 
 
@@ -58,14 +70,21 @@ def _lock_root_metadata() -> str:
     return ""
 
 
+def _version_tuple(version: str, width: int) -> tuple[int, ...]:
+    """把版本号拆成定长数字元组，缺位补 0（3.14 与 3.14.0 视为同一版本）。"""
+    parts = [int(part) for part in re.findall(r"\d+", version)[:width]]
+    parts += [0] * (width - len(parts))
+    return tuple(parts)
+
+
 def test_314_critical_specifiers_present():
-    """三个包的版本声明不得被回退到不支持 3.14 的老版本。"""
+    """几个关键包的版本声明不得被回退到不支持 3.14/3.15 的老版本。"""
     declared = _declared_specifiers()
 
     for name, expected in _REQUIRED_SPECIFIERS.items():
         assert name in declared, f"pyproject.toml 缺少依赖 {name}"
         assert declared[name] == expected, (
-            f"{name} 的版本声明是 {declared[name]}，3.14 需要 {expected}；"
+            f"{name} 的版本声明是 {declared[name]}，3.14/3.15 需要 {expected}；"
             "回退会让 build-py314.yml 的 `uv sync --locked` 失败，理由见 tests/test_py314_dependency_floors.py 文档"
         )
 
@@ -89,15 +108,16 @@ def test_uv_lock_metadata_matches_pyproject():
 
 
 def test_locked_versions_admit_python_314():
-    """uv.lock 实际 pin 的版本也必须够新（av 要有 cp314 wheel，pyinstaller 要允许 3.14）。"""
+    """uv.lock 实际 pin 的版本也必须够新（av 要有 abi3 wheel，pyinstaller 要允许 3.15）。"""
     content = (_ROOT / "uv.lock").read_text(encoding="utf-8")
 
     for name, floor in _REQUIRED_LOCKED.items():
         match = re.search(rf'(?m)^\[\[package\]\]\nname = "{re.escape(name)}"\nversion = "([^"]+)"', content)
         assert match is not None, f"uv.lock 中找不到包 {name}"
-        version = tuple(int(part) for part in match.group(1).split(".")[:2])
+        version = _version_tuple(match.group(1), len(floor))
         assert version >= floor, (
-            f"uv.lock 里 {name} 锁的是 {match.group(1)}，低于 3.14 需要的 {'.'.join(str(p) for p in floor)}；"
+            f"uv.lock 里 {name} 锁的是 {match.group(1)}，低于 3.14/3.15 需要的 "
+            f"{'.'.join(str(p) for p in floor)}；"
             "请执行 `uv lock --upgrade-package " + name + "`"
         )
 

@@ -16,7 +16,7 @@ except ImportError:
 class LogBuffer:
     _lock = threading.Lock()
     all_buffers: dict[int, dict[str, "LogBuffer"]] = {}
-    global_buffer = None
+    global_buffer: "LogBuffer | None" = None
 
     # 任务树归因：记录"当前逻辑任务组"的根 task_id。
     # asyncio.create_task 会拷贝当前 context，子协程自动继承同一 root——

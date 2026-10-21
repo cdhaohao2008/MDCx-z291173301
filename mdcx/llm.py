@@ -8,7 +8,7 @@ from collections.abc import Callable
 from urllib.parse import urlparse
 
 from aiolimiter import AsyncLimiter
-from httpx import AsyncClient, Timeout
+from httpx2 import AsyncClient, Timeout
 from openai import AsyncOpenAI, BadRequestError
 from openai.types.chat import ChatCompletionMessageParam
 
@@ -65,8 +65,8 @@ class LLMClient:
         timeout: Timeout,
         rate: tuple[float, float],
     ):
-        # 这里不能立刻构造 AsyncOpenAI：它会在构造时建立 httpx.AsyncClient，
-        # 而 httpx 直到建立传输层才导入 httpcore。配置加载路径上的 Computed()
+        # 这里不能立刻构造 AsyncOpenAI：它会在构造时建立 httpx2.AsyncClient，
+        # 而 httpx2 直到建立传输层才导入 httpcore2。配置加载路径上的 Computed()
         # 一旦因此抛 ModuleNotFoundError，会被 ConfigManager.load() 误判成
         # 「配置文件验证失败」并切到 _failed.json（2026-10-21 实测：
         # 未安装 httpcore 的环境下，仅改 UI 文案也会被误认为配置损坏）。
@@ -87,10 +87,10 @@ class LLMClient:
         self._leases = 0
 
     def _ensure_client(self) -> AsyncOpenAI | None:
-        """首次翻译时才创建 OpenAI 客户端，避免配置加载阶段依赖 httpcore。
+        """首次翻译时才创建 OpenAI 客户端，避免配置加载阶段依赖 httpcore2。
 
-        AsyncOpenAI 构造时会建立 httpx.AsyncClient，而 httpx 在创建传输层时
-        才导入 httpcore。把这一步推迟到真正发请求，可让缺少 httpcore 的环境
+        AsyncOpenAI 构造时会建立 httpx2.AsyncClient，而 httpx2 在创建传输层时
+        才导入 httpcore2。把这一步推迟到真正发请求，可让缺少 httpcore2 的环境
         仍能正常加载配置、浏览、刮削（只是翻译不可用），而不是误切 _failed.json。
         """
         if not self._api_key or not self._api_key.strip():
@@ -191,7 +191,7 @@ class LLMClient:
         try:
             client = self._ensure_client()
         except Exception as e:
-            # httpcore/httpx 等网络栈缺失只影响翻译，不应影响配置加载和其他功能
+            # httpcore2/httpx2 等网络栈缺失只影响翻译，不应影响配置加载和其他功能
             log_fn(f"❌ LLM 客户端初始化失败，已跳过本次翻译: {e}\n")
             return None
         if client is None:
