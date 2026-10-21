@@ -301,3 +301,21 @@ def test_no_extra_escape_shortcut_registered(win):
     win.hide_to_tray = lambda: calls.append("tray")
     esc_shortcuts[0].activated.emit()
     assert calls == ["tray"], "ESC 快捷键没有接到 hide_to_tray 路径上"
+
+
+def test_tray_menu_hide_action_has_no_shortcut_suffix(win, app):
+    """托盘右键菜单的「隐藏到托盘」不再带「Q / Esc」后缀。
+
+    用户 2026-10-21：托盘菜单里「隐藏到托盘」后面跟的「Q / Esc」在系统托盘里
+    被 Qt 用制表符对齐渲染成一段空隙（看着像多截空白），要求只留「隐藏到托盘」。
+    Q / Esc 两条快捷键绑在主窗口上（QShortcut(Q) 与 hide_tips_widget_on_escape），
+    去掉菜单里的提示文字不影响快捷键本身。
+    """
+    _force_tray(win, app, visible=True)
+
+    menu = win.tray_icon.contextMenu()
+    assert menu is not None, "前置失败：托盘图标没有上下文菜单"
+
+    texts = [action.text() for action in menu.actions() if not action.isSeparator()]
+    assert "隐藏到托盘" in texts, f"托盘菜单里找不到「隐藏到托盘」项：{texts}"
+    assert "隐藏到托盘\tQ / Esc" not in texts, "托盘菜单「隐藏到托盘」仍带着「Q / Esc」后缀"

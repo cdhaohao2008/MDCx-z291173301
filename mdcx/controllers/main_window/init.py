@@ -1290,8 +1290,10 @@ def Init_QSystemTrayIcon(self: MyMAinWindow):
     self.tray_icon.activated.connect(self.tray_icon_click)
     self.tray_icon.setToolTip(f"MDCx {self.localversion}（左键显示/隐藏 | 右键退出）")
     show_action = QAction("显示", self)
-    # 与主窗内的隐藏入口保持一致：Q 键 / Esc 都收进托盘
-    hide_action = QAction("隐藏到托盘\tQ / Esc", self)
+    # 托盘菜单只写功能名，不带快捷键提示：Q / Esc 是主窗口级的快捷键
+    # （QShortcut(Q) 与 hide_tips_widget_on_escape），提示写在主窗口右键菜单里，
+    # 托盘菜单再挂一遍会被 Qt 用制表符对齐成一段空隙（看着像多截空白）。
+    hide_action = QAction("隐藏到托盘", self)
     quit_action = QAction("退出 MDCx", self)
     show_action.triggered.connect(self.tray_icon_show)
     hide_action.triggered.connect(self.hide_to_tray)
