@@ -107,7 +107,7 @@ def get_runtime(s):
             a = re.findall(r"(\d+)(分|min)", s)
             if a:
                 runtime = a[0][0]
-    except (ValueError, IndexError):
+    except ValueError, IndexError:
         runtime = ""
     return str(runtime)
 

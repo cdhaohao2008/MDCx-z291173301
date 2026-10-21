@@ -97,7 +97,7 @@ def _separator(char: str, width: int | None) -> str:
     """按传入宽度生成分隔线；width 为空/非正数/非整数时退回兜底宽度。"""
     try:
         count = int(width or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         count = 0
     return char * (count if count > 0 else DEFAULT_SEPARATOR_WIDTH)
 
@@ -1357,7 +1357,7 @@ async def run_network_check_item(
     spec: NetworkCheckSpec,
     *,
     cancel_event: threading.Event | None = None,
-    client: "AsyncWebClient | Any | None" = None,
+    client: AsyncWebClient | Any | None = None,
 ) -> NetworkCheckResult:
     if cancel_event and cancel_event.is_set():
         return NetworkCheckResult(spec=spec, status=NetworkCheckStatus.CANCELLED, message="已取消")
@@ -1682,11 +1682,11 @@ def _classify_missav_api(status_code: int, text: str) -> tuple[NetworkCheckStatu
 async def run_network_check(
     *,
     progress: ProgressCallback | None = None,
-    on_item_done: "Callable[[int, int], None] | None" = None,
-    on_item_result: "Callable[[NetworkCheckResult], None] | None" = None,
+    on_item_done: Callable[[int, int], None] | None = None,
+    on_item_result: Callable[[NetworkCheckResult], None] | None = None,
     cancel_event: threading.Event | None = None,
     concurrency: int = 10,
-    client: "AsyncWebClient | Any | None" = None,
+    client: AsyncWebClient | Any | None = None,
     emit_header: bool = True,
     specs: list[NetworkCheckSpec] | None = None,
     separator_width: int | None = None,
@@ -2016,7 +2016,7 @@ def _offer_site_check_entry(merged: dict, key: str, level: str, route: str, now:
     merged[key] = {"status": level, "route": route, "checked_at": now}
 
 
-def merge_site_check_cache(results: "list[NetworkCheckResult]") -> None:
+def merge_site_check_cache(results: list[NetworkCheckResult]) -> None:
     """把检测结果中带站点归属的项合并进持久化缓存。
 
     议题 #129: 由"只收集站点检测组"放宽为凡 spec.site 非空即写——

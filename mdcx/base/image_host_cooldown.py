@@ -107,7 +107,7 @@ def _load() -> None:
     path = _store_path()
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return
     if not isinstance(raw, dict):
         return
@@ -116,7 +116,7 @@ def _load() -> None:
     for host, until_wall in raw.items():
         try:
             remaining = float(until_wall) - now_wall
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         # 上限放宽 2s：持久化 round() 有进位误差，过期的下一轮 load 自然丢弃
         if 0 < remaining <= _COOLDOWN_SECONDS + 2:

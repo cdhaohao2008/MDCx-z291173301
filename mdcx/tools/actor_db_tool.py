@@ -330,7 +330,7 @@ async def _collect_from_nfo(nfo_path: Path, actors: list[str], seen: set[str]) -
     try:
         async with aiofiles.open(nfo_path, encoding="utf-8") as f:
             content = await f.read()
-    except (OSError, UnicodeDecodeError):
+    except OSError, UnicodeDecodeError:
         return
     parser = etree.XMLParser(encoding="utf-8", recover=True)
     try:
@@ -2225,7 +2225,7 @@ async def clean_male_actors(*, limit: int = 5000, concurrency: int = 5) -> Clean
             if checked_file.exists():
                 try:
                     checked_ids = {int(x) for x in json.loads(checked_file.read_text(encoding="utf-8"))}
-                except (ValueError, json.JSONDecodeError, OSError):
+                except ValueError, json.JSONDecodeError, OSError:
                     checked_ids = set()
 
             candidate_rows: list[tuple[int, int]] = []
@@ -2423,7 +2423,7 @@ async def verify_tmdb_ids(*, limit: int = 5000, concurrency: int = 5) -> VerifyT
             if verified_file.exists():
                 try:
                     verified_set = {int(x) for x in json.loads(verified_file.read_text(encoding="utf-8"))}
-                except (ValueError, json.JSONDecodeError, OSError):
+                except ValueError, json.JSONDecodeError, OSError:
                     verified_set = set()
 
             candidate_rows: list[tuple[int, int, str, str]] = []
@@ -2639,7 +2639,7 @@ def _update_nfo_tmdbids_text(text: str, id_map: dict[str, int]) -> tuple[str, in
     return new_text, updated
 
 
-async def update_nfo_tmdb_ids(dir_path: Path, *, limit: int = 5000, concurrency: int = 5) -> "UpdateNfoTmdbIdResult":
+async def update_nfo_tmdb_ids(dir_path: Path, *, limit: int = 5000, concurrency: int = 5) -> UpdateNfoTmdbIdResult:
     """批量更新指定目录下所有 nfo 中 actor 的 tmdbid。
 
     对每个 nfo：
@@ -2701,7 +2701,7 @@ async def update_nfo_tmdb_ids(dir_path: Path, *, limit: int = 5000, concurrency:
             try:
                 async with aiofiles.open(nfo_path, encoding="utf-8") as f:
                     content = await f.read()
-            except (OSError, UnicodeDecodeError):
+            except OSError, UnicodeDecodeError:
                 return
             # 解析 actor names
             import re as _re
@@ -2721,7 +2721,7 @@ async def update_nfo_tmdb_ids(dir_path: Path, *, limit: int = 5000, concurrency:
                     continue
                 try:
                     id_map[nm] = int(str(raw_tmdbid).strip())
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     continue
             if not id_map:
                 return

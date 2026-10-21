@@ -106,7 +106,7 @@ def _build_info_db_index(rows: list[dict]) -> dict[str, dict]:
     return index
 
 
-def get_actor_db_sheet(wb) -> "Worksheet":
+def get_actor_db_sheet(wb) -> Worksheet:
     """显式取「演员数据库」sheet，不依赖 sheet 顺序（防止男优备份等辅助 sheet 被误读）。
 
     若工作簿中无该名（新建/异常文件），回退到 active sheet 保持兼容。

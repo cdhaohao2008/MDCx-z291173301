@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import asdict, is_dataclass
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
@@ -10,10 +10,7 @@ def is_dataclass_instance(obj):
     return is_dataclass(obj) and not isinstance(obj, type)
 
 
-T = TypeVar("T", bound="DataclassInstance")
-
-
-def update(d1: "T", d2: "DataclassInstance | dict") -> T:
+def update[T: DataclassInstance](d1: T, d2: DataclassInstance | dict) -> T:
     """
     用一个 dataclass/dict 更新另一个 dataclass, 此函数返回一个新实例.
 
@@ -26,7 +23,7 @@ def update(d1: "T", d2: "DataclassInstance | dict") -> T:
     return type(d1)(**update_existing(asdict(d1), d2))
 
 
-def update_valid(d1: "T", d2: "DataclassInstance | dict", validator: Callable[..., bool] = bool) -> T:
+def update_valid[T: DataclassInstance](d1: T, d2: DataclassInstance | dict, validator: Callable[..., bool] = bool) -> T:
     """
     用一个 dataclass/dict 中的有效值更新另一个 dataclass, 此函数返回一个新实例.
 

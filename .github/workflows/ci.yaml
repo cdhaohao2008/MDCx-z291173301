@@ -19,9 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # 锁定 3.14：本 job 原本没有 setup-python，uv 会自行下载满足 requires-python
-      # 的最新解释器（现为 3.15），而 jiter/av/lxml 尚无 cp315 wheel 会退回源码编译失败。
-      UV_PYTHON: "3.14"
+      # 锁定 3.15：程序已迁移到 Python 3.15（pyproject 的 requires-python 为 >=3.14，
+      # 3.15 为当前构建目标），这里显式钉死，避免 uv 自行挑选解释器导致结果不可预期。
+      UV_PYTHON: "3.15"
+      # 3.15 下 PyYAML 只能靠 cp314 wheel 顶替（见「Install locked dependencies」），
+      # uv run 默认的隐式 sync 会把它判定为需重新安装并再次失败，故关掉隐式同步。
+      UV_NO_SYNC: "1"
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -81,19 +84,30 @@ jobs:
           libavutil-dev libavfilter-dev libswscale-dev libswresample-dev
           libxml2-dev libxslt1-dev libxslt-dev python3-dev zlib1g-dev gcc
 
-      - name: Set up Python 3.14
+      - name: Set up Python 3.15
         if: steps.changes.outputs.code_changed == 'true'
         uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          python-version: "3.15"
 
       - name: Set up uv
         if: steps.changes.outputs.code_changed == 'true'
         uses: astral-sh/setup-uv@v10.1.0
 
+      # PyYAML 至今没有 cp315 wheel（6.0.3 只发到 cp314），3.15 下 uv sync 会退回源码
+      # 编译（Windows runner 缺 MSVC 头文件、Linux 也要编译器）。这里用 cp314 wheel
+      # 顶替：`_yaml` 只是可选的 C 加速，缺它时 PyYAML 自动退回纯 Python 实现，
+      # 功能一致。等 PyYAML 出了 cp315 wheel，把 --no-install-package pyyaml 与下面
+      # 那条 uv pip install 一起删掉即可。
       - name: Install locked dependencies
         if: steps.changes.outputs.code_changed == 'true'
-        run: uv sync --locked --dev
+        shell: bash
+        run: |
+          uv sync --locked --dev --no-install-package pyyaml
+          VENV_PY="$PWD/.venv/bin/python"
+          [ -x "$VENV_PY" ] || VENV_PY="$PWD/.venv/Scripts/python.exe"
+          uv pip install --python "$VENV_PY" --python-version 3.14 --only-binary=:all: "pyyaml==6.0.3"
+          "$VENV_PY" -c "import yaml; print('pyyaml', yaml.__version__, 'libyaml', yaml.__with_libyaml__)"
 
       - name: Run ruff format
         if: steps.changes.outputs.code_changed == 'true'
@@ -130,6 +144,11 @@ jobs:
     name: Windows Compatibility and Build
     runs-on: windows-2025
     timeout-minutes: 45
+    env:
+      # 与 quality job 同口径：3.15 为当前构建目标。
+      UV_PYTHON: "3.15"
+      # 3.15 下 PyYAML 靠 cp314 wheel 顶替，关掉 uv run 的隐式 sync（见安装步骤注释）。
+      UV_NO_SYNC: "1"
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -162,11 +181,11 @@ jobs:
           if ($base -eq '0000000000000000000000000000000000000000' -or -not (git cat-file -e "$base^{commit}" 2>$null)) { $base = 'HEAD^' }
           git diff --check $base $env:GITHUB_SHA
 
-      - name: Set up Python 3.13
+      - name: Set up Python 3.15
         if: steps.changes.outputs.code_changed == 'true'
         uses: actions/setup-python@v7
         with:
-          python-version: "3.13"
+          python-version: "3.15"
 
       - name: Set up uv
         if: steps.changes.outputs.code_changed == 'true'
@@ -174,11 +193,17 @@ jobs:
         with:
           activate-environment: true
 
+      # PyYAML 至今没有 cp315 wheel（6.0.3 只发到 cp314），3.15 下只能源码编译，
+      # Windows runner 缺 MSVC 头文件会直接失败。用 cp314 wheel 顶替：`_yaml` 只是
+      # 可选的 C 加速，缺它时 PyYAML 自动退回纯 Python 实现，功能一致。
       - name: Install dependencies
         if: steps.changes.outputs.code_changed == 'true'
         shell: pwsh
         run: |
-          uv sync --locked --all-extras --dev
+          uv sync --locked --all-extras --dev --no-install-package pyyaml
+          $venvPy = ".venv\Scripts\python.exe"
+          uv pip install --python $venvPy --python-version 3.14 --only-binary=:all: "pyyaml==6.0.3"
+          & $venvPy -c "import yaml; print('pyyaml', yaml.__version__, 'libyaml', yaml.__with_libyaml__)"
 
       - name: Run Windows offline tests
         if: steps.changes.outputs.code_changed == 'true'

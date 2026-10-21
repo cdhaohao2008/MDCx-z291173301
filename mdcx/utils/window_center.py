@@ -40,7 +40,7 @@ def available_geometry(widget: Any) -> QRect | None:
         if screen is None:
             return None
         avail = screen.availableGeometry()
-    except (RuntimeError, AttributeError):
+    except RuntimeError, AttributeError:
         # 窗口已被 C++ 侧销毁，或根本不是 QWidget
         return None
     except Exception:
@@ -82,7 +82,7 @@ def center_on_screen(widget: Any, avail: QRect | None = None, *, allow_defer: bo
         # 比可用区域还大时贴左上角，保证整个窗口都留在屏幕里
         widget.move(max(x, avail.x()), max(y, avail.y()))
         return True
-    except (RuntimeError, AttributeError):
+    except RuntimeError, AttributeError:
         return False
     except Exception:
         # 居中属于锦上添花，绝不能因为它把调用方的业务流程带崩

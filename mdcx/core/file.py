@@ -121,7 +121,7 @@ async def creat_folder(
 
     try:
         fn_stat = await aiofiles.os.stat(file_new_path)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         # 目标文件不存在
         return True
 

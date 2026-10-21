@@ -1363,7 +1363,7 @@ class Config(BaseModel):
         return v
 
     @classmethod
-    def from_legacy(cls, data: dict[str, Any]) -> "Config":
+    def from_legacy(cls, data: dict[str, Any]) -> Config:
         """
         从 ConfigV1 创建 Config 实例. 此方法仅用于转换旧版配置文件.
         """

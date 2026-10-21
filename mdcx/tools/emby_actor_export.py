@@ -153,13 +153,13 @@ def _windows_system_scale() -> float | None:
 
         try:
             user32 = ctypes.windll.user32  # type: ignore[attr-defined]
-        except (AttributeError, OSError):
+        except AttributeError, OSError:
             return None
         try:
             dpi = user32.GetDpiForSystem()
             if dpi and dpi > 0:
                 return float(dpi) / 96.0
-        except (AttributeError, OSError):
+        except AttributeError, OSError:
             pass
         try:
             gdi32 = ctypes.windll.gdi32  # type: ignore[attr-defined]
@@ -171,7 +171,7 @@ def _windows_system_scale() -> float | None:
                         return float(dpi) / 96.0
                 finally:
                     user32.ReleaseDC(0, hdc)
-        except (AttributeError, OSError):
+        except AttributeError, OSError:
             pass
     except Exception:
         pass
@@ -194,15 +194,15 @@ def effective_screen_width_px(screen: object) -> float:
     """
     try:
         raw = float(screen.availableGeometry().width())  # type: ignore[attr-defined]
-    except (TypeError, ValueError, AttributeError, RuntimeError):
+    except TypeError, ValueError, AttributeError, RuntimeError:
         return EXPORT_FALLBACK_SCREEN_PX
     try:
         dpr = float(screen.devicePixelRatio()) or 1.0  # type: ignore[attr-defined]
-    except (TypeError, ValueError, AttributeError, RuntimeError):
+    except TypeError, ValueError, AttributeError, RuntimeError:
         dpr = 1.0
     try:
         dpi_scale = float(screen.logicalDotsPerInchX()) / 96.0  # type: ignore[attr-defined]
-    except (TypeError, ValueError, AttributeError, RuntimeError, ZeroDivisionError):
+    except TypeError, ValueError, AttributeError, RuntimeError, ZeroDivisionError:
         dpi_scale = 1.0
     win_scale = _windows_system_scale() or 0.0
     scale = max(dpr, dpi_scale, win_scale)
@@ -222,7 +222,7 @@ def text_col_width_for_screen_width(screen_px: object) -> float:
         # 签名刻意放宽为 object: 上层可能传入 None/异常值(测试覆盖了这些兜底路径),
         # 非法输入统一由下面的 except 收敛到最小列宽, 故此处压制 arg-type。
         width_px = float(screen_px)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return EXPORT_MIN_TEXT_COL_WIDTH
     content_px = width_px - SCREEN_ROW_HEADER_PX - SCREEN_VSCROLL_PX - EXPORT_TABLE_MARGIN_PX
     total_units = (content_px - EXPORT_COLUMN_COUNT * EXCEL_TABLE_PADDING_PX) / EXCEL_UNIT_PX
@@ -338,7 +338,7 @@ def actor_export_row(actor: object) -> tuple:
         status = f"{EXPORT_WARN_STATUS_PAD}{status}"
     try:
         movie_count = int(getattr(actor, "movie_count", 0) or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         movie_count = 0
     return (status, name, image_icon, info_icon, birthday, birthplace, detail, tags, movie_count)
 

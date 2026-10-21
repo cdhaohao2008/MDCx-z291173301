@@ -341,7 +341,7 @@ async def _get_mediainfo_size(file_path: Path, file_number: str = "") -> tuple[s
         async with aiofiles.open(mediainfo_path, encoding="utf-8") as f:
             content = await f.read()
         data = json.loads(content)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return "", ""
     height = _mediainfo_video_height(data)
     if not height:

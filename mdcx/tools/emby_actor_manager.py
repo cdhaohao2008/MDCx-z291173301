@@ -168,7 +168,7 @@ def _safe_int(value: object) -> int | None:
     if isinstance(value, str):
         try:
             return int(value.strip())
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
     return None
 
@@ -191,7 +191,7 @@ def _remember_all_staff_count(count: int) -> None:
     global _all_staff_count_cache
     try:
         count = int(count)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return
     if count > 0:
         _all_staff_count_cache = (time.monotonic(), count)

@@ -84,7 +84,7 @@ def _apply_text_clean_rules(text: str, rules: object = None) -> str:
     for item in items:
         try:
             original, replacement = item
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         if not isinstance(original, str) or not original:
             continue

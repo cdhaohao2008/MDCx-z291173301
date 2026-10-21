@@ -740,14 +740,21 @@ uv run build --debug
 
 上述约定由 `tests/test_py314_release_workflow.py`（11 项）与 `tests/test_workflow_action_pins.py` 守住（纯文本断言，不引入 yaml 依赖），改工作流后请一并跑 `uv run pytest tests/test_sr_bundling.py tests/test_py314_release_workflow.py tests/test_workflow_action_pins.py`。
 
+2026-10-21 起程序迁移到 Python 3.15，新增 `.github/workflows/build-py315.yml`（**Build Python3.15**）：三平台矩阵与 3.14 一致，3.15 专属三处同款（`UV_PYTHON: 3.15`、`python-version: 3.15`、构建前 `sys.version_info[:2] == (3, 15)` 断言），artifact 名带 `mdcx315-` 前缀，与 3.14 流程的 `mdcx-*` 区分，两条流程并行跑不会互相覆盖同名 artifact。**它只手动触发（`workflow_dispatch`）、不创建 Release**：两条流程共用同一套纯数字 tag 命名空间且都是 `overwrite: true`，同时发版会互相把对方的包刷掉、把同一条 release 的 `created_at` 顶到列表第一条，用户会下到错版本的一体包。**正式发版仍只有 `build-py314.yml` 一条**（该文件原样保留），等 3.15 全平台验证通过、决定把发版职责换过去时，再按 `build-py314.yml` 的 `publish-release` 结构补上并删掉本段说明。
 
-依赖版本下限按 Python 3.14 抬过三处，改依赖时务必守住（否则 3.14 流水线的 `uv sync --locked` 会硬失败）：
+3.15 有一条 3.14 没有的坑：**PyYAML 至今没有任何 cp315 wheel**（6.0.3 只发到 cp314），3.15 下 `uv sync` 会退回源码编译（Windows runner 缺 MSVC 头文件直接失败，Linux/macOS 也要编译器链）。做法是 `uv sync --locked --dev --no-install-package pyyaml` 跳过它，再 `uv pip install --python <venv> --python-version 3.14 --only-binary=:all: "pyyaml==6.0.3"` 把 cp314 wheel 装进 3.15 环境（6.0.3 的 cp314 wheel 覆盖 win_amd64 / macos arm64 / manylinux x86_64）；PyYAML 官方 wheel 里的 `_yaml` 只是可选的 C 加速，缺它时 PyYAML 会自动退回纯 Python 实现（`__with_libyaml__ = False`，`safe_load`/`dump` 行为与加速版一致），构建与使用都不受影响。以后 PyYAML 出了 cp315 wheel，把这两行兼容代码删掉即可。两条 3.15 工作流还都设了 `UV_NO_SYNC: "1"`：否则 `uv run` 的隐式 sync 会把已装好的 pyyaml 判定为「需重新安装」并再次失败，依赖统一在安装步骤显式 sync 一次。
 
-- `pyinstaller>=6.16.0,<7`：6.14.2 的元数据是 `requires-python = ">=3.8,<3.14"`，3.14 上装不上。
-- `av>=15.1.0`：15.0.0 只有 cp39~cp313 的 wheel，3.14 上会退回源码编译（需 FFmpeg 开发库）。
-- `aiofiles==25.1.0`：25.1.0 起官方测试并支持 3.14。
 
-其余依赖已逐条核对，3.14 直接可用、无需动：`pyqt6`（cp310-abi3）、`opencv-contrib-python-headless`（cp37-abi3）、`curl-cffi`（cp310-abi3）、`aiohttp`/`lxml`/`numpy`/`pillow`/`pydantic-core`/`mypy`（有 cp314 wheel）、`pyinstaller`/`ruff`（`py3-none`）、`oshash`/`zhconv`（PyPI 上只有 sdist，但上游是**纯 Python**、无 C 扩展，不会编译）。核对口径：看 PyPI `releases[版本].urls` 的 tag 是否为 `cp314-*` / `*-abi3-*` / `*-none-*`，并读 `requires_python` 上界。改完依赖记得 `uv lock`（CI 用 `uv sync --locked` 强校验），`requires-python` 保持 `>=3.13.4`（不能带 upper bound），3.13 仍是基线。`tests/test_py314_dependency_floors.py` 守着上述三条下限、`uv.lock` 与 `pyproject.toml` 的声明同步、以及 `requires-python` 无上界。
+依赖版本下限按 Python 3.14/3.15 抬过（`tests/test_py314_dependency_floors.py` 逐条守着），改依赖时务必守住（否则流水线的 `uv sync --locked` 会硬失败）：
+
+- `aiohttp>=3.14.5`：`3.14.4` 起才有 cp315 wheel，更早的版本在 3.15 上只能源码编译。
+- `av>=19.0.2`：`17.0.0` 起改发 abi3 wheel（`19.0.2` 为 cp312-abi3），3.15 直接可用；15.x/16.x 只有 cp3xx 专用 wheel，会退回源码编译（需 FFmpeg 开发库）。
+- `lxml>=6.1.3` / `pillow>=13.0.0` / `numpy>=2.5.4`：分别从 `6.1.2` / `12.3.0` / `2.5.2` 起才有 cp315 wheel。
+- `pyinstaller>=6.22.3,<7`：`6.21.0` 起 `requires-python` 放宽到 `<3.16`；`6.16.0~6.20.0` 声明 `<3.15`，3.15 上装不上。
+- `aiofiles>=25.1.0`：`25.1.0` 起官方测试并支持 3.14/3.15。
+- `cffi`（`curl-cffi` 的传递依赖）：`2.0.0` 没有 cp315 wheel，3.15 下会退回源码编译（报 "Microsoft Visual C++ 14.0 or greater is required"），lock 里必须到 `2.1.1`。
+
+其余依赖已逐条核对，3.14/3.15 直接可用、无需动：`pyqt6`（cp39-abi3）、`opencv-contrib-python-headless`（cp37-abi3）、`curl-cffi`（cp310-abi3）、`httpx`/`httpx2`（纯 Python）、`pyinstaller`/`ruff`（`py3-none`）、`oshash`/`zhconv`（PyPI 上只有 sdist，但上游是**纯 Python**、无 C 扩展，不会编译）。核对口径：看 PyPI `releases[版本].urls` 的 tag 是否为 `cp315-*` / `*-abi3-*` / `*-none-*`，并读 `requires_python` 上界。改完依赖记得 `uv lock`（CI 用 `uv sync --locked` 强校验），`requires-python` 保持 `>=3.14`（不能带 upper bound），3.15 为当前构建目标、3.14 保留给 `build-py314.yml`。
 
 ## 迁移指南
 

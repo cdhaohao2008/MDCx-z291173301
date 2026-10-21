@@ -50,7 +50,7 @@ class FileInfo:
             return None
         return self.file_path
 
-    def crawler_input(self) -> "CrawlerInput":
+    def crawler_input(self) -> CrawlerInput:
         """
         将 FileInfo 转换为 CallCrawlerInput 类型
         """
@@ -65,7 +65,7 @@ class FileInfo:
             org_language=Language.UNDEFINED,
         )
 
-    def crawl_task(self) -> "CrawlTask":
+    def crawl_task(self) -> CrawlTask:
         """
         将 FileInfo 转换为 CrawlTask 类型
         """
@@ -89,7 +89,7 @@ class FileInfo:
         )
 
     @classmethod
-    def empty(cls) -> "FileInfo":
+    def empty(cls) -> FileInfo:
         """
         返回一个空的 FileInfo 实例
         """
@@ -136,7 +136,7 @@ class CrawlerInput:
     org_language: Language
 
     @classmethod
-    def empty(cls) -> "CrawlerInput":
+    def empty(cls) -> CrawlerInput:
         return FileInfo.empty().crawler_input()
 
 
@@ -154,7 +154,7 @@ class CrawlTask(CrawlerInput):
     youma: str
 
     @classmethod
-    def empty(cls) -> "CrawlTask":
+    def empty(cls) -> CrawlTask:
         return FileInfo.empty().crawl_task()
 
 
@@ -263,7 +263,7 @@ class BaseCrawlerResult:
         self.directors = value.split(",") if value else []
 
     @classmethod
-    def empty(cls) -> "BaseCrawlerResult":
+    def empty(cls) -> BaseCrawlerResult:
         """
         返回一个空的 BaseCrawlerResultDataClass 实例
         """
@@ -307,7 +307,7 @@ class CrawlerResult(BaseCrawlerResult):
     external_id: str
 
     @classmethod
-    def empty(cls) -> "CrawlerResult":
+    def empty(cls) -> CrawlerResult:
         """
         返回一个空的 CrawlerResultDataclass 实例
         """
@@ -333,7 +333,7 @@ class FailureReason(StrEnum):
     UNKNOWN = "unknown"  # 其他未知错误
 
     @classmethod
-    def classify(cls, error: Exception) -> "FailureReason":
+    def classify(cls, error: Exception) -> FailureReason:
         """
         根据异常特征将错误归类为 FailureReason.
 
@@ -411,7 +411,7 @@ class CrawlersResult(BaseCrawlerResult):
     letters: str  # 番号字母部分, 理论上 get_file_info 函数会返回这个字段
 
     @classmethod
-    def empty(cls) -> "CrawlersResult":
+    def empty(cls) -> CrawlersResult:
         """
         返回一个空的 CrawlersResultDataClass 实例
         """
@@ -497,7 +497,7 @@ class OtherInfo:
     thumb_size: tuple[int, int]
 
     @classmethod
-    def empty(cls) -> "OtherInfo":
+    def empty(cls) -> OtherInfo:
         """
         返回一个空的 OtherInfo 实例
         """
@@ -532,7 +532,7 @@ class ShowData(ScrapeResult):
     show_name: str
 
     @classmethod
-    def empty(cls) -> "ShowData":
+    def empty(cls) -> ShowData:
         """
         返回一个空的 ShowDataDataclass 实例
         """

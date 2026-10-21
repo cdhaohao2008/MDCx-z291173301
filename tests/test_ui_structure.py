@@ -75,7 +75,7 @@ def _ruff_version(exe_prefix):
             cwd=REPO,
             timeout=60,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError, subprocess.TimeoutExpired:
         return None
     if result.returncode != 0:
         return None
@@ -108,7 +108,7 @@ def _group_boxes_by_parent(root):
             y = int(rect.find("y").text)
             w = int(rect.find("width").text)
             h = int(rect.find("height").text)
-        except (AttributeError, TypeError, ValueError):
+        except AttributeError, TypeError, ValueError:
             continue
         by_parent.setdefault(pname, []).append((gb.get("name"), x, y, w, h))
     return by_parent
@@ -132,7 +132,7 @@ def _scroll_area_heights(root):
             continue
         try:
             heights[name] = int(rect.find("height").text)
-        except (AttributeError, TypeError, ValueError):
+        except AttributeError, TypeError, ValueError:
             continue
     return heights
 
@@ -290,7 +290,7 @@ def test_mdcx_py_in_sync_with_ui():
                 timeout=180,
             )
             formatted = result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except FileNotFoundError, subprocess.TimeoutExpired:
             formatted = False
         if not formatted:
             ver = _ruff_version(["ruff"])
@@ -307,7 +307,7 @@ def test_mdcx_py_in_sync_with_ui():
                     timeout=60,
                 )
                 formatted = result.returncode == 0
-            except (FileNotFoundError, subprocess.TimeoutExpired):
+            except FileNotFoundError, subprocess.TimeoutExpired:
                 pytest.skip("系统 ruff 执行失败，跳过同步检查")
             assert formatted, "系统 ruff format 执行失败"
 

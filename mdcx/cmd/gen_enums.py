@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from _typeshed import DataclassInstance
 
 
-def generate_enum(dataclass_type: type["DataclassInstance"], enum_name: str | None = None) -> str:
+def generate_enum(dataclass_type: type[DataclassInstance], enum_name: str | None = None) -> str:
     """
     生成 StrEnum 的代码字符串
 
@@ -64,7 +64,7 @@ def generate_enum(dataclass_type: type["DataclassInstance"], enum_name: str | No
     return "\n".join(lines)
 
 
-def gen(dataclass_types: list[type["DataclassInstance"]], output_file: str | Path | None = None) -> str:
+def gen(dataclass_types: list[type[DataclassInstance]], output_file: str | Path | None = None) -> str:
     """
     从多个 dataclass 生成对应的 StrEnum 代码
 

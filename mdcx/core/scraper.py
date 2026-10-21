@@ -190,7 +190,7 @@ def reset_flags_preserving_single_file_inputs() -> None:
 
 
 class Scraper:
-    def __init__(self, crawler_provider: "CrawlerProviderProtocol"):
+    def __init__(self, crawler_provider: CrawlerProviderProtocol):
         self.crawler_provider = crawler_provider
         self._rest_lock = asyncio.Lock()
         self._state_cache: ScrapeStateCache | None = None

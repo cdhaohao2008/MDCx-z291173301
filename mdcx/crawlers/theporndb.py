@@ -51,7 +51,7 @@ def read_data(data, kind: TheporndbKind):
     try:
         # duration 可能是 int，也可能是 "7200.0" 这类浮点字符串。
         runtime = str(int(float(data.get("duration") or 0) / 60))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         runtime = ""
     try:
         series = data["site"]["name"] or ""
@@ -86,7 +86,7 @@ def read_data(data, kind: TheporndbKind):
         try:
             if each["parent"]["extras"]["gender"] != "Male":
                 actor_list.append(name)
-        except (KeyError, TypeError):
+        except KeyError, TypeError:
             pass
     number = get_number(series, release, title)
     return CrawlerData(

@@ -91,7 +91,7 @@ def _sanitize_clean_rules(rules: object) -> list[tuple[str, str]]:
     for item in items:
         try:
             original, replacement = item
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         if not isinstance(original, str) or not original.strip():
             continue

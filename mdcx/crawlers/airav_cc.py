@@ -69,7 +69,7 @@ def get_cover(html):
         return ""
     try:
         data_dict = json.loads(scripts[0])
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return ""
     thumbs = data_dict.get("thumbnailUrl") or []
     if isinstance(thumbs, str):

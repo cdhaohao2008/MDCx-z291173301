@@ -45,7 +45,7 @@ MAX_IMAGE_PROBE_BYTES = 512 * 1024
 def _image_read_timeout() -> float:
     try:
         return max(float(manager.config.timeout), 1.0)
-    except (TypeError, ValueError, AttributeError):
+    except TypeError, ValueError, AttributeError:
         return 30.0
 
 

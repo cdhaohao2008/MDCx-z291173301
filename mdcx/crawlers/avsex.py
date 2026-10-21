@@ -77,7 +77,7 @@ def get_runtime(html):
         result = re.findall(r"\d+", result)
         if len(result) == 3:
             runtime = int(result[0]) * 60 + int(result[1])
-    except (ValueError, IndexError):
+    except ValueError, IndexError:
         runtime = ""
     return runtime
 

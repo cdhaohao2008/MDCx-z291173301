@@ -29,7 +29,7 @@ def safe_rmtree(path: str | Path) -> None:
     # 否则会被 Path.home() 的 except(OSError) 自己吞掉, 导致守护失效。
     try:
         home = Path.home().resolve()
-    except (OSError, RuntimeError):
+    except OSError, RuntimeError:
         # Path.home() 解析失败时不阻断正常删除
         home = None
     if home is not None and p == home:
@@ -67,7 +67,7 @@ def is_descendant(p: str | Path, parent: str | Path) -> bool:
     # os.path.commonpath 可以处理这种情况
     try:
         return os.path.commonpath([p, parent]) == str(parent)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return False
 
 

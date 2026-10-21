@@ -217,7 +217,7 @@ def _safe_float(value: object, default: float) -> float:
         if isinstance(value, (str, bytes, int, float)):
             return float(value)
         return default
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -285,7 +285,7 @@ class _CompositeLimiter:
     def __init__(self, *limiters: AsyncLimiter):
         self.limiters = limiters
 
-    async def __aenter__(self) -> "_CompositeLimiter":
+    async def __aenter__(self) -> _CompositeLimiter:
         for limiter in self.limiters:
             await limiter.__aenter__()
         return self
@@ -1690,7 +1690,7 @@ class AsyncWebClient:
                 try:
                     body_bytes = await self._peek_response_body(response)
                     body_text = body_bytes.decode("utf-8", errors="ignore").lower()
-                except (TimeoutError, RequestException):
+                except TimeoutError, RequestException:
                     raise
                 except Exception:
                     body_text = ""

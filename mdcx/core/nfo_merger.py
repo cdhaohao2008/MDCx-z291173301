@@ -246,7 +246,7 @@ def merge_nfo_fields(
                 )
                 if field_enum:
                     merged.field_sources[field_enum] = "local"
-            except (ValueError, KeyError):
+            except ValueError, KeyError:
                 pass
 
     from ..models.log_buffer import LogBuffer

@@ -76,7 +76,7 @@ def _download_face_model(model_path: Path) -> bool:
         tmp_path.replace(model_path)
         LogBuffer.web().write("\n 🖼 人脸识别模型已自动缓存")
         return True
-    except (OSError, URLError, ValueError):
+    except OSError, URLError, ValueError:
         if tmp_path.exists():
             tmp_path.unlink(missing_ok=True)
         return False

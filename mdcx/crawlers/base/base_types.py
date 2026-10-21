@@ -67,7 +67,7 @@ class CrawlerData:
     external_id: FieldValue = NOT_SUPPORT
     source: FieldValue = NOT_SUPPORT
 
-    def to_result(self) -> "CrawlerResult":
+    def to_result(self) -> CrawlerResult:
         result = update_valid(CrawlerResult.empty(), self, is_valid)
         result.mosaic = normalize_mosaic(result.mosaic)
         return result
@@ -79,7 +79,7 @@ class CrawlerException(Exception): ...
 @dataclass
 class Context:
     input: CrawlerInput  # crawler 的原始输入
-    debug_info: "CrawlerDebugInfo" = field(default_factory=CrawlerDebugInfo)
+    debug_info: CrawlerDebugInfo = field(default_factory=CrawlerDebugInfo)
 
     def debug(self, message: str):
         """添加调试消息.

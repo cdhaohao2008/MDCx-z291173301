@@ -249,7 +249,7 @@ class _FlushLogTextEdit(QPlainTextEdit):
                 bar.setMaximum(flush_at)  # Qt 会把 value 钳进新范围
             finally:
                 self._flush_busy = False
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass  # C++ 对象已销毁等竞态：纯外观调整，静默放弃
 
 
@@ -359,7 +359,7 @@ def _inline_edited_fields(actor) -> set:
     try:
         fields = getattr(actor, "_inline_edited", None)
         return fields if isinstance(fields, set) else set()
-    except (RuntimeError, AttributeError):
+    except RuntimeError, AttributeError:
         return set()
     except Exception:
         return set()
@@ -372,7 +372,7 @@ def _mark_inline_edited(actor, field: str) -> None:
             fields = set()
             actor._inline_edited = fields
         fields.add(field)
-    except (RuntimeError, AttributeError):
+    except RuntimeError, AttributeError:
         pass
     except Exception:
         pass
@@ -381,7 +381,7 @@ def _mark_inline_edited(actor, field: str) -> None:
 def _clear_inline_edited(actor) -> None:
     try:
         actor._inline_edited = set()
-    except (RuntimeError, AttributeError):
+    except RuntimeError, AttributeError:
         pass
     except Exception:
         pass
@@ -395,7 +395,7 @@ def _effective_pending(actor, field: str, new_value, existing_value):
     try:
         if actor.need_update_info and new_value:
             return new_value
-    except (RuntimeError, AttributeError):
+    except RuntimeError, AttributeError:
         pass
     except Exception:
         pass
@@ -431,7 +431,7 @@ class _InlineEditDelegate(QStyledItemDelegate):
             if self._editor_changed is not None:
                 self._editor_changed(edit)
             return edit
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return None
         except Exception:
             return None
@@ -450,7 +450,7 @@ class _InlineEditDelegate(QStyledItemDelegate):
                     if row is not None and col is not None:
                         callback(int(row), int(col))
                         return True
-        except (RuntimeError, AttributeError, ValueError, TypeError):
+        except RuntimeError, AttributeError, ValueError, TypeError:
             pass
         except Exception:
             pass
@@ -463,7 +463,7 @@ class _InlineEditDelegate(QStyledItemDelegate):
                 full = index.data(Qt.ItemDataRole.DisplayRole) or ""
             editor.setText(str(full))
             editor.selectAll()
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
@@ -472,7 +472,7 @@ class _InlineEditDelegate(QStyledItemDelegate):
         try:
             if self._editor_changed is not None:
                 self._editor_changed(None)
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
@@ -1147,7 +1147,7 @@ class ActorCleanRulesDialog(QDialog):
         self._suspend_autosave = False
         try:
             self.table.itemChanged.disconnect(self._on_item_changed)
-        except (TypeError, RuntimeError):
+        except TypeError, RuntimeError:
             pass
         self.table.itemChanged.connect(self._on_item_changed)
         self._refresh_status()
@@ -1156,13 +1156,13 @@ class ActorCleanRulesDialog(QDialog):
         """批量改表时暂停 itemChanged → 状态刷新/自动保存, 返回重连函数。"""
         try:
             self.table.itemChanged.disconnect(self._on_item_changed)
-        except (TypeError, RuntimeError):
+        except TypeError, RuntimeError:
             pass
 
     def _resume_refresh(self):
         try:
             self.table.itemChanged.disconnect(self._on_item_changed)
-        except (TypeError, RuntimeError):
+        except TypeError, RuntimeError:
             pass
         self.table.itemChanged.connect(self._on_item_changed)
         self._refresh_status()
@@ -1187,7 +1187,7 @@ class ActorCleanRulesDialog(QDialog):
                         self._append_rule_row()
                         self._last_blank_add = time.monotonic()
                         return True
-        except (RuntimeError, AttributeError, TypeError, ValueError):
+        except RuntimeError, AttributeError, TypeError, ValueError:
             pass
         except Exception:
             pass
@@ -1602,7 +1602,7 @@ class EmbyActorManagerDialog(QDialog):
             if total > 0:
                 pct = max(0, min(100, int(current * 100 / total)))
                 self._set_status(f"{label} {current}/{total}（{pct}%）")
-        except (RuntimeError, AttributeError, TypeError, ValueError, ZeroDivisionError):
+        except RuntimeError, AttributeError, TypeError, ValueError, ZeroDivisionError:
             pass
 
     def _build_connection_section(self, parent_layout: QVBoxLayout):
@@ -1919,7 +1919,7 @@ class EmbyActorManagerDialog(QDialog):
             if getattr(self, "_user_moved_splitter", False):
                 return
             wide = self._is_wide_state()
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return
         except Exception:
             return
@@ -1944,11 +1944,11 @@ class EmbyActorManagerDialog(QDialog):
                     target = max(1, int(round(base * ratio)))
                     if w.minimumHeight() != target:
                         w.setMinimumHeight(target)
-                except (RuntimeError, AttributeError):
+                except RuntimeError, AttributeError:
                     continue
                 except Exception:
                     continue
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
@@ -1974,7 +1974,7 @@ class EmbyActorManagerDialog(QDialog):
             return int(hint)
         try:
             return int(widget.sizeHint().width())
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return 0
 
     def _sync_button_natural_width(self) -> int:
@@ -1986,13 +1986,13 @@ class EmbyActorManagerDialog(QDialog):
             return 0
         try:
             advance = btn.fontMetrics().horizontalAdvance(btn.text())
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return 0
         overhead = getattr(self, "_sync_overhead_w", 0)
         if not overhead:
             try:
                 overhead = btn.sizeHint().width() - advance
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 overhead = 0
         return int(advance + (overhead if overhead > 0 else 15))
 
@@ -2042,7 +2042,7 @@ class EmbyActorManagerDialog(QDialog):
                 if want > 0 and (sync.minimumWidth() != want or sync.maximumWidth() != want):
                     sync.setFixedWidth(want)
             self._apply_button_row_compact()
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
@@ -2061,7 +2061,7 @@ class EmbyActorManagerDialog(QDialog):
         try:
             fm = label.fontMetrics()
             return int(max(fm.horizontalAdvance(line) for line in narrow.split("\n")))
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return 0
 
     def _narrow_min_width(self) -> int:
@@ -2089,10 +2089,10 @@ class EmbyActorManagerDialog(QDialog):
                 if main is not None:
                     mg = main.contentsMargins()
                     outer += int(mg.left() + mg.right())
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 outer = 26
             return int(max(row + outer, self._NARROW_MIN_W_FLOOR))
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return self._BASE_MIN_W
 
     def _apply_button_row_compact(self) -> None:
@@ -2182,9 +2182,9 @@ class EmbyActorManagerDialog(QDialog):
             # 宽态恢复原最小宽，最大化布局与最小尺寸语义均不变。
             try:
                 self._apply_narrow_min_width()
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 pass
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
@@ -2197,7 +2197,7 @@ class EmbyActorManagerDialog(QDialog):
             base_h = max(720, int(self.minimumHeight() or 720))
             if self.minimumWidth() != want or self.minimumHeight() != base_h:
                 self.setMinimumSize(want, base_h)
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
@@ -2206,7 +2206,7 @@ class EmbyActorManagerDialog(QDialog):
         """最大化/全屏即宽态，其余（还原/常规/最小化）即窄态。"""
         try:
             return bool(self.isMaximized() or self.isFullScreen())
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return False
         except Exception:
             return False
@@ -2229,7 +2229,7 @@ class EmbyActorManagerDialog(QDialog):
             if adv <= 0:
                 return int(self._BIRTHDAY_W) + int(self._BIRTHDAY_CELL_PADDING)
             return int(math.ceil(float(adv))) + int(self._BIRTHDAY_CELL_PADDING)
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             try:
                 return int(self._BIRTHDAY_W) + int(self._BIRTHDAY_CELL_PADDING)
             except Exception:
@@ -2302,7 +2302,7 @@ class EmbyActorManagerDialog(QDialog):
             if getattr(self, "_log_snap_queued", False):
                 return
             self._log_snap_queued = True
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return
         QTimer.singleShot(0, self._log_line_snap_tick)
 
@@ -2346,7 +2346,7 @@ class EmbyActorManagerDialog(QDialog):
                 splitter.setSizes([int(sizes[0] + over), int(sizes[1] - over)])
             finally:
                 self._setting_splitter_sizes = False
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return
 
     def eventFilter(self, a0, a1):
@@ -2369,7 +2369,7 @@ class EmbyActorManagerDialog(QDialog):
                         if a1.matches(QKeySequence.StandardKey.Copy):
                             if self._copy_selected_cells_to_clipboard():
                                 return True
-                    except (RuntimeError, AttributeError):
+                    except RuntimeError, AttributeError:
                         pass
                     except Exception:
                         pass
@@ -2378,7 +2378,7 @@ class EmbyActorManagerDialog(QDialog):
                         self._apply_column_widths()
                     if (a0 is table.viewport()) or (log is not None and a0 is log.viewport()):
                         self._queue_viewport_refit()
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
@@ -2402,12 +2402,12 @@ class EmbyActorManagerDialog(QDialog):
             for ix in indexes:
                 try:
                     r, c = int(ix.row()), int(ix.column())
-                except (RuntimeError, AttributeError, ValueError, TypeError):
+                except RuntimeError, AttributeError, ValueError, TypeError:
                     continue
                 try:
                     item = table.item(r, c)
                     txt = item.text() if item is not None else (ix.data(Qt.ItemDataRole.DisplayRole) or "")
-                except (RuntimeError, AttributeError):
+                except RuntimeError, AttributeError:
                     continue
                 except Exception:
                     continue
@@ -2422,7 +2422,7 @@ class EmbyActorManagerDialog(QDialog):
             # 必然已存在 QApplication，取剪贴板不会返回 None。
             QGuiApplication.clipboard().setText("\n".join(lines))  # type: ignore[union-attr]
             return True
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return False
         except Exception:
             return False
@@ -2440,7 +2440,7 @@ class EmbyActorManagerDialog(QDialog):
             if getattr(self, "_viewport_refit_queued", False):
                 return
             self._viewport_refit_queued = True
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return
         except Exception:
             return
@@ -2453,7 +2453,7 @@ class EmbyActorManagerDialog(QDialog):
                 return
             if self.isMinimized() or (self.windowState() & Qt.WindowState.WindowMinimized):
                 return
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return
         except Exception:
             return
@@ -2478,7 +2478,7 @@ class EmbyActorManagerDialog(QDialog):
                 return
             if table.viewport().height() == want_vp and log.viewport().height() == want_log:
                 return
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return
         except Exception:
             return
@@ -2515,14 +2515,14 @@ class EmbyActorManagerDialog(QDialog):
                 try:
                     _w.setMinimumWidth(0)
                     _w.setMaximumWidth(self._HELP_MAX_W)
-                except (RuntimeError, AttributeError):
+                except RuntimeError, AttributeError:
                     pass
             for _attr, _w in _widgets:
                 if _w is None:
                     continue
                 try:
                     setattr(self, _attr, _w.sizeHint().width())
-                except (RuntimeError, AttributeError):
+                except RuntimeError, AttributeError:
                     pass
             # 同步按钮内边距开销：自然宽度 - 当前文案字宽，窄态按实时文案重算自然宽度时用。
             _sync = getattr(self, "btn_sync", None)
@@ -2530,7 +2530,7 @@ class EmbyActorManagerDialog(QDialog):
                 try:
                     _adv = _sync.fontMetrics().horizontalAdvance(_sync.text())
                     self._sync_overhead_w = _sync.sizeHint().width() - _adv
-                except (RuntimeError, AttributeError):
+                except RuntimeError, AttributeError:
                     pass
         self._apply_button_widths()
         self._apply_button_heights()
@@ -2565,7 +2565,7 @@ class EmbyActorManagerDialog(QDialog):
                 self.resize(want, self.height())
                 # 缩宽改变了 frame 宽度，居中结果随之改变 → 重定位回屏幕正中央。
                 self._center_on_screen()
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
@@ -2580,7 +2580,7 @@ class EmbyActorManagerDialog(QDialog):
         try:
             if event.type() == QEvent.Type.WindowStateChange and not self._is_wide_state():
                 QTimer.singleShot(0, self._shrink_narrow_width)
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
@@ -2714,7 +2714,7 @@ class EmbyActorManagerDialog(QDialog):
             if self.isMinimized() or (self.windowState() & Qt.WindowState.WindowMinimized):
                 return
             maximized = self.isMaximized() or self.isFullScreen()
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return
         except Exception:
             maximized = False
@@ -2814,7 +2814,7 @@ class EmbyActorManagerDialog(QDialog):
             if not getattr(self, "_fit_verify_queued", False):
                 self._fit_verify_queued = True
                 QTimer.singleShot(0, self._fit_verify_tick)
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             # C++ 对象已销毁等竞态：纯外观调整，静默放弃
             pass
 
@@ -3375,7 +3375,7 @@ class EmbyActorManagerDialog(QDialog):
         """数据工具下拉框：0 数据获取 / 1 数据清洗 / 2 数据导出 / 3 数据导入。"""
         try:
             text = self.cmb_data_tool.itemText(index)
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return
         if text == "数据获取":
             self._on_prepare_preview()
@@ -3519,7 +3519,7 @@ class EmbyActorManagerDialog(QDialog):
                     return
                 try:
                     mgr._clean_rules_dialog = None
-                except (RuntimeError, AttributeError):
+                except RuntimeError, AttributeError:
                     pass
 
             dialog.destroyed.connect(_forget)
@@ -3579,7 +3579,7 @@ class EmbyActorManagerDialog(QDialog):
         """
         try:
             dialog = self._clean_rules_dialog
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             return
         if dialog is None:
             return
@@ -3589,7 +3589,7 @@ class EmbyActorManagerDialog(QDialog):
         except RuntimeError:
             try:
                 self._clean_rules_dialog = None
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 pass
             return
         # 先摘除引用再销毁: 规则窗关闭不影响管理器, 管理器清洗也不影响规则窗。
@@ -3834,7 +3834,7 @@ class EmbyActorManagerDialog(QDialog):
                     continue
                 try:
                     sig.disconnect()
-                except (TypeError, RuntimeError):
+                except TypeError, RuntimeError:
                     pass
             if hasattr(thread, "abort"):
                 thread.abort()
@@ -3858,7 +3858,7 @@ class EmbyActorManagerDialog(QDialog):
         """行内编辑器开关跟踪：create/destroy 时由代理回调，供双击先提交再弹详情窗。"""
         try:
             self._cell_editor = editor
-        except (RuntimeError, AttributeError):
+        except RuntimeError, AttributeError:
             pass
         except Exception:
             pass
@@ -3872,14 +3872,14 @@ class EmbyActorManagerDialog(QDialog):
         try:
             table.commitData(editor)
             table.closeEditor(editor, QAbstractItemDelegate.EndEditHint.SubmitModelCache)
-        except (RuntimeError, AttributeError, TypeError):
+        except RuntimeError, AttributeError, TypeError:
             pass
         except Exception:
             pass
         finally:
             try:
                 self._cell_editor = None
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 pass
             except Exception:
                 pass
@@ -3897,7 +3897,7 @@ class EmbyActorManagerDialog(QDialog):
             name_item = table.item(int(row), 1)
             name = name_item.text() if name_item is not None else ""
             return next((a for a in self._actors if a.name == name), None)
-        except (RuntimeError, AttributeError, ValueError, TypeError):
+        except RuntimeError, AttributeError, ValueError, TypeError:
             return None
         except Exception:
             return None
@@ -3912,7 +3912,7 @@ class EmbyActorManagerDialog(QDialog):
             if item is None:
                 return
             table.editItem(item)
-        except (RuntimeError, AttributeError, ValueError, TypeError):
+        except RuntimeError, AttributeError, ValueError, TypeError:
             pass
         except Exception:
             pass
@@ -3926,7 +3926,7 @@ class EmbyActorManagerDialog(QDialog):
                 return
             QGuiApplication.clipboard().setText(item.text())  # type: ignore[union-attr]
             self.log(f"📋 已复制: {item.text()[:60]}")
-        except (RuntimeError, AttributeError, ValueError, TypeError):
+        except RuntimeError, AttributeError, ValueError, TypeError:
             pass
         except Exception:
             pass
@@ -3936,7 +3936,7 @@ class EmbyActorManagerDialog(QDialog):
         在这里转调同一套双击逻辑（先提交编辑器，再按 actor_id 弹详情窗）。"""
         try:
             self._on_table_double_clicked(int(row), int(col))
-        except (RuntimeError, AttributeError, ValueError, TypeError):
+        except RuntimeError, AttributeError, ValueError, TypeError:
             pass
         except Exception:
             pass
@@ -3950,7 +3950,7 @@ class EmbyActorManagerDialog(QDialog):
             if actor is None:
                 return
             self._open_detail_dialog(actor)
-        except (RuntimeError, AttributeError, ValueError, TypeError):
+        except RuntimeError, AttributeError, ValueError, TypeError:
             pass
         except Exception:
             pass
@@ -4073,7 +4073,7 @@ class EmbyActorManagerDialog(QDialog):
             # 0 列 UserRole 存 actor_id：排序/改名后按行反查不错位。
             try:
                 icon_item.setData(Qt.ItemDataRole.UserRole, actor.actor_id)
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 pass
             except Exception:
                 pass
@@ -4082,7 +4082,7 @@ class EmbyActorManagerDialog(QDialog):
             name_item.setToolTip(f"ID: {actor.actor_id}")
             try:
                 name_item.setData(Qt.ItemDataRole.UserRole, actor.name)
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 pass
             except Exception:
                 pass
@@ -4121,7 +4121,7 @@ class EmbyActorManagerDialog(QDialog):
             birthday_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             try:
                 birthday_item.setData(Qt.ItemDataRole.UserRole, birthday_text)
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 pass
             except Exception:
                 pass
@@ -4130,7 +4130,7 @@ class EmbyActorManagerDialog(QDialog):
             location_item = QTableWidgetItem(location_text)
             try:
                 location_item.setData(Qt.ItemDataRole.UserRole, location_text)
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 pass
             except Exception:
                 pass
@@ -4148,7 +4148,7 @@ class EmbyActorManagerDialog(QDialog):
             detail_item = QTableWidgetItem(overview_text)
             try:
                 detail_item.setData(Qt.ItemDataRole.UserRole, eff_overview or "")
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 pass
             except Exception:
                 pass
@@ -4157,7 +4157,7 @@ class EmbyActorManagerDialog(QDialog):
             tags_item = QTableWidgetItem(tags_text)
             try:
                 tags_item.setData(Qt.ItemDataRole.UserRole, ", ".join(eff_taglines) if eff_taglines else "")
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 pass
             except Exception:
                 pass
@@ -4179,7 +4179,7 @@ class EmbyActorManagerDialog(QDialog):
                         _it.setFlags(_fl | Qt.ItemFlag.ItemIsEditable)
                     else:
                         _it.setFlags(_fl & ~Qt.ItemFlag.ItemIsEditable)
-                except (RuntimeError, AttributeError):
+                except RuntimeError, AttributeError:
                     pass
                 except Exception:
                     pass
@@ -4219,7 +4219,7 @@ class EmbyActorManagerDialog(QDialog):
                 self._commit_overview_edit(item, actor, text)
             elif col == 7:
                 self._commit_taglines_edit(item, actor, text)
-        except (RuntimeError, AttributeError, ValueError, TypeError):
+        except RuntimeError, AttributeError, ValueError, TypeError:
             pass
         except Exception:
             pass
@@ -4306,7 +4306,7 @@ class EmbyActorManagerDialog(QDialog):
             item.setText(display_text)
             try:
                 item.setData(Qt.ItemDataRole.UserRole, full_value)
-            except (RuntimeError, AttributeError):
+            except RuntimeError, AttributeError:
                 pass
             except Exception:
                 pass
@@ -4317,7 +4317,7 @@ class EmbyActorManagerDialog(QDialog):
         """编辑生效后：刷新该行展示（状态图标/绿底/规范文本）+ 同步按钮计数 + 日志。"""
         try:
             row = int(item.row())
-        except (RuntimeError, AttributeError, ValueError, TypeError):
+        except RuntimeError, AttributeError, ValueError, TypeError:
             return
         except Exception:
             return
@@ -4338,7 +4338,7 @@ class EmbyActorManagerDialog(QDialog):
                 it.setText(display)
                 try:
                     it.setData(Qt.ItemDataRole.UserRole, full)
-                except (RuntimeError, AttributeError):
+                except RuntimeError, AttributeError:
                     pass
                 except Exception:
                     pass
@@ -5038,15 +5038,15 @@ class ActorSourceTestDialog(QDialog):
         if thread is not None:
             try:
                 thread.result.disconnect()
-            except (TypeError, RuntimeError):
+            except TypeError, RuntimeError:
                 pass
             try:
                 thread.progress.disconnect()
-            except (TypeError, RuntimeError):
+            except TypeError, RuntimeError:
                 pass
             try:
                 thread.error.disconnect()
-            except (TypeError, RuntimeError):
+            except TypeError, RuntimeError:
                 pass
             thread.cancel()
             if thread.isRunning() and not thread.wait(5000):
@@ -5058,7 +5058,7 @@ class ActorSourceTestDialog(QDialog):
         try:
             label = self.status_label
             edit = self.name_edit
-        except (AttributeError, RuntimeError):
+        except AttributeError, RuntimeError:
             return
         try:
             label.setText(msg or "")
@@ -5068,7 +5068,7 @@ class ActorSourceTestDialog(QDialog):
                 return
             label.show()
             self._layout_status_overlay()
-        except (AttributeError, RuntimeError):
+        except AttributeError, RuntimeError:
             pass
 
     def _layout_status_overlay(self) -> None:
@@ -5077,7 +5077,7 @@ class ActorSourceTestDialog(QDialog):
         try:
             label = self.status_label
             edit = self.name_edit
-        except (AttributeError, RuntimeError):
+        except AttributeError, RuntimeError:
             return
         try:
             if not label.text():
@@ -5091,7 +5091,7 @@ class ActorSourceTestDialog(QDialog):
             label.setGeometry(edit.width() - w - 6, 0, w, h)
             label.raise_()
             edit.setTextMargins(0, 0, w + 8, 0)
-        except (AttributeError, RuntimeError, ValueError):
+        except AttributeError, RuntimeError, ValueError:
             pass
 
     def _set_running(self, running: bool) -> None:

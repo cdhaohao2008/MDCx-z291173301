@@ -5,7 +5,7 @@ if TYPE_CHECKING:
 
 
 class BrowserProvider:
-    def __init__(self, config: "Config"):
+    def __init__(self, config: Config):
         self.config = config
 
     async def get_browser(self) -> Any:

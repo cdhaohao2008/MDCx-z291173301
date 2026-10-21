@@ -181,7 +181,7 @@ class ConfigManager:
             self.computed = computed
         self._close_old_computed(old_computed)
 
-    def acquire_computed(self) -> "ComputedLease":
+    def acquire_computed(self) -> ComputedLease:
         return ComputedLease(self)
 
     def _close_old_computed(self, old_computed: Computed | None):

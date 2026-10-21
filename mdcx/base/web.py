@@ -354,7 +354,7 @@ def _should_retry_link_error(error: str) -> bool:
 def _parse_content_length(value: Any) -> int | None:
     try:
         length = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return length if length > 0 else None
 
@@ -607,7 +607,7 @@ async def check_url(url: str, length: bool = False, real_url: bool = False):
                 # 如果返回内容的文件大小 < 8k，视为不可用
                 try:
                     content_length_int = int(str(content_length).strip())
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     log_console.add_log(f"🔴 检测链接失败: 返回大小不可解析({content_length}) {true_url}")
                     return None
                 if content_length_int < 8192:
@@ -1265,7 +1265,7 @@ def check_version() -> RemoteVersion | None:
 
     try:
         timeout = max(float(manager.config.timeout), 5.0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         timeout = 5.0
     configured_proxy = manager.config.proxy.strip() if manager.config.use_proxy and manager.config.proxy else ""
     request_proxies = [configured_proxy] if configured_proxy else []
@@ -1445,14 +1445,14 @@ def _read_version_cache(max_age: float) -> tuple[RemoteVersion, float] | None:
     """
     try:
         raw = json.loads(_version_cache_path().read_text(encoding="UTF-8"))
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
     if not isinstance(raw, dict):
         return None
     try:
         remote = RemoteVersion(tag=int(raw["tag"]), name=str(raw["name"]))
         checked_at = float(raw["checked_at"])
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         return None
     if time.time() - checked_at > max_age:
         return None
@@ -1467,7 +1467,7 @@ def _write_version_cache(remote: RemoteVersion) -> None:
         tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="UTF-8")
         os.replace(tmp, path)
-    except (OSError, TypeError, ValueError):
+    except OSError, TypeError, ValueError:
         return
 
 

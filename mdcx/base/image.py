@@ -157,7 +157,7 @@ async def _add_to_pic(pic_path: Path, img_pic: Image.Image, mark_size: int, coun
         try:
             scroll_high = int(img_pic.height * mark_size / 40)
             scroll_width = int(scroll_high * img_subt.width / img_subt.height)
-        except (ZeroDivisionError, ValueError, OverflowError):
+        except ZeroDivisionError, ValueError, OverflowError:
             return
         if scroll_high <= 0 or scroll_width <= 0:
             return

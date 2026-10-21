@@ -63,7 +63,7 @@ def _duration_bucket(runtime: str) -> int | None:
         return None
     try:
         minutes = int(float(str(runtime).strip()))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if minutes <= 0:
         return None
@@ -93,7 +93,7 @@ def _parse_score(score: str) -> float | None:
     try:
         cleaned = re.sub(r"\(.*?\)", "", str(score)).strip().replace("分", "").replace(",", ".").replace("　", "")
         return float(cleaned)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 

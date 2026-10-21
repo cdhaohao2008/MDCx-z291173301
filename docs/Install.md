@@ -3,7 +3,7 @@
 ## 系统要求
 
 - **操作系统**：Windows 10+ / macOS 11+ / Linux（Ubuntu 20.04+、Debian 11+、CentOS 8+）
-- **Python**：3.13.4 或更高版本（源码运行需要）
+- **Python**：3.14 或更高版本（推荐 3.15；源码运行需要）
 - **网络**：需要能访问数据源网站
 
 ## 方法一：用 Release 包（推荐）
@@ -26,7 +26,7 @@ chmod +x MDCx-...-linux-x86_64-...
 ## 方法二：从源码运行
 
 ```bash
-# 1. 装 Python 3.13+
+# 1. 装 Python 3.14+（推荐 3.15）
 # 去 https://www.python.org/downloads/ 下载安装
 # Windows 安装时记得勾 "Add Python to PATH"
 

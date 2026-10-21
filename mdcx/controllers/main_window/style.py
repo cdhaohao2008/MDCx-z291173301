@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from .main_window import MyMAinWindow
 
 
-def _apply_log_document_style(self: "MyMAinWindow", dark: bool) -> None:
+def _apply_log_document_style(self: MyMAinWindow, dark: bool) -> None:
     t = _tokens(dark)
     document_style = f"""
         a {{
@@ -103,7 +103,7 @@ def _nfo_lib_top_button_qss(dark: bool) -> str:
         """
 
 
-def apply_nfo_lib_top_button_style(self: "MyMAinWindow", dark: bool) -> None:
+def apply_nfo_lib_top_button_style(self: MyMAinWindow, dark: bool) -> None:
     """套用信息管理顶栏按钮样式，并把宽高钉死在套用前的尺寸上。
 
     QSS 里的 padding/边框会改变控件的 sizeHint，直接套用会让顶部栏重新排版；
@@ -122,7 +122,7 @@ def apply_nfo_lib_top_button_style(self: "MyMAinWindow", dark: bool) -> None:
         button.setFixedSize(natural)
 
 
-def set_style(self: "MyMAinWindow"):
+def set_style(self: MyMAinWindow):
     if self.dark_mode:
         self.set_dark_style()
         return
@@ -618,7 +618,7 @@ def set_style(self: "MyMAinWindow"):
     apply_nfo_lib_top_button_style(self, False)
 
 
-def set_dark_style(self: "MyMAinWindow"):
+def set_dark_style(self: MyMAinWindow):
     apply_application_palette(True)
     _apply_log_document_style(self, True)
     self.Ui.treeWidget_number.setStyleSheet(build_tree_widget_style(True))

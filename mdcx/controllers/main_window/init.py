@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 _SITE_STATUS_DOT_PX = 8  # 状态圆点边长（逻辑像素）
 
 
-def _effective_dpr(widget: "QWidget | None" = None) -> float:
+def _effective_dpr(widget: QWidget | None = None) -> float:
     """图标绘制用的有效缩放比。
 
     优先取图标所在控件的 `devicePixelRatioF()`：多屏时各屏 dpr 不同，按控件取才准；
@@ -58,7 +58,7 @@ def _effective_dpr(widget: "QWidget | None" = None) -> float:
     return dpr if dpr > 0 else 1.0
 
 
-def _site_status_icon(level: str, widget: "QWidget | None" = None) -> QIcon:
+def _site_status_icon(level: str, widget: QWidget | None = None) -> QIcon:
     """站点检测状态圆点图标：ok 绿 / warn 黄 / fail 红；未知或 skip 返回空图标。
 
     画布按 dpr 放大到设备像素并挂上 `setDevicePixelRatio`，绘制仍在逻辑坐标系里做，
@@ -182,7 +182,7 @@ def _populate_site_combo(combo: QComboBox, site_values: list[str], *, with_capti
         view.setTextElideMode(Qt.TextElideMode.ElideRight)
 
 
-def refresh_network_check_badges(self: "MyMAinWindow") -> None:
+def refresh_network_check_badges(self: MyMAinWindow) -> None:
     """检测完成后刷新三个站点下拉框的状态图标与 tooltip（不重排文本，保留当前选中项）。"""
     invalidate_check_cache()
     for combo in (
@@ -472,7 +472,7 @@ def _clamp_tip_pos(anchor: QPoint, width: int, height: int) -> QPoint:
     return QPoint(x, y)
 
 
-_SITE_TIP_LABEL: "_SiteTipLabel | None" = None
+_SITE_TIP_LABEL: _SiteTipLabel | None = None
 
 
 def _site_tip_label() -> _SiteTipLabel:
@@ -742,7 +742,7 @@ def _adaptive_window_sizes(avail_w: int, avail_h: int) -> tuple[int, int, int, i
     return min_w, min_h, def_w, def_h
 
 
-def Init_Ui(self: "MyMAinWindow"):
+def Init_Ui(self: MyMAinWindow):
     self.setWindowTitle("MDCx")  # 设置任务栏标题
     self.setWindowIcon(QIcon(resources.icon_ico))  # 设置任务栏图标
     self.setWindowOpacity(1.0)  # 设置窗口透明度
@@ -932,7 +932,7 @@ def Init_Ui(self: "MyMAinWindow"):
         scroll_area.sync_content_min_height()
 
 
-def _setup_combo_boxes(self: "MyMAinWindow") -> None:
+def _setup_combo_boxes(self: MyMAinWindow) -> None:
     """给所有下拉框统一装 QListView 视图（每下拉至多露 10 行、逐像素滚动）。
 
     view 上**不再设 maximumHeight**（原先写死 322）：弹窗外框（`QComboBoxPrivateContainer`）
@@ -957,7 +957,7 @@ def _setup_combo_boxes(self: "MyMAinWindow") -> None:
         combo_view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
 
-def Init_Singal(self: "MyMAinWindow"):
+def Init_Singal(self: MyMAinWindow):
     # region 外部信号量连接
     signal_qt.log_text.connect(self.show_log_text)  # 可视化日志输出
     signal_qt.scrape_info.connect(self.show_scrape_info)  # 可视化日志输出
@@ -1279,7 +1279,7 @@ def Init_Singal(self: "MyMAinWindow"):
     self.net_check_item_done.connect(self._on_net_check_item)
 
 
-def Init_QSystemTrayIcon(self: "MyMAinWindow"):
+def Init_QSystemTrayIcon(self: MyMAinWindow):
     self.tray_icon = QSystemTrayIcon(self)
     self.tray_icon.setIcon(QIcon(resources.icon_ico))
     self.tray_icon.activated.connect(self.tray_icon_click)
@@ -1303,7 +1303,7 @@ def Init_QSystemTrayIcon(self: "MyMAinWindow"):
     # icon的值  0没有图标  1是提示  2是警告  3是错误
 
 
-def init_QTreeWidget(self: "MyMAinWindow"):
+def init_QTreeWidget(self: MyMAinWindow):
     # 初始化树状控件
     try:
         movie_path_text = ";".join(str(path) for path in get_movie_path_setting().movie_paths)

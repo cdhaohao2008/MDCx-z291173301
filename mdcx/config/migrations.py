@@ -33,7 +33,7 @@ def _migrate_actor_clean_rules(data: dict[str, Any]) -> None:
         for item in value:
             try:
                 original, replacement = item
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 kept.append(item)
                 continue
             if isinstance(original, str) and isinstance(replacement, str):

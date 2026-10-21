@@ -170,7 +170,7 @@ def parse_fc2cmadb_inertia_html(html_text: str) -> dict[str, Any] | None:
     for script_text in doc.xpath('//script[@data-page="app" and @type="application/json"]/text()'):
         try:
             page_data = json.loads(script_text)
-        except (TypeError, json.JSONDecodeError):
+        except TypeError, json.JSONDecodeError:
             continue
         props = page_data.get("props", {}) if isinstance(page_data, dict) else {}
         article = props.get("article", {}) if isinstance(props, dict) else {}
@@ -201,7 +201,7 @@ def extract_inertia_version(html_text: str) -> str | None:
     for script_text in doc.xpath('//script[@data-page="app" and @type="application/json"]/text()'):
         try:
             page_data = json.loads(script_text)
-        except (TypeError, json.JSONDecodeError):
+        except TypeError, json.JSONDecodeError:
             continue
         if isinstance(page_data, dict):
             version = page_data.get("version")

@@ -119,7 +119,7 @@ async def _image_size_async(pic_path: str | Path) -> tuple[int, int] | None:
     try:
         if not await asyncio.to_thread(os.path.exists, pic_path):
             return None
-    except (OSError, TypeError, ValueError):
+    except OSError, TypeError, ValueError:
         return None
     return await asyncio.to_thread(_image_size_blocking, pic_path)
 

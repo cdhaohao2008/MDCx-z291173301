@@ -99,10 +99,10 @@ class GenericBaseCrawler[T: Context = Context](ABC):
             site = cls.site()
             if site is not None and not getattr(cls, "_skip_auto_register", False):
                 crawler_registry[site] = cls  # type: ignore[assignment]
-        except (TypeError, NotImplementedError):
+        except TypeError, NotImplementedError:
             pass
 
-    def __init__(self, client: "AsyncWebClient", base_url: str = "", browser=None):
+    def __init__(self, client: AsyncWebClient, base_url: str = "", browser=None):
         """
         初始化爬虫实例.
 

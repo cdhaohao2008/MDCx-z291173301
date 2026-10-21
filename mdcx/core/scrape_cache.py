@@ -302,7 +302,7 @@ class ScrapeStateCache:
         for row in rows:
             try:
                 data = json.loads(row["summary_json"])
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 continue
             if isinstance(data, dict) and data:
                 summaries.append(data)

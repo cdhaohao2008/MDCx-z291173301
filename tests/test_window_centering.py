@@ -428,7 +428,7 @@ def _top_level_window_classes() -> dict[str, str]:
     for path in sorted(_MDCX_ROOT.rglob("*.py")):
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))
-        except (SyntaxError, UnicodeDecodeError):
+        except SyntaxError, UnicodeDecodeError:
             continue
         for node in ast.walk(tree):
             if not isinstance(node, ast.ClassDef):
@@ -448,7 +448,7 @@ def _class_index() -> dict[str, str]:
     for path in sorted(_MDCX_ROOT.rglob("*.py")):
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))
-        except (SyntaxError, UnicodeDecodeError):
+        except SyntaxError, UnicodeDecodeError:
             continue
         rel = str(path.relative_to(_MDCX_ROOT.parent)).replace("\\", "/")
         for node in ast.walk(tree):
@@ -469,7 +469,7 @@ def _class_source_files(class_name: str, index: dict[str, str]) -> list[str]:
         files.add(rel)
         try:
             tree = ast.parse((_MDCX_ROOT.parent / rel).read_text(encoding="utf-8"))
-        except (SyntaxError, UnicodeDecodeError):
+        except SyntaxError, UnicodeDecodeError:
             continue
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef) and node.name == name:

@@ -274,7 +274,7 @@ def _check_orphan_hyperlinks(xlsx: Path):
             if not sheet_xml:
                 return errors  # 结构异常由 read_only 阶段负责
             xml_text = zf.read(sheet_xml).decode("utf-8")
-    except (zipfile.BadZipFile, OSError, KeyError):
+    except zipfile.BadZipFile, OSError, KeyError:
         return errors
 
     defined = set(_CELL_PATTERN.findall(xml_text))
@@ -310,7 +310,7 @@ def _locate_sheet_xml(zf: zipfile.ZipFile, names: set[str]) -> str | None:
         if target.startswith("/"):
             return target.lstrip("/")
         return f"xl/{target}"
-    except (KeyError, OSError):
+    except KeyError, OSError:
         return None
 
 

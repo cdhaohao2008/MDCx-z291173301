@@ -100,7 +100,7 @@ def _extract_deeplx_text(res: object) -> str | None:
         try:
             if int(res["code"]) != 200:  # code=106 等均为服务端错误，不应视为成功
                 return None
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
     data = res["data"]
     return data if isinstance(data, str) else None
@@ -270,7 +270,7 @@ def _reset_llm_translate_cache_for_test() -> None:
     _llm_translate_cache = None
 
 
-def _get_llm_translate_cache() -> "LLMTranslateCache":
+def _get_llm_translate_cache() -> LLMTranslateCache:
     """LLM 翻译缓存单例（进程内同批次/重刮场景复用）。
 
     缓存绑定配置指纹（model/url/关闭思考开关）：切换模型或服务商后自动失效重建，

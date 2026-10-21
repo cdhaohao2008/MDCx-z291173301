@@ -584,7 +584,7 @@ class FixedScrapingType(Enum):
     DONGMAN = "dongman"
 
     @classmethod
-    def dropdown_order(cls) -> tuple["FixedScrapingType", ...]:
+    def dropdown_order(cls) -> tuple[FixedScrapingType, ...]:
         """「锁定刮削类型」下拉框八项的排列顺序，.ui 的 comboBox_fixed_scraping_type 与之一一对应。
 
         **与枚举声明顺序不同**：2.6.0 起「国产短剧」按用户要求排在「国产传媒」之下，

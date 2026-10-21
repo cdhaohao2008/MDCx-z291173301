@@ -2,7 +2,7 @@
 #
 # 工具二进制不入库：打包时由 scripts/fetch_sr_tools.py 从官方 GitHub Release 拉取，
 # 校验 sha256 后解压到 build/sr_tools。这里按月预热 actions/cache，
-# 让 build-py314.yml / package-trawl.yml 打包时免下载、提速构建。
+# 让 build-py314.yml / build-py315.yml / package-trawl.yml 打包时免下载、提速构建。
 #
 # 刷新失败（上游重新打包导致 sha256 不匹配）会让作业变红并保留旧缓存，
 # 避免坏包扩散到发布产物。
@@ -20,10 +20,12 @@ permissions:
   contents: read
 
 env:
-  # 锁定 3.14：setup-python 不写版本会取最新（现为 3.15），而 jiter/av/lxml 等
-  # 尚无 cp315 wheel，会退回源码编译；jiter 的 PyO3 0.27.1 最高只支持到 3.14，直接失败。
-  # 与 build-py314.yml 同口径（python-version + UV_PYTHON 双保险）。
-  UV_PYTHON: "3.14"
+  # 锁定 3.15：与 build-py315.yml / ci.yaml 同口径（python-version + UV_PYTHON 双保险）。
+  # 依赖已全部换成有 cp315 wheel 的版本，只剩 PyYAML 没有 cp315 wheel（见安装步骤）。
+  UV_PYTHON: "3.15"
+  # 关掉 uv run 的隐式 sync：PyYAML 是用 cp314 wheel 顶替装的，隐式 sync 会把它
+  # 判定为需重新安装并再次失败。
+  UV_NO_SYNC: "1"
 
 jobs:
   refresh:
@@ -40,21 +42,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Python 3.14
+      - name: Set up Python 3.15
         uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          python-version: "3.15"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.1.0
         with:
           activate-environment: true
 
-      # 防 uv 悄悄挑到别的解释器（与 build-py314.yml 同款断言）。
-      - name: Verify Python 3.14 in use
+      # 防 uv 悄悄挑到别的解释器（与 build-py315.yml 同款断言）。
+      - name: Verify Python 3.15 in use
         shell: bash
         run: |
-          python -c 'import sys; print(sys.version); assert sys.version_info[:2] == (3, 14), f"expected 3.14, got {sys.version_info[:2]}"'
+          python -c 'import sys; print(sys.version); assert sys.version_info[:2] == (3, 15), f"expected 3.15, got {sys.version_info[:2]}"'
 
       # Linux 上 import 链（scripts.fetch_sr_tools → mdcx.core.super_resolution →
       # mdcx.signals/resources → PyQt6）需要 Qt 系统库；av 包（pyav/pyav）源码编译
@@ -69,9 +71,16 @@ jobs:
             libavutil-dev libavfilter-dev libswscale-dev libswresample-dev \
             libxml2-dev libxslt1-dev libxslt-dev python3-dev zlib1g-dev gcc
 
+      # PyYAML 至今没有 cp315 wheel（6.0.3 只发到 cp314），3.15 下只能源码编译
+      # （Windows runner 要 MSVC、Linux 要 gcc + Cython）。用 cp314 wheel 顶替：
+      # `_yaml` 只是可选的 C 加速，缺它时 PyYAML 自动退回纯 Python 实现。
       - name: Install locked dependencies
         shell: bash
-        run: uv sync --all-extras --dev
+        run: |
+          uv sync --all-extras --dev --no-install-package pyyaml
+          VENV_PY="$PWD/.venv/bin/python"
+          [ -x "$VENV_PY" ] || VENV_PY="$PWD/.venv/Scripts/python.exe"
+          uv pip install --python "$VENV_PY" --python-version 3.14 --only-binary=:all: "pyyaml==6.0.3"
 
       - name: Cache SR tools
         uses: actions/cache@v6

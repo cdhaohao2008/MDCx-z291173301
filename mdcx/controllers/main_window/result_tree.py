@@ -142,7 +142,7 @@ class ResultTreeMixin:
         self._set_main_two_line(ui.label_outline, getattr(self, "_main_outline_text", ""))
         self._set_main_two_line(ui.label_tag, getattr(self, "_main_tag_text", ""))
 
-    def set_main_info(self, show_data: "ShowData | None"):
+    def set_main_info(self, show_data: ShowData | None):
         if show_data is not None:
             self.show_data = show_data
             file_info = show_data.file_info

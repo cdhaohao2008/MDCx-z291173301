@@ -124,7 +124,7 @@ def normalize_release(value: object) -> str:
 def seconds_to_minutes(value: object) -> str:
     try:
         seconds = int(float(str(value).strip()))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return ""
     if seconds <= 0:
         return ""

@@ -550,7 +550,7 @@ def _teardown_qt():
             inst = QApplication.instance()
             if inst is not None:
                 sip.delete(inst)
-        except (RuntimeError, ValueError, ImportError):
+        except RuntimeError, ValueError, ImportError:
             pass
     except Exception:
         pass

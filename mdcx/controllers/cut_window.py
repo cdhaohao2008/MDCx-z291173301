@@ -91,7 +91,7 @@ class CutWindow(QDialog):
     _SIDE_BTN_BOTTOM = 10  # 右侧面板动作按钮距底
     _SIDE_BTN_GAP = 10  # 右侧面板动作按钮彼此间距
 
-    def __init__(self, parent: "MyMAinWindow"):
+    def __init__(self, parent: MyMAinWindow):
         # 独立顶层窗口（不挂 owner）：主窗口最小化/隐藏/切到托盘都不牵连本窗口，
         # 本窗口最小化/最大化也不动主窗口。parent 只作为 Python 引用留着取配置与发信号。
         super().__init__()
@@ -462,7 +462,7 @@ class CutWindow(QDialog):
         return poster_path
 
     # 显示要裁剪的图片
-    def showimage(self, img_path: Path | None = None, json_data: "FileInfo | None" = None):
+    def showimage(self, img_path: Path | None = None, json_data: FileInfo | None = None):
         self.Ui.label_backgroud_pic.setText(" ")  # 清空背景
         # 初始化数据
         self.Ui.checkBox_add_sub.setChecked(False)

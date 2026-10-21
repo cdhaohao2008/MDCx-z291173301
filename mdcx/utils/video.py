@@ -50,13 +50,13 @@ def get_video_metadata_ffmpeg(p: Path) -> tuple[int, str]:
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, creationflags=creationflags, timeout=30)
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         return 0, ""
     if result.returncode != 0 or not result.stdout:
         return 0, ""
     try:
         data = json.loads(result.stdout)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return 0, ""
     streams = data.get("streams")
     if not isinstance(streams, list):
@@ -70,7 +70,7 @@ def get_video_metadata_ffmpeg(p: Path) -> tuple[int, str]:
     if video_stream:
         try:
             height = int(video_stream.get("height", 0) or 0)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             height = 0
         codec_name = video_stream.get("codec_name") or ""
         codec_fourcc = str(codec_name).upper()

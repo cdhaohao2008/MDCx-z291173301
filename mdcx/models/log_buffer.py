@@ -15,8 +15,8 @@ except ImportError:
 
 class LogBuffer:
     _lock = threading.Lock()
-    all_buffers: dict[int, dict[str, "LogBuffer"]] = {}
-    global_buffer: "LogBuffer | None" = None
+    all_buffers: dict[int, dict[str, LogBuffer]] = {}
+    global_buffer: LogBuffer | None = None
 
     # 任务树归因：记录"当前逻辑任务组"的根 task_id。
     # asyncio.create_task 会拷贝当前 context，子协程自动继承同一 root——
@@ -25,7 +25,7 @@ class LogBuffer:
     _ROOT: contextvars.ContextVar[int | None] = contextvars.ContextVar("logbuffer_root", default=None)
 
     @staticmethod
-    def _global_buffer() -> "LogBuffer":
+    def _global_buffer() -> LogBuffer:
         if LogBuffer.global_buffer is None:
             LogBuffer.global_buffer = LogBuffer()
         return LogBuffer.global_buffer
@@ -73,7 +73,7 @@ class LogBuffer:
         return root
 
     @staticmethod
-    def _get_buffer(category: str) -> "LogBuffer":
+    def _get_buffer(category: str) -> LogBuffer:
         """按任务组 root 归因取 buffer。
 
         写入侧统一落【root】键（而非当前 task_id）：子协程与 to_thread
@@ -129,11 +129,11 @@ class LogBuffer:
         LogBuffer.clear_task()
 
     @staticmethod
-    def log() -> "LogBuffer":
+    def log() -> LogBuffer:
         return LogBuffer._get_buffer("log")
 
     @staticmethod
-    def web() -> "LogBuffer":
+    def web() -> LogBuffer:
         """爬虫/网络/图片等过程明细通道（议题 #98）。
 
         与 log 通道的关键区别：log 通道是影片处理的关键节点行（file/number/
@@ -145,16 +145,16 @@ class LogBuffer:
 
     @staticmethod
     @deprecated("仅用于向后兼容")
-    def info() -> "LogBuffer":
+    def info() -> LogBuffer:
         return LogBuffer._get_buffer("info")
 
     @staticmethod
-    def error() -> "LogBuffer":
+    def error() -> LogBuffer:
         return LogBuffer._get_buffer("error")
 
     @staticmethod
     @deprecated("内容不会被任何位置使用")
-    def req() -> "LogBuffer":
+    def req() -> LogBuffer:
         return LogBuffer._get_buffer("req")
 
     def __init__(self):

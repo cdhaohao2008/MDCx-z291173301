@@ -74,7 +74,7 @@ BRAND_PREFIX_SITES: dict[str, Website] = {
 }
 
 
-def _is_site_disabled(config: "Config", site: Website) -> bool:
+def _is_site_disabled(config: Config, site: Website) -> bool:
     """站点是否被用户禁用；旧配置/测试桩没有该字段时按全部启用处理。"""
     return site in (getattr(config, "website_disabled", None) or ())
 
@@ -163,7 +163,7 @@ class ScrapeClassification:
     mosaic: str = ""
 
 
-def classify_scrape_task(task_input: CrawlTask, config: "Config", use_fixed_type: bool = True) -> ScrapeClassification:
+def classify_scrape_task(task_input: CrawlTask, config: Config, use_fixed_type: bool = True) -> ScrapeClassification:
     file_number = task_input.number or ""
     file_path = task_input.file_path
     file_path_str = str(file_path).lower() if file_path else ""
@@ -254,7 +254,7 @@ def apply_scrape_classification(result: CrawlersResult, classification: ScrapeCl
 
 
 def classify_existing_scrape_result(
-    task_input: CrawlTask, result: CrawlersResult, config: "Config", use_fixed_type: bool = True
+    task_input: CrawlTask, result: CrawlersResult, config: Config, use_fixed_type: bool = True
 ) -> ScrapeClassification:
     # 读取已有 NFO 时保留文件上下文，只用 NFO 中更可信的番号和马赛克覆盖分类输入。
     classification_input = update(
@@ -313,7 +313,7 @@ def _deal_res(res: CrawlersResult) -> CrawlersResult:
 
 
 class FileScraper:
-    def __init__(self, config: "Config", crawler_provider: "CrawlerProviderProtocol"):
+    def __init__(self, config: Config, crawler_provider: CrawlerProviderProtocol):
         self.config = config
         self.crawler_provider = crawler_provider
 

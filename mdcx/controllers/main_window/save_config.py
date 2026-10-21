@@ -54,11 +54,11 @@ def _int_or(text: str, default: int) -> int:
     """
     try:
         return int(text)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return default
 
 
-def save_config(self: "MyMAinWindow"):
+def save_config(self: MyMAinWindow):
     """
     从 UI 获取配置并保存到 config 对象中, 并更新配置文件
     """

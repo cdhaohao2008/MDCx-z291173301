@@ -1538,7 +1538,7 @@ class FieldPriorityDialog(CenterOnFirstShowMixin, QDialog):
                 skip_check.setChecked(False)
 
 
-def setup_site_priority_ui(window: "MyMAinWindow") -> None:
+def setup_site_priority_ui(window: MyMAinWindow) -> None:
     ui = window.Ui
     # 行号对应 layoutWidget_6 里 gridLayout_36 的行：每个「标签 + 输入框 + 两个按钮」
     # 占一行、下一行是绿色说明。2.6.0 起「国产短剧」那一行按用户要求挪到「国产传媒」
@@ -1581,7 +1581,7 @@ def setup_site_priority_ui(window: "MyMAinWindow") -> None:
     apply_site_priority_theme(window)
 
 
-def apply_site_priority_theme(window: "MyMAinWindow") -> None:
+def apply_site_priority_theme(window: MyMAinWindow) -> None:
     dark = bool(getattr(window, "dark_mode", False))
     for info in getattr(window, "_type_website_ui", {}).values():
         _style_config_line_edit(info.line_edit, dark)
@@ -1591,7 +1591,7 @@ def apply_site_priority_theme(window: "MyMAinWindow") -> None:
             _style_inline_button(info.priority_button, dark)
 
 
-def refresh_site_priority_ui(window: "MyMAinWindow") -> None:
+def refresh_site_priority_ui(window: MyMAinWindow) -> None:
     for info in getattr(window, "_type_website_ui", {}).values():
         _set_site_summary(info.line_edit)
 
@@ -1621,7 +1621,7 @@ def _style_inline_button(button: QPushButton, dark: bool = False) -> None:
     )
 
 
-def _open_site_editor(window: "MyMAinWindow", scraping_type: FixedScrapingType) -> None:
+def _open_site_editor(window: MyMAinWindow, scraping_type: FixedScrapingType) -> None:
     info = window._type_website_ui[scraping_type]
     selected_sites = _parse_sites(info.line_edit.text())
     registered_sites: list[Website] = []
@@ -1672,7 +1672,7 @@ def _open_site_editor(window: "MyMAinWindow", scraping_type: FixedScrapingType) 
     refresh_site_priority_ui(window)
 
 
-def _open_priority_editor(window: "MyMAinWindow", scraping_type: FixedScrapingType) -> None:
+def _open_priority_editor(window: MyMAinWindow, scraping_type: FixedScrapingType) -> None:
     info = window._type_website_ui[scraping_type]
     type_sites = _parse_sites(info.line_edit.text())
     if not type_sites:
@@ -1699,7 +1699,7 @@ def _open_priority_editor(window: "MyMAinWindow", scraping_type: FixedScrapingTy
     refresh_site_priority_ui(window)
 
 
-def _hide_legacy_field_website_group(window: "MyMAinWindow") -> None:
+def _hide_legacy_field_website_group(window: MyMAinWindow) -> None:
     window.Ui.groupBox_35.hide()
     window.Ui.layoutWidget2.hide()
     window.Ui.scrollAreaWidgetContents_guaxiaowangzhan.setMinimumHeight(1330)

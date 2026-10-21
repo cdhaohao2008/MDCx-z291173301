@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from .main_window import MyMAinWindow
 
 
-def load_config(self: "MyMAinWindow"):
+def load_config(self: MyMAinWindow):
     """
     读取配置文件并绑定到 UI 组件
     """

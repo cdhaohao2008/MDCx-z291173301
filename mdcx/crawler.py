@@ -14,12 +14,12 @@ if TYPE_CHECKING:
 class CrawlerProviderProtocol(Protocol):
     client: Any
 
-    async def get(self, site: Website) -> "GenericBaseCrawler[Never]": ...
+    async def get(self, site: Website) -> GenericBaseCrawler[Never]: ...
     async def close(self) -> None: ...
 
 
 class CrawlerProvider:
-    def __init__(self, config: "Config", client: "AsyncWebClient", config_getter: Callable[[], "Config"] | None = None):
+    def __init__(self, config: Config, client: AsyncWebClient, config_getter: Callable[[], Config] | None = None):
         self.instances: dict[Website, GenericBaseCrawler[Never]] = {}
         self.config = config
         self._config_getter = config_getter or (lambda: config)

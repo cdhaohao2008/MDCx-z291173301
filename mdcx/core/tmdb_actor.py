@@ -1329,7 +1329,7 @@ async def _query_single_actor(actor_name: str, base_url: str, api_key: str, clie
 
         try:
             detail = detail_resp.json()
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             continue
         place = detail.get("place_of_birth", "")
 
@@ -1419,7 +1419,7 @@ async def _fetch_person_translations(pid: int, base_url: str, api_key: str, clie
 
         try:
             trans_data = trans_resp.json()
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             return result
         for trans in trans_data.get("translations", []):
             iso = trans.get("iso_639_1", "")
@@ -1469,7 +1469,7 @@ async def fetch_person_gender(pid: int, base_url: str, api_key: str, client: Any
             return None
         try:
             data = resp.json()
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             return None
         gender = data.get("gender")
         if isinstance(gender, int) and gender in (0, 1, 2):
@@ -1496,7 +1496,7 @@ async def fetch_person_identity(pid: int, base_url: str, api_key: str, client: A
             return None
         try:
             data = resp.json()
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             return None
         identity = {
             "gender": data.get("gender"),
@@ -1656,7 +1656,7 @@ async def migrate_info_xml_to_xlsx() -> bool:
                 try:
                     if cell.value:
                         max_length = max(max_length, len(str(cell.value)) + 2)
-                except (TypeError, AttributeError):
+                except TypeError, AttributeError:
                     pass
             adjusted_width = min(max_length, 30)
             ws.column_dimensions[column].width = adjusted_width

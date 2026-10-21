@@ -74,7 +74,7 @@ def _parse_widget(el: ET.Element, parent_chain: list[str]) -> WidgetInfo:
         if (n := p.find("number")) is not None:
             try:
                 entry.props[pname] = int(n.text or "")
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 pass
         if (rect := p.find("rect")) is not None:
             d: dict[str, int] = {}
@@ -83,7 +83,7 @@ def _parse_widget(el: ET.Element, parent_chain: list[str]) -> WidgetInfo:
                 if ln in ("x", "y", "width", "height"):
                     try:
                         d[ln] = int(sub.text or "")
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         pass
             entry.props[pname] = d
         if (sz := p.find("size")) is not None:
@@ -93,7 +93,7 @@ def _parse_widget(el: ET.Element, parent_chain: list[str]) -> WidgetInfo:
                 if ln in ("width", "height"):
                     try:
                         d2[ln] = int(sub.text or "")
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         pass
             entry.props[pname] = d2
         if (sp := p.find("sizepolicy")) is not None:

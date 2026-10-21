@@ -32,7 +32,7 @@ class GatherGroup[T = Any]:
         self._tasks.append(coro)
         return coro
 
-    async def __aenter__(self) -> "GatherGroup[T]":
+    async def __aenter__(self) -> GatherGroup[T]:
         self._entered = True
         return self
 
