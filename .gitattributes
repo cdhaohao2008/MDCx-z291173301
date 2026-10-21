@@ -1,1 +1,5 @@
 *.py text eol=lf
+# Git hooks 是 sh 脚本：必须始终以 LF 落盘。
+# Windows 的 core.autocrlf=true 默认会把检出写成 CRLF，
+# Git Bash 执行时会因每行末尾多一个 \r 而报 "command not found"，钩子静默失效。
+.githooks/* text eol=lf

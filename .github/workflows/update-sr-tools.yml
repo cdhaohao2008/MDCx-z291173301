@@ -23,8 +23,11 @@ env:
   # 锁定 3.15：与 build-py315.yml / ci.yaml 同口径（python-version + UV_PYTHON 双保险）。
   # 依赖已全部换成有 cp315 wheel 的版本，只剩 PyYAML 没有 cp315 wheel（见安装步骤）。
   UV_PYTHON: "3.15"
-  # 关掉 uv run 的隐式 sync：PyYAML 是用 cp314 wheel 顶替装的，隐式 sync 会把它
-  # 判定为需重新安装并再次失败。
+  # PyYAML 至今没有 cp315 wheel：置 0 让它跳过 `yaml._yaml` C 扩展，从 sdist 直接
+  # 产出纯 Python wheel，不需要编译器链。
+  PYYAML_FORCE_LIBYAML: "0"
+  # 关掉 uv run 的隐式 sync：依赖统一在安装步骤显式 sync 一次（隐式 sync 每次
+  # uv run 都会重新解析，可能重建 pyyaml，拖慢构建）。
   UV_NO_SYNC: "1"
 
 jobs:
@@ -72,15 +75,17 @@ jobs:
             libxml2-dev libxslt1-dev libxslt-dev python3-dev zlib1g-dev gcc
 
       # PyYAML 至今没有 cp315 wheel（6.0.3 只发到 cp314），3.15 下只能源码编译
-      # （Windows runner 要 MSVC、Linux 要 gcc + Cython）。用 cp314 wheel 顶替：
-      # `_yaml` 只是可选的 C 加速，缺它时 PyYAML 自动退回纯 Python 实现。
+      # （Windows runner 要 MSVC、Linux 要 gcc + Cython）。工作流级
+      # `PYYAML_FORCE_LIBYAML=0` 让它跳过 `yaml._yaml` C 扩展，直接产出纯 Python
+      # wheel（py3-none-any），不需要编译器；`_yaml` 只是可选的 C 加速，缺它时
+      # PyYAML 自动退回纯 Python 实现，功能一致。
       - name: Install locked dependencies
         shell: bash
         run: |
-          uv sync --all-extras --dev --no-install-package pyyaml
+          uv sync --all-extras --dev
           VENV_PY="$PWD/.venv/bin/python"
           [ -x "$VENV_PY" ] || VENV_PY="$PWD/.venv/Scripts/python.exe"
-          uv pip install --python "$VENV_PY" --python-version 3.14 --only-binary=:all: "pyyaml==6.0.3"
+          "$VENV_PY" -c "import yaml; print('pyyaml', yaml.__version__, 'libyaml', yaml.__with_libyaml__)"
 
       - name: Cache SR tools
         uses: actions/cache@v6

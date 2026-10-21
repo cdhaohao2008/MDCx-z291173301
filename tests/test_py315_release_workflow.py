@@ -206,12 +206,15 @@ def test_python_315_pins_and_relock_fallback():
         text,
         re.S,
     ), "uv sync --locked 失败必须自动回退重新解析（uv.lock 缺 cp315 wheel 时需要）"
-    # 3.15 专属：PyYAML 至今无 cp315 wheel，只能用 cp314 wheel 顶替
-    assert "--no-install-package pyyaml" in text, "3.15 下必须跳过 pyyaml（无 cp315 wheel，会退回源码编译）"
-    assert 'uv pip install --python "$VENV_PY" --python-version 3.14 --only-binary=:all: "pyyaml==6.0.3"' in text, (
-        "pyyaml 必须用 cp314 wheel 顶替装进 3.15 环境"
+    # 3.15 专属：PyYAML 至今无 cp315 wheel，用 PYYAML_FORCE_LIBYAML=0 让它跳过 C 扩展
+    assert 'PYYAML_FORCE_LIBYAML: "0"' in text, (
+        "3.15 下必须用 PYYAML_FORCE_LIBYAML=0 让 pyyaml 跳过 `yaml._yaml` C 扩展（无 cp315 wheel）"
     )
-    assert 'UV_NO_SYNC: "1"' in text, "uv run 的隐式 sync 会把已装好的 pyyaml 判为需重新安装，必须关掉"
+    assert "--no-install-package pyyaml" not in text, (
+        "不必再跳过 pyyaml：PYYAML_FORCE_LIBYAML=0 已让它能从 sdist 直接产出纯 Python wheel"
+    )
+    assert "--python-version 3.14" not in text, "不再用 cp314 wheel 顶替：cp314 的 C 扩展与 3.15 ABI 不匹配，混装有隐患"
+    assert 'UV_NO_SYNC: "1"' in text, "uv run 的隐式 sync 会重新解析并可能重建 pyyaml，必须关掉"
 
 
 def test_publish_requires_all_platform_artifacts():

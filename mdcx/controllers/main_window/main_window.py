@@ -198,7 +198,7 @@ class MyMAinWindow(
             None  # 已提示过的远端版本：12h 定时复查仅在发现更新的版本时再提示，避免同一版本重复刷屏
         )
         # 以下属性的类型由对应 mixin 内的赋值推定，此处仅声明可空初值，故需要 ignore
-        self.show_data: ShowData | None = None  # type: ignore[assignment]  # 当前树状图选中文件的数据
+        self.show_data: ShowData | None = None  # type: ignore[assignment, annotation-unchecked]  # 当前树状图选中文件的数据
         self.img_path = None  # 当前树状图选中文件的图片地址
         self.m_drag = False  # 允许鼠标拖动的标识
         self.m_DragPosition: QPoint | None = None  # 鼠标拖动位置
@@ -219,14 +219,14 @@ class MyMAinWindow(
         self._thumb_src_pixmap: QPixmap | None = None
         self._did_apply_initial_size = False
         self._user_initiated_close = False  # 标记是否为用户主动关闭窗口
-        self._naming_design: dict | None = None  # type: ignore[assignment]  # 命名页模板预览区：首次登记的设计几何基准
+        self._naming_design: dict | None = None  # type: ignore[assignment, annotation-unchecked]  # 命名页模板预览区：首次登记的设计几何基准
         self._naming_resyncing = False  # 命名页模板预览区：重算中标志（防 label resize 递归触发）
         self._naming_last_width = -1  # 命名页说明文字上次同步所用的宽度
         # 渲染扫描重入门闩：lbl.render() 会派发 Resize 重入 eventFilter 而 eventFilter
         # 又同步调 _naming_label_painted_height，不设闩会无限递归爆栈（见其 docstring）。
         self._naming_scanning = False
         self._naming_fix_tries = 0  # 同一宽度下的重算次数上限，防止布局压不下时反复排队
-        self._fanyi_design: dict | None = None  # type: ignore[assignment]  # 翻译页两组：首次登记的设计几何基准
+        self._fanyi_design: dict | None = None  # type: ignore[assignment, annotation-unchecked]  # 翻译页两组：首次登记的设计几何基准
         self._fanyi_resyncing = False  # 翻译页两组：重算中标志（防标签 resize 递归触发）
         self._defn_resyncing = False  # 命名页画质组：重算中标志（防标签 resize 递归触发）
         self._defn_last_width = -1  # 命名页画质组说明文字上次同步所用宽度（宽度变了才重排）
@@ -340,7 +340,7 @@ class MyMAinWindow(
         self.start_click_pos: QPoint
         self.window_marjin = None
         self.now_show_name = None
-        self._nfo_editor_snapshot: tuple[str, ...] | None = None  # type: ignore[assignment]
+        self._nfo_editor_snapshot: tuple[str, ...] | None = None  # type: ignore[assignment, annotation-unchecked]
         self.show_name = None
         self.t_net = None
         self.options: QFileDialog.Option

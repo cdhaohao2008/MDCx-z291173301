@@ -13,6 +13,11 @@
 import subprocess
 import sys
 
+try:
+    from scripts.check import resolve_tool
+except ModuleNotFoundError:
+    from check import resolve_tool
+
 COMMANDS = [
     ["ruff", "format", "--check"],
     ["ruff", "check"],
@@ -22,8 +27,15 @@ COMMANDS = [
 
 def main() -> int:
     for command in COMMANDS:
-        print(f"[quick-check] running: {' '.join(command)}")
-        result = subprocess.run(command)
+        resolved = resolve_tool(command)
+        print(f"[quick-check] running: {' '.join(resolved)}")
+        try:
+            result = subprocess.run(resolved)
+        except FileNotFoundError, ModuleNotFoundError:
+            print(
+                f"[quick-check] 缺少命令 {command[0]}：请先装好开发依赖（uv sync --dev 或 pip install -r requirements.txt）"
+            )
+            return 127
         if result.returncode != 0:
             print("[quick-check] 有报错，请先修复后重跑（错误见上方红字）")
             return result.returncode

@@ -1,10 +1,20 @@
 #!/bin/sh
 
 echo "[pre-push] 运行推送前快速自检（ruff format/check + mypy + 线程安全，不含 pytest）..."
+
+# 工具链探测：uv（仓库标准，自动用 .venv）→ python3 → python
+# Windows 的 Git Bash 里通常只有 python.exe、没有 python3，少了 python 这一档钩子会以
+# "python3: command not found"（退出码 127）把每一次推送都拦下来，故必须逐级兜底。
 if command -v uv >/dev/null 2>&1; then
   uv run check --skip-hook-install
-else
+elif command -v python3 >/dev/null 2>&1; then
   python3 scripts/check.py --skip-hook-install
+elif command -v python >/dev/null 2>&1; then
+  python scripts/check.py --skip-hook-install
+else
+  echo "[pre-push] 未找到 uv / python3 / python，无法运行自检。"
+  echo "[pre-push] 请先装好工具链：uv sync --dev（或 pip install -r requirements.txt），并确保 PATH 里能找到 python。"
+  exit 1
 fi
 status=$?
 

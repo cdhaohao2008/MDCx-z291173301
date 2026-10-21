@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 import sys
 
@@ -85,6 +86,19 @@ def should_run_xlsx_check(triggers: tuple[str, ...], changed: set[str] | None) -
     return any(path in changed for path in triggers)
 
 
+def resolve_tool(command: list[str]) -> list[str]:
+    """PATH 上找不到命令时，退回「当前解释器 -m 工具名」。
+
+    Windows 上 pip 默认装进用户目录（%APPDATA%\\Python\\Python315\\Scripts），
+    该目录常常不在 PATH 里，裸调 `ruff` 会直接 FileNotFoundError。
+    ruff / mypy 都带 Python 入口（`python -m ruff`、`python -m mypy`），可以这样兜底。
+    """
+    tool = command[0]
+    if tool in {"ruff", "mypy"} and shutil.which(tool) is None:
+        return [sys.executable, "-m", tool, *command[1:]]
+    return command
+
+
 def main() -> int:
     if "--skip-hook-install" not in sys.argv:
         install_hooks()
@@ -108,8 +122,17 @@ def main() -> int:
         print("[check] 跳过 check_info_db（出厂信息库未改）")
 
     for command in commands:
-        print(f"[check] running: {' '.join(command)}")
-        result = subprocess.run(command)
+        resolved = resolve_tool(command)
+        print(f"[check] running: {' '.join(resolved)}")
+        try:
+            result = subprocess.run(resolved)
+        except FileNotFoundError, ModuleNotFoundError:
+            # pre-push 钩子会调用本脚本：工具链没装好时给出可执行的提示，
+            # 而不是抛一串 FileNotFoundError 堆栈
+            print(
+                f"[check] 缺少命令 {command[0]}：请先装好开发依赖（uv sync --dev 或 pip install -r requirements.txt）"
+            )
+            return 127
         if result.returncode != 0:
             return result.returncode
     return 0

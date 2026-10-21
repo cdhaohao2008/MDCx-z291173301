@@ -21,7 +21,8 @@
 - `PyQt6-sip`（pyqt6 依赖，C++ 扩展）：`13.11.1` 无 cp315 wheel，`13.13.0` 起才有。
 
 `pyyaml` 是唯一至今没有 cp315 wheel 的包（`6.0.3` 只到 cp314），但它只是
-`pre-commit` 的传递依赖且提供纯 Python 回退，CI 里用 cp314 wheel 顶替即可，
+`pre-commit` 的传递依赖且提供纯 Python 回退，CI 里设 `PYYAML_FORCE_LIBYAML=0`
+让它跳过 `yaml._yaml` C 扩展、从 sdist 直接产出纯 Python wheel 即可，
 见 `.github/workflows/build-py315.yml`。
 
 同时校验 `pyproject.toml` 与 `uv.lock` 的依赖声明不脱节：`uv sync --locked` 在
