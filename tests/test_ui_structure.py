@@ -83,6 +83,17 @@ def _ruff_version(exe_prefix):
     return parts[1] if len(parts) >= 2 and parts[0] == "ruff" else None
 
 
+def _ruff_candidates():
+    """返回可用的 ruff 调用前缀（按优先级），供回退链逐个探测。
+
+    - ``["ruff"]``：PATH 上的 ruff（CI 里 uv run 失败时的常规回退）；
+    - ``[sys.executable, "-m", "ruff"]``：虚拟环境里装了 ruff（uv sync 的开发依赖）时可用。
+      很多本地环境不会把 ``.venv\\Scripts`` 放进 PATH，没有这条兜底就会白白 skip，
+      与 ``scripts/check.py`` 的 ``resolve_tool()`` 回退思路保持一致。
+    """
+    return [["ruff"], [sys.executable, "-m", "ruff"]]
+
+
 def _group_boxes_by_parent(root):
     """按直接父容器分组收集 QGroupBox 的几何信息。
 
@@ -255,6 +266,8 @@ def test_mdcx_py_in_sync_with_ui():
     注意：pyuic6 会把输入路径写进头部注释，必须用相对路径编译才能与仓库版对齐。
     注意：必须用 uv.lock 锁定的 ruff 版本格式化（0.15.x 小版本间排版有差异），
     版本对不上时本用例 skip 而不是误报。
+    ruff 查找顺序：uv run ruff → PATH 上的 ruff → 虚拟环境内的 python -m ruff
+    （虚拟环境装了 ruff 开发依赖但 Scripts 未进 PATH 时也能跑，不必白白 skip）。
     """
     assert PY_PATH.exists(), f"缺少 {PY_PATH}"
     assert UI_PATH.exists(), f"缺少 {UI_PATH}"
@@ -293,14 +306,29 @@ def test_mdcx_py_in_sync_with_ui():
         except FileNotFoundError, subprocess.TimeoutExpired:
             formatted = False
         if not formatted:
-            ver = _ruff_version(["ruff"])
-            if ver is None:
-                pytest.skip("无可用 ruff（uv 与系统 ruff 均不可用），跳过同步检查")
-            if locked is not None and ver != locked:
-                pytest.skip(f"系统 ruff {ver} 与 uv.lock 锁定版本 {locked} 不一致，跳过同步检查（错版本排版必误报）")
+            # 回退链：PATH 上的 ruff → 虚拟环境内的 python -m ruff。
+            # 只接受与 uv.lock 锁定版本一致的 ruff：错版本排版有差异，对比只会产生假红，
+            # 因此版本对不上只能 skip；一个都没有才 skip（说明环境缺开发依赖）。
+            matched = None
+            seen = []
+            for prefix in _ruff_candidates():
+                ver = _ruff_version(prefix)
+                if ver is None:
+                    continue
+                seen.append(f"{' '.join(prefix)} {ver}")
+                if locked is None or ver == locked:
+                    matched = prefix
+                    break
+            if matched is None:
+                if seen:
+                    pytest.skip(
+                        f"可用 ruff 版本与 uv.lock 锁定版本 {locked} 不一致（{'; '.join(seen)}），"
+                        "跳过同步检查（错版本排版必误报）"
+                    )
+                pytest.skip("无可用 ruff（uv / PATH / 虚拟环境均不可用），跳过同步检查")
             try:
                 result = subprocess.run(
-                    ["ruff", "format", str(tmp_path)],
+                    [*matched, "format", str(tmp_path)],
                     capture_output=True,
                     text=True,
                     cwd=REPO,
@@ -308,8 +336,8 @@ def test_mdcx_py_in_sync_with_ui():
                 )
                 formatted = result.returncode == 0
             except FileNotFoundError, subprocess.TimeoutExpired:
-                pytest.skip("系统 ruff 执行失败，跳过同步检查")
-            assert formatted, "系统 ruff format 执行失败"
+                pytest.skip("ruff format 执行失败，跳过同步检查")
+            assert formatted, "ruff format 执行失败"
 
         # 3. 文本对比。
         #    pyuic6 on Windows emits backslash path separators in resource
