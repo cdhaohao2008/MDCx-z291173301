@@ -245,7 +245,7 @@ UI 层 (PyQt6)         → 界面展示、用户操作
 | 默认末行 | 🔍 | `点击检查最新版本` | `__init__` 的 `new_version` 初值 |
 | 有新版本末行 | 🍉 | `有新版本了！<font color="red">{latest}</font>`（版本号相同仅日期更新时日期包含在红字范围内） | `_show_version_thread` |
 
-**四条硬规则**
+**五条硬规则**
 
 1. `before_info` 只做 `strip()`，**不得过滤 emoji**：调用方传的
    `💡/🔎/🎉/⛔/✅`（刮削中/完成/停止/提示）是首行图标，过滤即丢失。
@@ -268,9 +268,22 @@ UI 层 (PyQt6)         → 界面展示、用户操作
    否则下一次运行会串用上一次的文案。
 4. 改本节规范时同步改 `tests/test_left_status_icons.py` 的
    `_REQUIRED_ICON_LITERALS`，文档与测试二者必须一致。
+5. **路径归属判断不能因为 realpath 解析失败就判否**：`mdcx/utils/path.py::is_descendant()`
+   是「文件是否在成功输出目录内」（`is_in_success_folder`）、多刮削目录选择、独立模式元数据
+   目录忽略、剩余任务提示等判断的唯一入口。网络盘/云盘挂载盘（CloudDrive2 等）上
+   `os.path.realpath(path, strict=os.path.ALLOW_MISSING)` 会抛
+   `OSError: [WinError 1005] 此卷不包含可识别的文件系统`；旧实现一旦解析失败就
+   `return False`，于是该盘上的每一次归属判断都是 False —— 整理模式因此认不出
+   「文件已在成功输出目录内」，既不会自动切换到读取模式（左下角一直停留在「整理模式」），
+   又会把已经在成功输出目录里的文件再整理一遍（原地搬动自己）。故 `is_descendant()`
+   必须用 realpath 的默认 `strict=False` 语义（解析失败退回绝对路径、不抛异常），
+   并额外用词法基准（`abspath` + `normcase`）兜底；跨盘符时 `commonpath` 抛
+   `ValueError` 仍按「不是后代」处理。
 
 回归：`tests/test_left_status_icons.py`（图标逐字存在、`SCRAPE_INFO_EMOJI_RE`
-不得复活、`GITHUB_REPO`/帮助页地址指向自有仓库、`reset()` 不得清空模式文案）。
+不得复活、`GITHUB_REPO`/帮助页地址指向自有仓库、`reset()` 不得清空模式文案）；
+`tests/test_path_descendant.py`（realpath 抛异常时退回词法比较、网盘 lenient 行为、
+跨盘符、前缀相同的兄弟目录、`is_in_success_folder` 命中判定）。
 
 ### 信息管理筛选框匹配规则（改前必读）
 

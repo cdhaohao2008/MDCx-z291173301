@@ -54,21 +54,56 @@ def showFilePath(file_path: str) -> str:
     return show_file_path
 
 
+def _normcase(path: str | Path) -> str:
+    """词法规范化: 转绝对路径 + 统一大小写与分隔符(Windows)。"""
+    try:
+        return os.path.normcase(os.path.abspath(path))
+    except OSError, ValueError:
+        return os.path.normcase(str(path))
+
+
+def _realpath(path: str | Path) -> str | None:
+    """解析符号链接后的规范化路径; 解析失败时返回 None。
+
+    注意: 这里必须使用 realpath 的默认 strict=False 语义, 不能传
+    strict=os.path.ALLOW_MISSING —— 网络盘/云盘挂载盘(CloudDrive2 等)上
+    realpath 会抛出 OSError(WinError 1005 "此卷不包含可识别的文件系统"),
+    旧实现在那里直接返回 False, 导致挂在网盘上的媒体库永远认不出
+    "文件已在成功输出目录内", 整理模式也就无法自动切换到读取模式
+    (左下角文案一直停留在"整理模式")。
+    """
+    try:
+        return os.path.normcase(os.path.realpath(path))
+    except OSError, ValueError:
+        return None
+
+
+def _is_within(child: str, parent: str) -> bool:
+    """child 是否位于 parent 之内(含 parent 自身)。
+
+    用 os.path.commonpath 而不是简单前缀判断: parent = /foo/bar 时,
+    /foo/barbar 不应被算作后代。
+    """
+    try:
+        return os.path.commonpath([child, parent]) == parent
+    except OSError, ValueError:
+        # 跨盘符(如 C:\\ 与 K:\\)时 commonpath 会抛 ValueError → 不属于同一棵树
+        return False
+
+
 def is_descendant(p: str | Path, parent: str | Path) -> bool:
     """
     检查 p 是否是 parent 或者 parent 的后代.
+
+    先按 realpath(可识别符号链接)比较, 再按词法绝对路径比较; 任意一种
+    成立即视为后代。网盘/云盘挂载盘上 realpath 解析不出来时, 词法比较
+    仍然有效, 不会把"文件已在成功输出目录内"误判成"不在目录内"。
     """
-    try:
-        p = os.path.realpath(p, strict=os.path.ALLOW_MISSING)
-        parent = os.path.realpath(parent, strict=os.path.ALLOW_MISSING)
-    except OSError:
-        return False
-    # parent = /foo/bar, p = /foo/barbar 使得简单的前缀判断失效
-    # os.path.commonpath 可以处理这种情况
-    try:
-        return os.path.commonpath([p, parent]) == str(parent)
-    except OSError, ValueError:
-        return False
+    child_real = _realpath(p)
+    parent_real = _realpath(parent)
+    if child_real is not None and parent_real is not None and _is_within(child_real, parent_real):
+        return True
+    return _is_within(_normcase(p), _normcase(parent))
 
 
 def is_any_descendant(p: str | Path, *parents: str | Path) -> bool:

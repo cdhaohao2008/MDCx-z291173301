@@ -9,6 +9,7 @@
 4. 「自动休息」允许的最小值为 40 秒。
 """
 
+import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -119,6 +120,45 @@ async def test_organize_inplace_file_is_handled_as_read_mode(monkeypatch: pytest
     # 文件仍在原地
     assert strm.exists()
     # 结果正常统计
+    assert Flags.total_count == 1
+    assert Flags.fail_count == 0
+    # 左下角文案切换为「读取模式」
+    assert Flags.mode_text_override == "读取模式"
+
+
+@pytest.mark.asyncio
+async def test_organize_inplace_file_on_netdisk_switches_to_read_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """网盘(CloudDrive2 等)上 realpath(strict=ALLOW_MISSING) 会抛 WinError 1005。
+
+    旧实现一旦解析失败就直接判定"不是后代目录"，于是认不出"文件已在成功输出目录内"，
+    整理模式既不会自动转读取模式（左下角一直停留在「整理模式」），也会对已在成功
+    输出目录里的文件再做一次整理。
+    """
+    media_dir = tmp_path / "media"
+    success_dir = media_dir / "JAV_output" / "あやめ美桜" / "ABS-040"
+    success_dir.mkdir(parents=True)
+    strm = success_dir / "ABS-040.strm"
+    strm.write_text("https://example.com/ABS-040.mp4", encoding="utf-8")
+    _write_sample_nfo(success_dir)
+    _configure_organize_mode(monkeypatch, media_dir)
+
+    original_realpath = os.path.realpath
+
+    def fake_realpath(path, *args, **kwargs):
+        # 模拟网盘: 严格模式下 realpath 抛 "此卷不包含可识别的文件系统"
+        if kwargs.get("strict", None) is os.path.ALLOW_MISSING:
+            raise OSError(1005, "此卷不包含可识别的文件系统")
+        return original_realpath(path, *args, **kwargs)
+
+    monkeypatch.setattr(os.path, "realpath", fake_realpath)
+
+    moved: list = []
+    monkeypatch.setattr(scraper_module, "organize_files", lambda *args, **kwargs: moved.append((args, kwargs)))
+
+    await Scraper(_DummyCrawlerProvider()).run(FileMode.Default, None)
+
+    assert moved == []
+    assert strm.exists()
     assert Flags.total_count == 1
     assert Flags.fail_count == 0
     # 左下角文案切换为「读取模式」
