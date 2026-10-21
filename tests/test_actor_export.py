@@ -19,6 +19,8 @@ import pytest  # noqa: E402
 from PyQt6.QtCore import Qt  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QComboBox  # noqa: E402
 
+from tests._qt_windows import run_in_windows_qt  # noqa: E402
+
 
 @pytest.fixture(scope="module")
 def app():
@@ -498,9 +500,14 @@ def test_title_and_label_align_with_button_text(app):
 
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
+    # 离屏平台没有字体，像素断言没有意义；在 Windows 上用真实平台另起进程重跑。
+    if app.platformName() != "windows":
+        run_in_windows_qt(__file__, "test_title_and_label_align_with_button_text")
+        return
+
     has_font = bool(QFontDatabase.families())
     if not has_font:
-        pytest.skip("离屏(offscreen)平台无字体，字形退化、像素对齐测不出也不可信，见 docstring")
+        pytest.skip("Windows Qt 平台未加载到字体，字形退化、像素对齐测不出也不可信")
 
     def _dark_cols(img, y0, y1, x1=340):
         xs = [

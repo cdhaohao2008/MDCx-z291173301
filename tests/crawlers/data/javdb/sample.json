@@ -1,0 +1,43 @@
+{
+  "not_support": [
+    "originalplot",
+    "outline",
+    "poster",
+    "mosaic"
+  ],
+  "title": "テスト JavDB タイトル",
+  "actors": [
+    "女優E",
+    "女優F"
+  ],
+  "all_actors": [
+    "女優E",
+    "女優F"
+  ],
+  "directors": [
+    "監督D"
+  ],
+  "extrafanart": [
+    "https://example.com/javdb-1.jpg",
+    "https://example.com/javdb-2.jpg"
+  ],
+  "originaltitle": "Original JavDB Title",
+  "publisher": "ジャブ發行",
+  "release": "2026-04-05",
+  "runtime": "110",
+  "score": "4.25",
+  "series": "ジャブシリーズ",
+  "studio": "ジャブメーカー",
+  "tags": [
+    "ジャブタグA",
+    "ジャブタグB"
+  ],
+  "thumb": "https://example.com/javdb-cover.jpg",
+  "trailer": "https://example.com/javdb-trailer.mp4",
+  "wanted": "123",
+  "year": "2026",
+  "image_download": false,
+  "number": "IPX-535",
+  "external_id": "",
+  "source": ""
+}

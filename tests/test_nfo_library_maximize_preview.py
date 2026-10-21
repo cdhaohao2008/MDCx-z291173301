@@ -35,6 +35,8 @@ from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QFormLayout, QLabel
 
+from tests._qt_windows import run_in_windows_qt
+
 _app: QApplication | None = None
 
 # 「简介/标签」两个多行框：最大化时它们吸收富余高度，故不参与行间隙比对
@@ -392,11 +394,14 @@ def test_preview_window_has_own_taskbar_app_id(win, app, library):
     """
     from mdcx.views.nfo_preview_window import NfoPreviewWindow
 
+    # 离屏平台没有 Windows shell，任务栏 AppUserModelID 读不回来；真实平台另起进程重跑。
+    if app.platformName() != "windows":
+        run_in_windows_qt(__file__, "test_preview_window_has_own_taskbar_app_id")
+        return
+
     win._nfo_lib_current_path = library / "ABC-001.nfo"
     _left_click(win, app, win.Ui.label_nfo_lib_poster_preview)
     window = win.nfo_lib_preview_window
-    if app.platformName() != "windows":
-        pytest.skip("任务栏 AppUserModelID 需要真实 Windows 窗口系统，离屏平台无 shell 可读回")
     assert window._read_taskbar_app_id() == "MDCx.NfoPreview"
     assert NfoPreviewWindow._read_app_id_for_widget(win) != "MDCx.NfoPreview"
 

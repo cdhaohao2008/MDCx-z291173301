@@ -1,0 +1,40 @@
+{
+  "not_support": [
+    "all_actors",
+    "originalplot",
+    "originaltitle",
+    "poster",
+    "wanted",
+    "year",
+    "image_download",
+    "number"
+  ],
+  "title": "テスト モノ タイトル",
+  "actors": [
+    "女優A",
+    "女優B"
+  ],
+  "directors": [
+    "監督A"
+  ],
+  "extrafanart": [
+    "https://example.com/samplejp-1.jpg",
+    "https://example.com/samplejp-2.jpg"
+  ],
+  "outline": "モノ あらすじ 1\nモノ あらすじ 2",
+  "publisher": "テストレーベル",
+  "release": "2026-01-02",
+  "runtime": "120",
+  "score": "4.5",
+  "series": "テストシリーズ",
+  "studio": "テストメーカー",
+  "tags": [
+    "タグA",
+    "タグB"
+  ],
+  "thumb": "https://pics.dmm.co.jp/digital/video/ipx00535/ipx00535pl.jpg",
+  "trailer": "",
+  "mosaic": "里番",
+  "external_id": "",
+  "source": ""
+}

@@ -1,0 +1,40 @@
+{
+  "not_support": [
+    "all_actors",
+    "originalplot",
+    "originaltitle",
+    "poster",
+    "wanted",
+    "year",
+    "image_download",
+    "number"
+  ],
+  "title": "テスト デジタル タイトル",
+  "actors": [
+    "女優C",
+    "女優D"
+  ],
+  "directors": [
+    "監督B"
+  ],
+  "extrafanart": [
+    "https://example.com/digital-4.jpg",
+    "https://example.com/digital-5.jpg"
+  ],
+  "outline": "デジタル あらすじ",
+  "publisher": "デジタルレーベル",
+  "release": "2026-02-03",
+  "runtime": "90",
+  "score": "4.2",
+  "series": "デジタルシリーズ",
+  "studio": "デジタルメーカー",
+  "tags": [
+    "デジタルタグA",
+    "デジタルタグB"
+  ],
+  "thumb": "https://example.com/digital-1.jpg",
+  "trailer": "https://example.com/digital-trailer.mp4",
+  "mosaic": "有码",
+  "external_id": "",
+  "source": ""
+}

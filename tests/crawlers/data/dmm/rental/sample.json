@@ -1,0 +1,38 @@
+{
+  "not_support": [
+    "all_actors",
+    "originalplot",
+    "originaltitle",
+    "poster",
+    "release",
+    "wanted",
+    "year",
+    "image_download",
+    "number"
+  ],
+  "title": "テスト レンタル タイトル",
+  "actors": [
+    "女優G"
+  ],
+  "directors": [
+    "監督C"
+  ],
+  "extrafanart": [
+    "https://example.com/rental-1.jpg",
+    "https://example.com/rental-2.jpg"
+  ],
+  "outline": "レンタル あらすじ",
+  "publisher": "レンタルレーベル",
+  "runtime": "95",
+  "score": "3.8",
+  "series": "レンタルシリーズ",
+  "studio": "レンタルメーカー",
+  "tags": [
+    "タグG"
+  ],
+  "thumb": "https://pics.dmm.co.jp/mono/video/rental001/rental001pl.jpg",
+  "trailer": "",
+  "mosaic": "有码",
+  "external_id": "",
+  "source": ""
+}
