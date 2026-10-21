@@ -20,7 +20,7 @@ from mdcx.base.file import get_movie_list, move_mediainfo
 from mdcx.config.extend import ORGANIZE_MAIN_MODE, is_organize_mode
 from mdcx.config.manager import manager
 from mdcx.core import organize as organize_module
-from mdcx.core.organize import organize_files
+from mdcx.core.organize import build_organize_index, organize_files
 from mdcx.core.scraper import Scraper
 from mdcx.core.utils import get_video_size_for_file
 from mdcx.models.enums import FileMode
@@ -577,3 +577,172 @@ async def test_organize_batch_waits_for_previous_batch(tmp_path: Path, monkeypat
     assert events.index("end-1") < third_start
     assert events.index("end-2") < third_start
     assert active <= 2
+
+
+def test_build_organize_index_links_numbers_and_companions(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart")
+    monkeypatch.setattr(manager.config, "sub_type", [".srt"])
+
+    folder = tmp_path / "library"
+    folder.mkdir()
+    video = folder / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    other_video = folder / "ABS-040-1.mp4"
+    other_video.write_bytes(b"other video")
+    nfo = folder / "ABS-040.nfo"
+    nfo.write_text("<movie />", encoding="utf-8")
+    other_nfo = folder / "ABS-040-1.nfo"
+    other_nfo.write_text("<movie />", encoding="utf-8")
+    poster = folder / "ABS-040-poster.jpg"
+    poster.write_bytes(b"poster")
+    other_poster = folder / "ABS-040-1-poster.jpg"
+    other_poster.write_bytes(b"other poster")
+    shared_poster = folder / "poster.jpg"
+    shared_poster.write_bytes(b"shared")
+    extra = folder / "extrafanart" / "ABS-040-extra.jpg"
+    extra.parent.mkdir()
+    extra.write_bytes(b"extra")
+    other_extra = folder / "extrafanart" / "ABS-040-1-extra.jpg"
+    other_extra.write_bytes(b"other extra")
+
+    index = build_organize_index([folder])
+
+    assert index.file_count == 9
+    assert index.media_count == 2
+    assert index.number_count == 1
+    assert {(info.path, info.number) for info in (index.media_info(video), index.media_info(other_video)) if info} == {
+        (video, "ABS-040"),
+        (other_video, "ABS-040"),
+    }
+    assert index.owner_of(nfo) == video
+    assert index.owner_of(poster) == video
+    assert index.owner_of(extra) == video
+    assert index.owner_of(other_nfo) == other_video
+    assert index.owner_of(other_poster) == other_video
+    assert index.owner_of(other_extra) == other_video
+    # 同目录多个番号时，无前缀的 poster.jpg 归属不明，必须保持原位。
+    assert index.owner_of(shared_poster) is None
+    assert set(index.media_for_number("ABS-040")) == {video, other_video}
+
+
+def test_build_organize_index_links_nested_asset_folder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart")
+
+    show_folder = tmp_path / "ABS-100"
+    show_folder.mkdir()
+    video = show_folder / "ABS-100.mp4"
+    video.write_bytes(b"video")
+    extra = show_folder / "extrafanart" / "random.jpg"
+    extra.parent.mkdir()
+    extra.write_bytes(b"extra")
+
+    index = build_organize_index([tmp_path])
+
+    assert index.owner_of(extra) == video
+    assert index.files_under(show_folder / "extrafanart") == [extra]
+
+
+def test_build_organize_index_does_not_promote_asset_video_to_owner(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart")
+
+    show_folder = tmp_path / "ABS-101"
+    show_folder.mkdir()
+    video = show_folder / "ABS-101.mp4"
+    video.write_bytes(b"video")
+    trailer = show_folder / "trailers" / "trailer.mp4"
+    trailer.parent.mkdir()
+    trailer.write_bytes(b"trailer")
+
+    index = build_organize_index([tmp_path])
+
+    assert index.media_count == 1
+    assert index.owner_of(trailer) == video
+
+
+@pytest.mark.asyncio
+async def test_organize_files_reuses_prebuilt_index_after_previous_number_moved(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    monkeypatch.setattr(manager.config, "subtitle_add_chs", False)
+    monkeypatch.setattr(manager.config, "sub_type", [".srt"])
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "trailer_simple_name", False)
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart")
+
+    old_folder = tmp_path / "old"
+    old_folder.mkdir()
+    for stem in ("ABS-040", "ABS-040-1"):
+        (old_folder / f"{stem}.mp4").write_bytes(b"video")
+        (old_folder / f"{stem}.nfo").write_text("<movie />", encoding="utf-8")
+        (old_folder / f"{stem}-poster.jpg").write_bytes(b"poster")
+        (old_folder / f"{stem}-mediainfo.json").write_text("{}", encoding="utf-8")
+        (old_folder / f"{stem}.zh.srt").write_text("subtitle", encoding="utf-8")
+        (old_folder / f"{stem}.torrent").write_bytes(b"torrent")
+    (old_folder / "poster.jpg").write_bytes(b"shared poster")
+    extra_folder = old_folder / "extrafanart"
+    extra_folder.mkdir()
+    (extra_folder / "ABS-040-extra.jpg").write_bytes(b"extra")
+    (extra_folder / "ABS-040-1-extra.jpg").write_bytes(b"other extra")
+
+    index = build_organize_index([old_folder])
+    assert index.owner_of(old_folder / "ABS-040-poster.jpg") == old_folder / "ABS-040.mp4"
+    assert index.owner_of(old_folder / "ABS-040-1-poster.jpg") == old_folder / "ABS-040-1.mp4"
+
+    async def organize_one(stem: str) -> tuple[bool, str]:
+        new_folder = tmp_path / f"new-{stem}"
+        new_folder.mkdir()
+        return await organize_files(
+            file_path=old_folder / f"{stem}.mp4",
+            file_new_path=new_folder / f"{stem}.mp4",
+            folder_old_path=old_folder,
+            folder_new_path=new_folder,
+            nfo_new_path=new_folder / f"{stem}.nfo",
+            naming_rule=stem,
+            number=stem,
+            sub_list=[".zh.srt"],
+            poster_final_path=new_folder / "poster.jpg",
+            thumb_final_path=new_folder / "thumb.jpg",
+            fanart_final_path=new_folder / "fanart.jpg",
+            index=index,
+        )
+
+    moved, error = await organize_one("ABS-040")
+    assert moved, error
+    moved, error = await organize_one("ABS-040-1")
+    assert moved, error
+
+    first_folder = tmp_path / "new-ABS-040"
+    second_folder = tmp_path / "new-ABS-040-1"
+    for new_folder, stem in ((first_folder, "ABS-040"), (second_folder, "ABS-040-1")):
+        assert (new_folder / f"{stem}.mp4").exists()
+        assert (new_folder / f"{stem}.nfo").exists()
+        assert (new_folder / "poster.jpg").exists()
+        assert (new_folder / f"{stem}-mediainfo.json").exists()
+        assert (new_folder / f"{stem}.zh.srt").exists()
+        assert (new_folder / f"{stem}.torrent").exists()
+        assert (new_folder / "extrafanart" / f"{stem}-extra.jpg").exists()
+    assert (old_folder / "poster.jpg").read_bytes() == b"shared poster"
+
+
+@pytest.mark.asyncio
+async def test_organize_transaction_accepts_move_reported_as_failed_after_completion(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    async def move_then_report_failure(src, dst, *, overwrite: bool = False):
+        Path(src).rename(dst)
+        return False, "网络盘回报失败，但文件已经移动"
+
+    monkeypatch.setattr(organize_module, "move_file_async", move_then_report_failure)
+    source = tmp_path / "source.jpg"
+    target = tmp_path / "target.jpg"
+    source.write_bytes(b"image")
+
+    transaction = organize_module.OrganizeTransaction()
+    ok, error = await transaction.move_file(source, target)
+
+    assert ok, error
+    assert target.read_bytes() == b"image"
+    assert not source.exists()

@@ -77,7 +77,7 @@ from .file_crawler import FileScraper, classify_existing_scrape_result, classify
 from .image import add_mark, replace_thumb_fanart_with_poster
 from .media_resource import MediaResourceContext
 from .nfo import get_nfo_data, write_nfo
-from .organize import organize_files
+from .organize import OrganizeIndex, build_organize_index, organize_files
 from .super_resolution import maybe_upscale_poster
 from .translate import translate_actor, translate_info, translate_title_outline
 from .utils import (
@@ -197,6 +197,32 @@ class Scraper:
         self._organize_batch_size = 0
         self._pending_organize_retries: list[_OrganizeRetryTask] = []
         self._deferred_organize_paths: set[Path] = set()
+        self._organize_index: OrganizeIndex | None = None
+
+    async def _prepare_organize_index(
+        self,
+        movie_list: list[Path],
+        scan_roots: list[Path],
+        ignore_dirs: list[Path],
+    ) -> None:
+        """在移动任何文件前建立目录快照，固定番号与伴生文件的归属关系。"""
+        roots = scan_roots or sorted({path.parent for path in movie_list}, key=str)
+        if not roots:
+            self._organize_index = None
+            return
+        signal.show_log_text(" 🧭 整理模式预扫描：正在建立番号与文件关联索引...")
+        try:
+            index = await asyncio.to_thread(build_organize_index, roots, ignore_dirs=ignore_dirs)
+        except Exception as e:
+            self._organize_index = None
+            signal.show_log_text(f" ⚠ 整理索引建立失败，将按单目录索引继续整理：{e}")
+            return
+        self._organize_index = index
+        signal.show_log_text(
+            f" 🧭 整理索引完成：{index.file_count} 个文件，{index.media_count} 个视频/STRM，"
+            f"{index.number_count} 个番号，{index.companion_count} 个关联文件，"
+            f"{index.shared_count} 个未归属文件"
+        )
 
     async def _run_tasks_with_limit(self, movie_list: list[Path], task_count: int, thread_number: int) -> None:
         self._pending_organize_retries.clear()
@@ -319,6 +345,7 @@ class Scraper:
                     thumb_final_path=task.thumb_final_path,
                     fanart_final_path=task.fanart_final_path,
                     elevated=True,
+                    index=self._organize_index,
                 )
             except Exception as e:
                 moved, error = False, str(e)
@@ -396,12 +423,14 @@ class Scraper:
             if self._state_cache is not None:
                 self._state_cache.close()
                 self._state_cache = None
+            self._organize_index = None
             # 协程真正退出前兜底落盘一次最新剩余任务：停止/取消过程中最后
             # 完成/取消的任务变化不被 1.5s 定时器竞态吞掉（议题 #98）
             save_remain_list_now()
 
     async def _run(self, file_mode: FileMode, movie_list: list[Path] | None) -> None:
         reset_flags_preserving_single_file_inputs()
+        self._organize_index = None
         if movie_list is None:
             movie_list = []
         Flags.scrape_start_time = time.time()  # 开始刮削时间
@@ -450,6 +479,8 @@ class Scraper:
         # 拿去做全库 scrape_state 清理，否则不在子集里的合法记录会被误判
         # "源文件已不存在"而清光（议题 #98 2.4）。
         full_library_scan = not movie_list
+        organize_scan_roots: list[Path] = []
+        organize_ignore_dirs: list[Path] = []
         if not movie_list:
             signal.show_log_text("\n ⏰ Start time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
             movie_list = []
@@ -465,6 +496,9 @@ class Scraper:
                         current_paths.softlink_path,
                     )
                     scan_path = current_paths.softlink_path
+                if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+                    organize_scan_roots.append(scan_path)
+                    organize_ignore_dirs.extend(scan_ignore_dirs)
                 movie_list.extend(await get_movie_list(file_mode, scan_path, scan_ignore_dirs))
         else:
             signal.show_log_text("\n ⏰ Start time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
@@ -536,6 +570,10 @@ class Scraper:
         self._organize_batch_size = 0
         if manager.config.main_mode == ORGANIZE_MAIN_MODE and Switch.REST_SCRAPE in manager.config.switch_on:
             self._organize_batch_size = max(1, int(manager.config.rest_count))
+
+        # 整理模式：先完成整目录预扫描并固定归属关系，再允许任何文件开始移动。
+        if task_count and manager.config.main_mode == ORGANIZE_MAIN_MODE:
+            await self._prepare_organize_index(movie_list, organize_scan_roots, organize_ignore_dirs)
 
         # 进度速率估算（纯呈现层：滑动窗口速率 → 预计剩余时间）
         from .scrape_progress import ScrapeRateEstimator
@@ -1617,6 +1655,7 @@ class Scraper:
                 poster_final_path=poster_final_path,
                 thumb_final_path=thumb_final_path,
                 fanart_final_path=fanart_final_path,
+                index=self._organize_index,
             )
             if not moved:
                 LogBuffer.error().write(error)
