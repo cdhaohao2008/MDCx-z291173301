@@ -1201,18 +1201,21 @@ class RemoteVersion(NamedTuple):
         return self.name or str(self.tag)
 
 
-_RELEASE_VERSION_RE = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
+_RELEASE_VERSION_RE = re.compile(r"v?(\d+)\.(\d+)(?:\.(\d+))?")
 
 
 def parse_release_version(name: str) -> tuple[int, int, int] | None:
     """从 release 标题（如 `MDCx 2.1.8 (20261001)`）解析展示版本号；解析不出返回 None。
 
-    只搜标题里的 `X.Y.Z` 段，不锚定开头，故标题带不带 `MDCx ` / `v` 前缀都能解析出。
+    只搜标题里的 `X.Y[.Z]` 段，不锚定开头，故标题带不带 `MDCx ` / `v` 前缀都能解析出。
+    第三段可省略（v3.0 这种两段版本号，v3.0.0 从 v3.0 升上来时也算同一个版本）：
+    省略时补 0，故 `MDCx 3.0 (20261022)` 解析成 (3, 0, 0)。
     """
+
     matched = _RELEASE_VERSION_RE.search(str(name or ""))
     if matched is None:
         return None
-    return int(matched[1]), int(matched[2]), int(matched[3])
+    return int(matched[1]), int(matched[2]), int(matched[3] or 0)
 
 
 def is_remote_version_newer(remote: RemoteVersion, local_tag: int, local_name: str) -> bool:

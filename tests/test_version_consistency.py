@@ -1,11 +1,13 @@
 """版本号同步点一致性校验（发版流程回归）。
 
-版本号有五个同步点：
+版本号有四个同步点：
 1. `mdcx/consts.py` 的 `LOCAL_VERSION`（纯数字 YYYYMMDD，GitHub tag 也用它）
-2. `mdcx/consts.py` 的 `VERSION_NAME`（展示名 vX.Y.Z）
+2. `mdcx/consts.py` 的 `VERSION_NAME`（展示名 vX.Y[.Z]；v3.0 起固定为 v3.0）
 3. `pyproject.toml` 的 `version`（去掉 v 前缀）
-4. `docs/Changelog.md` 首个版本段标题 `## vX.Y.Z (YYYY-MM-DD)` 的版本与日期
-5. `uv.lock` 根包 `mdcx` 的 `version`（CI 全平台 `uv sync --locked` 强校验，脱节即构建失败）
+4. `uv.lock` 根包 `mdcx` 的 `version`（CI 全平台 `uv sync --locked` 强校验，脱节即构建失败）
+
+changelog 改按**日期**分段（`## YYYY-MM-DD`）后，版本号不再进标题，日期才是它的
+同步点：`docs/Changelog.md` 必须有与 `LOCAL_VERSION` 同日期的段，且各段按日期倒序。
 
 `scripts/bump.py --check` 与本测试覆盖同一不变量；此处用 pytest 让它进入常规回归。
 """
@@ -23,20 +25,28 @@ def test_version_name_matches_pyproject():
     package_version = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     display_version = VERSION_NAME.removeprefix("v")
 
-    assert re.fullmatch(r"\d+\.\d+\.\d+", display_version)
+    assert re.fullmatch(r"\d+\.\d+(?:\.\d+)?", display_version)
     assert package_version == display_version
 
 
-def test_changelog_head_matches_local_version_and_name():
+def test_changelog_has_section_for_local_version():
+    """changelog 必须有与 LOCAL_VERSION 同日期的段（今天的改动记在今天下）。"""
     changelog = (_ROOT / "docs" / "Changelog.md").read_text(encoding="utf-8")
-    head = re.search(r"(?m)^##\s+(v\d+\.\d+\.\d+)\s+\((\d{4})-(\d{2})-(\d{2})\)", changelog)
+    dates = re.findall(r"(?m)^##\s+(\d{4})-(\d{2})-(\d{2})\s*$", changelog)
 
-    assert head is not None, "changelog 首个版本段格式应为 '## vX.Y.Z (YYYY-MM-DD)'"
-    assert head.group(1) == VERSION_NAME, f"changelog 首个版本段 {head.group(1)} 与 VERSION_NAME {VERSION_NAME} 不一致"
-    date_digits = head.group(2) + head.group(3) + head.group(4)
-    assert date_digits == str(LOCAL_VERSION), (
-        f"changelog 版本段日期 {date_digits} 与 LOCAL_VERSION {LOCAL_VERSION} 不一致"
+    assert dates, "changelog 首个段格式应为 '## YYYY-MM-DD'"
+    date_digits = {d[0] + d[1] + d[2] for d in dates}
+    assert str(LOCAL_VERSION) in date_digits, (
+        f"changelog 没有与 LOCAL_VERSION {LOCAL_VERSION} 同日期的段（今天的改动必须记在今天下）"
     )
+
+
+def test_changelog_sections_sorted_by_date_desc():
+    """changelog 的日期段必须按日期倒序（新 → 旧），否则读者会看到旧记录排在前面。"""
+    changelog = (_ROOT / "docs" / "Changelog.md").read_text(encoding="utf-8")
+    dates = [f"{d[0]}-{d[1]}-{d[2]}" for d in re.findall(r"(?m)^##\s+(\d{4})-(\d{2})-(\d{2})\s*$", changelog)]
+
+    assert dates == sorted(dates, reverse=True), f"changelog 日期段未按倒序排列: {dates}"
 
 
 def test_uv_lock_root_version_matches_display_name():

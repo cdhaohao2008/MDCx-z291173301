@@ -83,12 +83,12 @@ def get_current_name() -> str:
 
 
 def _normalize_name(name: str) -> str:
-    """把展示版本名规范为 vX.Y.Z 形态。"""
+    """把展示版本名规范为 vX.Y[.Z] 形态。"""
     name = name.strip()
     if not name.startswith("v"):
         name = "v" + name
-    if not re.fullmatch(r"v\d+\.\d+\.\d+", name):
-        raise ValueError(f"展示版本名格式无效（应为 vX.Y.Z）: {name}")
+    if not re.fullmatch(r"v\d+\.\d+(?:\.\d+)?", name):
+        raise ValueError(f"展示版本名格式无效（应为 vX.Y 或 vX.Y.Z）: {name}")
     return name
 
 
@@ -154,35 +154,35 @@ def sync_uv_lock_version(display_name: str) -> Path | None:
     return uv_lock
 
 
-def update_changelog_date(new_local_version: int, display_name: str) -> Path | None:
-    """把 changelog 首个版本段的日期同步为 LOCAL_VERSION 对应的日期。
+def update_changelog_date(new_local_version: int) -> Path | None:
+    """把 changelog 首个日期段的日期同步为 LOCAL_VERSION 对应的日期。
 
-    仅当首个版本段的版本号与 display_name 一致时才更新（否则说明段标题尚未
-    为本次发布准备，跳过并提示）。
+    v3.0 起 changelog 改按**日期**分段（`## YYYY-MM-DD`），版本号不再进标题、
+    固定为 v3.0，故这里只同步首段日期；首段不是日期段时跳过并提示。
     """
     changelog = get_changelog_file()
     if not changelog.exists():
         return None
     content = changelog.read_text(encoding="utf-8")
 
-    match = re.search(r"(?m)^##\s+(v\d+\.\d+\.\d+)\s+\((\d{4})-(\d{2})-(\d{2})\)", content)
+    match = re.search(r"(?m)^##\s+(\d{4}-\d{2}-\d{2})\s*$", content)
     if not match:
-        return None
-    if match.group(1) != display_name:
-        console.print(
-            f"[yellow]⚠ changelog 首个版本段是 {match.group(1)}，与当前展示版本 {display_name} 不一致，"
-            "跳过日期同步（请先为该版本创建 changelog 段）[/yellow]"
-        )
+        console.print("[yellow]⚠ changelog 首个段不是日期段（应为 '## YYYY-MM-DD'），跳过日期同步[/yellow]")
         return None
 
     date_str = f"{str(new_local_version)[:4]}-{str(new_local_version)[4:6]}-{str(new_local_version)[6:8]}"
-    new_content = content[: match.start()] + f"## {display_name} ({date_str})" + content[match.end() :]
+    new_content = content[: match.start()] + f"## {date_str}" + content[match.end() :]
     changelog.write_text(new_content, encoding="utf-8")
     return changelog
 
 
 def check_consistency() -> list[str]:
-    """校验五处版本点是否一致，返回问题列表（空表示一致）。"""
+    """校验版本点是否一致，返回问题列表（空表示一致）。
+
+    v3.0 起校验三件事：pyproject.toml 的 version == VERSION_NAME、uv.lock 根包
+    version == VERSION_NAME、changelog 首个日期段的日期 == LOCAL_VERSION
+    （changelog 改按日期分段后，版本号不再进标题，故这里只校日期）。
+    """
     issues: list[str] = []
     local = get_current_version()
     name = get_current_name()
@@ -202,15 +202,13 @@ def check_consistency() -> list[str]:
     changelog = get_changelog_file()
     if changelog.exists():
         content = changelog.read_text(encoding="utf-8")
-        head = re.search(r"(?m)^##\s+(v\d+\.\d+\.\d+)\s+\((\d{4})-(\d{2})-(\d{2})\)", content)
+        head = re.search(r"(?m)^##\s+(\d{4})-(\d{2})-(\d{2})\s*$", content)
         if not head:
-            issues.append("changelog 首个版本段格式异常（应为 '## vX.Y.Z (YYYY-MM-DD)'）")
+            issues.append("changelog 首个段格式异常（应为 '## YYYY-MM-DD'）")
         else:
-            if head.group(1) != name:
-                issues.append(f"changelog 首个版本段 {head.group(1)} 与 VERSION_NAME={name} 不一致")
-            date_digits = head.group(2) + head.group(3) + head.group(4)
+            date_digits = head.group(1) + head.group(2) + head.group(3)
             if date_digits != str(local):
-                issues.append(f"changelog 版本段日期 {date_digits} 与 LOCAL_VERSION={local} 不一致")
+                issues.append(f"changelog 首个日期段 {date_digits} 与 LOCAL_VERSION={local} 不一致")
     return issues
 
 
@@ -226,14 +224,18 @@ def main(
     ] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run", "-n", help="预览模式")] = False,
     force: Annotated[bool, typer.Option("--force", "-f", help="强制执行")] = False,
-    check: Annotated[bool, typer.Option("--check", "-c", help="仅校验五处版本点是否一致")] = False,
+    check: Annotated[bool, typer.Option("--check", "-c", help="仅校验版本点是否一致")] = False,
 ) -> None:
     """
-    更新 LOCAL_VERSION（发版日），可选同步展示版本名与 changelog 段日期。
+    更新 LOCAL_VERSION（发版日），可选同步展示版本名与 changelog 首段日期。
+
+    v3.0 起：展示版本名固定为 v3.0（版本号不再随每次发布变动），changelog 改按
+    **日期**分段（`## YYYY-MM-DD`），本脚本只把首个日期段的日期同步成
+    LOCAL_VERSION 对应的日期。
 
     [bold green]示例:[/bold green]
 
-    • [cyan]python bump.py --check[/cyan] - 校验五处版本点一致
+    • [cyan]python bump.py --check[/cyan] - 校验版本点一致
     • [cyan]python bump.py[/cyan] - LOCAL_VERSION +1
     • [cyan]python bump.py --version 20260918[/cyan] - 设为指定日期版本号
     • [cyan]python bump.py --version 20260918 --name 2.1.2[/cyan] - 同时升展示版本
@@ -246,7 +248,7 @@ def main(
                 for issue in issues:
                     console.print(f"[red]✗ {issue}[/red]")
                 raise typer.Exit(1)
-            console.print("[green]✓ 五处版本点一致[/green]")
+            console.print("[green]✓ 版本点一致[/green]")
             return
 
         current_version = get_current_version()
@@ -277,7 +279,7 @@ def main(
             console.print(
                 "[dim]将修改: consts.py 的 LOCAL_VERSION"
                 + (" + VERSION_NAME、pyproject.toml version、uv.lock 根包版本" if name else "")
-                + f"、changelog 段日期（若段标题为 {new_name}）[/dim]"
+                + "、changelog 首个日期段的日期[/dim]"
             )
             return
 
@@ -289,7 +291,7 @@ def main(
         changed = [update_local_version(new_version)]
         if name:
             changed.extend(update_display_name(new_name))
-        changelog = update_changelog_date(new_version, new_name)
+        changelog = update_changelog_date(new_version)
         if changelog:
             changed.append(changelog)
 

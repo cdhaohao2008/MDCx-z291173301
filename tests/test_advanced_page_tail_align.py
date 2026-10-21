@@ -527,14 +527,13 @@ def test_narrow_menu_icon_lands_on_dark_mode_when_it_fits(win, app, width, heigh
 
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
-def test_restored_infinite_scrape_lands_on_show_data_log(win, app, width, height):
-    """需求④（v2.7.6 最新一条）：还原态「无限次刮削」与「显示字段内容信息」严格对齐。
+def test_restored_infinite_scrape_lands_on_show_from_log(win, app, width, height):
+    """v3.0 需求①：还原态「无限次刮削」与「显示字段来源信息」严格对齐。
 
-    「显示字段内容信息」位置保持不变——它就是目标竖线本身，实现只钉前导项
+    「显示字段来源信息」位置保持不变——它就是目标竖线本身，实现只钉前导项
     「记住任务，重启续刮」，不碰它；本用例断言它在同步前后不动。
     「无按钮」的落点由 _sync_advanced_page_tail_align 钉出（「显示字段内容信息」
-    那条竖线），故「无限次刮削」那一段必须排在 tail_align **之后**才量得到终态 x；
-    离屏环境里两者落在同一条竖线上（间距被布局吸收），故也一并断言。
+    那条竖线），与本需求的目标竖线不是同一条，故只断言它没被带偏。
     """
     ui = win.Ui
     win.show()
@@ -542,20 +541,21 @@ def test_restored_infinite_scrape_lands_on_show_data_log(win, app, width, height
     _resize(win, app, width, height)
     assert not win._advanced_page_window_maximized(), f"{width} 宽下离屏窗口应处于还原态"
 
-    data_x = _abs(ui, ui.checkBox_show_data_log)
+    from_x = _abs(ui, ui.checkBox_show_from_log)
     win._sync_page_layouts()
     app.processEvents()
-    assert _abs(ui, ui.checkBox_show_data_log) == data_x, (
-        f"还原态 {width} 宽下「显示字段内容信息」位置变了: {data_x} -> {_abs(ui, ui.checkBox_show_data_log)}"
+    assert _abs(ui, ui.checkBox_show_from_log) == from_x, (
+        f"还原态 {width} 宽下「显示字段来源信息」位置变了: {from_x} -> {_abs(ui, ui.checkBox_show_from_log)}"
     )
 
     infinite_x = _abs(ui, ui.checkBox_infinite_scrape)
-    assert infinite_x == data_x, (
-        f"还原态 {width} 宽下「无限次刮削」未与「显示字段内容信息」严格上下对齐: x={infinite_x} 期望={data_x}"
+    assert infinite_x == from_x, (
+        f"还原态 {width} 宽下「无限次刮削」未与「显示字段来源信息」严格上下对齐: x={infinite_x} 期望={from_x}"
     )
     # 「无按钮」自己不许动：它仍落在「显示字段内容信息」那条竖线上
-    assert _abs(ui, ui.radioButton_hide_none) == data_x, (
-        f"还原态 {width} 宽下「无按钮」被带偏: x={_abs(ui, ui.radioButton_hide_none)} 期望={data_x}"
+    assert _abs(ui, ui.radioButton_hide_none) == _abs(ui, ui.checkBox_show_data_log), (
+        f"还原态 {width} 宽下「无按钮」被带偏: x={_abs(ui, ui.radioButton_hide_none)} "
+        f"期望={_abs(ui, ui.checkBox_show_data_log)}"
     )
 
 

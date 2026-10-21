@@ -30,6 +30,10 @@ from mdcx.base.web import RemoteVersion, is_remote_version_newer, parse_release_
         ("Release v2.1.8 (20261001) 正式版", (2, 1, 8)),
         ("v10.0.12 (20261001)", (10, 0, 12)),
         ("v2.1.8-rc1 (20261001)", (2, 1, 8)),
+        # v3.0 起展示版本名固定为两段（v3.0），第三段省略时补 0
+        ("MDCx 3.0 (20261022)", (3, 0, 0)),
+        ("v3.0", (3, 0, 0)),
+        ("3.0.1 (20261022)", (3, 0, 1)),
         ("20261001", None),
         ("", None),
         ("nightly build", None),

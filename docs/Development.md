@@ -626,7 +626,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 
 ### 变更日志纪律：纯界面改动不写 Changelog
 
-`docs/Changelog.md` 只记**功能逻辑**的变更。**不涉及功能逻辑的界面修改不写入 `docs/Changelog.md`**，免得版本段被「这一轮挪了哪个按钮」这类条目淹没，发版核对时还得逐条去分辨它到底改没改行为。
+`docs/Changelog.md` 只记**功能逻辑**的变更。**不涉及功能逻辑的界面修改不写入 `docs/Changelog.md`**，免得日期段被「这一轮挪了哪个按钮」这类条目淹没，发版核对时还得逐条去分辨它到底改没改行为。
 
 判定标准只有一条：**改完之后用户可观察到的行为是否变化。** 行为没变就是纯界面，不写。
 
@@ -640,8 +640,8 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 
 - 纯界面改动**仍要按「界面问题的取证与验证」立规取证并留回归测试**（断言几何不变量，见「离屏渲染校验流程」），只是不占 Changelog 一行——不写日志不等于不验证、不等于不改测试。
 - 纯界面改动**顺带改到了功能语义**时，按功能条目写，并在条目里点明是哪次界面调整带来的，不要因为主体是界面就漏记。
-- 同一版本段里若已有一条功能条目提到了该界面区域，纯界面的微调并进那条描述即可，不另起一条。
-- 历史版本段里的界面条目保持原样不动，本纪律只对新增条目生效。
+- 同一日期段里若已有一条功能条目提到了该界面区域，纯界面的微调并进那条描述即可，不另起一条。
+- 历史日期段里的界面条目保持原样不动，本纪律只对新增条目生效。
 
 ### 站点收录边界：默认名单只收该站真能查到的类型
 
@@ -677,31 +677,32 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 
 ## 版本号管理
 
-版本号有两处定义、五个同步点；任一处不一致都会被 `scripts/bump.py --check` 与 `tests/test_version_consistency.py` 判红。
+版本号有两处定义、四个同步点；任一处不一致都会被 `scripts/bump.py --check` 与 `tests/test_version_consistency.py` 判红。
 
 **两处定义（`mdcx/consts.py`）**
 
 - `LOCAL_VERSION`：纯数字 `YYYYMMDD`，用于版本比较、更新检查与构建；**GitHub release 的 Tag 必须是同值纯数字**（`check_version` 对 `tag_name` 做 `int()`，`vX.Y.Z` 形态的标签会被直接跳过）。唯一发版工作流 `build-py315.yml` 遵守这一条，没有非纯数字 tag 的例外，详见「构建」一节。
-- `VERSION_NAME`：展示名 `vX.Y.Z`，界面/日志统一显示为 `VERSION_NAME (LOCAL_VERSION)`；更新检查时它也作为**版本号维度**参与比较（见下节），不再纯装饰。
+- `VERSION_NAME`：展示名 `vX.Y[.Z]`（v3.0 起固定为 `v3.0`，不再随每次发布递增），界面/日志统一显示为 `VERSION_NAME (LOCAL_VERSION)`；更新检查时它也作为**版本号维度**参与比较（见下节），不再纯装饰。
 
-**五个同步点**
+**四个同步点**
 
 | 位置 | 值 |
 |---|---|
 | `mdcx/consts.py` 的 `LOCAL_VERSION` | `YYYYMMDD` |
-| `mdcx/consts.py` 的 `VERSION_NAME` | `vX.Y.Z` |
-| `pyproject.toml` 的 `version` | `X.Y.Z`（`VERSION_NAME` 去掉 `v`） |
-| `docs/Changelog.md` 首个版本段 `## vX.Y.Z (YYYY-MM-DD)` | 版本 = `VERSION_NAME`；日期 = `LOCAL_VERSION` 的日期 |
-| `uv.lock` 根包 `mdcx` 的 `version` | `X.Y.Z`（与 `pyproject.toml` 一致；CI 全平台 `uv sync --locked` 强校验，脱节即构建失败） |
+| `mdcx/consts.py` 的 `VERSION_NAME` | `vX.Y[.Z]`（v3.0 起固定 `v3.0`） |
+| `pyproject.toml` 的 `version` | `X.Y[.Z]`（`VERSION_NAME` 去掉 `v`） |
+| `uv.lock` 根包 `mdcx` 的 `version` | `X.Y[.Z]`（与 `pyproject.toml` 一致；CI 全平台 `uv sync --locked` 强校验，脱节即构建失败） |
+
+`docs/Changelog.md` 自 v3.0 起改按**日期**分段（`## YYYY-MM-DD`，段内是 `### 总结` / `### 改进` / `### 更新` 等类别，版本号不再进标题、只在段标题下一行的「（vX.Y.Z、…）」里留档），故它不再是版本号同步点，只与 `LOCAL_VERSION` 对**日期**：必须有与当天同日期的段。
 
 **事故记录（2026-09-27）**：曾只升 `pyproject.toml` 到 2.1.4、漏同步 `uv.lock`（根包仍锁 2.1.3），发版工作流四个构建腿（windows-2025 / macos-latest / macos-15-intel / ubuntu-latest）齐刷刷在 `Install locked dependencies` 步 exit 1。教训：改版本号/日期必须走 `bump`（现已自动同步 lock），且以 `bump --check` + 版本一致性测试为准，不要手改单点。
 
 **改版流程**
 
-1. 在 `docs/Changelog.md` 顶部新建目标版本段并写条目；已发版旧段保留，未发版段被后续议题取代时合并重写成最终形态。
-2. `uv run bump --version <YYYYMMDD> --name X.Y.Z` 同步五处（`--dry-run` 预览、`--force` 免交互；`--name` 会连带同步 `uv.lock` 根包版本）；只校验用 `uv run bump --check`。
+1. 在 `docs/Changelog.md` 顶部按**日期**写条目：当天没有段就新建 `## YYYY-MM-DD` 段（段内按 `### 总结` / `### 改进` / `### 更新` 等类别分块），已有段就并进当天的段；已发版旧段保留，未发版段被后续议题取代时合并重写成最终形态。
+2. `uv run bump --version <YYYYMMDD>` 同步 `LOCAL_VERSION` 与 changelog 首个日期段的日期（`--dry-run` 预览、`--force` 免交互）；展示版本名 v3.0 起固定，只有真的要改展示版本号时才加 `--name X.Y[.Z]`（会连带同步 `pyproject.toml` 与 `uv.lock` 根包版本）。只校验用 `uv run bump --check`。
 3. 复核 `uv run pytest tests/test_version_consistency.py tests/test_version_metadata.py`。
-4. 打**纯数字** tag（= `LOCAL_VERSION`）触发 `.github/workflows/build-py315.yml`。「已发版」的判据是数字 tag 已推送，而非 changelog 有没有该段。同一版本号重复触发会覆盖更新同一条 Release（`overwrite: true`），不会多出第二条。
+4. 打**纯数字** tag（= `LOCAL_VERSION`）触发 `.github/workflows/build-py315.yml`（Release 正文取 changelog 里与 tag 同日期的那一段）。「已发版」的判据是数字 tag 已推送，而非 changelog 有没有该段。同一版本号重复触发会覆盖更新同一条 Release（`overwrite: true`），不会多出第二条。
 
 版本号归属维护者，不擅自开新段。`scripts/build.py` 与主窗口不留版本常量：build 从 `consts.py` 读 `LOCAL_VERSION`（`--version` 可覆盖），界面统一展示 `VERSION_NAME (LOCAL_VERSION)`。
 
@@ -711,7 +712,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 
 **① 取 tag 最大的 release，不是列表第一条。** `/releases?per_page=10` 按 `created_at` 倒序返回，**不按 tag 倒序**；而本工作流三个 `Create Release` 步骤用同一 tag + `overwrite: true`（`svenstaro/upload-release-action` 先删后建），任何一次补发/重跑都会把那条 release 的 `created_at` 刷成"当前时间"、顶到第一位。原实现取第一条，于是**手动补发一次旧 tag 就让所有用户从此看不到新版本提示且无任何报错**。修法是遍历全部条目收集所有 `tag_name.isdigit()` 的值取 `max`（`tests/test_version_check_pick_latest.py` 守卫）。tag 必须纯数字这条硬约束不变，非纯数字 tag 照旧跳过。
 
-**② 版本号优先，版本号相等才比日期。** 两侧版本号都能解析时：不同 → 由版本号决出（远端更高即有新版本）；相等 → 比日期（远端更新即有新版本）。任一侧解析不出（标题里没有 `X.Y.Z` 段）→ 退回只比日期。两条并列才覆盖得住：只比日期则"当天发两版、两个 tag 同一天"认不出第二版；只比版本号则"同版本号跨日期补发"会漏判。
+**② 版本号优先，版本号相等才比日期。** 两侧版本号都能解析时：不同 → 由版本号决出（远端更高即有新版本）；相等 → 比日期（远端更新即有新版本）。任一侧解析不出（标题里没有 `X.Y[.Z]` 段）→ 退回只比日期。两条并列才覆盖得住：只比日期则"当天发两版、两个 tag 同一天"认不出第二版；只比版本号则"同版本号跨日期补发"会漏判。
 
 刻意**不做字面 OR**（不让"日期更新"在版本号更低时也触发）：那会提示用户**降级**，且 `LOCAL_VERSION` 常先于线上发布 bump（源码已 20261002 而线上还是 20261001），开发版会对着已发布的历史版本反复提示「请及时更新」。
 
