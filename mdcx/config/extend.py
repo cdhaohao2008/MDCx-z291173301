@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -369,6 +370,28 @@ def get_movie_path_setting(
         extrafanart_folder=extrafanart_folder,
         softlink_path=softlink_path,
     )
+
+
+def _path_key(path: Path) -> str:
+    """归一化路径用于比较：解析成绝对路径并统一大小写（Windows 不区分大小写）。"""
+    try:
+        resolved = Path(path).resolve()
+    except OSError:
+        resolved = Path(path)
+    return os.path.normcase(str(resolved))
+
+
+def drop_ignore_dir(ignore_dirs: list[Path], target: Path | None) -> list[Path]:
+    """从排除目录列表中移除指定目录（比较时忽略大小写与路径分隔符差异）。
+
+    整理模式专用：整理结果写入「成功输出目录」（默认 JAV_output），而该目录默认
+    也在「排除目录」列表里。扫描时若不把它摘掉，整棵成功输出目录会被跳过，整理
+    模式就看不到自己上一次的产物，于是再次点「开始」只会得到「共 0 个文件」。
+    """
+    if target is None:
+        return list(ignore_dirs)
+    key = _path_key(target)
+    return [item for item in ignore_dirs if _path_key(item) != key]
 
 
 def need_clean(file_path: Path, file_name: str, file_ext: str) -> bool:

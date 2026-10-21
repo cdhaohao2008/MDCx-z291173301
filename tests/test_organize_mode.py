@@ -17,13 +17,19 @@ from pathlib import Path
 import pytest
 
 from mdcx.base.file import get_movie_list, move_mediainfo
-from mdcx.config.extend import ORGANIZE_MAIN_MODE, is_organize_mode
+from mdcx.config.extend import (
+    ORGANIZE_MAIN_MODE,
+    drop_ignore_dir,
+    get_movie_path_setting,
+    is_organize_mode,
+)
 from mdcx.config.manager import manager
 from mdcx.core import organize as organize_module
 from mdcx.core.organize import build_organize_index, organize_files
-from mdcx.core.scraper import Scraper
+from mdcx.core.scraper import Scraper, get_scan_ignore_dirs
 from mdcx.core.utils import get_video_size_for_file
 from mdcx.models.enums import FileMode
+from mdcx.models.flags import Flags
 
 pytestmark = pytest.mark.skipif(sys.version_info < (3, 13), reason="项目配置模型需要 Python 3.13+")
 
@@ -746,3 +752,174 @@ async def test_organize_transaction_accepts_move_reported_as_failed_after_comple
     assert ok, error
     assert target.read_bytes() == b"image"
     assert not source.exists()
+
+
+# ---------------------------------------------------------------------------
+# 整理模式「共 0 个文件」回归（用户实测）
+#
+# 现象：整理模式把文件成功整理到 JAV_output（成功输出目录）后，再点「开始」
+# 重新整理，界面直接提示「恭喜！全部刮削完成！共 0 个文件！用时 0.05 秒」，
+# 只有重启软件后整理模式才恢复正常。
+#
+# 根因：整理结果写在「成功输出目录」里，而该目录默认也在「排除目录」列表中，
+# 扫描时整棵被跳过 → 整理模式看不见自己上一次的产物，第二次必然扫到 0 个文件。
+# ---------------------------------------------------------------------------
+
+
+class _DummyCrawlerProvider:
+    """整理模式不联网刮削，爬虫提供者只需要能被 close()。"""
+
+    client = None
+
+    async def close(self) -> None:
+        return None
+
+
+def _write_sample_nfo(folder: Path, number: str = "ABS-040") -> Path:
+    """写一个整理模式可解析的最小 nfo。"""
+    folder.mkdir(parents=True, exist_ok=True)
+    nfo = folder / f"{number}.nfo"
+    nfo.write_text(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        "<movie>\n"
+        f"  <title>{number} cheeky pretty</title>\n"
+        "  <originaltitle>cheeky pretty</originaltitle>\n"
+        f"  <num>{number}</num>\n"
+        "  <release>2017-11-21</release>\n"
+        "  <studio>プレステージ</studio>\n"
+        "  <actor><name>あやめ美桜</name></actor>\n"
+        "</movie>\n",
+        encoding="utf-8",
+    )
+    return nfo
+
+
+def _configure_organize_mode(monkeypatch: pytest.MonkeyPatch, media_dir: Path) -> None:
+    """把配置切到与用户实测一致的整理模式（成功输出目录同时也在排除目录里）。"""
+    monkeypatch.setattr(manager.config, "main_mode", ORGANIZE_MAIN_MODE)
+    monkeypatch.setattr(manager.config, "media_path", str(media_dir))
+    monkeypatch.setattr(manager.config, "success_output_folder", "JAV_output")
+    monkeypatch.setattr(manager.config, "failed_output_folder", "failed")
+    monkeypatch.setattr(manager.config, "folders", ["JAV_output"])
+    monkeypatch.setattr(manager.config, "folder_name", "{{ actor }}/{{ number }}")
+    monkeypatch.setattr(manager.config, "naming_file", "{{ number }}")
+    monkeypatch.setattr(manager.config, "media_type", [".mp4", ".strm"])
+    monkeypatch.setattr(manager.config, "clean_enable", [])
+    monkeypatch.setattr(manager.config, "no_escape", [])
+    monkeypatch.setattr(manager.config, "switch_on", [])
+    monkeypatch.setattr(manager.config, "soft_link", 0)
+    monkeypatch.setattr(manager.config, "success_file_move", True)
+    monkeypatch.setattr(manager.config, "success_file_rename", True)
+    monkeypatch.setattr(manager.config, "del_empty_folder", False)
+    monkeypatch.setattr(manager.config, "scrape_softlink_path", False)
+    # 关闭刮削结束后的 emby 演员照片同步（会联网，测试环境不可用）
+    monkeypatch.setattr(manager.config, "emby_on", [])
+    monkeypatch.setattr(manager.config, "actor_photo_kodi_auto", False)
+
+
+def test_drop_ignore_dir_removes_only_the_target(tmp_path: Path):
+    success = tmp_path / "JAV_output"
+    other = tmp_path / "examples"
+    ignore_dirs = [success, other]
+
+    dropped = drop_ignore_dir(ignore_dirs, success)
+
+    assert dropped == [other]
+    # 不修改传入的列表
+    assert ignore_dirs == [success, other]
+    # 目标不存在时保持原样
+    assert drop_ignore_dir(ignore_dirs, tmp_path / "not-exists") == ignore_dirs
+
+
+def test_scan_ignore_dirs_keep_success_folder_only_in_organize_mode(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    monkeypatch.setattr(manager.config, "media_path", str(media_dir))
+    monkeypatch.setattr(manager.config, "success_output_folder", "JAV_output")
+    monkeypatch.setattr(manager.config, "folders", ["JAV_output"])
+
+    setting = get_movie_path_setting(movie_path_override=media_dir)
+    assert setting.success_folder in setting.ignore_dirs
+
+    monkeypatch.setattr(manager.config, "main_mode", ORGANIZE_MAIN_MODE)
+    organize_ignore = get_scan_ignore_dirs(setting)
+    assert setting.success_folder not in organize_ignore
+
+    monkeypatch.setattr(manager.config, "main_mode", 1)
+    normal_ignore = get_scan_ignore_dirs(setting)
+    assert setting.success_folder in normal_ignore
+
+
+@pytest.mark.asyncio
+async def test_organize_scan_finds_files_inside_success_output_folder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    media_dir = tmp_path / "media"
+    success_dir = media_dir / "JAV_output" / "あやめ美桜" / "ABS-040"
+    success_dir.mkdir(parents=True)
+    (success_dir / "ABS-040.strm").write_text("https://example.com/ABS-040.mp4", encoding="utf-8")
+    _configure_organize_mode(monkeypatch, media_dir)
+
+    setting = get_movie_path_setting(movie_path_override=media_dir)
+    organize_movies = await get_movie_list(FileMode.Default, media_dir, get_scan_ignore_dirs(setting))
+    assert [path.name for path in organize_movies] == ["ABS-040.strm"]
+
+    # 正常模式仍然排除成功输出目录（避免把已整理好的文件重复刮削）
+    monkeypatch.setattr(manager.config, "main_mode", 1)
+    normal_movies = await get_movie_list(FileMode.Default, media_dir, get_scan_ignore_dirs(setting))
+    assert normal_movies == []
+
+
+@pytest.mark.asyncio
+async def test_organize_rerun_after_first_run_still_finds_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """整理成功后再次点「开始」，必须仍能扫到文件（原来恒为「共 0 个文件」）。"""
+    media_dir = tmp_path / "media"
+    movie_dir = media_dir / "あやめ美桜" / "プレステージ" / "2017-11-21 ABS-040"
+    _write_sample_nfo(movie_dir)
+    (movie_dir / "ABS-040.strm").write_text("https://example.com/ABS-040.mp4", encoding="utf-8")
+    _configure_organize_mode(monkeypatch, media_dir)
+
+    await Scraper(_DummyCrawlerProvider()).run(FileMode.Default, None)
+
+    assert Flags.total_count == 1
+    assert Flags.fail_count == 0
+    organized = sorted(media_dir.glob("JAV_output/**/*.strm"))
+    assert len(organized) == 1
+
+    # 第二次整理：文件已经在成功输出目录里，必须能被重新扫到并（幂等地）重新整理
+    await Scraper(_DummyCrawlerProvider()).run(FileMode.Default, None)
+
+    assert Flags.total_count == 1
+    assert Flags.fail_count == 0
+    assert sorted(media_dir.glob("JAV_output/**/*.strm")) == organized
+
+
+@pytest.mark.asyncio
+async def test_zero_file_run_reports_not_found_instead_of_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """一个文件都没扫到时不能再报「恭喜！全部刮削完成」，否则用户无法定位问题。"""
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    _configure_organize_mode(monkeypatch, media_dir)
+
+    from mdcx.core import scraper as scraper_module
+
+    class _Recorder:
+        def __init__(self) -> None:
+            self.messages: list[str] = []
+
+        def emit(self, text: str) -> None:
+            self.messages.append(text)
+
+        def connect(self, *args, **kwargs) -> None:
+            return None
+
+        def disconnect(self, *args, **kwargs) -> None:
+            return None
+
+    recorder = _Recorder()
+    monkeypatch.setattr(scraper_module.signal, "set_label_file_path", recorder)
+
+    await Scraper(_DummyCrawlerProvider()).run(FileMode.Default, None)
+
+    assert Flags.total_count == 0
+    assert recorder.messages, "没有收到结果提示"
+    assert "恭喜" not in recorder.messages[-1]
+    assert "未找到" in recorder.messages[-1]

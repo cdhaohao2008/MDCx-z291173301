@@ -36,11 +36,14 @@ from ..config.enums import (
 from ..config.extend import (
     ORGANIZE_MAIN_MODE,
     SEPARATE_MAIN_MODE,
+    MoviePathSetting,
+    drop_ignore_dir,
     eff_del_empty_folder,
     eff_success_file_move,
     eff_success_file_rename,
     get_movie_path_setting,
     get_separate_meta_root,
+    is_organize_mode,
     mirror_meta_folder,
     parse_media_paths,
     remap_meta_paths,
@@ -133,6 +136,22 @@ class StopScrape(Exception): ...
 
 
 class UnexpectedScrapeCancellation(Exception): ...
+
+
+def get_scan_ignore_dirs(path_setting: MoviePathSetting) -> list[Path]:
+    """计算本次扫描要排除的目录列表。
+
+    整理模式（main_mode == 6）把整理结果写进「成功输出目录」（默认 JAV_output），
+    而该目录默认也在「排除目录」列表里 → 扫描时整棵被跳过，整理模式永远看不到
+    自己上一次的产物，于是再次点「开始」只会得到「共 0 个文件」（用户实测）。
+    因此整理模式下把成功输出目录从排除列表中摘掉：整理是幂等的（已经在目标位置
+    的文件无需移动），这样再次点「开始」就能把上次的整理结果重新整理一遍。
+    """
+    if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+        # getattr 兜底：部分调用方（含测试桩）构造的是精简的路径设置对象，
+        # 没有 success_folder 时按「无可摘除项」处理，不能让扫描整段抛异常。
+        return drop_ignore_dir(path_setting.ignore_dirs, getattr(path_setting, "success_folder", None))
+    return list(path_setting.ignore_dirs)
 
 
 @dataclass(slots=True)
@@ -488,7 +507,7 @@ class Scraper:
             for media_path in scan_movie_paths:
                 current_paths = get_movie_path_setting(movie_path_override=media_path)
                 scan_path = current_paths.movie_path
-                scan_ignore_dirs = current_paths.ignore_dirs
+                scan_ignore_dirs = get_scan_ignore_dirs(current_paths)
                 if manager.config.scrape_softlink_path:
                     await newtdisk_creat_symlink(
                         Switch.COPY_NETDISK_NFO in manager.config.switch_on,
@@ -635,13 +654,38 @@ class Scraper:
         used_time = str(round((end_time - Flags.start_time), 2))
         average_time = str(round((end_time - Flags.start_time) / task_count, 2)) if task_count else used_time
         signal.exec_set_processbar.emit(0)
-        signal.set_label_file_path.emit(f"🎉 恭喜！全部刮削完成！共 {task_count} 个文件！用时 {used_time} 秒")
-        signal.show_traceback_log(
-            f"🎉 All finished!!! Total {task_count} , Success {Flags.succ_count} , Failed {Flags.fail_count} "
-        )
-        signal.show_log_text(
-            f" 🎉🎉🎉 All finished!!! Total {task_count} , Success {Flags.succ_count} , Failed {Flags.fail_count} "
-        )
+        if task_count:
+            signal.set_label_file_path.emit(f"🎉 恭喜！全部刮削完成！共 {task_count} 个文件！用时 {used_time} 秒")
+            signal.show_traceback_log(
+                f"🎉 All finished!!! Total {task_count} , Success {Flags.succ_count} , Failed {Flags.fail_count} "
+            )
+            signal.show_log_text(
+                f" 🎉🎉🎉 All finished!!! Total {task_count} , Success {Flags.succ_count} , Failed {Flags.fail_count} "
+            )
+        else:
+            # 一个文件都没扫到时不能报「恭喜完成」——用户会以为整理成功，实际是
+            # 扫描没覆盖到文件（整理模式最常见原因：文件已被整理进「成功输出目录」，
+            # 而该目录同时被列进了「排除目录」）。这里给出可定位的提示。
+            signal.set_label_file_path.emit(f"🔍 未找到需要处理的文件！用时 {used_time} 秒")
+            signal.show_traceback_log("🔍 No files found!!! Total 0 , Success 0 , Failed 0 ")
+            signal.show_log_text(" 🔍 未找到任何待处理文件（扫描目录内没有符合媒体类型条件的文件）")
+            for media_path in movie_paths:
+                current_paths = get_movie_path_setting(movie_path_override=media_path)
+                signal.show_log_text(f" 📂 扫描目录：{current_paths.movie_path}")
+                success_folder = getattr(current_paths, "success_folder", None)
+                if success_folder is not None:
+                    signal.show_log_text(f" 📥 成功输出目录：{success_folder}")
+                if current_paths.ignore_dirs:
+                    signal.show_log_text(f" 🚫 已排除的目录：{'；'.join(str(d) for d in current_paths.ignore_dirs)}")
+            if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+                signal.show_log_text(
+                    " 💡 整理模式提示：已被整理进「成功输出目录」的文件会被自动纳入扫描"
+                    "并重新整理（幂等，无需手动移出）；若文件在其它位置，请确认该位置在扫描目录内且未被排除。"
+                )
+            else:
+                signal.show_log_text(
+                    " 💡 提示：请确认待处理文件位于扫描目录内、扩展名在媒体类型列表中，且所在目录未被列入「排除目录」。"
+                )
         signal.show_log_text("================================================================================")
         if Flags.failed_list:
             from .fail_reason_stats import format_failed_summary
@@ -664,7 +708,7 @@ class Scraper:
         signal.show_log_text(" 📺 Movies num".ljust(15) + f": {task_count}")
         signal.show_log_text(" 🍕 Per time".ljust(15) + f": {average_time}S")
         signal.show_log_text("================================================================================")
-        signal.show_scrape_info(f"🎉 刮削完成 {task_count}/{task_count}")
+        signal.show_scrape_info(f"🎉 刮削完成 {task_count}/{task_count}" if task_count else "🔍 未找到待处理文件")
 
         # 兜底清理：原子写/原子复制中断遗留的孤儿临时文件（Windows 目标被占用时
         # os.replace 与 unlink 双失败，形态如 .fanart.jpg.XXX.tmp——用户实测报告）。
@@ -1915,6 +1959,12 @@ def start_new_scrape(file_mode: FileMode, movie_list: list[Path] | None = None) 
 
 def get_remain_list() -> bool:
     """This function is intended to be sync."""
+    if is_organize_mode():
+        # 整理模式每次都应该重新扫描整个待整理目录：remain.txt 里记录的是「移动前」
+        # 的旧路径，文件整理成功后已被搬到成功输出目录，续刮会对着不存在的文件反复
+        # 失败。整理本身是幂等的，重新扫描即可覆盖全部文件。
+        signal.show_log_text("🧭 整理模式：忽略残留的「剩余任务」列表，改为重新扫描整个待整理目录。")
+        return False
     remain_list_path = resources.u("remain.txt")
     if not remain_list_path.is_file():
         return False
