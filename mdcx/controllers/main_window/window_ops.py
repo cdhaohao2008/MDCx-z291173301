@@ -44,6 +44,7 @@ from mdcx.consts import (
     IS_WINDOWS,
     VERSION_NAME,
 )
+from mdcx.log_console import strip_leading_indent
 from mdcx.signals import signal_qt
 from mdcx.tools.actress_db import ActressDB
 from mdcx.utils import split_path
@@ -593,7 +594,7 @@ class WindowOpsMixin:
         # 显示版本信息和反馈入口
         signal_qt.show_log_text(version_info)
         if feedback or download_link:
-            self.main_logs_show.emit(f"{feedback}{download_link}")
+            self.main_logs_show.emit(strip_leading_indent(f"{feedback}{download_link}"))
         signal_qt.show_log_text(
             "============================================================================================================"
         )

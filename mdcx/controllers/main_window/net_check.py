@@ -26,6 +26,7 @@ from mdcx.core.network_check import (
     run_network_check,
     scrape_probe_ladder_text,
 )
+from mdcx.log_console import with_site_prefix
 from mdcx.signals import signal_qt
 from mdcx.utils import (
     add_html_plain_text,
@@ -343,5 +344,5 @@ class NetCheckMixin:
         if input_cookie:
             self.set_javdb_status.emit(tips)
             # self.Ui.pushButton_check_javdb_cookie.setEnabled(True)
-        self.show_log_text(tips.replace("❌", " ❌ JavDb").replace("✅", " ✅ JavDb"))
+        self.show_log_text(with_site_prefix(tips, "JavDb"))
         return tips

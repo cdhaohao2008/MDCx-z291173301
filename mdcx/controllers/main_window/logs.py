@@ -15,6 +15,7 @@ from mdcx.config.extend import get_movie_path_setting
 from mdcx.config.manager import manager
 from mdcx.config.resources import resources
 from mdcx.core.scraper import start_new_scrape
+from mdcx.log_console import strip_leading_indent
 from mdcx.models.enums import FileMode
 from mdcx.models.flags import Flags
 from mdcx.signals import signal_qt
@@ -210,7 +211,7 @@ class LogPageMixin:
             if self.logs_counts >= self.main_log_max_count:
                 self.logs_counts = len(logs)
                 self.main_logs_clear.emit("")
-                self.main_logs_show.emit(add_html(" 🗑️ 日志过多，已清屏！"))
+                self.main_logs_show.emit(add_html(strip_leading_indent("🗑️ 日志过多，已清屏！")))
             self.main_logs_show.emit(add_html("\n".join(logs)))
         except Exception:
             signal_qt.show_traceback_log(traceback.format_exc())
@@ -232,7 +233,12 @@ class LogPageMixin:
     def show_log_text(self, text):
         if not text:
             return
-        self.main_log_queue.append(str(text))
+        # 行首缩进统一在这里去掉：无论消息来自 log_console 还是 signal_qt.show_log_text，
+        # 进队列前就已左对齐，窗口里每一行的左边缘一致（显示与落盘文件同源同形）。
+        text = strip_leading_indent(str(text))
+        if not text:
+            return
+        self.main_log_queue.append(text)
         # 无界 deque 在生产远超 100ms 消费时 OOM：丢最旧保内存（显示行为不变，只丢刷不出的旧行）
         if len(self.main_log_queue) > 2000:
             try:

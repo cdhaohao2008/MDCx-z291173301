@@ -22,6 +22,33 @@ from contextlib import suppress
 from .utils import singleton
 
 
+def strip_leading_indent(text: str) -> str:
+    """去掉日志首行的水平缩进（空格 / Tab），使日志窗口严格左对齐。
+
+    为什么只动首行：日志里大量消息是「一行标题 + 若干缩进明细」的形态
+    （traceback 的调用栈、路径清单、参数回显），那些缩进是内容本身的一部分，
+    整段 lstrip 会把 traceback 的调用层级压平，反而更难读。
+
+    只吃掉行首的空格与 Tab，不吃换行——以 `\\n` 开头的消息（刻意留空行分隔）
+    仍保留那个空行。
+    """
+    if not isinstance(text, str):
+        text = str(text)
+    return text.lstrip(" \t")
+
+
+def with_site_prefix(text: str, site: str) -> str:
+    """给日志消息补上站点名前缀：图标与站点名之间留一个空格，行首不留缩进。
+
+    形如 ``"✅ 连接正常！"`` + ``"JavBus"`` → ``"✅ JavBus 连接正常！"``。
+    早先各调用点各自 ``replace("✅", " ✅ Site")``，替换串里那个前导空格会让整行
+    右移一格、与同批消息左边缘不齐；这里统一由 `strip_leading_indent` 兜底。
+    """
+    if not isinstance(text, str):
+        text = str(text)
+    return text.replace("❌", f"❌ {site}").replace("✅", f"✅ {site}")
+
+
 @singleton
 class LogConsole:
     """详情日志缓冲 + 停止标志 + UI 日志出口。不依赖 Qt，可被任意层直接导入。"""
@@ -63,10 +90,14 @@ class LogConsole:
         self.add_log(text)
 
     def log_text(self, text):
-        """写入 UI 日志页。未注册出口（无 GUI 环境）时静默丢弃。"""
+        """写入 UI 日志页。未注册出口（无 GUI 环境）时静默丢弃。
+
+        行首缩进在这里统一去掉：日志窗口里所有消息（含各业务模块自带的
+        「 ✅ …」「 🔴 …」前缀缩进）左边缘一致，严格对齐。
+        """
         sink = self._text_sink
         if sink is not None:
-            sink(text)
+            sink(strip_leading_indent(text))
 
 
 log_console = LogConsole()

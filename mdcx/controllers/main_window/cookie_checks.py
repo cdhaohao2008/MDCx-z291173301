@@ -18,6 +18,7 @@ from mdcx.crawlers.fc2ppvdb import (
     cookie_str_to_dict,
     fetch_article_info_with_warmup,
 )
+from mdcx.log_console import with_site_prefix
 from mdcx.signals import signal_qt
 from mdcx.utils import executor
 
@@ -162,7 +163,7 @@ class CookieChecksMixin:
         input_cookie = self.Ui.plainTextEdit_cookie_fc2ppvdb.toPlainText().strip()
         if not input_cookie:
             self.set_fc2ppvdb_status.emit("❌ 未填写Cookie")
-            self.show_log_text(" ❌ FC2PPVDB 未填写Cookie，可在「软件设置」-「网络」添加！")
+            self.show_log_text("❌ FC2PPVDB 未填写Cookie，可在「软件设置」-「网络」添加！")
             return
         self.set_fc2ppvdb_status.emit("⏳ 正在检测中...")
         try:
@@ -208,7 +209,7 @@ class CookieChecksMixin:
                 tips = "✅ 连接正常！"
 
         self.set_fc2ppvdb_status.emit(tips)
-        self.show_log_text(tips.replace("❌", " ❌ FC2PPVDB").replace("✅", " ✅ FC2PPVDB"))
+        self.show_log_text(with_site_prefix(tips, "FC2PPVDB"))
         return tips
 
     # javbus cookie
@@ -237,7 +238,7 @@ class CookieChecksMixin:
             self.exec_save_config.emit()
             tips = "✅ 连接正常，Cookie 已保存！"
 
-        self.show_log_text(tips.replace("❌", " ❌ JavBus").replace("✅", " ✅ JavBus"))
+        self.show_log_text(with_site_prefix(tips, "JavBus"))
         self.set_javbus_status.emit(tips)
         # self.Ui.pushButton_check_javbus_cookie.setEnabled(True)
         return tips

@@ -23,10 +23,10 @@ class ActressDB:
                 info_count = cls.DB.execute(
                     "select count(*) from Info"
                 ).fetchone()  # 必须实际执行查询才能判断是否连接成功
-                log_console.log_text(f" ✅ 数据库连接成功, 共有 {info_count[0]} 条女优信息")
+                log_console.log_text(f"✅ 数据库连接成功, 共有 {info_count[0]} 条女优信息")
             except Exception:
                 log_console.show_traceback_log(traceback.format_exc())
-                log_console.log_text(" ❌ 数据库连接失败, 请检查数据库设置")
+                log_console.log_text("❌ 数据库连接失败, 请检查数据库设置")
                 cls.DB = None
 
     @classmethod

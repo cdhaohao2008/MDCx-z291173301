@@ -21,7 +21,7 @@ from PIL import Image
 
 from ..config.manager import manager
 from ..consts import GITHUB_RELEASES_API_LIST, GITHUB_RELEASES_ATOM
-from ..log_console import log_console
+from ..log_console import log_console, with_site_prefix
 from ..models.log_buffer import LogBuffer
 from ..network_fingerprint import build_amazon_headers, build_fingerprint_headers, select_fingerprint
 from ..utils import executor
@@ -1500,7 +1500,7 @@ def check_theporndb_api_token() -> str:
             tips = "✅ 连接正常！" if response.json().get("data") else "❌ 返回数据异常！"
         else:
             tips = f"❌ 连接失败！请检查网络或代理设置！ {response.status_code} {response.text}"
-    log_console.log_text(tips.replace("❌", " ❌ ThePornDB").replace("✅", " ✅ ThePornDB"))
+    log_console.log_text(with_site_prefix(tips, "ThePornDB"))
     return tips
 
 
