@@ -752,9 +752,17 @@ uv run build --debug
 - `lxml>=6.1.3` / `pillow>=13.0.0` / `numpy>=2.5.4`：分别从 `6.1.2` / `12.3.0` / `2.5.2` 起才有 cp315 wheel。
 - `pyinstaller>=6.22.3,<7`：`6.21.0` 起 `requires-python` 放宽到 `<3.16`；`6.16.0~6.20.0` 声明 `<3.15`，3.15 上装不上。
 - `aiofiles>=25.1.0`：`25.1.0` 起官方测试并支持 3.14/3.15。
-- `cffi`（`curl-cffi` 的传递依赖）：`2.0.0` 没有 cp315 wheel，3.15 下会退回源码编译（报 "Microsoft Visual C++ 14.0 or greater is required"），lock 里必须到 `2.1.1`。
+- `cffi>=2.1.1`（`curl-cffi` 的传递依赖）：`2.0.0` 没有 cp315 wheel，3.15 下会退回源码编译（报 "Microsoft Visual C++ 14.0 or greater is required"）。
+- `jiter>=0.17.0`（`openai` 的传递依赖，Rust 扩展）：`0.12.0` 没有 cp315 wheel。
+- `markupsafe>=3.0.4`（`jinja2` 的传递依赖，C 扩展）：`3.0.3` 没有 cp315 wheel。
+- `pydantic-core>=2.50.1`（`pydantic` 的传递依赖，Rust 扩展）：`2.41.5` 没有 cp315 wheel。
+- `PyQt6-sip>=13.13.0`（`pyqt6` 的传递依赖，C++ 扩展）：`13.11.1` 没有 cp315 wheel。
+
+上面最后五个本来只是传递依赖（由 `curl-cffi` / `openai` / `jinja2` / `pydantic` / `pyqt6` 间接引入），现已写进 `pyproject.toml` 与 `requirements.txt` 作为显式依赖：它们的版本下限同时决定「有没有 cp315 wheel」，一旦 `uv lock` 重新解析就可能被回退到装不上的老版本，显式钉住后 `uv sync --locked` 与 `pip install -r requirements.txt` 两条路径都不会再退回源码编译。
 
 其余依赖已逐条核对，3.14/3.15 直接可用、无需动：`pyqt6`（cp39-abi3）、`opencv-contrib-python-headless`（cp37-abi3）、`curl-cffi`（cp310-abi3）、`httpx`/`httpx2`（纯 Python）、`pyinstaller`/`ruff`（`py3-none`）、`oshash`/`zhconv`（PyPI 上只有 sdist，但上游是**纯 Python**、无 C 扩展，不会编译）。核对口径：看 PyPI `releases[版本].urls` 的 tag 是否为 `cp315-*` / `*-abi3-*` / `*-none-*`，并读 `requires_python` 上界。改完依赖记得 `uv lock`（CI 用 `uv sync --locked` 强校验），`requires-python` 保持 `>=3.14`（不能带 upper bound），3.15 为当前构建目标、3.14 保留给 `build-py314.yml`。
+
+已锁定的 131 个包里（含根项目本身）只有 `pyyaml`（纯 Python sdist + 无 cp315 wheel）需要源码编译；其余 129 个第三方包都不用编译——127 个有 cp315 / abi3 / 纯 Python wheel，`oshash` / `zhconv` 只有纯 Python sdist（无 C 扩展）；`pyyaml` 的处理见上面 PyYAML 顶替方案。
 
 ## 迁移指南
 

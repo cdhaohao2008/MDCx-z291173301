@@ -1,6 +1,8 @@
 # 从 pyproject.toml [project].dependencies 提取，适用于 pip install -r requirements.txt
-# requires-python >=3.13.4（Python 3.13 / 3.14 / 3.15 均已实测可安装）
-# 版本下限已抬到「首个提供 Python 3.15（cp315 / abi3）可用 wheel」的版本。
+# requires-python >=3.14（Python 3.14 / 3.15 均已实测可安装）
+# 版本下限已抬到「首个提供 Python 3.15（cp315 / abi3）可用 wheel」的版本；
+# 末尾的 cffi / jiter / markupsafe / pydantic-core / PyQt6-sip 是带原生扩展的传递依赖，
+# 显式钉住 cp315 wheel 起步版本，避免重新解析时回退到需要源码编译的老版本。
 aiofiles>=25.1.0
 aiohttp>=3.14.5
 aiolimiter>=1.3.0
@@ -24,6 +26,11 @@ jinja2>=3.1.6
 openpyxl>=3.1.5
 defusedxml>=0.7.1
 uvicorn>=0.54.0
+cffi>=2.1.1
+jiter>=0.17.0
+markupsafe>=3.0.4
+pydantic-core>=2.50.1
+PyQt6-sip>=13.13.0
 # 从 pyproject.toml [dependency-groups].dev 提取，适用于 pip install -r requirements-dev.txt
 # 先安装主依赖，再安装开发依赖
 altgraph>=0.17.5

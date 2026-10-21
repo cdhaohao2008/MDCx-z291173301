@@ -11,6 +11,19 @@
 - `aiohttp`/`lxml`/`pillow`/`numpy`：从 `3.14.4`/`6.1.2`/`12.3.0`/`2.5.2` 起才发 cp315
   wheel，更早的版本在 3.15 上只能源码编译（需 MSVC 等编译工具链）。
 
+另外几个带原生扩展的**传递依赖**也显式钉了下限（它们原本由别的包间接引入，
+一旦重新 `uv lock` 就有回退到无 cp315 wheel 老版本的风险）：
+
+- `cffi`（curl-cffi 依赖，C 扩展）：`2.0.0` 只发到 cp314，`2.1.1` 起才有 cp315 wheel；
+- `jiter`（openai 依赖，Rust 扩展）：`0.12.0` 无 cp315 wheel，`0.17.0` 起才有；
+- `markupsafe`（jinja2 依赖，C 扩展）：`3.0.3` 无 cp315 wheel，`3.0.4` 起才有；
+- `pydantic-core`（pydantic 依赖，Rust 扩展）：`2.41.5` 无 cp315 wheel，`2.50.1` 起才有；
+- `PyQt6-sip`（pyqt6 依赖，C++ 扩展）：`13.11.1` 无 cp315 wheel，`13.13.0` 起才有。
+
+`pyyaml` 是唯一至今没有 cp315 wheel 的包（`6.0.3` 只到 cp314），但它只是
+`pre-commit` 的传递依赖且提供纯 Python 回退，CI 里用 cp314 wheel 顶替即可，
+见 `.github/workflows/build-py315.yml`。
+
 同时校验 `pyproject.toml` 与 `uv.lock` 的依赖声明不脱节：`uv sync --locked` 在
 CI 里强校验 lock 是否与 manifest 一致，改依赖后忘了 `uv lock` 会直接 exit 1。
 其余依赖（`pyqt6` cp39-abi3、`opencv-contrib-python-headless` cp37-abi3、
@@ -33,6 +46,12 @@ _REQUIRED_SPECIFIERS = {
     "numpy": ">=2.5.4",
     "pillow": ">=13.0.0",
     "pyinstaller": ">=6.22.3,<7",
+    # 带原生扩展的传递依赖：下限 = 首个提供 cp315 wheel 的版本
+    "cffi": ">=2.1.1",
+    "jiter": ">=0.17.0",
+    "markupsafe": ">=3.0.4",
+    "pydantic-core": ">=2.50.1",
+    "pyqt6-sip": ">=13.13.0",
 }
 
 # 已锁定的解析版本下限（uv.lock 实际 pin 的版本也必须够新）
@@ -43,6 +62,11 @@ _REQUIRED_LOCKED = {
     "numpy": (2, 5, 4),
     "pillow": (13, 0, 0),
     "pyinstaller": (6, 22, 3),
+    "cffi": (2, 1, 1),
+    "jiter": (0, 17, 0),
+    "markupsafe": (3, 0, 4),
+    "pydantic-core": (2, 50, 1),
+    "pyqt6-sip": (13, 13, 0),
 }
 
 

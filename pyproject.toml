@@ -40,6 +40,16 @@ dependencies = [
     # --- 外部CF服务适配层依赖 (TRAWL/FlareSolverr 协议翻译) ---
     # 内置 CF Bypass (cloakbrowser + cf_bypasser) 已移除, 过 CF 统一走外部服务。
     "uvicorn>=0.54.0",
+    # --- 原生扩展传递依赖：显式钉住 cp315 wheel 起步版本 ---
+    # 下面几个包由上/下文的包间接引入，但都带 C / Rust / C++ 扩展：
+    # 老版本没有 cp315 wheel，Python 3.15 上会退回源码编译（需 MSVC / Rust / C++ 工具链），
+    # 而 CI 与 docs/Development.md 都要求 `uv sync --locked`，因此在这里显式设下限，
+    # 避免重新 `uv lock` 时回退到装不上的版本。
+    "cffi>=2.1.1",  # curl-cffi 传递依赖；2.0.0 只发到 cp314，3.15 下只能源码编译
+    "jiter>=0.17.0",  # openai 传递依赖（Rust 扩展）；0.12.0 无 cp315 wheel
+    "markupsafe>=3.0.4",  # jinja2 传递依赖（C 扩展）；3.0.3 无 cp315 wheel
+    "pydantic-core>=2.50.1",  # pydantic 传递依赖（Rust 扩展）；2.41.5 无 cp315 wheel
+    "PyQt6-sip>=13.13.0",  # pyqt6 传递依赖（C++ 扩展）；13.11.1 无 cp315 wheel
 ]
 
 [project.optional-dependencies]
