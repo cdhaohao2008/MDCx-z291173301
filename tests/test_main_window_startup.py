@@ -267,17 +267,28 @@ def _click_cell(dlg, row: int, col: int, times: int = 1, kinds=None):
         else:
             kind = "press" if i == 0 else "dblclick"
         dlg._on_viewport_mouse_click(pos, kind)
-        dlg._on_viewport_mouse_release()
+        dlg._on_viewport_mouse_release(pos)
         time.sleep(0.03)
 
 
 def _click_cell_again(dlg, row: int, col: int):
-    """在已选中的格上「再次单击」（两次点击间隔超出双击间隔 → 走行内编辑）。"""
+    """在已选中的格上「再次单击」（两次点击间隔超出双击间隔 → 走行内编辑）。
+
+    行内编辑器是延后一个双击间隔才开的（这期间若来了双击就改弹详情窗），
+    故这里按下后要转一会儿事件循环，等编辑器真的开出来。
+    """
     table = dlg.table
     pos = table.visualItemRect(table.item(row, col)).center()
     time.sleep(dlg._click_interval() + 0.05)  # 超出双击间隔：不算快速双击
     dlg._on_viewport_mouse_click(pos, "press")
-    dlg._on_viewport_mouse_release()
+    dlg._on_viewport_mouse_release(pos)
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        QApplication.processEvents()
+        if dlg._cell_editor is not None:
+            return
+        time.sleep(0.01)
+    QApplication.processEvents()
 
 
 def _patch_cell_menu(monkeypatch, action_text: str | None = None) -> list:

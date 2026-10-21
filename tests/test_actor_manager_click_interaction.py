@@ -1,27 +1,20 @@
-"""演员管理器主窗口左键手势回归：单击选中 / 再次单击编辑 / 快速双击详情。
+"""演员管理器主窗口左键手势回归：单击选中 / 再次单击编辑 / 双击（连续点击）看详情。
 
-背景：可编辑列（姓名/出生日期/出生地/详情/标签）此前单击即弹行内编辑器，
-误触一次就进入编辑态，用户反馈"太容易误操作"。改成单击只选中后，
-"双击编辑"与"双击打开详情窗"又撞在一起，故约定三段式手势。
+用户 2026-10-21 分三轮反馈，逐步收紧交互：
+1) 编辑状态整格铺蓝底看不清 → 改成纯白底 + 四周一圈蓝边
+   （见 tests/test_actor_manager_inline_editor_style.py）；
+2) 选中态不要铺浅蓝底 → 保持格子原有底色（白/隔行浅灰），只在四周画一圈蓝条；
+3) 单击选中后，双击/连续点击要弹演员详情窗；编辑状态里双击同样要弹详情窗。
 
-用户 2026-10-21 再次调整手势：
-- 单击某格 → 只选中（浅蓝底）；
-- 已选中该格、再点一次（两次点击间隔超出双击间隔）→ 进行内编辑；
-- 快速双击（两次点击间隔在双击间隔内，Qt 把第二次按下报成
-  MouseButtonDblClick）→ 弹演员详情窗。
+手势约定：
+- 单击某格 → 只选中（不弹编辑器，防误触）；
+- 已选中该格、再点一次（间隔超出双击间隔）→ 进行内编辑（延后一个双击间隔
+  才开：这期间若来了双击，改弹详情窗，双击不会顺带闪出编辑器）；
+- 快速双击 / 连续快速点击（间隔在双击间隔内）→ 弹演员详情窗；
+- 行内编辑器里双击/连续点击 → 提交已改的值后弹演员详情窗。
 
 "再次单击"与"快速双击"的区分不靠自己的连击计数，而靠两件事：
 ① 点的是不是上一次点过的那一格；② 两次点击的间隔是否在系统双击间隔内。
-
-本测试直接驱动管理器内部的手势判定与分派函数，验证：
-
-- 单击可编辑列只选中，不弹编辑器；
-- 再次单击可编辑列进行内编辑，编辑器初值取 UserRole 里的完整值；
-- 快速双击可编辑列弹演员详情窗（且不会同时开编辑器）；
-- 不可编辑列快速双击也弹详情窗，再次单击则什么都不做；
-- 换格即重新开始（不会把两格连成一次手势）；
-- 同一次物理按下被重复上报（press + dblclick）只算一次点击；
-- 编辑器里点击不再弹详情窗（详情窗由快速双击在进编辑器之前就分派完了）。
 """
 
 from __future__ import annotations
@@ -86,7 +79,7 @@ def _click(dlg, row: int, col: int, kind: str = "press", wait: float = 0.0):
         time.sleep(wait)
     pos = _cell_pos(dlg, row, col)
     dlg._on_viewport_mouse_click(pos, kind)
-    dlg._on_viewport_mouse_release()
+    dlg._on_viewport_mouse_release(pos)
 
 
 def _slow_gap(dlg) -> float:
@@ -97,6 +90,45 @@ def _slow_gap(dlg) -> float:
 def _fast_gap() -> float:
     """「快速双击」的间隔：在双击间隔内、但大于重复上报去重窗口（10ms）。"""
     return 0.05
+
+
+def _wait_editor(dlg, timeout: float = 2.0):
+    """等延后定时器把行内编辑器开出来（编辑器是延后一个双击间隔才开的）。"""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        QApplication.processEvents()
+        if dlg._cell_editor is not None:
+            return dlg._cell_editor
+        time.sleep(0.01)
+    QApplication.processEvents()
+    return dlg._cell_editor
+
+
+def _wait_detail(dlg, timeout: float = 2.0):
+    """等详情窗真的弹出来（双击后是 QTimer.singleShot(0) 延后开的）。"""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        QApplication.processEvents()
+        if dlg._detail_dialogs:
+            return True
+        time.sleep(0.01)
+    QApplication.processEvents()
+    return bool(dlg._detail_dialogs)
+
+
+def _editor_event(kind: str, x: float = 3.0):
+    """造一个发给行内编辑器的鼠标事件。"""
+    from PyQt6.QtCore import QEvent, QPointF, Qt
+    from PyQt6.QtGui import QMouseEvent
+
+    etype = QEvent.Type.MouseButtonDblClick if kind == "dblclick" else QEvent.Type.MouseButtonPress
+    return QMouseEvent(
+        etype,
+        QPointF(x, 3.0),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
 
 
 def test_single_click_only_selects_no_editor(app):
@@ -123,7 +155,7 @@ def test_second_click_opens_inline_editor(app):
         _click(dlg, 0, 7)  # 第一次：只选中
         assert dlg._cell_editor is None
         _click(dlg, 0, 7, wait=_slow_gap(dlg))  # 第二次（慢）：进行内编辑
-        editor = dlg._cell_editor
+        editor = _wait_editor(dlg)
         assert editor is not None, "再次单击应打开行内编辑器"
         assert editor.text() == "标签一, 标签二, 标签三", "编辑器初值应是完整标签，不是展示文本"
     finally:
@@ -139,9 +171,29 @@ def test_fast_double_click_opens_detail_window(app):
     try:
         _click(dlg, 0, 1)  # 第一下：只选中
         _click(dlg, 0, 1, kind="dblclick", wait=_fast_gap())  # 第二下：快速双击
-        app.processEvents()
-        assert set(dlg._detail_dialogs) == {"e9"}, "快速双击应弹演员详情窗"
+        assert _wait_detail(dlg), "快速双击应弹演员详情窗"
+        assert set(dlg._detail_dialogs) == {"e9"}
+        # 延后开编辑器的定时器也会在这期间到期，双击不该顺带闪出编辑器
+        _wait_editor(dlg, timeout=dlg._click_interval() + 0.3)
         assert dlg._cell_editor is None, "快速双击不该同时开行内编辑器"
+        for d in list(dlg._detail_dialogs.values()):
+            d.close()
+    finally:
+        dlg.close()
+        dlg.deleteLater()
+        app.processEvents()
+
+
+def test_rapid_consecutive_clicks_open_detail_window(app):
+    """连续快速点击（两次按下间隔在双击间隔内）：同样弹演员详情窗。"""
+    actor = _make_actor(name="连击演员", actor_id="e20")
+    dlg = _manager([actor])
+    try:
+        _click(dlg, 0, 1)  # 第一下：只选中
+        _click(dlg, 0, 1, wait=_fast_gap())  # 第二下：连击（报成 press）
+        assert _wait_detail(dlg), "连续点击应弹演员详情窗"
+        assert set(dlg._detail_dialogs) == {"e20"}
+        assert dlg._cell_editor is None
         for d in list(dlg._detail_dialogs.values()):
             d.close()
     finally:
@@ -157,7 +209,7 @@ def test_fast_double_click_on_readonly_column_opens_detail(app):
     try:
         _click(dlg, 0, 0)
         _click(dlg, 0, 0, kind="dblclick", wait=_fast_gap())
-        app.processEvents()
+        assert _wait_detail(dlg)
         assert set(dlg._detail_dialogs) == {"e11"}
         for d in list(dlg._detail_dialogs.values()):
             d.close()
@@ -192,72 +244,90 @@ def test_click_on_another_cell_starts_over(app):
         assert dlg._cell_editor is None
         assert dlg._click_gesture == "select"
         _click(dlg, 0, 4, wait=_slow_gap(dlg))  # 第二格第 2 次 → 行内编辑器
-        assert dlg._cell_editor is not None
+        assert _wait_editor(dlg) is not None
     finally:
         dlg.close()
         dlg.deleteLater()
         app.processEvents()
 
 
-def test_same_physical_press_reported_twice_counts_once(app):
-    """同一次物理按下既报 press 又报 dblclick 时只算一次点击。
-
-    否则一次按下会被当成「单击 + 快速双击」两个手势：既弹详情窗又进编辑器。
-    """
-    dlg = _manager([_make_actor()])
-    try:
-        pos = _cell_pos(dlg, 0, 1)
-        dlg._on_viewport_mouse_click(pos, "press")
-        dlg._on_viewport_mouse_click(pos, "dblclick")  # 同一物理按下的重复上报
-        dlg._on_viewport_mouse_release()
-        app.processEvents()
-        assert dlg._click_gesture == "select", "重复上报不该被当成快速双击"
-        assert dlg._cell_editor is None, "只算一次点击就不该弹编辑器"
-        assert dlg._detail_dialogs == {}, "只算一次点击就不该弹详情窗"
-    finally:
-        dlg.close()
-        dlg.deleteLater()
-        app.processEvents()
-
-
-def test_selected_cell_uses_light_blue_background(app):
-    """选中的格子用浅蓝底 + 黑字（不再是深蓝底 #42a5f5 配白字，看不清）。"""
-    dlg = _manager([_make_actor()])
-    try:
-        style = dlg.styleSheet()
-        assert "QTableWidget::item:selected { background-color: #bbdefb; color: #000000; }" in style, (
-            "选中态应为浅蓝底 + 黑字"
-        )
-        assert "#42a5f5" not in style, "选中态不应再用深蓝底"
-    finally:
-        dlg.close()
-        dlg.deleteLater()
-        app.processEvents()
-
-
-def test_click_inside_editor_does_not_open_detail(app):
-    """编辑器里点击只挪光标，不弹详情窗（详情窗由快速双击在进编辑器前分派）。"""
-    from PyQt6.QtCore import QEvent, QPointF, Qt
-    from PyQt6.QtGui import QMouseEvent
-    from PyQt6.QtWidgets import QApplication
+def test_double_click_inside_inline_editor_opens_detail(app):
+    """编辑状态里双击：弹演员详情窗（用户 2026-10-21 要求）。"""
+    from PyQt6.QtWidgets import QApplication as _App
 
     actor = _make_actor(name="编辑中", actor_id="e14")
     dlg = _manager([actor])
     try:
         _click(dlg, 0, 1)
-        _click(dlg, 0, 1, wait=_slow_gap(dlg))  # 再次单击 → 进编辑器
-        editor = dlg._cell_editor
-        assert editor is not None
-        press = QMouseEvent(
-            QEvent.Type.MouseButtonPress,
-            QPointF(3.0, 3.0),
-            Qt.MouseButton.LeftButton,
-            Qt.MouseButton.LeftButton,
-            Qt.KeyboardModifier.NoModifier,
-        )
-        QApplication.sendEvent(editor, press)  # 编辑器里点一下（挪光标）
+        _click(dlg, 0, 1, wait=_slow_gap(dlg))
+        editor = _wait_editor(dlg)
+        assert editor is not None, "应先进，行内编辑器"
+        _App.sendEvent(editor, _editor_event("dblclick"))
+        assert _wait_detail(dlg), "编辑状态里双击应弹演员详情窗"
+        assert set(dlg._detail_dialogs) == {"e14"}
+        for d in list(dlg._detail_dialogs.values()):
+            d.close()
+    finally:
+        dlg.close()
+        dlg.deleteLater()
         app.processEvents()
-        assert dlg._detail_dialogs == {}, "编辑器里点击不该弹详情窗"
+
+
+def test_rapid_clicks_inside_inline_editor_open_detail(app):
+    """编辑状态里连续快速点击：同样弹演员详情窗。"""
+    from PyQt6.QtWidgets import QApplication as _App
+
+    actor = _make_actor(name="编辑中2", actor_id="e15")
+    dlg = _manager([actor])
+    try:
+        _click(dlg, 0, 1)
+        _click(dlg, 0, 1, wait=_slow_gap(dlg))
+        editor = _wait_editor(dlg)
+        assert editor is not None
+        _App.sendEvent(editor, _editor_event("press", x=3.0))
+        time.sleep(0.02)
+        _App.sendEvent(editor, _editor_event("press", x=9.0))
+        assert _wait_detail(dlg), "编辑状态里连续点击应弹演员详情窗"
+        assert set(dlg._detail_dialogs) == {"e15"}
+        for d in list(dlg._detail_dialogs.values()):
+            d.close()
+    finally:
+        dlg.close()
+        dlg.deleteLater()
+        app.processEvents()
+
+
+def test_selected_cell_keeps_original_background_with_blue_border(app):
+    """选中格保持原有底色（白/隔行浅灰），只在四周画一圈蓝条表示选中。"""
+    from mdcx.tools.emby_actor_manager_ui import _SELECTION_BORDER_COLOR
+
+    dlg = _manager([_make_actor(), _make_actor(name="第二行", actor_id="id2")])
+    try:
+        dlg.show()
+        app.processEvents()
+        table = dlg.table
+        style = dlg.styleSheet()
+        assert "item:selected" not in style, "选中态不该再用样式表铺底色"
+        assert "#bbdefb" not in style, "选中态不该再铺浅蓝底"
+        table.setCurrentCell(0, 1)
+        app.processEvents()
+        item = table.item(0, 1)
+        rect = table.visualItemRect(item)
+        img = table.viewport().grab().toImage()
+        assert not img.isNull()
+
+        def px(x, y):
+            c = img.pixelColor(x, y)
+            return (c.red(), c.green(), c.blue())
+
+        border = tuple(int(_SELECTION_BORDER_COLOR[i : i + 2], 16) for i in (1, 3, 5))
+        # 四周一圈蓝条
+        assert px(rect.x() + 1, rect.y() + 1) == border, "左上角应是蓝色边框"
+        assert px(rect.x() + rect.width() - 2, rect.y() + rect.height() // 2) == border, "右侧应是蓝色边框"
+        # 格子内部保持原底色（不是浅蓝、也不是系统高亮深蓝）
+        center = px(rect.x() + rect.width() // 2, rect.y() + rect.height() // 2)
+        assert center != (187, 222, 251), "选中格不该铺浅蓝底"
+        assert center != (48, 140, 198), "选中格不该铺系统高亮深蓝"
     finally:
         dlg.close()
         dlg.deleteLater()
