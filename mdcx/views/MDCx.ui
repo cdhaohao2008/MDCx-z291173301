@@ -24368,9 +24368,28 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               </widget>
                             </item>
                             <item>
-                              <widget class="QLabel" name="label_42">
+                              <widget class="QCheckBox" name="checkBox_hide_menu_icon">
                                 <property name="sizePolicy">
                                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="minimumSize">
+                                  <size>
+                                    <width>0</width>
+                                    <height>30</height>
+                                  </size>
+                                </property>
+                                <property name="text">
+                                  <string>隐藏菜单栏图标（Mac）</string>
+                                </property>
+                              </widget>
+                            </item>
+                            <item>
+                              <widget class="QLabel" name="label_42">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
                                     <horstretch>0</horstretch>
                                     <verstretch>0</verstretch>
                                   </sizepolicy>
@@ -24389,25 +24408,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 </property>
                                 <property name="alignment">
                                   <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-                                </property>
-                              </widget>
-                            </item>
-                            <item>
-                              <widget class="QCheckBox" name="checkBox_hide_menu_icon">
-                                <property name="sizePolicy">
-                                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                                    <horstretch>0</horstretch>
-                                    <verstretch>0</verstretch>
-                                  </sizepolicy>
-                                </property>
-                                <property name="minimumSize">
-                                  <size>
-                                    <width>0</width>
-                                    <height>30</height>
-                                  </size>
-                                </property>
-                                <property name="text">
-                                  <string>隐藏菜单栏图标（Mac）</string>
                                 </property>
                               </widget>
                             </item>

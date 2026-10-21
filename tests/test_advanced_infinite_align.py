@@ -9,6 +9,13 @@
 「记住未完成的刮削任务」，使末位「无限次刮削」落到「停止刮削时」实测 x。
 只断言「精确落在锚点左缘」，不断言移动方向（离屏无 CJK 字体，方向不可比）。
 
+v2.7.6 需求③：最小化时「无限次刮削」改为与「无按钮」（radioButton_hide_none）
+严格上下对齐，且「无按钮」位置保持不变——真机上「停止刮削时」因前导项
+「退出软件时」的 sizeHint 过大而钉不上（停在竖线左侧），「无按钮」却钉得上，
+故窄态的目标竖线换成「无按钮」的实测 x。实现上这一段整段挪到
+_sync_advanced_page_tail_align() 之后（「无按钮」的终态 x 是那里钉出来的）；
+宽态仍取「停止刮削时」，逐位不变。
+
 可行性门控（与「隐藏菜单栏图标」行同款手法）：落点落在前导项文本自然宽
 之内时硬钉会裁字，此时整行放弃、保持设计态原样。窄态与全最大化下放得下，
 必须精确对齐；1100/1366 中间带在离屏度量下放不下，走延后分支断言。
@@ -96,13 +103,19 @@ def _resize(win, app, width, height):
     app.processEvents()
 
 
-def _remain_row(ui):
-    """保留任务行的实测可行性（与实现同式）：钉宽放得下才算可行。"""
+def _remain_row(ui, wide):
+    """保留任务行的实测可行性（与实现同式）：钉宽放得下才算可行。
+
+    v2.7.6 需求③：窄态的目标竖线从「停止刮削时」换成「无按钮」
+    （radioButton_hide_none）——「无按钮」位置保持不变，「无限次刮削」向右移过去
+    与它严格上下对齐；宽态仍取「停止刮削时」（逐位不变）。
+    """
     host = ui.gridLayoutWidget_20
     content = ui.scrollAreaWidgetContents_gaoji
     host_x = host.mapTo(content, QPoint(0, 0)).x()
     row5_x = _abs(ui, ui.checkBox_remain_task) - host_x
-    want = _abs(ui, ui.checkBox_show_dialog_stop_scrape) - host_x
+    target = ui.checkBox_show_dialog_stop_scrape if wide else ui.radioButton_hide_none
+    want = _abs(ui, target) - host_x
     lay = ui.horizontalLayout_89
     col_w = host.width() - row5_x
     pin = want - row5_x - lay.spacing()
@@ -120,15 +133,21 @@ _NARROW_SIZES = ((1030, 753), (1000, 700))
 
 @pytest.mark.parametrize("width,height", _WIDE_SIZES + _NARROW_SIZES)
 def test_infinite_aligns_to_stop_or_defers(win, app, width, height):
-    """放得下就必须精确对齐；放不下就整行放弃（不钉宽、不裁字）。"""
+    """放得下就必须精确对齐；放不下就整行放弃（不钉宽、不裁字）。
+
+    目标竖线按态取：宽态「停止刮削时」（逐位不变），窄态「无按钮」（v2.7.6 需求③，
+    且「无按钮」自己不许动）。
+    """
     ui = win.Ui
     win.show()
     _goto_advanced(win, app)
     _resize(win, app, width, height)
 
-    row = _remain_row(ui)
+    wide = win._scroll_stretch_extra(win._adv_scroll) > 0
+    row = _remain_row(ui, wide)
     got = _abs(ui, ui.checkBox_infinite_scrape)
-    want = _abs(ui, ui.checkBox_show_dialog_stop_scrape)
+    target = ui.checkBox_show_dialog_stop_scrape if wide else ui.radioButton_hide_none
+    want = _abs(ui, target)
     remain = ui.checkBox_remain_task
     infinite = ui.checkBox_infinite_scrape
 

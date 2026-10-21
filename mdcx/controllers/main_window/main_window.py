@@ -288,7 +288,7 @@ class MyMAinWindow(
         self._nfo_target_col_trailing = 0
         self._zimu_dl_gap = -1  # 该间隔当前生效的宽度（-1 = 未安装/已拆除）
         self._nfo_colon_cal: tuple | None = None  # NFO冒号对齐：(字体样式key, 组标题冒号x, 行标签右pad)，像素标定缓存
-        self._adv_dock_spacer = None  # 高级页隐藏图标行插在 label_42 与「隐藏菜单栏图标」之间的固定间隔
+        self._adv_dock_spacer = None  # 高级页隐藏图标行插在「隐藏Dock图标」与「隐藏菜单栏图标」之间的固定间隔
         self._adv_dock_gap = -1  # 该间隔当前生效的宽度（-1 = 从未设置）
 
         self.window_radius = 0  # 窗口四角弧度，为0时表示显示窗口标题栏

@@ -279,8 +279,11 @@ _REFS_X_ONLY = (
     # 第五组：第 8 行那枚 Fixed 前缀「隐藏Dock图标（Mac）」，第五组只许动第 2 行，
     # 它必须逐位不动（_dock_row / test_narrow_auto_exit_lands_on_menu_icon 会比对它）
     "checkBox_hide_dock_icon",
-    "label_42",
 )
+# v2.7.6 需求①把「保存后重启生效」挪到「隐藏菜单栏图标（Mac）」右侧，故 label_42
+# 的左缘**按设计**要变（原贴在 Dock 图标后面，现改为贴在菜单栏图标后面），
+# 不能留在 _REFS_X_ONLY 里当「左缘不许动」的参照件——它的相对关系由
+# test_menu_icon_row_aligns_or_defers 单独断言（在菜单栏图标右侧）。
 
 # 必然随需求一起动的从动项（末位吸收余量/紧贴右邻），只作窄态与往返比对。
 _FOLLOWERS = ("label_nav_hide_hint",)
@@ -395,10 +398,15 @@ def test_left_targets_land_on_from_log_in_wide(win, app, width, height):
 def _dock_row(ui, anchor_name):
     """隐藏图标行（horizontalLayout_dock）的实测可行性。
 
-    与 _sync_advanced_page_align 里那一段同式：前缀 = 两个 Fixed 文本项的 sizeHint
-    之和 + 两个间隔，能插入的间隔 gap = 新竖线 - 行左缘 - 前缀；放得下的条件是
-    gap >= 0 且让出 gap 后剩余宽度仍够末项的 sizeHint（sizeHint 就是不裁字下限）。
-    竖线按态传入：宽态是「显示字段来源信息」，窄态是「显示字段内容信息」。
+    与 _sync_advanced_page_align 里那一段同式。v2.7.6 需求①把「保存后重启生效」
+    挪到了「隐藏菜单栏图标（Mac）」**右侧**，行内顺序变成
+    「隐藏Dock图标 | 间隔 | 隐藏菜单栏图标 | 保存后重启生效」，故前缀只含
+    「隐藏Dock图标」+ 一个间隔，末尾还要给提示词标签留出它自己的 sizeHint
+    （不裁字下限）。能插入的间隔 gap = 目标竖线 - 行左缘 - 前缀；放得下的条件是
+    0 <= gap <= 列宽 - 前缀 - 末尾（间隔项是 Fixed 策略的 QSpacerItem，它的
+    sizeHint 会算进行内最小宽度，间隔过大会把整页网格列宽撑开、把不许动的
+    「暗黑模式」一起推走，故实现里把它夹取到这个区间内）。
+    竖线按态传入：宽态是「显示字段来源信息」，窄态是「暗黑模式」（需求②）。
     """
     lay = ui.horizontalLayout_dock
     host = ui.gridLayoutWidget_20
@@ -407,23 +415,32 @@ def _dock_row(ui, anchor_name):
     row_x = _abs(ui, ui.checkBox_hide_dock_icon) - host_x
     col_w = host.width() - row_x
     anchor = _abs(ui, getattr(ui, anchor_name)) - host_x
-    prefix = ui.checkBox_hide_dock_icon.sizeHint().width() + ui.label_42.sizeHint().width() + 2 * lay.spacing()
+    prefix = ui.checkBox_hide_dock_icon.sizeHint().width() + lay.spacing()
+    tail = ui.checkBox_hide_menu_icon.sizeHint().width() + lay.spacing() + ui.label_42.sizeHint().width()
+    avail = col_w - prefix - tail
     gap = anchor - row_x - prefix
     return {
         "gap": gap,
         "prefix": prefix,
-        "feasible": gap >= 0 and col_w - gap - prefix >= ui.checkBox_hide_menu_icon.sizeHint().width(),
+        "avail": avail,
+        "feasible": 0 <= gap <= avail,
+        "want_gap": max(0, min(gap, avail)),
     }
 
 
 @pytest.mark.parametrize("width,height", _WIDE_SIZES + _NARROW_SIZES)
 def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
-    """「隐藏菜单栏图标（Mac）」：放得下就必须精确对齐，放不下就整行放弃。
+    """「隐藏菜单栏图标（Mac）」：放得下就必须精确对齐，放不下就夹到可行区间内。
 
-    放弃态的语义与本页其余各行一致：间隔归 0、不裁字、Fixed 前缀两项一律不动，
-    于是末项停在竖线**右侧**（前缀本身就压过竖线，物理上够不到）。
-    两态都验：第四组需求②把它的窄态竖线换成更靠右的「显示字段内容信息」，
-    可行性结论也随之改变（窄态前缀相对更宽、更容易放不下）。
+    v2.7.6 三处变化：
+      ① 「保存后重启生效」挪到它**右侧**（行内顺序变了，前缀/末尾宽度随之重算）；
+      ② 窄态的目标竖线从「显示字段内容信息」换成「暗黑模式」——且「暗黑模式」
+         自己不许动，故窄态那条竖线取「暗黑模式」的实测终态 x；
+      ③ 放弃态不再「整行放弃、间隔归 0」，而是把间隔**夹取**到
+         [0, 列宽-前缀-末尾]：间隔项是 Fixed 策略的 QSpacerItem，它的 sizeHint
+         会算进行内最小宽度，间隔过大反而会把整页网格列宽撑开、把不许动的
+         「暗黑模式」一起推走——那等于把需求②自己毁掉。
+    两种情形下 Fixed 前缀「隐藏Dock图标」都不许动、菜单栏图标都不许被压到裁字。
     """
     ui = win.Ui
     win.show()
@@ -432,33 +449,104 @@ def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
     wide = _extra(win) > 0
     assert wide == ((width, height) in _WIDE_SIZES), f"{width} 宽下窗宽状态与用例表不符"
 
-    anchor_name = "checkBox_show_from_log" if wide else "checkBox_show_data_log"
+    anchor_name = "checkBox_show_from_log" if wide else "checkBox_dark_mode"
     row = _dock_row(ui, anchor_name)
     menu = ui.checkBox_hide_menu_icon
     dock = ui.checkBox_hide_dock_icon
+    label = ui.label_42
     anchor_x = _abs(ui, getattr(ui, anchor_name))
     menu_x = _abs(ui, menu)
-    prefix_before = (_abs(ui, dock), _abs(ui, ui.label_42))
+    dock_before = _abs(ui, dock)
 
     if row["feasible"]:
-        assert menu_x == anchor_x, f"{width} 宽下前缀放得下（gap={row['gap']}）却未对齐: x={menu_x} 期望={anchor_x}"
-    else:
-        assert menu_x > anchor_x, (
-            f"{width} 宽下前缀放不下（gap={row['gap']}）本应整行放弃，却对到了 x={menu_x}（可能裁字）"
+        assert menu_x == anchor_x, (
+            f"{width} 宽下前缀放得下（gap={row['gap']} avail={row['avail']}）却未对齐: x={menu_x} 期望={anchor_x}"
         )
-        assert _abs(ui, ui.label_42) + ui.label_42.width() <= menu_x, (
-            f"{width} 宽下放弃态里「隐藏菜单栏图标」压住了 Fixed 前缀: 前缀右缘"
-            f"{_abs(ui, ui.label_42) + ui.label_42.width()} > 目标左缘 {menu_x}"
+    else:
+        want_x = _abs(ui, dock) + dock.sizeHint().width() + ui.horizontalLayout_dock.spacing() + row["want_gap"]
+        assert menu_x == want_x, (
+            f"{width} 宽下前缀放不下（gap={row['gap']} avail={row['avail']}）本应夹取到 x={want_x}，实际={menu_x}"
         )
 
-    # 两种情形下 Fixed 前缀两项都不许动、末项都不许被压到裁字
+    # 需求①：「保存后重启生效」必须在「隐藏菜单栏图标（Mac）」右侧
+    assert _abs(ui, label) >= menu_x + menu.width(), (
+        f"{width} 宽下「保存后重启生效」不在「隐藏菜单栏图标」右侧:"
+        f" label_x={_abs(ui, label)} 菜单栏图标右缘={menu_x + menu.width()}"
+    )
+
+    # 两种情形下 Fixed 前缀「隐藏Dock图标」都不许动、末项都不许被压到裁字
     win._sync_page_layouts()
     app.processEvents()
-    assert (_abs(ui, dock), _abs(ui, ui.label_42)) == prefix_before, (
-        f"{width} 宽下 Fixed 前缀两项被本需求带偏: {prefix_before} -> {(_abs(ui, dock), _abs(ui, ui.label_42))}"
+    assert _abs(ui, dock) == dock_before, (
+        f"{width} 宽下 Fixed 前缀「隐藏Dock图标」被本需求带偏: {dock_before} -> {_abs(ui, dock)}"
     )
     assert menu.width() >= menu.sizeHint().width(), (
         f"{width} 宽下「隐藏菜单栏图标」被压到 {menu.width()}px（sizeHint {menu.sizeHint().width()}），会裁字"
+    )
+
+
+@pytest.mark.parametrize("width,height", _NARROW_SIZES)
+def test_narrow_menu_icon_lands_on_dark_mode_when_it_fits(win, app, width, height):
+    """需求②（**判别力所在**）：窄态「隐藏菜单栏图标（Mac）」与「暗黑模式」严格上下对齐。
+
+    离屏环境里这一档天然「放不下」：需求①把提示词挪到菜单栏图标**右侧**后，
+    该行最小宽度变大（「隐藏菜单栏图标」到「暗黑模式」那条竖线的间隔超出可放区间），
+    实现只能把间隔夹取（宁可离目标近一点也不撑破网格列宽——撑破列宽会把不许动的
+    「暗黑模式」一起推走，等于把需求②自己毁掉）。真实字体下这几个控件更窄，走的
+    是对齐分支——本用例把菜单栏图标的提示词临时改短来复现那条分支，断言后原样
+    恢复（手法与本文件既有的 test_narrow_nav_row_lands_on_from_log_when_it_fits 一致）。
+
+    同时钉住需求②的另一半：「暗黑模式」位置保持不变（改短提示词不许带偏它）。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_advanced(win, app)
+    _resize(win, app, width, height)
+    assert _extra(win) <= 0, f"{width} 宽下应处于窄态（拉伸量 <= 0）"
+
+    menu = ui.checkBox_hide_menu_icon
+    dark = ui.checkBox_dark_mode
+    dark_before = _abs(ui, dark)
+    original = menu.text()
+    menu.setText("M")
+    try:
+        _resize(win, app, width, height)
+        row = _dock_row(ui, "checkBox_dark_mode")
+        assert row["feasible"], (
+            f"{width} 宽下临时提示词仍不够短，没能制造出可行场景: gap={row['gap']} avail={row['avail']}"
+        )
+        assert _abs(ui, dark) == dark_before, (
+            f"窄态 {width} 宽下「暗黑模式」位置变了: {dark_before} -> {_abs(ui, dark)}"
+        )
+        assert _abs(ui, menu) == _abs(ui, dark), (
+            f"窄态 {width} 宽下「隐藏菜单栏图标」未与「暗黑模式」严格上下对齐: x={_abs(ui, menu)} 期望={_abs(ui, dark)}"
+        )
+    finally:
+        menu.setText(original)
+        _resize(win, app, width, height)
+
+
+@pytest.mark.parametrize("width,height", _NARROW_SIZES)
+def test_narrow_infinite_scrape_lands_on_hide_none(win, app, width, height):
+    """需求③：窄态「无限次刮削」与「无按钮」严格上下对齐，且「无按钮」位置不动。
+
+    「无按钮」的落点由 _sync_advanced_page_tail_align 钉出（「显示字段内容信息」
+    那条竖线），故「无限次刮削」那一段必须排在 tail_align **之后**才量得到终态 x。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_advanced(win, app)
+    _resize(win, app, width, height)
+    assert _extra(win) <= 0, f"{width} 宽下应处于窄态（拉伸量 <= 0）"
+
+    none_x = _abs(ui, ui.radioButton_hide_none)
+    infinite_x = _abs(ui, ui.checkBox_infinite_scrape)
+    assert infinite_x == none_x, (
+        f"窄态 {width} 宽下「无限次刮削」未与「无按钮」严格上下对齐: x={infinite_x} 期望={none_x}"
+    )
+    # 「无按钮」自己不许动：它仍落在「显示字段内容信息」那条竖线上
+    assert none_x == _abs(ui, ui.checkBox_show_data_log), (
+        f"窄态 {width} 宽下「无按钮」被带偏: x={none_x} 期望={_abs(ui, ui.checkBox_show_data_log)}"
     )
 
 
@@ -923,9 +1011,11 @@ def test_narrow_auto_exit_lands_on_menu_icon(win, app, monkeypatch, width, heigh
     # 锚点位置保持不变：它是第四组需求②的窄态落点（450 → 495），本组需求要的正是
     # 「刮削结束后自动退出软件」跟它对齐，故它不得被本组带偏回自然位；这里核对的是
     # 它在「只有通用宽幅逻辑」的基线**之上**仍停在该组已定的竖线上——已由上面
-    # got == want 覆盖。本组只允许动第 2 行的两枚控件，故第 8 行的 Fixed 前缀必须
-    # 逐位不动（menu_icon 自身是第四组目标，不在此列）。
-    for name in ("checkBox_hide_dock_icon", "label_42"):
+    # got == want 覆盖。本组只允许动第 2 行的两枚控件，故第 8 行的 Fixed 前缀
+    # 「隐藏Dock图标」必须逐位不动（menu_icon 自身是第四组目标，不在此列）。
+    # label_42 不在此列：v2.7.6 需求①把它挪到「隐藏菜单栏图标（Mac）」右侧，
+    # 它的左缘按设计要变（由 test_menu_icon_row_aligns_or_defers 断言）。
+    for name in ("checkBox_hide_dock_icon",):
         assert _abs(ui, getattr(ui, name)) == base[name][0], (
             f"窄态 {width} 宽下第五组不该动的 Fixed 前缀「{name}」被带偏: 基线={base[name][0]}"
             f" 实际={_abs(ui, getattr(ui, name))}"

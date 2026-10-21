@@ -601,6 +601,23 @@ class LayoutMasterMixin:
         下）就整行解除，保持设计态原样。
         「隐藏入口：」冒号对齐已在 MDCx.ui/.py 静态补齐 RightToLeft + AlignRight，
         与同列标签共用网格列右缘，不需运行时介入。休眠页跳过。
+
+        v2.7.6 又加三条需求（只动窄态，宽态逐位不变）：
+        ① 「保存后重启生效」挪到「隐藏菜单栏图标（Mac）」**右侧**：MDCx.ui 里
+          horizontalLayout_dock 的项序改成「隐藏Dock图标 | 隐藏菜单栏图标 |
+          保存后重启生效」，同时把「隐藏菜单栏图标（Mac）」的 sizePolicy 由
+          Minimum 改成 Fixed——Minimum 会独吞整行余量，提示词会被顶到行末，
+          改 Fixed 后它才紧贴在复选框文字右侧；提示词自己改成 Minimum 顶住余量，
+          该行才仍是「可拉伸项」，否则 QGridLayout 的 col1 不再伸展、整页列宽错乱。
+        ② 窄态「隐藏菜单栏图标（Mac）」与「暗黑模式」严格上下对齐，且「暗黑模式」
+          位置保持不变：隐藏图标行的目标竖线在窄态改取「暗黑模式」的**实测终态
+          x**（不是共用 anchor——窄态 anchor 是「显示字段内容信息」那条线，真机上
+          「暗黑模式」与它并不重合）。故「界面外观行」一段排到隐藏图标行之前，
+          且窄态先 activate 一次 lay_c 再量。
+        ③ 窄态「无限次刮削」与「无按钮」严格上下对齐，且「无按钮」位置保持不变：
+          保留任务行的目标竖线在窄态改取 radioButton_hide_none 的实测 x，且本段
+          整段挪到 _sync_advanced_page_tail_align() 之后（「无」的终态 x 是那里
+          钉出来的）。宽态仍取「停止刮削时」，与本批需求之前逐位相同。
         """
         ui = self.Ui
         host = ui.gridLayoutWidget_20
@@ -698,7 +715,7 @@ class LayoutMasterMixin:
         if anchor <= row_x or col_w <= 0:
             return
         lay_a = ui.horizontalLayout_55  # 退出软件时 / 停止刮削时
-        lay_b = ui.horizontalLayout_dock  # 隐藏Dock图标 / 保存后重启生效 / 隐藏菜单栏图标
+        lay_b = ui.horizontalLayout_dock  # 隐藏Dock图标 / 隐藏菜单栏图标 / 保存后重启生效
         lay_d = ui.horizontalLayout_nav_hide  # 隐藏Emby演员管理 / 隐藏NFO库管理 / 说明
         # 阶段一已就位（改了就当场 activate），此处重新起算：下面四段共用行末
         # 那批 invalidate+activate
@@ -712,32 +729,10 @@ class LayoutMasterMixin:
         )
         changed |= self._pin_row_lead_width(lead_box, pin_a if ok_a else None)
 
-        # ---- 隐藏图标行：前两项是 Fixed 文本项，插固定间隔把末项单独推到 anchor ----
-        # 用「插在 label_42 之后」的固定间隔，而不是给整行加左 margin：后者会
-        # 把「隐藏Dock图标（Mac）」「保存后重启生效」一起推到右边，破坏本页
-        # 「每行第一个控件都贴着 col1 左缘」的节奏（实测 col1 左缘 = row_x = 97）。
-        # gap_b < 0 说明列太窄、Fixed 前缀已经越过 anchor，QCheckBox/QLabel 的
-        # sizeHint 就是不裁字下限，压缩必裁字，所以整行放弃（保持设计态原样）。
-        dock_icon = ui.checkBox_hide_dock_icon
-        label_42 = ui.label_42
-        menu_icon = ui.checkBox_hide_menu_icon
-        prefix = dock_icon.sizeHint().width() + label_42.sizeHint().width() + 2 * lay_b.spacing()
-        gap_b = anchor - row_x - prefix
-        ok_b = gap_b >= 0 and col_w - gap_b - prefix >= menu_icon.sizeHint().width()
-        new_gap_b = gap_b if ok_b else 0
-        if self._adv_dock_gap != new_gap_b:
-            # PyQt6 的 insertSpacing 返回值恒为 None，改插完再 itemAt 取回
-            spacer = self._adv_dock_spacer
-            if spacer is None or lay_b.indexOf(spacer) != 2:
-                lay_b.insertSpacing(2, new_gap_b)
-                spacer = lay_b.itemAt(2)
-                self._adv_dock_spacer = spacer
-            if spacer is not None:
-                spacer.changeSize(new_gap_b, 0, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
-                self._adv_dock_gap = new_gap_b
-                changed = True
-
         # ---- 界面外观行：「暗黑模式」落 anchor，两条路子按「容器装不装得下」二选一 ----
+        # 本段必须排在「隐藏图标行」**之前**：窄态需求②要「隐藏菜单栏图标（Mac）」
+        # 与「暗黑模式」严格上下对齐，而「暗黑模式」位置保持不变，故隐藏图标行的
+        # 目标取「暗黑模式」的实测终态 x；不先让本行落定就量不到它的终态坐标。
         # 路子甲（最大化）：layoutWidget5 加宽到 2*(anchor-row_x)-spacing，行内两项
         #   均分，末位即落 anchor。want_w 恒等于 col_w（anchor = row_x + col_w/2 + 3，
         #   两项均分同式），即最多填满 frame，绝不溢出。
@@ -762,6 +757,61 @@ class LayoutMasterMixin:
         if lw.width() != new_w:
             lw.setGeometry(lw.x(), lw.y(), new_w, lw.height())
             changed = True
+
+        # ---- 隐藏图标行：插固定间隔把「隐藏菜单栏图标（Mac）」单独推到目标竖线 ----
+        # v2.7.6 行内顺序改为：隐藏Dock图标（Mac）| 间隔 | 隐藏菜单栏图标（Mac）|
+        # 保存后重启生效 —— 需求①要那条 teal 提示词挪到「隐藏菜单栏图标（Mac）」
+        # 复选框的右侧（贴着它的文字），不再挤在「隐藏Dock图标」后面。间隔因此插在
+        # 第 1、2 项之间（index 1），末项是提示词标签。
+        # 目标竖线分两态：
+        #   最大化：仍是 anchor（「显示字段来源信息」那条线），最大化结果与本批
+        #     需求之前逐位不变；
+        #   还原态（需求②）：取「暗黑模式」的实测终态 x —— 需求写的是「隐藏菜单栏
+        #     图标与暗黑模式严格上下对齐，且暗黑模式位置保持不变」，而窄态的
+        #     anchor 是「显示字段内容信息」那条线，真机上两者并不重合（暗黑模式
+        #     在 543、显示字段内容信息在 787），沿用 anchor 根本对不上。
+        # 实测前必须让「界面外观行」真正落定：_pin_row_lead_width 只改约束不重排，
+        # lw 的宽度也是刚 setGeometry 出来的，故窄态先 invalidate+activate 一次
+        # lay_c（不 activate gridLayout_20，避免中间态把网格最小宽顶大）。
+        dock_icon = ui.checkBox_hide_dock_icon
+        label_42 = ui.label_42
+        menu_icon = ui.checkBox_hide_menu_icon
+        if not wide:
+            lay_c.invalidate()
+            lay_c.activate()
+        target_b = anchor if wide else col_x(dark_c)
+        # 行内顺序 [隐藏Dock图标 | 间隔 | 隐藏菜单栏图标 | 保存后重启生效]：
+        # 前缀只到「隐藏菜单栏图标」，末尾还要给提示词标签留出它自己的宽度
+        # （它是 Minimum 策略，sizeHint 即不裁字的下界）。
+        prefix = dock_icon.sizeHint().width() + lay_b.spacing()
+        tail_b = menu_icon.sizeHint().width() + lay_b.spacing() + label_42.sizeHint().width()
+        avail_b = col_w - prefix - tail_b
+        gap_b = target_b - row_x - prefix
+        # 间隔项是 Fixed 策略的 QSpacerItem，它的 sizeHint 会算进行内最小宽度，
+        # 故间隔一旦超过 avail_b，整行的最小宽度就会撑破网格列宽——那会把整页
+        # （连同不许动的「暗黑模式」）一起推走，等于把需求②自己毁掉。
+        # 放不下就把目标竖线夹到可行区间内：宁可离目标近一点也不裁字、不撑破列宽。
+        if gap_b < 0:
+            gap_b = 0
+        elif gap_b > avail_b:
+            gap_b = avail_b
+        new_gap_b = gap_b
+        if self._adv_dock_gap != new_gap_b:
+            # PyQt6 的 insertSpacing 返回值恒为 None，改插完再 itemAt 取回
+            spacer = self._adv_dock_spacer
+            if spacer is not None and lay_b.indexOf(spacer) != 1:
+                # 间隔项的位置变了（v2.7.6 起插在第 1、2 项之间），先摘掉旧的，
+                # 否则行里会留下两个间隔项
+                lay_b.removeItem(spacer)
+                spacer = None
+            if spacer is None:
+                lay_b.insertSpacing(1, new_gap_b)
+                spacer = lay_b.itemAt(1)
+                self._adv_dock_spacer = spacer
+            if spacer is not None:
+                spacer.changeSize(new_gap_b, 0, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+                self._adv_dock_gap = new_gap_b
+                changed = True
 
         # ---- 隐藏入口行：钉「隐藏 Emby 演员管理」，「隐藏NFO库管理」落锚点 ----
         # 钉住后还须把 nfo 本身也钉回 sizeHint 宽：QCheckBox 默认 sizePolicy 可拉伸，
@@ -805,29 +855,6 @@ class LayoutMasterMixin:
             ui.gridLayout_20.invalidate()
             ui.gridLayout_20.activate()
 
-        # ---- 保留任务行：「无限次刮削」落到「停止刮削时」同一竖线（两态生效） ----
-        # 「停止刮削时」自身位置保持不变，只钉前导项「记住未完成的刮削任务」。
-        # 必须排在上面那批 activate 之后：stop 的终态 x 由 lay_a 那批钉宽决定，
-        # 提前量到的是等分旧值。row5 与 row6 同处 gridLayout_20 的 col1，
-        # 行左缘天然相等，但仍按实测分开起算，避免布局边距假设。
-        lay_r = ui.horizontalLayout_89
-        remain_task = ui.checkBox_remain_task
-        infinite_scrape = ui.checkBox_infinite_scrape
-        row5_x = col_x(remain_task)
-        want_r = col_x(stop_scrape)
-        col_w_r = host.width() - row5_x
-        pin_r = want_r - row5_x - lay_r.spacing()
-        ok_r = (
-            want_r > row5_x
-            and pin_r >= remain_task.sizeHint().width()
-            and col_w_r - pin_r - lay_r.spacing() >= infinite_scrape.sizeHint().width()
-        )
-        if self._pin_row_lead_width(remain_task, pin_r if ok_r else None):
-            lay_r.invalidate()
-            lay_r.activate()
-            ui.gridLayout_20.invalidate()
-            ui.gridLayout_20.activate()
-
         # ---- 窄态阶段一（本批需求）：「刮削结束后自动退出软件」右移到「隐藏菜单栏图标」----
         # 必须排在上面那批 activate 之后：窄态下「隐藏菜单栏图标」的左缘是由第 8 行
         # 的 gap_b 决定的，而 gap_b 又由本方法的 anchor 算出——只有这批 activate 跑完
@@ -853,6 +880,37 @@ class LayoutMasterMixin:
         # 提前量到的是它被等分推到右缘的旧值（用户截图红框里那两个「关」就是这么
         # 被钉歪的）。changed 为假时网格几何本就是终态，照量不误。
         self._sync_advanced_page_tail_align()
+
+        # ---- 保留任务行：「无限次刮削」落到目标竖线（两态生效） ----
+        # 「无限次刮削」自身的位置由前导项「记住未完成的刮削任务」的钉宽决定，只钉
+        # 前导项即可。目标竖线分两态：
+        #   最大化：仍是「停止刮削时」col_x(stop_scrape)，最大化结果与本批需求之前
+        #     逐位相同；
+        #   还原态（需求③）：取「无」col_x(radioButton_hide_none) —— 需求写的是
+        #     「无限次刮削与无按钮严格上下对齐，且无按钮位置保持不变」。真机上窄态
+        #     的「停止刮削时」钉不上（同行前导项「退出软件时」sizeHint 太大，整行
+        #     放弃后它停在自然位 543），而「无」钉得上（787，正是「显示字段内容
+        #     信息」那条线），故必须换锚点，否则两者永远对不齐。
+        # 本段必须排在 _sync_advanced_page_tail_align() 之后：「无」的终态 x 是那
+        # 里面钉出来的，提前量到的是等分旧值。row5 与 row6 同处 gridLayout_20 的
+        # col1，行左缘天然相等，但仍按实测分开起算，避免布局边距假设。
+        lay_r = ui.horizontalLayout_89
+        remain_task = ui.checkBox_remain_task
+        infinite_scrape = ui.checkBox_infinite_scrape
+        row5_x = col_x(remain_task)
+        want_r = col_x(stop_scrape) if wide else col_x(ui.radioButton_hide_none)
+        col_w_r = host.width() - row5_x
+        pin_r = want_r - row5_x - lay_r.spacing()
+        ok_r = (
+            want_r > row5_x
+            and pin_r >= remain_task.sizeHint().width()
+            and col_w_r - pin_r - lay_r.spacing() >= infinite_scrape.sizeHint().width()
+        )
+        if self._pin_row_lead_width(remain_task, pin_r if ok_r else None):
+            lay_r.invalidate()
+            lay_r.activate()
+            ui.gridLayout_20.invalidate()
+            ui.gridLayout_20.activate()
 
     def _sync_advanced_page_rest_interval_align(self, wide: bool) -> None:
         """还原态：「每次间隔」时长框右缘缩到与「间歇刮削」文件数框右缘严格对齐。
