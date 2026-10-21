@@ -8,6 +8,8 @@
 
 - **整理模式两枚复选框文案按用户要求改名（`mdcx/views/MDCx.ui` + `mdcx/views/MDCx.py` + `mdcx/config/models.py` + `mdcx/config/extend.py` + `mdcx/core/scraper.py` + `docs/Features.md` + `docs/Configuration.md` + `tests/test_ui_structure.py`）**：「本地存储不限制间隔时间整理文件」→「本地存储不设置时间间隔整理文件」、「网盘存储按自动休息间隔整理文件」→「网盘按照自动休息间隔整理文件」；配置字段名（`organize_local_no_interval` / `organize_netdisk_rest_interval`）与运行行为不变，仅界面文案、代码注释与文档同步。**版本号**：v2.7.5。
 
+- **读取模式「允许更新NFO文件」旁的说明文案微调（`mdcx/views/MDCx.ui` + `mdcx/views/MDCx.py` + `tests/test_ui_structure.py`）**：用户 2026-10-21 要求把「按Emby标题、设置-翻译、NFO设置利用本地NFO更新」改成「按Emby标题、设置-翻译、NFO设置利用本地信息更新」；仅措辞调整，该选项的行为（按 Emby 标题 / 设置-翻译 / NFO 设置，利用本地已有信息更新 NFO）不变。**版本号**：v2.7.5。
+
 ## v2.7.4 (2026-10-21)
 ### 总结
 - **本机 `pip install -r requirements.txt` 不再因 PyYAML 编译失败而中断（`.github/workflows/build-py315.yml` + `.github/workflows/ci.yaml` + `.github/workflows/update-sr-tools.yml` + `pyproject.toml` + `docs/Development.md` + `DADA/MEMORY.md`）**：**现象**：Windows 本机（未装 MSVC）执行 `pip install -r requirements.txt` 报 "Building wheel for pyyaml (pyproject.toml) did not run successfully … error: Microsoft Visual C++ 14.0 or greater is required"，整条安装失败（`oshash` / `zhconv` 等其余包均正常，只有 pyyaml 挂在编译上）。**根因**：`pyyaml` 至今没有 cp315 wheel（6.0.3 只发到 cp314），pip 只能退回源码编译 `yaml._yaml` C 扩展，没有 MSVC 就必然失败。**改法**：PyYAML 的 `setup.py` 支持环境变量 `PYYAML_FORCE_LIBYAML`，值为 `0` 时直接跳过 C 扩展、产出纯 Python 的 `py3-none-any` wheel——**任何平台都不需要编译器**。CI 三份工作流（`build-py315.yml` / `ci.yaml` / `update-sr-tools.yml`）统一改用该环境变量，删掉原来的「跳过 pyyaml + 拿 cp314 wheel 顶替」两行（不再跨 ABI 混装 wheel）；`uv sync` 与 `pip install -r requirements.txt` 两条路径都认这个变量。**验证**：本机 `pip install -r requirements.txt` 全量装完（`import yaml` → `__with_libyaml__ = False`，`safe_load` 正常），`pip check` 无冲突。

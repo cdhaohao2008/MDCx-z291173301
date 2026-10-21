@@ -13500,7 +13500,7 @@ class Ui_MDCx(object):
         self.checkBox_read_has_nfo_update.setText(_translate("MDCx", "本地刮削成功的文件，按更新模式重新整理分类"))
         self.label_345.setText(_translate("MDCx", "可无需联网重新整理分类"))
         self.checkBox_read_update_nfo.setText(_translate("MDCx", "允许更新NFO文件"))
-        self.label_37.setText(_translate("MDCx", "<p> 按Emby标题、设置-翻译、NFO设置利用本地NFO更新</p>"))
+        self.label_37.setText(_translate("MDCx", "<p> 按Emby标题、设置-翻译、NFO设置利用本地信息更新</p>"))
         self.checkBox_read_download_file_again.setText(_translate("MDCx", "本地NFO内有链接，重新下载封面图片等文件"))
         self.label_347.setText(_translate("MDCx", "将按设置 -「下载」更新"))
         self.checkBox_read_no_nfo_scrape.setText(_translate("MDCx", "本地没有NFO的文件，按正常模式规则重新刮削"))

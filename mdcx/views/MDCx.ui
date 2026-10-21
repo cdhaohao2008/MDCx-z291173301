@@ -5992,7 +5992,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                                   <string notr="true">color: rgb(8, 128, 128);</string>
                                                 </property>
                                                 <property name="text">
-                                                  <string>&lt;p&gt; 按Emby标题、设置-翻译、NFO设置利用本地NFO更新&lt;/p&gt;</string>
+                                                  <string>&lt;p&gt; 按Emby标题、设置-翻译、NFO设置利用本地信息更新&lt;/p&gt;</string>
                                                 </property>
                                               </widget>
                                             </item>
