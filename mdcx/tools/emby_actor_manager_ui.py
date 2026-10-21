@@ -13,7 +13,7 @@ from typing import cast
 from pydantic import HttpUrl
 from PyQt6.QtCore import QEvent, Qt, QThread, QTimer
 from PyQt6.QtCore import pyqtSignal as Signal
-from PyQt6.QtGui import QColor, QGuiApplication, QKeySequence
+from PyQt6.QtGui import QColor, QGuiApplication, QKeySequence, QPalette
 from PyQt6.QtWidgets import (
     QAbstractItemDelegate,
     QAbstractItemView,
@@ -346,6 +346,34 @@ _DUPLICATE_CLICK_GAP = 0.01
 
 两次上报间隔小于这个值就当同一次点击，不重复累加连击次数。"""
 
+_INLINE_EDITOR_QSS = (
+    "QLineEdit { background-color: #ffffff; color: #000000;"
+    " border: 2px solid #1565c0; border-radius: 0px; padding: 0px 2px; }"
+)
+"""行内编辑器的外观：纯白底 + 黑字，蓝色边框一圈表示「正处于编辑状态」。
+
+用户 2026-10-21 反馈：姓名/出生日期/出生地/详情/标签进入编辑状态后整格铺着
+蓝色底色（那是 QLineEdit 默认全选文本后的系统高亮色 Highlight=#308cc6 配
+HighlightedText=#ffffff，白字压深蓝底看不清），要求改成纯白底、只在四周留
+一圈蓝条标示编辑状态。故底色钉死白色、文字钉死黑色，编辑状态只由蓝边表示。"""
+
+_INLINE_EDITOR_SELECTION_BG = "#bbdefb"
+"""行内编辑器里「用户自己选中文字」的底色：浅蓝（沿用表格自身的选中色）。
+
+编辑器打开时 Qt 会自动全选一次文本，那一次用白色底（见
+_INLINE_EDITOR_SELECTION_BG_HIDDEN）让它看不出来；用户动手拖选 / Ctrl+A
+之后才换成这个浅蓝底，选中范围依旧认得出，且黑字压浅蓝看得清。"""
+
+_INLINE_EDITOR_SELECTION_BG_HIDDEN = "#ffffff"
+"""行内编辑器刚打开时「被选中文字」的底色：纯白（等于底色，选中态看不出来）。
+
+Qt 打开编辑器时会自动全选文本，若沿用系统高亮色就是整格深蓝底、白字压
+深蓝看不清（用户 2026-10-21 反馈）；打开这一瞬用白色底，选中态即隐形，
+格子保持纯白。"""
+
+_INLINE_EDITOR_SELECTION_FG = "#000000"
+"""行内编辑器里「被选中文字」的字色：黑色，保证浅蓝底上依旧清晰。"""
+
 _CELL_MENU_COPY = "复制内容"
 """可编辑格右键小菜单项：把本格内容直接复制到剪贴板。"""
 
@@ -418,6 +446,58 @@ def _effective_pending(actor, field: str, new_value, existing_value):
     return existing_value
 
 
+class _InlineEditor(QLineEdit):
+    """行内编辑器：纯白底 + 黑字 + 一圈蓝边，编辑状态不再被蓝底糊住。
+
+    表格打开编辑器时会替它调一次 `selectAll()`（Qt 的 openEditor 在
+    SelectedClicked / DoubleClicked / EditKeyPressed / AnyKeyPressed 触发下
+    都会这么做），系统高亮色（Highlight=#308cc6 配 HighlightedText=#ffffff）
+    随即把整格铺成深蓝底、白字压深蓝，看不清（用户 2026-10-21 反馈
+    「编辑状态整格蓝底」）。这里：
+
+    - 打开瞬间把选中底色设成白色 → 那次自动全选看不出，格子始终纯白；
+    - 编辑器建好后立刻撤销那次全选、光标落到文本末尾，免得用户随手一敲
+      就把整条内容覆盖掉；
+    - 用户自己拖选 / 按 Ctrl+A 时再把选中底色换成浅蓝（#bbdefb 配黑字），
+      看得清、也认得出选中了哪一段。
+    """
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._user_input_seen = False
+        self._set_selection_bg(_INLINE_EDITOR_SELECTION_BG_HIDDEN)
+
+    def _set_selection_bg(self, color: str) -> None:
+        """设置「被选中文字」的底色（字色恒为黑色，浅底上依旧清晰）。"""
+        pal = self.palette()
+        pal.setColor(QPalette.ColorRole.Highlight, QColor(color))
+        pal.setColor(QPalette.ColorRole.HighlightedText, QColor(_INLINE_EDITOR_SELECTION_FG))
+        self.setPalette(pal)
+
+    def clear_auto_selection(self) -> None:
+        """撤掉 Qt 打开编辑器时自动做的那次全选：底色纯白、光标落到末尾。"""
+        try:
+            self.deselect()
+            self.setCursorPosition(len(self.text()))
+        except RuntimeError:
+            pass
+
+    def _mark_user_input(self) -> None:
+        """用户开始自己操作：选中态改回浅蓝底黑字（看得清、认得出选中）。"""
+        if self._user_input_seen:
+            return
+        self._user_input_seen = True
+        self._set_selection_bg(_INLINE_EDITOR_SELECTION_BG)
+
+    def keyPressEvent(self, event):  # noqa: N802
+        self._mark_user_input()
+        super().keyPressEvent(event)
+
+    def mousePressEvent(self, event):  # noqa: N802
+        self._mark_user_input()
+        super().mousePressEvent(event)
+
+
 class _InlineEditDelegate(QStyledItemDelegate):
     """可编辑列的行内编辑代理：双击进可编辑 QLineEdit，回车/点别处提交。
 
@@ -429,6 +509,11 @@ class _InlineEditDelegate(QStyledItemDelegate):
     编辑器盖住格子后表格收不到后续点击，故给编辑器装过滤器把左键点击
     （按下/双击）转调出去，供主窗口续上连击计数（三击开详情窗）；
     转调时带上事件种类 press/dblclick，便于主窗口给同一次物理按下去重。
+
+    编辑状态的外观：纯白底 + 黑字 + 四周一圈蓝边（_INLINE_EDITOR_QSS）。
+    编辑器打开时 Qt 会自动全选一次文本，那次全选用白色底（选中态隐形，
+    用户 2026-10-21 反馈整格蓝底看不清），并在编辑器建好后由
+    `_open_cell_editor()` 撤销，光标落在文本末尾。
     """
 
     def __init__(self, parent=None, editor_changed=None, editor_clicked=None):
@@ -440,13 +525,16 @@ class _InlineEditDelegate(QStyledItemDelegate):
         try:
             if index.column() not in _EDITABLE_COLUMNS:
                 return None
-            edit = QLineEdit(parent)
+            edit = _InlineEditor(parent)
+            # 外观：纯白底 + 黑字 + 一圈蓝边（编辑状态只由蓝边表示）。
+            # 默认样式下编辑器会继承系统高亮色，一旦全选文本就变成「白字压
+            # 深蓝底」，整格看不清（用户 2026-10-21 反馈），故这里钉死底色。
+            edit.setStyleSheet(_INLINE_EDITOR_QSS)
             # 记下格子位置并给编辑器装过滤器：双击开编辑器后编辑器盖住格子，
             # 表格收不到第三次点击，编辑器上的左键按下必须在这里转调出去。
             edit.setProperty("cellRow", int(index.row()))
             edit.setProperty("cellCol", int(index.column()))
             edit.installEventFilter(self)
-            edit.selectAll()
             if self._editor_changed is not None:
                 self._editor_changed(edit)
             return edit
@@ -483,7 +571,10 @@ class _InlineEditDelegate(QStyledItemDelegate):
             if full is None:
                 full = index.data(Qt.ItemDataRole.DisplayRole) or ""
             editor.setText(str(full))
-            editor.selectAll()
+            # 不全选：全选会把整格铺成高亮蓝底（白字压深蓝，看不清），
+            # 与「纯白底 + 蓝边」的要求相冲。光标落在文本末尾，底色始终纯白。
+            editor.setCursorPosition(len(str(full)))
+            editor.deselect()
         except RuntimeError, AttributeError:
             pass
         except Exception:
@@ -4092,13 +4183,24 @@ class EmbyActorManagerDialog(QDialog):
             pass
 
     def _open_cell_editor(self, row: int, col: int) -> None:
-        """双击可编辑列：打开行内编辑器（初值取 UserRole 存的完整值）。"""
+        """双击可编辑列：打开行内编辑器（初值取 UserRole 存的完整值）。
+
+        表格打开编辑器时会替编辑器自动全选一次文本（Qt 的 openEditor 在
+        SelectedClicked / DoubleClicked / EditKeyPressed / AnyKeyPressed 下
+        都这么做），那一次全选会把整格铺成高亮蓝底、白字压深蓝看不清
+        （用户 2026-10-21 反馈）。这里在编辑器建好、尚未绘制前把它撤掉：
+        光标落到文本末尾、整格保持纯白底（编辑状态只由四周那圈蓝边表示）。
+        """
         try:
             table = self.table
             item = table.item(int(row), int(col))
             if item is None:
                 return
             table.editItem(item)
+            editor = getattr(self, "_cell_editor", None)
+            clearer = getattr(editor, "clear_auto_selection", None)
+            if callable(clearer):
+                clearer()
         except RuntimeError, AttributeError, TypeError, ValueError:
             pass
         except Exception:
