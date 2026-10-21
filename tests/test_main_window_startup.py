@@ -9,6 +9,7 @@
 """
 
 import sys
+import time
 
 import pytest
 from PyQt6.QtWidgets import QApplication
@@ -251,9 +252,26 @@ def test_emby_actor_manager_columns_fit_after_vertical_scrollbar(app):
         app.processEvents()
 
 
+def _click_cell(dlg, row: int, col: int, times: int = 1):
+    """在 (row, col) 格上模拟 times 次左键点击（每次按下+松开）。
+
+    Qt 连击的第 2 次按下报的是 MouseButtonDblClick（不是 MouseButtonPress），
+    这里按真实行为给事件种类；两次点击之间留 30ms 间隔，别被「同一次物理
+    按下的重复上报」去重窗口吃掉。
+    """
+    table = dlg.table
+    pos = table.visualItemRect(table.item(row, col)).center()
+    for i in range(times):
+        kind = "press" if i == 0 else "dblclick"
+        dlg._on_viewport_mouse_click(pos, kind)
+        dlg._on_viewport_mouse_release()
+        time.sleep(0.03)
+
+
 def test_emby_actor_manager_inline_edit_and_copy(app):
-    """新行为：单击可编辑列行内编辑（回车/点别处提交即本地缓存+绿底🔄，仅改过行参与同步），
-    双击任意列都弹详情窗（先提交编辑器），右键/Ctrl+C 复制可编辑列文本。
+    """新行为：单击可编辑列只选中（不再误弹编辑器），双击才进行内编辑
+    （回车/点别处提交即本地缓存+绿底🔄，仅改过行参与同步），
+    三击弹演员详情窗（先提交编辑器），右键/Ctrl+C 复制可编辑列文本。
     简介列（状态图标）只读不可编辑。"""
     import math
 
@@ -291,8 +309,12 @@ def test_emby_actor_manager_inline_edit_and_copy(app):
         assert dlg._measured_birthday_width() == int(
             math.ceil(max(table.fontMetrics().horizontalAdvance(s) for s in ("0000-00-00", "8888-88-88", "出生日期")))
         ) + int(dlg._BIRTHDAY_CELL_PADDING)
-        # 单击可编辑列开编辑器，改名后提交：本地缓存 + 绿底 🔄 + 只该行待同步。
-        dlg._on_table_clicked(table.model().index(0, 1))
+        # 单击可编辑列：只选中，不弹编辑器（单击编辑太容易误操作）。
+        dlg._reset_click_tracking()
+        _click_cell(dlg, 0, 1, times=1)
+        assert dlg._cell_editor is None, "单击不该弹出行内编辑器"
+        # 双击可编辑列：才进行内编辑，改名后提交：本地缓存 + 绿底 🔄 + 只该行待同步。
+        _click_cell(dlg, 0, 1, times=1)  # 第二次按下即双击
         assert dlg._cell_editor is not None
         editor = dlg._cell_editor
         editor.setText("改名演员")
@@ -310,10 +332,11 @@ def test_emby_actor_manager_inline_edit_and_copy(app):
         assert QGuiApplication.clipboard().text() == "改名演员"
         dlg._on_table_right_clicked(table.visualItemRect(table.item(0, 3)).center())
         assert QGuiApplication.clipboard().text() != ""
-        # 双击可编辑列：提交编辑器后仍弹详情窗。
-        dlg._on_table_clicked(table.model().index(0, 4))
+        # 三击可编辑列：提交编辑器后仍弹详情窗。
+        dlg._reset_click_tracking()
+        _click_cell(dlg, 0, 4, times=2)  # 双击进行内编辑器
         assert dlg._cell_editor is not None
-        dlg._on_table_double_clicked(0, 4)
+        dlg._on_editor_clicked(0, 4)  # 第三次按下落在编辑器上
         app.processEvents()
         assert set(dlg._detail_dialogs) == {"e1"}
         # 整格 Ctrl+C：只复制可编辑列。
@@ -330,39 +353,29 @@ def test_emby_actor_manager_inline_edit_and_copy(app):
         app.processEvents()
 
 
-def test_emby_actor_manager_editor_double_click_opens_detail(app):
-    """编辑器打开时双击编辑器本身也要弹详情窗：单击开编辑器后第二次点击
-    落在 QLineEdit 上，表格 cellDoubleClicked 收不到，必须靠编辑器上的
-    eventFilter 把双击转调详情窗。先红后绿的回归测试。"""
-    from PyQt6.QtCore import QEvent, QPointF, Qt
-    from PyQt6.QtGui import QMouseEvent
-    from PyQt6.QtWidgets import QApplication
-
+def test_emby_actor_manager_triple_click_opens_detail(app):
+    """三击开详情窗：双击已把编辑器打开、编辑器盖住格子，第三次点击落在
+    QLineEdit 上、表格收不到，必须靠编辑器上的 eventFilter 把左键按下
+    转调出去续上连击计数，再提交编辑器并弹详情窗。"""
     from mdcx.tools.emby_actor_manager import ActorInfo
     from mdcx.tools.emby_actor_manager_ui import EmbyActorManagerDialog
 
     dlg = EmbyActorManagerDialog()
     try:
-        actor = ActorInfo(name="双击演员", actor_id="e9", server_id="s")
+        actor = ActorInfo(name="三击演员", actor_id="e9", server_id="s")
         dlg._actors = [actor]
         dlg._populate_table([actor])
-        table = dlg.table
-        # 单击开编辑器（此时第二次点击只会落到编辑器上，不会到表格）。
-        dlg._on_table_clicked(table.model().index(0, 1))
+        # 双击进行内编辑器（此时第三次点击只会落到编辑器上，不会到表格）。
+        dlg._reset_click_tracking()
+        _click_cell(dlg, 0, 1, times=2)
         editor = dlg._cell_editor
         assert editor is not None
-        editor.setText("双击改名")
-        dbl = QMouseEvent(
-            QEvent.Type.MouseButtonDblClick,
-            QPointF(5.0, 5.0),
-            Qt.MouseButton.LeftButton,
-            Qt.MouseButton.LeftButton,
-            Qt.KeyboardModifier.NoModifier,
-        )
-        QApplication.sendEvent(editor, dbl)
+        editor.setText("三击改名")
+        # 第三次左键按下落在编辑器上：代理转调，连击计数续到 3。
+        dlg._on_editor_clicked(0, 1)
         app.processEvents()
         # 编辑器先提交（改名进本地缓存），再弹出该演员的详情窗。
-        assert actor.name == "双击改名"
+        assert actor.name == "三击改名"
         assert set(dlg._detail_dialogs) == {"e9"}
         for d in list(dlg._detail_dialogs.values()):
             d.close()

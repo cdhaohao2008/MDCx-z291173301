@@ -106,7 +106,7 @@ def test_detail_dialog_independent_from_manager():
                     return r
             raise AssertionError(f"表格缺 {name} 行")
 
-        mgr._on_table_double_clicked(_row_of("甲"), 0)
+        mgr._open_actor_detail(_row_of("甲"))
         _pump()
         assert set(mgr._detail_dialogs) == {"da1"}
         d1 = mgr._detail_dialogs["da1"]
@@ -114,13 +114,13 @@ def test_detail_dialog_independent_from_manager():
         assert not d1.isModal(), "详情应非模态，管理器可并存操作"
         assert d1.isVisible()
         assert d1.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        # 同演员再次双击：复用，不多开
-        mgr._on_table_double_clicked(_row_of("甲"), 0)
+        # 同演员再次打开：复用，不多开
+        mgr._open_actor_detail(_row_of("甲"))
         _pump()
         assert set(mgr._detail_dialogs) == {"da1"}
         assert mgr._detail_dialogs["da1"] is d1
         # 不同演员：多开，互不干扰
-        mgr._on_table_double_clicked(_row_of("乙"), 0)
+        mgr._open_actor_detail(_row_of("乙"))
         _pump()
         assert set(mgr._detail_dialogs) == {"da1", "da2"}
         # 关一个：摘除，另一个与管理器都不受影响
