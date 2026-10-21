@@ -48,6 +48,9 @@ SEPARATE_MAIN_MODE = 2
 ORGANIZE_MAIN_MODE = 6
 """整理模式的 main_mode 值：不联网刮削，读取同目录 nfo 字段后按命名规则重新整理文件。"""
 
+READ_MAIN_MODE = 5
+"""读取模式的 main_mode 值：只读取同目录 nfo 字段，不联网刮削、不移动文件。"""
+
 SEPARATE_META_EXTS = frozenset({".nfo", ".jpg", ".jpeg", ".png", ".webp", ".strm"})
 """分离模式下归入数据存放目录的元数据文件扩展名（小写）。
 
@@ -56,13 +59,57 @@ SEPARATE_META_EXTS = frozenset({".nfo", ".jpg", ".jpeg", ".png", ".webp", ".strm
 """
 
 
+_runtime_main_mode: int | None = None
+"""运行时刮削模式覆盖：仅在本次运行内生效，绝不写回配置文件。
+
+整理模式下若扫描到的文件已全部位于「成功输出目录」内，运行时会临时把
+刮削模式切成读取模式（见 `set_runtime_main_mode`），避免重复整理自己
+上一次的产物；该覆盖在运行结束（或下次运行开始）时清除。
+"""
+
+
+def get_runtime_main_mode() -> int:
+    """获取本次运行实际生效的刮削模式。
+
+    优先返回运行时覆盖（临时切换，不落盘），没有覆盖时以配置文件为准。
+    """
+    if _runtime_main_mode is not None:
+        return _runtime_main_mode
+    return manager.config.main_mode
+
+
+def set_runtime_main_mode(mode: int | None) -> None:
+    """临时覆盖本次运行的刮削模式（不修改配置文件、不落盘）。
+
+    传 None 表示取消覆盖，恢复以配置文件为准。
+    """
+    global _runtime_main_mode
+    _runtime_main_mode = mode
+
+
+def reset_runtime_main_mode() -> None:
+    """清除运行时刮削模式覆盖（恢复以配置文件为准）。"""
+    global _runtime_main_mode
+    _runtime_main_mode = None
+
+
+def is_organize_selected() -> bool:
+    """用户在「软件设置」里选择的刮削模式是否为整理模式（不受运行时覆盖影响）。
+
+    「文件是否已经在成功输出目录内、是否允许移动」这类判断必须依据用户
+    的选择而非运行时的临时切换：整理模式下已在成功输出目录内的文件，
+    任何情况下都不移动、不复制后删源。
+    """
+    return manager.config.main_mode == ORGANIZE_MAIN_MODE
+
+
 def is_separate_mode() -> bool:
     """当前是否为分离模式（刮削模式 == 2）。
 
     分离模式下，视频刮削目录内的视频文件（移动/重命名/失败移动）走右侧
     「分离模式」开关；正常模式下全部走左侧开关（右侧开关被忽略）。
     """
-    return manager.config.main_mode == SEPARATE_MAIN_MODE
+    return get_runtime_main_mode() == SEPARATE_MAIN_MODE
 
 
 def is_organize_mode() -> bool:
@@ -70,8 +117,10 @@ def is_organize_mode() -> bool:
 
     整理模式不联网刮削、不下载图片、不生成/更新 nfo，只读取同目录 nfo
     中的字段，按「设置→命名」重新组织视频/STRM、图片、nfo 及 mediainfo。
+
+    运行时被临时切成读取模式后，本函数返回 False（本次运行不再整理文件）。
     """
-    return manager.config.main_mode == ORGANIZE_MAIN_MODE
+    return get_runtime_main_mode() == ORGANIZE_MAIN_MODE
 
 
 def should_generate_strm(meta_root: Path | None, skip_reorganize: bool) -> bool:
@@ -392,6 +441,39 @@ def drop_ignore_dir(ignore_dirs: list[Path], target: Path | None) -> list[Path]:
         return list(ignore_dirs)
     key = _path_key(target)
     return [item for item in ignore_dirs if _path_key(item) != key]
+
+
+def get_success_output_name(success_output_folder: str | None = None) -> str:
+    """取「成功输出目录」配置的目录名（默认 JAV_output）。
+
+    配置可以是相对名（`JAV_output`）、多段相对路径（`output/JAV_output`）
+    或绝对路径，这里统一取最后一段目录名用于目录名比对。
+    """
+    if success_output_folder is None:
+        success_output_folder = manager.config.success_output_folder
+    raw = str(success_output_folder or "").replace("\\", "/").strip("/")
+    return raw.rsplit("/", 1)[-1].strip()
+
+
+def is_success_output_tree(path: Path | str, success_output_folder: str | None = None) -> bool:
+    """判断目录是否落在「成功输出目录」树内（目录本身就是成功输出目录，或是它的子目录）。
+
+    「成功输出目录」通常配置为相对名（默认 `JAV_output`），相对待刮削目录解析。
+    用户若直接把成功输出目录（或它的子目录）当成待刮削目录来跑，目标目录会被
+    算成 `<选中目录>/JAV_output` 这种套娃路径，整理没有意义，应当按读取模式处理。
+
+    判定方式：从目录自身开始逐级向上，任何一级目录名与成功输出目录名一致，
+    即说明该目录落在成功输出目录树内。
+    """
+    name = get_success_output_name(success_output_folder)
+    if not name:
+        return False
+    try:
+        parts = Path(path).parts
+    except TypeError, ValueError:
+        return False
+    target = name.casefold()
+    return any(part.casefold() == target for part in parts)
 
 
 def is_in_success_folder(file_path: Path | str, success_folder: Path | str | None) -> bool:

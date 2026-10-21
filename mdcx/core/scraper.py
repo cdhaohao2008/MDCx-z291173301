@@ -36,6 +36,7 @@ from ..config.enums import (
 )
 from ..config.extend import (
     ORGANIZE_MAIN_MODE,
+    READ_MAIN_MODE,
     SEPARATE_MAIN_MODE,
     MoviePathSetting,
     drop_ignore_dir,
@@ -43,14 +44,18 @@ from ..config.extend import (
     eff_success_file_move,
     eff_success_file_rename,
     get_movie_path_setting,
+    get_runtime_main_mode,
     get_separate_meta_root,
     is_in_success_folder,
-    is_organize_mode,
+    is_organize_selected,
+    is_success_output_tree,
     mirror_meta_folder,
     organize_netdisk_rest_enabled,
     organize_rest_seconds,
     parse_media_paths,
     remap_meta_paths,
+    reset_runtime_main_mode,
+    set_runtime_main_mode,
     should_generate_strm,
     should_overwrite_meta,
     should_overwrite_strm,
@@ -151,7 +156,7 @@ def get_scan_ignore_dirs(path_setting: MoviePathSetting) -> list[Path]:
     因此整理模式下把成功输出目录从排除列表中摘掉：整理是幂等的（已经在目标位置
     的文件无需移动），这样再次点「开始」就能把上次的整理结果重新整理一遍。
     """
-    if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+    if is_organize_selected():
         # getattr 兜底：部分调用方（含测试桩）构造的是精简的路径设置对象，
         # 没有 success_folder 时按「无可摘除项」处理，不能让扫描整段抛异常。
         return drop_ignore_dir(path_setting.ignore_dirs, getattr(path_setting, "success_folder", None))
@@ -428,6 +433,7 @@ class Scraper:
                     fanart_final_path=task.fanart_final_path,
                     elevated=True,
                     index=self._organize_index,
+                    success_folder=get_movie_path_setting(task.file_path).success_folder,
                 )
             except Exception as e:
                 moved, error = False, str(e)
@@ -508,16 +514,21 @@ class Scraper:
             self._organize_index = None
             # 整理模式：记录本次整理的结束时间。下次整理（网盘模式）以它为起点
             # 计算「两次整理之间必须间隔的时间」，不足则自动等待（见 _wait_organize_interval）
-            if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+            if is_organize_selected():
                 organize_state = load_organize_state()
                 organize_state["last_run_end"] = time.time()
                 save_organize_state(organize_state)
+            # 清除本次运行的临时刮削模式覆盖（整理→读取的自动切换只在运行期生效，
+            # 绝不能泄漏到界面或下一次运行）
+            reset_runtime_main_mode()
             # 协程真正退出前兜底落盘一次最新剩余任务：停止/取消过程中最后
             # 完成/取消的任务变化不被 1.5s 定时器竞态吞掉（议题 #98）
             save_remain_list_now()
 
     async def _run(self, file_mode: FileMode, movie_list: list[Path] | None) -> None:
         reset_flags_preserving_single_file_inputs()
+        # 清掉上一轮运行残留的临时刮削模式覆盖（整理→读取的自动切换只在运行期生效）
+        reset_runtime_main_mode()
         self._organize_index = None
         if movie_list is None:
             movie_list = []
@@ -563,7 +574,7 @@ class Scraper:
 
         # 整理模式 + 网盘存储：距上次整理结束不足「自动休息」时间时先自动等待，
         # 保证「上一次整理结束 → 本次整理开始」的间隔达标（网盘目录缓存刷新延迟）
-        if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+        if is_organize_selected():
             await self._wait_organize_interval()
 
         # 获取待刮削文件列表的相关信息
@@ -578,6 +589,9 @@ class Scraper:
         # 用于判断本次是否整体退化为读取模式（左下角文案随之切换）
         organize_inplace_count = 0
         organize_scanned_count = 0
+        # 整理模式：用户选中的待刮削目录本身是否就是「成功输出目录」或它的子目录
+        # （此时目标目录会算成 <选中目录>/JAV_output 这种套娃路径，整理没有意义）
+        organize_scan_in_success_tree = False
         if not movie_list:
             signal.show_log_text("\n ⏰ Start time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
             movie_list = []
@@ -593,11 +607,13 @@ class Scraper:
                         current_paths.softlink_path,
                     )
                     scan_path = current_paths.softlink_path
-                if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+                if is_organize_selected():
                     organize_scan_roots.append(scan_path)
                     organize_ignore_dirs.extend(scan_ignore_dirs)
+                    if is_success_output_tree(current_paths.movie_path):
+                        organize_scan_in_success_tree = True
                 scanned = await get_movie_list(file_mode, scan_path, scan_ignore_dirs)
-                if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+                if is_organize_selected():
                     organize_scanned_count += len(scanned)
                     organize_inplace_count += sum(
                         1 for item in scanned if is_in_success_folder(item, current_paths.success_folder)
@@ -605,31 +621,43 @@ class Scraper:
                 movie_list.extend(scanned)
         else:
             signal.show_log_text("\n ⏰ Start time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
-            if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+            if is_organize_selected():
                 organize_scanned_count = len(movie_list)
                 organize_inplace_count = sum(
                     1 for item in movie_list if is_in_success_folder(item, get_movie_path_setting(item).success_folder)
                 )
+                organize_scan_in_success_tree = any(
+                    is_success_output_tree(get_movie_path_setting(item).movie_path) for item in movie_list
+                )
 
-        # 整理模式：待整理的文件已经全部躺在「成功输出目录」内 → 本次没有任何
-        # 可移动/可重命名的目标，整体退化为读取模式（不移动、不复制任何文件），
-        # 左下角文案同步由「整理模式」切换为「读取模式」。
-        if (
-            manager.config.main_mode == ORGANIZE_MAIN_MODE
-            and organize_scanned_count > 0
-            and organize_inplace_count >= organize_scanned_count
+        # 整理模式：待整理的文件已经全部躺在「成功输出目录」内，或者用户选中的目录
+        # 本身就是「成功输出目录」（或其子目录）→ 本次没有任何可移动/可重命名的目标，
+        # 运行模式临时退化为读取模式（不移动、不复制任何文件），
+        # 左下角文案同步由「整理模式」切换为「读取模式·字段优先」。
+        # 注意：这里只改运行时模式（set_runtime_main_mode），绝不写回配置文件，
+        # 用户「设置」里选择的仍然是整理模式，下次运行依旧按整理模式处理。
+        if is_organize_selected() and (
+            organize_scan_in_success_tree
+            or (organize_scanned_count > 0 and organize_inplace_count >= organize_scanned_count)
         ):
+            set_runtime_main_mode(READ_MAIN_MODE)
             Flags.mode_text_override = "读取模式"
-            signal.show_log_text(
-                f" 📖 整理模式：{organize_inplace_count} 个文件已全部位于成功输出目录内，"
-                "自动转为读取模式（不移动、不复制、不重命名任何文件）"
-            )
+            if organize_scan_in_success_tree:
+                signal.show_log_text(
+                    " 📖 整理模式：选中的目录本身位于成功输出目录内，"
+                    "自动转为读取模式（不移动、不复制、不重命名任何文件）"
+                )
+            else:
+                signal.show_log_text(
+                    f" 📖 整理模式：{organize_inplace_count} 个文件已全部位于成功输出目录内，"
+                    "自动转为读取模式（不移动、不复制、不重命名任何文件）"
+                )
             signal.show_scrape_info("🔎 正在刮削中...")
 
         # 断点续刮：过滤掉已完成且 mtime 未变的文件；恢复上次失败的未超限文件（跨会话重试）
         # 读取模式（5）/整理模式（6）本质是读已有结果，不参与断点续刮的跳过/恢复逻辑，
         # 否则会导致只能看到「mtime 变化」的文件，且读完即被标记 done 导致下次读不到。
-        if cache.is_usable() and manager.config.main_mode not in (5, 6):
+        if cache.is_usable() and get_runtime_main_mode() not in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE):
             try:
                 existing = set(movie_list)
                 # 只有全量扫描拿到的才是完整媒体库集合，才有资格做全库清理；
@@ -691,11 +719,11 @@ class Scraper:
         task_count = len(movie_list)
         Flags.total_count = task_count
         self._organize_batch_size = 0
-        if manager.config.main_mode == ORGANIZE_MAIN_MODE and Switch.REST_SCRAPE in manager.config.switch_on:
+        if get_runtime_main_mode() == ORGANIZE_MAIN_MODE and Switch.REST_SCRAPE in manager.config.switch_on:
             self._organize_batch_size = max(1, int(manager.config.rest_count))
 
         # 整理模式：先完成整目录预扫描并固定归属关系，再允许任何文件开始移动。
-        if task_count and manager.config.main_mode == ORGANIZE_MAIN_MODE:
+        if task_count and get_runtime_main_mode() == ORGANIZE_MAIN_MODE:
             await self._prepare_organize_index(movie_list, organize_scan_roots, organize_ignore_dirs)
 
         # 进度速率估算（纯呈现层：滑动窗口速率 → 预计剩余时间）
@@ -705,9 +733,9 @@ class Scraper:
 
         if task_count:
             Flags.count_claw = await Flags.increment("count_claw")
-            if manager.config.main_mode == 5:
+            if get_runtime_main_mode() == READ_MAIN_MODE:
                 signal.show_log_text(f" 🕷 当前为读取模式，并发数（{thread_number}），线程延时（0）秒...")
-            elif manager.config.main_mode == ORGANIZE_MAIN_MODE:
+            elif get_runtime_main_mode() == ORGANIZE_MAIN_MODE:
                 signal.show_log_text(
                     f" 🕷 当前为整理模式（不刮削、不下载，仅读取 nfo 整理文件），并发数（{thread_number}）..."
                 )
@@ -719,7 +747,10 @@ class Scraper:
                 if task_count < thread_number:
                     thread_number = task_count
                 signal.show_log_text(f" 🕷 开启异步并发，并发数（{thread_number}），线程延时（{thread_time}）秒...")
-            if Switch.REST_SCRAPE in manager.config.switch_on and manager.config.main_mode not in (5, 6):
+            if Switch.REST_SCRAPE in manager.config.switch_on and get_runtime_main_mode() not in (
+                READ_MAIN_MODE,
+                ORGANIZE_MAIN_MODE,
+            ):
                 signal.show_log_text(
                     f'<font color="brown"> 🍯 间歇刮削 已启用，连续刮削 {manager.config.rest_count} 个文件后，将自动休息 {Flags.rest_time_convert} 秒...</font>'
                 )
@@ -749,7 +780,7 @@ class Scraper:
             clean_path = current_paths.softlink_path if manager.config.scrape_softlink_path else media_path
             # 视频刮削目录下的空目录：永远走左侧正常模式开关（两种模式都一样）
             await _clean_empty_folders(clean_path, file_mode, allow_empty=manager.config.del_empty_folder)
-            if manager.config.main_mode == SEPARATE_MAIN_MODE:
+            if get_runtime_main_mode() == SEPARATE_MAIN_MODE:
                 meta_root = get_separate_meta_root(media_path, current_paths.success_folder)
                 if meta_root is not None:
                     # 数据存放目录下的空目录：走右侧分离模式开关
@@ -781,7 +812,7 @@ class Scraper:
                     signal.show_log_text(f" 📥 成功输出目录：{success_folder}")
                 if current_paths.ignore_dirs:
                     signal.show_log_text(f" 🚫 已排除的目录：{'；'.join(str(d) for d in current_paths.ignore_dirs)}")
-            if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+            if get_runtime_main_mode() == ORGANIZE_MAIN_MODE:
                 signal.show_log_text(
                     " 💡 整理模式提示：已被整理进「成功输出目录」的文件会被自动纳入扫描"
                     "并重新整理（幂等，无需手动移出）；若文件在其它位置，请确认该位置在扫描目录内且未被排除。"
@@ -901,7 +932,7 @@ class Scraper:
 
         # 处理间歇任务
         while (
-            manager.config.main_mode not in (5, 6)
+            get_runtime_main_mode() not in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE)
             and Switch.REST_SCRAPE in manager.config.switch_on
             and count - Flags.rest_now_begin_count > manager.config.rest_count
         ):
@@ -912,7 +943,7 @@ class Scraper:
         Flags.scrape_starting = await Flags.increment("scrape_starting")
         count = Flags.scrape_starting
         thread_time = manager.config.thread_time
-        if count == 1 or thread_time == 0 or manager.config.main_mode in (5, 6):
+        if count == 1 or thread_time == 0 or get_runtime_main_mode() in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE):
             Flags.next_start_time = time.time()
             signal.show_log_text(f" 🕷 {get_current_time()} 开始刮削：{Flags.scrape_starting}/{count_all} {show_name}")
             thread_time = 0
@@ -964,7 +995,7 @@ class Scraper:
         if (
             manager.config.scrape_like == "single"
             and file_mode != FileMode.Single
-            and manager.config.main_mode not in (5, 6)
+            and get_runtime_main_mode() not in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE)
         ):
             LogBuffer.log().write(
                 f"\n 😸 [Note] You specified 「 {website_single} 」, some videos may not have results! "
@@ -977,7 +1008,7 @@ class Scraper:
         try:
             json_data, other = await self._process_one_file(file_info, file_mode)
             if json_data and other:
-                if manager.config.main_mode in (5, ORGANIZE_MAIN_MODE):
+                if get_runtime_main_mode() in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE):
                     number = json_data.number
                 async with Flags._json_get_lock:
                     Flags.json_data_dic[number] = ScrapeResult(file_info, json_data, other)
@@ -1021,7 +1052,11 @@ class Scraper:
                 signal.show_list_name("succ", show_data, number)
                 # 读取模式不写缓存：读取模式只读已有 NFO/结果，不应标记文件为 done，
                 # 否则下次读取模式或普通模式会被断点续刮跳过。
-                if self._state_cache and self._state_cache.is_usable() and manager.config.main_mode not in (5, 6):
+                if (
+                    self._state_cache
+                    and self._state_cache.is_usable()
+                    and get_runtime_main_mode() not in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE)
+                ):
                     try:
                         summary = {
                             "number": number,
@@ -1046,7 +1081,7 @@ class Scraper:
                         )
                     except Exception:
                         pass
-            elif manager.config.main_mode == ORGANIZE_MAIN_MODE and file_path in self._deferred_organize_paths:
+            elif get_runtime_main_mode() == ORGANIZE_MAIN_MODE and file_path in self._deferred_organize_paths:
                 # 首次直接移动失败：不计失败，等全部番号处理完再统一管理员重试。
                 LogBuffer.log().write("\n 🟡 整理失败已排队，等待全部番号处理完成后统一管理员重试。")
             else:
@@ -1068,7 +1103,7 @@ class Scraper:
                         "\n 🔴 该问题为权限问题：请尝试以管理员身份运行，同时关闭其他正在运行的Python脚本！"
                     )
                 failed_folder = get_movie_path_setting(file_path).failed_folder
-                if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+                if get_runtime_main_mode() == ORGANIZE_MAIN_MODE:
                     # 整理失败已在事务中回滚，保持全部文件在原目录不动。
                     fail_file_path = file_path
                     LogBuffer.log().write("\n 🟡 整理失败，相关文件已保留在原目录。")
@@ -1078,7 +1113,11 @@ class Scraper:
                     Flags.failed_list.append((fail_file_path, error_msg))
                 await self._failed_file_info_show(str(Flags.fail_count), fail_file_path, error_msg)
                 signal.view_failed_list_settext.emit(f"失败 {Flags.fail_count}")
-                if self._state_cache and self._state_cache.is_usable() and manager.config.main_mode not in (5, 6):
+                if (
+                    self._state_cache
+                    and self._state_cache.is_usable()
+                    and get_runtime_main_mode() not in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE)
+                ):
                     try:
                         self._state_cache.set_failed(
                             fail_file_path,  # 移动后路径：文件已被移到 failed_folder
@@ -1142,7 +1181,9 @@ class Scraper:
 
         # 处理间歇刮削
         try:
-            if manager.config.main_mode not in (5, 6) and Switch.REST_SCRAPE in manager.config.switch_on:
+            if get_runtime_main_mode() not in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE) and (
+                Switch.REST_SCRAPE in manager.config.switch_on
+            ):
                 async with self._rest_lock:
                     time_note = f" 🏖 已累计刮削 {count}/{count_all}，已连续刮削 {count - Flags.rest_now_begin_count}/{manager.config.rest_count}..."
                     signal.show_log_text(time_note)
@@ -1296,10 +1337,17 @@ class Scraper:
         is_nfo_existed = False
         res = CrawlersResult.empty()  # todo 保证所有路径上均有 res 值
         file_classification = None
-        organize_mode = manager.config.main_mode == ORGANIZE_MAIN_MODE
+        # 本次运行实际生效的刮削模式（整理模式自动切换成读取模式后为 5）
+        runtime_mode = get_runtime_main_mode()
+        organize_mode = runtime_mode == ORGANIZE_MAIN_MODE
+        # 用户在「软件设置」里选择的模式（不受运行时临时切换影响）：
+        # 整理模式下已经躺在「成功输出目录」内的文件，任何情况下都不移动、
+        # 不复制后删源（跨盘 shutil.move = 复制 + 删除源文件）、不重命名、不删除。
+        organize_selected = is_organize_selected()
+        organize_inplace_locked = organize_selected and is_in_success_folder(file_path, success_folder)
         # 读取模式 / 整理模式：都从同目录 nfo 读取已有字段
         file_can_download = True
-        if manager.config.main_mode in (5, ORGANIZE_MAIN_MODE):
+        if runtime_mode in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE):
             nfo_data, info = await get_nfo_data(file_path, movie_number)
             if nfo_data:  # 有nfo
                 is_nfo_existed = True
@@ -1308,21 +1356,25 @@ class Scraper:
                 file_info.shared_number = movie_number  # 供释放方释放共享番号双键
                 file_classification = classify_existing_scrape_result(file_info.crawl_task(), res, manager.config)
 
+                if organize_inplace_locked:
+                    # 用户选的是整理模式、而文件已经躺在「成功输出目录」内
+                    # = 上一轮整理的产物，再整理一遍只会原地搬动自己（网盘目录
+                    # 缓存未刷新时容易报错，跨盘时还会退化成「复制到目标目录
+                    # 后删除源文件」），因此一律按「读取模式」处理：只读 nfo
+                    # 展示结果，不做任何移动/复制/重命名/删除操作。
+                    # 该保护与运行时模式无关：整理模式自动切换成读取模式后依然生效。
+                    file_can_download = False
+                    show_result(res, start_time)
+                    show_movie_info(file_info, nfo_data)
+                    LogBuffer.log().write(
+                        f"\n 🙉 [Movie] {file_path}\n 📖 文件已在成功输出目录内，按读取模式处理（未移动任何文件）"
+                    )
+                    await save_success_list(file_path, file_path)
+                    return nfo_data, info
+
                 if organize_mode:
                     # 整理模式完全离线：只读 nfo 字段并移动/重命名已有文件
                     file_can_download = False
-                    if is_in_success_folder(file_path, success_folder):
-                        # 文件已经躺在「成功输出目录」内 = 上一轮整理的产物，
-                        # 再整理一遍只会原地搬动自己（网盘目录缓存未刷新时容易报错），
-                        # 因此按「读取模式」处理：只读 nfo 展示结果，
-                        # 不做任何移动/复制/重命名操作。
-                        show_result(res, start_time)
-                        show_movie_info(file_info, nfo_data)
-                        LogBuffer.log().write(
-                            f"\n 🙉 [Movie] {file_path}\n 📖 文件已在成功输出目录内，按读取模式处理（未移动任何文件）"
-                        )
-                        await save_success_list(file_path, file_path)
-                        return nfo_data, info
                 else:
                     has_nfo_update = ReadMode.HAS_NFO_UPDATE in read_mode
                     should_update_nfo = ReadMode.READ_UPDATE_NFO in read_mode
@@ -1349,11 +1401,11 @@ class Scraper:
         if organize_mode:
             update_nfo = False
         # 不写nfo的情况：
-        elif manager.config.main_mode == 3 and Switch.SORT_DEL in manager.config.switch_on:
+        elif runtime_mode == 3 and Switch.SORT_DEL in manager.config.switch_on:
             # 3模式勾选“删除本地已下载的nfo文件”（暂无效，会直接return）
             update_nfo = False
-        elif manager.config.main_mode in [1, 2, 3, 4] or (
-            manager.config.main_mode == 5 and not is_nfo_existed and ReadMode.NO_NFO_SCRAPE in read_mode
+        elif runtime_mode in [1, 2, 3, 4] or (
+            runtime_mode == READ_MAIN_MODE and not is_nfo_existed and ReadMode.NO_NFO_SCRAPE in read_mode
         ):
             # 1、2、3、4模式，或5模式启用了“本地没有nfo的文件重新刮削”（变量命名有点问题，存在"no_nfo_scrape"意思其实是要刮削）
             # 且
@@ -1363,7 +1415,7 @@ class Scraper:
             if KeepableFile.NFO in manager.config.keep_files and is_nfo_existed:
                 # [下载]处勾选保留nfo且nfo存在时
                 update_nfo = False
-        elif manager.config.main_mode == 5:
+        elif runtime_mode == READ_MAIN_MODE:
             # 读模式下，由"允许更新 nfo 文件"独立控制
             update_nfo = ReadMode.READ_UPDATE_NFO in read_mode
 
@@ -1630,7 +1682,7 @@ class Scraper:
         show_movie_info(file_info, res)
 
         # 读模式不勾"重新整理分类"时跳过路径计算
-        skip_reorganize = manager.config.main_mode == 5 and is_nfo_existed and ReadMode.HAS_NFO_UPDATE not in read_mode
+        skip_reorganize = runtime_mode == READ_MAIN_MODE and is_nfo_existed and ReadMode.HAS_NFO_UPDATE not in read_mode
 
         if skip_reorganize:
             naming_rule = _generate_file_name(file_info.cd_part, file_info, res)
@@ -1773,7 +1825,7 @@ class Scraper:
 
         # 视频模式（原来叫整理模式）
         # 视频模式（仅根据刮削数据把电影命名为番号并分类到对应目录名称的文件夹下）
-        if manager.config.main_mode == 3:
+        if runtime_mode == 3:
             # 移动文件
             if await move_movie(other, file_info, file_path, file_new_path):
                 if Switch.SORT_DEL in manager.config.switch_on:
@@ -1816,6 +1868,7 @@ class Scraper:
                 thumb_final_path=thumb_final_path,
                 fanart_final_path=fanart_final_path,
                 index=self._organize_index,
+                success_folder=success_folder,
             )
             if not moved:
                 LogBuffer.error().write(error)
@@ -1842,9 +1895,15 @@ class Scraper:
                 )
                 LogBuffer.log().write("\n 🟡 整理移动失败，已加入统一管理员重试队列；相关文件已回滚并保留在原目录。")
                 return None, None
-            if await aiofiles.os.path.exists(organize_file_path):
-                file_info.file_path = organize_file_path
-            await save_success_list(file_path, organize_file_path)
+            # 主体文件的最终位置：只有源文件确实被搬走后，目标路径才生效；
+            # 若因目标位置已被「成功输出目录」内的既有文件占用而未搬动，则保持原路径
+            if await aiofiles.os.path.exists(file_path):
+                organized_media_path = file_path
+            else:
+                organized_media_path = organize_file_path
+                if await aiofiles.os.path.exists(organize_file_path):
+                    file_info.file_path = organize_file_path
+            await save_success_list(file_path, organized_media_path)
 
             if poster_final_path is not None:
                 if await aiofiles.os.path.exists(poster_final_path):
@@ -2075,7 +2134,7 @@ def start_new_scrape(file_mode: FileMode, movie_list: list[Path] | None = None) 
 
 def get_remain_list() -> bool:
     """This function is intended to be sync."""
-    if is_organize_mode():
+    if is_organize_selected():
         # 整理模式每次都应该重新扫描整个待整理目录：remain.txt 里记录的是「移动前」
         # 的旧路径，文件整理成功后已被搬到成功输出目录，续刮会对着不存在的文件反复
         # 失败。整理本身是幂等的，重新扫描即可覆盖全部文件。
@@ -2164,7 +2223,7 @@ async def move_sub(
     copy_flag = False
 
     # 更新模式 或 读取模式：只更新文件名且重命名关时，跳过字幕处理
-    if manager.config.main_mode in (4, 5):
+    if get_runtime_main_mode() in (4, READ_MAIN_MODE):
         if manager.config.update_mode == "c" and not eff_success_file_rename():
             return
 

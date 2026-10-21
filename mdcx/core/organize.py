@@ -9,6 +9,7 @@ from pathlib import Path
 
 import aiofiles.os
 
+from ..config.extend import is_in_success_folder
 from ..config.manager import manager
 from ..models.log_buffer import LogBuffer
 from ..number import get_file_number
@@ -791,12 +792,15 @@ async def organize_files(
     fanart_final_path: Path,
     elevated: bool = False,
     index: OrganizeIndex | None = None,
+    success_folder: Path | None = None,
 ) -> tuple[bool, str]:
     """按命名规则原子地整理当前番号的视频/STRM 及其全部伴生文件。
 
     返回 ``(成功, 错误信息)``。失败时会回滚已移动文件，源文件保持在原目录。
     ``elevated=True`` 用于所有其他番号处理完成后，对失败番号统一做一次管理员重试。
     ``index`` 是移动前建立的全目录关联快照；不传时按当前目录临时建立。
+    ``success_folder`` 是「成功输出目录」：已经躺在该目录内的文件一律不移动
+    （整理模式硬性要求：已在成功输出目录内的文件任何情况下都不移动、不复制后删源）。
     """
     try:
         plan = await _build_plan(
@@ -819,6 +823,22 @@ async def organize_files(
     except Exception as e:
         LogBuffer.error().write(f"整理失败：生成整理计划时出错：{e}")
         return False, str(e)
+
+    if success_folder is not None:
+        kept: list[tuple[Path, Path]] = []
+        for src, dst in plan:
+            if is_in_success_folder(src, success_folder):
+                # 源文件已经在「成功输出目录」内 → 一律不移动
+                # （跨盘 shutil.move 会退化成「复制 + 删除源文件」，风险最高）
+                LogBuffer.log().write(f"\n 📖 文件已在成功输出目录内，跳过移动（未移动任何文件）：{src}")
+                continue
+            if is_in_success_folder(dst, success_folder) and await _exists_settled(dst):
+                # 目标位置已被「成功输出目录」内的既有文件占用 → 既有文件不移动、
+                # 不覆盖、不删除，本次也不搬动新文件（宁可留在原地也不动既有产物）
+                LogBuffer.log().write(f"\n 📖 目标位置已被成功输出目录内的文件占用，既有文件不移动、不覆盖：{dst}")
+                continue
+            kept.append((src, dst))
+        plan = kept
 
     if not plan:
         return True, ""

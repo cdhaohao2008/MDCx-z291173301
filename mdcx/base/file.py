@@ -16,6 +16,7 @@ import aiofiles.os
 
 from ..config.enums import DownloadableFile, KeepableFile, NoEscape, Switch
 from ..config.extend import (
+    READ_MAIN_MODE,
     SEPARATE_MAIN_MODE,
     SEPARATE_META_EXTS,
     eff_del_empty_folder,
@@ -23,7 +24,9 @@ from ..config.extend import (
     eff_success_file_move,
     eff_success_file_rename,
     get_movie_path_setting,
+    get_runtime_main_mode,
     get_separate_meta_root,
+    is_organize_selected,
     need_clean,
 )
 from ..config.manager import manager
@@ -116,7 +119,7 @@ async def move_other_file(
         return
 
     # 更新模式 或 读取模式
-    if manager.config.main_mode == 4 or manager.config.main_mode == 5:
+    if get_runtime_main_mode() in (4, READ_MAIN_MODE):
         if manager.config.update_mode == "c" and not eff_success_file_rename():
             return
 
@@ -478,7 +481,7 @@ async def check_and_clean_files() -> None:
     for movie_path in movie_paths:
         # 视频刮削目录下的空目录：永远走左侧正常模式开关（两种模式都一样）
         await _clean_empty_folders(movie_path, FileMode.Default, allow_empty=manager.config.del_empty_folder)
-        if manager.config.main_mode == SEPARATE_MAIN_MODE:
+        if get_runtime_main_mode() == SEPARATE_MAIN_MODE:
             meta_root = get_separate_meta_root(
                 movie_path, get_movie_path_setting(movie_path_override=movie_path).success_folder
             )
@@ -626,10 +629,13 @@ async def get_movie_list(file_mode: FileMode, movie_path: Path, ignore_dirs: lis
             log_console.log_text(f" 🖥 Movie path: {movie_path}")
             log_console.log_text(" 🔎 Searching all videos, Please wait...")
             ui_hooks.set_label_file_path(f"正在遍历待刮削视频目录中的所有视频，请等待...\n {movie_path}")
-            if NoEscape.FOLDER in manager.config.no_escape or manager.config.main_mode in (4, 5):
+            if NoEscape.FOLDER in manager.config.no_escape or get_runtime_main_mode() in (4, READ_MAIN_MODE):
                 ignore_dirs = []
             media_type = list(manager.config.media_type)
-            organize_mode = manager.config.main_mode == 6
+            # 整理模式需要扫描已刮削成功的文件，并处理 STRM 链接文件
+            # （扫描规则跟着用户在「软件设置」里选择的模式走：整理模式自动
+            #  切换成读取模式发生在扫描之后，扫描时仍需看到成功输出目录内的文件）
+            organize_mode = is_organize_selected()
             # 整理模式需要扫描已刮削成功的文件，并处理 STRM 链接文件
             normalized_media_type = {str(ext).lower().lstrip(".") for ext in media_type}
             if organize_mode and "strm" not in normalized_media_type:
@@ -769,8 +775,10 @@ async def newtdisk_creat_symlink(
 async def move_file_to_failed_folder(failed_folder: Path, file_path: Path, folder_old_path: Path) -> Path:
     # 更新模式、读取模式，不移动失败文件；生效开关-关时，不移动； 软硬链接开时，不移动
     # （分离模式取右侧分离开关，否则取左侧正常开关）
-    main_mode = manager.config.main_mode
-    if main_mode == 4 or main_mode == 5 or not eff_failed_file_move() or manager.config.soft_link != 0:
+    # 注意：这里必须用「本次运行实际生效的模式」——整理模式自动切换成读取模式后，
+    # 失败文件同样不许再被搬走（成功输出目录内的文件绝不能被移动）。
+    main_mode = get_runtime_main_mode()
+    if main_mode == 4 or main_mode == READ_MAIN_MODE or not eff_failed_file_move() or manager.config.soft_link != 0:
         LogBuffer.log().write(f"\n 🙊 [Movie] {file_path}")
         return file_path
 
@@ -864,7 +872,7 @@ async def check_file(file_path: Path, file_escape_size: float) -> bool:
 
 async def move_torrent(old_dir: Path, new_dir: Path, file_name: str, number: str, naming_rule: str):
     # 更新模式 或 读取模式
-    if manager.config.main_mode == 4 or manager.config.main_mode == 5:
+    if get_runtime_main_mode() in (4, READ_MAIN_MODE):
         if manager.config.update_mode == "c" and not eff_success_file_rename():
             return
 
@@ -894,7 +902,7 @@ async def move_torrent(old_dir: Path, new_dir: Path, file_name: str, number: str
 
 async def move_bif(old_dir: Path, new_dir: Path, file_name: str, naming_rule: str) -> None:
     # 更新模式 或 读取模式
-    if manager.config.main_mode == 4 or manager.config.main_mode == 5:
+    if get_runtime_main_mode() in (4, READ_MAIN_MODE):
         if manager.config.update_mode == "c" and not eff_success_file_rename():
             return
 
@@ -912,9 +920,10 @@ async def move_bif(old_dir: Path, new_dir: Path, file_name: str, naming_rule: st
 
 
 async def move_trailer_video(old_dir: Path, new_dir: Path, file_name: str, naming_rule: str) -> None:
-    if manager.config.main_mode < 2 and not eff_success_file_move() and not eff_success_file_rename():
+    runtime_mode = get_runtime_main_mode()
+    if runtime_mode < 2 and not eff_success_file_move() and not eff_success_file_rename():
         return
-    if manager.config.main_mode in (4, 5):
+    if runtime_mode in (4, READ_MAIN_MODE):
         update_mode = manager.config.update_mode
         if update_mode == "c" and not eff_success_file_rename():
             return
