@@ -177,7 +177,7 @@ def test_organize_mode_ui_texts():
     assert label is not None
     assert (
         label.findtext("property[@name='text']/string")
-        == "执行：刮削->整理文件->重命名->移动文件全部操作，适合需要海报墙的情况"
+        == "执行：刮削->移动文件->重命名->加字幕等全部操作，适合需要海报墙的情况"
     )
 
 

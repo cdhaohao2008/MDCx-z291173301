@@ -65,22 +65,19 @@ class LLMClient:
         timeout: Timeout,
         rate: tuple[float, float],
     ):
-        # 未填 API Key 时**绝不能**构造 AsyncOpenAI：OpenAI SDK 会当场抛
-        # OpenAIError("Missing credentials")，而本对象是在 Computed() 里、
-        # 即 ConfigManager 加载配置的路径上同步构造的——一旦抛错，第一次会被
-        # load() 的 except Exception 抓住并回退到 _replace_config(Config())，
-        # 那里又用同样的空 Key 再抛一次，而这次已无人接管，整个
-        # `manager = ConfigManager()` 模块级实例化直接失败，软件连启动都进不去
-        # （用户 2026-10-19 实测：源码运行 main.py 即崩）。改为惰性留空，
-        # 真正用到翻译时再在 ask() 里明确报「未配置密钥」。
+        # 这里不能立刻构造 AsyncOpenAI：它会在构造时建立 httpx.AsyncClient，
+        # 而 httpx 直到建立传输层才导入 httpcore。配置加载路径上的 Computed()
+        # 一旦因此抛 ModuleNotFoundError，会被 ConfigManager.load() 误判成
+        # 「配置文件验证失败」并切到 _failed.json（2026-10-21 实测：
+        # 未安装 httpcore 的环境下，仅改 UI 文案也会被误认为配置损坏）。
+        # 因此统一推迟到第一次真正翻译时再建客户端；空 Key 时 ask() 会给出
+        # 明确提示。这样配置加载不再依赖可选网络栈。
+        self._api_key = api_key
+        self._base_url = base_url
+        self._proxy = proxy
+        self._timeout = timeout
         self.client: AsyncOpenAI | None = None
-        if api_key and api_key.strip():
-            self.client = AsyncOpenAI(
-                api_key=api_key,
-                base_url=base_url,
-                http_client=AsyncClient(proxy=proxy, timeout=timeout, follow_redirects=True),
-                timeout=timeout,
-            )
+        self._client_lock = threading.Lock()
         self.limiter = AsyncLimiter(*rate)
         self._closed = False
         self._close_requested = False
@@ -88,6 +85,29 @@ class LLMClient:
         self._active_lock = asyncio.Lock()
         self._lease_lock = threading.Lock()
         self._leases = 0
+
+    def _ensure_client(self) -> AsyncOpenAI | None:
+        """首次翻译时才创建 OpenAI 客户端，避免配置加载阶段依赖 httpcore。
+
+        AsyncOpenAI 构造时会建立 httpx.AsyncClient，而 httpx 在创建传输层时
+        才导入 httpcore。把这一步推迟到真正发请求，可让缺少 httpcore 的环境
+        仍能正常加载配置、浏览、刮削（只是翻译不可用），而不是误切 _failed.json。
+        """
+        if not self._api_key or not self._api_key.strip():
+            return None
+        if self.client is not None:
+            return self.client
+        if self._closed:
+            raise RuntimeError("LLM 客户端已关闭")
+        with self._client_lock:
+            if self.client is None:
+                self.client = AsyncOpenAI(
+                    api_key=self._api_key,
+                    base_url=self._base_url,
+                    http_client=AsyncClient(proxy=self._proxy, timeout=self._timeout, follow_redirects=True),
+                    timeout=self._timeout,
+                )
+        return self.client
 
     def retain(self) -> None:
         with self._lease_lock:
@@ -168,11 +188,16 @@ class LLMClient:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
-        if self.client is None:
+        try:
+            client = self._ensure_client()
+        except Exception as e:
+            # httpcore/httpx 等网络栈缺失只影响翻译，不应影响配置加载和其他功能
+            log_fn(f"❌ LLM 客户端初始化失败，已跳过本次翻译: {e}\n")
+            return None
+        if client is None:
             # 未配置密钥时给出可执行的提示，而不是让整轮翻译静默失败
             log_fn("💡 未配置 LLM API 密钥，已跳过本次翻译（请在设置页填写密钥后再试）")
             return None
-        client = self.client
         wait = 1
         body = extra_body
         chat = None

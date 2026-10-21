@@ -136,7 +136,9 @@ class ConfigManager:
             if old_config is None:
                 self._replace_config(Config())
             else:
-                logger.error("配置文件 %s 验证失败, 继续使用旧配置: %s", self._path, e)
+                # 这里也可能是 Computed() 的运行时依赖问题（如 httpcore 缺失），
+                # 不一定是配置内容真的不合法；保留完整堆栈便于区分。
+                logger.exception("配置文件 %s 加载失败, 继续使用旧配置", self._path)
             msg = f" 配置文件 {self._path} 验证失败. 错误信息: \n{e!s}"
             return msg.splitlines()
 

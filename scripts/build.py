@@ -249,6 +249,12 @@ class BuildManager:
             "uvicorn",
             "--collect-all",
             "pydantic",
+            # httpx 在创建传输层时才延迟导入 httpcore，静态分析可能漏收；
+            # 显式收集，避免打包版启动加载配置时报 No module named 'httpcore'。
+            "--collect-all",
+            "httpx",
+            "--collect-all",
+            "httpcore",
             *[item for module in EXCLUDED_MODULES for item in ("--exclude-module", module)],
         ]
 

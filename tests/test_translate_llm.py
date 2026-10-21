@@ -283,6 +283,54 @@ async def test_translate_title_outline_skips_unconfigured_baidu_and_falls_back(m
     assert data.outline == "CN::An English overview."
 
 
+def test_llm_client_defers_http_client_creation(monkeypatch: pytest.MonkeyPatch):
+    """配置加载阶段不得创建 httpx 客户端（否则缺少 httpcore 会误判配置损坏）。"""
+    from mdcx import llm as llm_module
+
+    created = []
+    monkeypatch.setattr(llm_module, "AsyncOpenAI", lambda **kwargs: created.append(kwargs) or object())
+
+    client = llm_module.LLMClient(
+        api_key="test-key",
+        base_url="https://example.com/v1",
+        timeout=llm_module.Timeout(5),
+        rate=(1, 1),
+    )
+
+    assert client.client is None
+    assert created == []
+
+
+@pytest.mark.asyncio
+async def test_llm_ask_degrades_when_client_init_fails(monkeypatch: pytest.MonkeyPatch):
+    """网络栈缺失只应跳过翻译，不能把异常抛回配置加载/UI 线程。"""
+    from mdcx import llm as llm_module
+
+    client = llm_module.LLMClient(
+        api_key="test-key",
+        base_url="https://example.com/v1",
+        timeout=llm_module.Timeout(5),
+        rate=(1, 1),
+    )
+
+    def fail():
+        raise ModuleNotFoundError("No module named 'httpcore'")
+
+    monkeypatch.setattr(client, "_ensure_client", fail)
+    logs: list[str] = []
+
+    result = await client.ask(
+        model="test-model",
+        system_prompt="system",
+        user_prompt="user",
+        max_try=1,
+        log_fn=logs.append,
+    )
+
+    assert result is None
+    assert logs and "LLM 客户端初始化失败" in logs[0]
+
+
 @pytest.mark.asyncio
 async def test_translate_title_outline_skip_does_not_fake_translate_via_zhconv(monkeypatch: pytest.MonkeyPatch):
     from mdcx.core import translate as core_translate
