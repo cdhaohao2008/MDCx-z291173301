@@ -1,4 +1,4 @@
-"""Python 3.14/3.15 依赖下限守卫（配合 `.github/workflows/build-py314.yml`）。
+"""Python 3.14/3.15 依赖下限守卫（配合 `.github/workflows/build-py315.yml`）。
 
 背景：3.14 流水线靠 `python-version: 3.14` + `uv sync --locked` 验证兼容性，
 其中几处依赖下限是被 3.14/3.15 核对抬上来的，回退会让该流水线硬失败：
@@ -109,7 +109,7 @@ def test_314_critical_specifiers_present():
         assert name in declared, f"pyproject.toml 缺少依赖 {name}"
         assert declared[name] == expected, (
             f"{name} 的版本声明是 {declared[name]}，3.14/3.15 需要 {expected}；"
-            "回退会让 build-py314.yml 的 `uv sync --locked` 失败，理由见 tests/test_py314_dependency_floors.py 文档"
+            "回退会让 build-py315.yml 的 `uv sync --locked` 失败，理由见 tests/test_py314_dependency_floors.py 文档"
         )
 
 
@@ -152,5 +152,5 @@ def test_requires_python_has_no_upper_bound():
 
     assert "<" not in requires_python, (
         f'requires-python = "{requires_python}" 带 upper bound，会把 Python 3.14 排除在外，'
-        "build-py314.yml 与 pyproject 前提冲突"
+        "build-py315.yml 与 pyproject 前提冲突"
     )

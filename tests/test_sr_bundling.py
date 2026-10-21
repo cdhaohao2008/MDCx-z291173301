@@ -169,7 +169,7 @@ def test_packaging_workflows_fetch_sr_tools_before_build():
     `scripts.fetch_sr_tools`，Windows job 测试全绿后在冒烟步 BuildError。
     """
     root = Path(".github/workflows")
-    for name in ("ci.yaml", "build-py314.yml", "build-py315.yml"):
+    for name in ("ci.yaml", "build-py315.yml"):
         text = (root / name).read_text(encoding="utf-8")
         fetch_idx = text.find("scripts.fetch_sr_tools")
         build_idx = text.find("scripts/build.py")

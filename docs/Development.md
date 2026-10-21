@@ -664,7 +664,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 
 **两处定义（`mdcx/consts.py`）**
 
-- `LOCAL_VERSION`：纯数字 `YYYYMMDD`，用于版本比较、更新检查与构建；**GitHub release 的 Tag 必须是同值纯数字**（`check_version` 对 `tag_name` 做 `int()`，`vX.Y.Z` 形态的标签会被直接跳过）。唯一发版工作流 `build-py314.yml` 遵守这一条，没有非纯数字 tag 的例外，详见「构建」一节。
+- `LOCAL_VERSION`：纯数字 `YYYYMMDD`，用于版本比较、更新检查与构建；**GitHub release 的 Tag 必须是同值纯数字**（`check_version` 对 `tag_name` 做 `int()`，`vX.Y.Z` 形态的标签会被直接跳过）。唯一发版工作流 `build-py315.yml` 遵守这一条，没有非纯数字 tag 的例外，详见「构建」一节。
 - `VERSION_NAME`：展示名 `vX.Y.Z`，界面/日志统一显示为 `VERSION_NAME (LOCAL_VERSION)`；更新检查时它也作为**版本号维度**参与比较（见下节），不再纯装饰。
 
 **五个同步点**
@@ -684,7 +684,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 1. 在 `docs/Changelog.md` 顶部新建目标版本段并写条目；已发版旧段保留，未发版段被后续议题取代时合并重写成最终形态。
 2. `uv run bump --version <YYYYMMDD> --name X.Y.Z` 同步五处（`--dry-run` 预览、`--force` 免交互；`--name` 会连带同步 `uv.lock` 根包版本）；只校验用 `uv run bump --check`。
 3. 复核 `uv run pytest tests/test_version_consistency.py tests/test_version_metadata.py`。
-4. 打**纯数字** tag（= `LOCAL_VERSION`）触发 `.github/workflows/build-py314.yml`。「已发版」的判据是数字 tag 已推送，而非 changelog 有没有该段。同一版本号重复触发会覆盖更新同一条 Release（`overwrite: true`），不会多出第二条。
+4. 打**纯数字** tag（= `LOCAL_VERSION`）触发 `.github/workflows/build-py315.yml`。「已发版」的判据是数字 tag 已推送，而非 changelog 有没有该段。同一版本号重复触发会覆盖更新同一条 Release（`overwrite: true`），不会多出第二条。
 
 版本号归属维护者，不擅自开新段。`scripts/build.py` 与主窗口不留版本常量：build 从 `consts.py` 读 `LOCAL_VERSION`（`--version` 可覆盖），界面统一展示 `VERSION_NAME (LOCAL_VERSION)`。
 
@@ -692,7 +692,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 
 代码在 `mdcx/base/web.py` 的 `check_version()`（拉取）与 `is_remote_version_newer()`（比较），主窗口侧是 `window_ops.py` 的 `_show_version_thread()`。有六条不变量，改任一处都要连带另几处。
 
-**① 取 tag 最大的 release，不是列表第一条。** `/releases?per_page=10` 按 `created_at` 倒序返回，**不按 tag 倒序**；而本工作流四个 `Create Release` 步骤用同一 tag + `overwrite: true`（`svenstaro/upload-release-action` 先删后建），任何一次补发/重跑都会把那条 release 的 `created_at` 刷成"当前时间"、顶到第一位。原实现取第一条，于是**手动补发一次旧 tag 就让所有用户从此看不到新版本提示且无任何报错**。修法是遍历全部条目收集所有 `tag_name.isdigit()` 的值取 `max`（`tests/test_version_check_pick_latest.py` 守卫）。tag 必须纯数字这条硬约束不变，非纯数字 tag 照旧跳过。
+**① 取 tag 最大的 release，不是列表第一条。** `/releases?per_page=10` 按 `created_at` 倒序返回，**不按 tag 倒序**；而本工作流三个 `Create Release` 步骤用同一 tag + `overwrite: true`（`svenstaro/upload-release-action` 先删后建），任何一次补发/重跑都会把那条 release 的 `created_at` 刷成"当前时间"、顶到第一位。原实现取第一条，于是**手动补发一次旧 tag 就让所有用户从此看不到新版本提示且无任何报错**。修法是遍历全部条目收集所有 `tag_name.isdigit()` 的值取 `max`（`tests/test_version_check_pick_latest.py` 守卫）。tag 必须纯数字这条硬约束不变，非纯数字 tag 照旧跳过。
 
 **② 版本号优先，版本号相等才比日期。** 两侧版本号都能解析时：不同 → 由版本号决出（远端更高即有新版本）；相等 → 比日期（远端更新即有新版本）。任一侧解析不出（标题非 `vX.Y.Z` 形态）→ 退回只比日期。两条并列才覆盖得住：只比日期则"当天发两版、两个 tag 同一天"认不出第二版；只比版本号则"同版本号跨日期补发"会漏判。
 
@@ -719,9 +719,9 @@ uv sync --locked --all-extras --dev
 uv run build --debug
 ```
 
-正式发版只有一条工作流：`.github/workflows/build-py314.yml`（**Build and Release (Python 3.14)**），三平台矩阵（macOS ARM64 / Windows x86_64 / Linux x86_64）全量构建，创建 tag 为纯数字 `LOCAL_VERSION` 的 Release，资产名 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，例如 `MDCx-2.4.7-20261020-windows-x86_64-<40位sha>.exe`。两个版本段刻意并存：`<展示版本号>` 是 `VERSION_NAME` 去 `v` 前缀（`v2.4.7` → `2.4.7`，由工作流的 `steps.metadata.outputs.asset_version` 提供），只给人看、不参与任何版本比较；`<tag>` 仍是纯数字 `LOCAL_VERSION`，`check_version()` 的 `int(tag_name)` 比的就是它——**新增展示版本号段不影响自动更新，因为客户端只读 `tag_name`、不解析资产名**。**客户端自动更新只看这个 Release，tag 形态（纯数字）与资产名都是对外契约，别动它。**
+正式发版只有一条工作流：`.github/workflows/build-py315.yml`（**Build and Release Python3.15**），三平台矩阵（macOS ARM64 / Windows x86_64 / Linux x86_64）全量构建，创建 tag 为纯数字 `LOCAL_VERSION` 的 Release，资产名 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，例如 `MDCx-2.4.7-20261020-windows-x86_64-<40位sha>.exe`。两个版本段刻意并存：`<展示版本号>` 是 `VERSION_NAME` 去 `v` 前缀（`v2.4.7` → `2.4.7`，由工作流的 `steps.metadata.outputs.asset_version` 提供），只给人看、不参与任何版本比较；`<tag>` 仍是纯数字 `LOCAL_VERSION`，`check_version()` 的 `int(tag_name)` 比的就是它——**新增展示版本号段不影响自动更新，因为客户端只读 `tag_name`、不解析资产名**。**客户端自动更新只看这个 Release，tag 形态（纯数字）与资产名都是对外契约，别动它。**
 
-2026-10-20 起 macOS Intel 腿退役：macOS 已放弃 x86_64 架构（GitHub 官方 Intel runner 2027 秋整体退役），矩阵里的 `macos-15-intel` / x86_64 那一条连同它在 `Verify all platform assets present` 里的核对项与 `Create Release - macOS (Intel)` 上传步骤一并删除，矩阵由四平台收敛为三平台。**三处必须同删**：只删矩阵项会让产物核对永远缺 `dist/MDCx-x86_64.dmg` 而 exit 1，把**所有**平台的发版一起卡死；只删矩阵项而留着上传步骤则会让 upload 步骤因文件缺失报错，可能留下半成品 Release（`overwrite: true` 重建语义）。`tests/test_py314_release_workflow.py::test_macos_intel_leg_is_gone` 钉死这三条不得复活。
+2026-10-20 起 macOS Intel 腿退役：macOS 已放弃 x86_64 架构（GitHub 官方 Intel runner 2027 秋整体退役），矩阵里的 `macos-15-intel` / x86_64 那一条连同它在 `Verify all platform assets present` 里的核对项与 `Create Release - macOS (Intel)` 上传步骤一并删除，矩阵由四平台收敛为三平台。**三处必须同删**：只删矩阵项会让产物核对永远缺 `dist/MDCx-x86_64.dmg` 而 exit 1，把**所有**平台的发版一起卡死；只删矩阵项而留着上传步骤则会让 upload 步骤因文件缺失报错，可能留下半成品 Release（`overwrite: true` 重建语义）。`tests/test_py315_release_workflow.py::test_macos_intel_leg_is_gone` 钉死这三条不得复活。
 
 两种触发方式：
 
@@ -730,19 +730,17 @@ uv run build --debug
 | `push` tag `2*`（如 `20260928`） | 推送的 ref | 一律 `false` |
 | `workflow_dispatch` 手动补发 | 输入的 `tag`，留空则取 `consts.py` 的 `LOCAL_VERSION` | 由 `prerelease` 输入决定 |
 
-2026-09-28 起本工作流接过了原 3.13 主流程（`build-py313.yml`，更早叫 `release.yml`）的全部职责，那两个文件连同单平台手动构建的 `build-windows.yml` / `build-linux.yml` 一并删除——多平台矩阵已完全覆盖后两者的功能，3.13 侧不再需要独立流程。
+2026-09-28 起本工作流接过了原 3.13 主流程（`build-py313.yml`，更早叫 `release.yml`）的全部职责，那两个文件连同单平台手动构建的 `build-windows.yml` / `build-linux.yml` 一并删除——多平台矩阵已完全覆盖后两者的功能，3.13 侧不再需要独立流程。2026-10-21 起程序迁移到 Python 3.15，本工作流又接过了原 3.14 主流程 `build-py314.yml` 的全部职责，那个文件一并删除：**发版路径自始至终只有一条**。两条流程并存会出事——它们共用同一套纯数字 tag 命名空间且都按 `overwrite: true` 覆盖资产，同时发版会互相把对方的包刷掉、把同一条 release 的 `created_at` 顶到 `/releases` 列表第一条，用户会下到错版本的一体包。
 
-3.14 专属三处：`python-version: 3.14`、`UV_PYTHON: 3.14`、构建前用 `sys.version_info[:2] == (3, 14)` 断言解释器（防 uv 悄悄挑到别的版本），以及 `uv sync --locked` 失败自动回退 `uv sync` 重新解析（`uv.lock` 未必有 cp314 wheel；只改 CI 临时工作树，不动仓库 lock）。另有三处护栏：
+3.15 专属三处：`python-version: 3.15`、`UV_PYTHON: 3.15`、构建前用 `sys.version_info[:2] == (3, 15)` 断言解释器（防 uv 悄悄挑到别的版本），以及 `uv sync --locked` 失败自动回退 `uv sync` 重新解析（`uv.lock` 未必有 cp315 wheel；只改 CI 临时工作树，不动仓库 lock）。另有三处护栏：
 
 1. **缺产物不发版**：`build-app` 带 `continue-on-error`，`publish-release` 用 `if: !cancelled() && needs.build-app.result == 'success'` 把关（不能写 `success()`：`needs` 里任一失败腿都会让它整体跳过），并在上传前核对三个平台产物齐全——半成品 Release 比不发更糟。
 2. **并发不互杀**：`concurrency` 按 ref 分组且 `cancel-in-progress: false`，半路取消会留下缺资产的 Release。
 3. **重跑幂等**：三个 Create Release 步骤都带 `overwrite: true`，同一版本号重复发版只更新同名资产，不新建。
 
-上述约定由 `tests/test_py314_release_workflow.py`（11 项）与 `tests/test_workflow_action_pins.py` 守住（纯文本断言，不引入 yaml 依赖），改工作流后请一并跑 `uv run pytest tests/test_sr_bundling.py tests/test_py314_release_workflow.py tests/test_workflow_action_pins.py`。
+上述约定由 `tests/test_py315_release_workflow.py`（12 项）与 `tests/test_workflow_action_pins.py` 守住（纯文本断言，不引入 yaml 依赖），改工作流后请一并跑 `uv run pytest tests/test_sr_bundling.py tests/test_py315_release_workflow.py tests/test_workflow_action_pins.py`。
 
-2026-10-21 起程序迁移到 Python 3.15，新增 `.github/workflows/build-py315.yml`（**Build Python3.15**）：三平台矩阵与 3.14 一致，3.15 专属三处同款（`UV_PYTHON: 3.15`、`python-version: 3.15`、构建前 `sys.version_info[:2] == (3, 15)` 断言），artifact 名带 `mdcx315-` 前缀，与 3.14 流程的 `mdcx-*` 区分，两条流程并行跑不会互相覆盖同名 artifact。**它只手动触发（`workflow_dispatch`）、不创建 Release**：两条流程共用同一套纯数字 tag 命名空间且都是 `overwrite: true`，同时发版会互相把对方的包刷掉、把同一条 release 的 `created_at` 顶到列表第一条，用户会下到错版本的一体包。**正式发版仍只有 `build-py314.yml` 一条**（该文件原样保留），等 3.15 全平台验证通过、决定把发版职责换过去时，再按 `build-py314.yml` 的 `publish-release` 结构补上并删掉本段说明。
-
-3.15 有一条 3.14 没有的坑：**PyYAML 至今没有任何 cp315 wheel**（6.0.3 只发到 cp314），3.15 下 `uv sync` 会退回源码编译（Windows runner 缺 MSVC 头文件直接失败，Linux/macOS 也要编译器链）。做法是 `uv sync --locked --dev --no-install-package pyyaml` 跳过它，再 `uv pip install --python <venv> --python-version 3.14 --only-binary=:all: "pyyaml==6.0.3"` 把 cp314 wheel 装进 3.15 环境（6.0.3 的 cp314 wheel 覆盖 win_amd64 / macos arm64 / manylinux x86_64）；PyYAML 官方 wheel 里的 `_yaml` 只是可选的 C 加速，缺它时 PyYAML 会自动退回纯 Python 实现（`__with_libyaml__ = False`，`safe_load`/`dump` 行为与加速版一致），构建与使用都不受影响。以后 PyYAML 出了 cp315 wheel，把这两行兼容代码删掉即可。两条 3.15 工作流还都设了 `UV_NO_SYNC: "1"`：否则 `uv run` 的隐式 sync 会把已装好的 pyyaml 判定为「需重新安装」并再次失败，依赖统一在安装步骤显式 sync 一次。
+3.15 有一条 3.14 没有的坑：**PyYAML 至今没有任何 cp315 wheel**（6.0.3 只发到 cp314），3.15 下 `uv sync` 会退回源码编译（Windows runner 缺 MSVC 头文件直接失败，Linux/macOS 也要编译器链）。做法是 `uv sync --locked --all-extras --dev --no-install-package pyyaml` 跳过它，再 `uv pip install --python <venv> --python-version 3.14 --only-binary=:all: "pyyaml==6.0.3"` 把 cp314 wheel 装进 3.15 环境（6.0.3 的 cp314 wheel 覆盖 win_amd64 / macos arm64 / manylinux x86_64）；PyYAML 官方 wheel 里的 `_yaml` 只是可选的 C 加速，缺它时 PyYAML 会自动退回纯 Python 实现（`__with_libyaml__ = False`，`safe_load`/`dump` 行为与加速版一致），构建与使用都不受影响。以后 PyYAML 出了 cp315 wheel，把这两行兼容代码删掉即可。工作流还设了 `UV_NO_SYNC: "1"`：否则 `uv run` 的隐式 sync 会把已装好的 pyyaml 判定为「需重新安装」并再次失败，依赖统一在安装步骤显式 sync 一次。
 
 
 依赖版本下限按 Python 3.14/3.15 抬过（`tests/test_py314_dependency_floors.py` 逐条守着），改依赖时务必守住（否则流水线的 `uv sync --locked` 会硬失败）：
@@ -760,7 +758,7 @@ uv run build --debug
 
 上面最后五个本来只是传递依赖（由 `curl-cffi` / `openai` / `jinja2` / `pydantic` / `pyqt6` 间接引入），现已写进 `pyproject.toml` 与 `requirements.txt` 作为显式依赖：它们的版本下限同时决定「有没有 cp315 wheel」，一旦 `uv lock` 重新解析就可能被回退到装不上的老版本，显式钉住后 `uv sync --locked` 与 `pip install -r requirements.txt` 两条路径都不会再退回源码编译。
 
-其余依赖已逐条核对，3.14/3.15 直接可用、无需动：`pyqt6`（cp39-abi3）、`opencv-contrib-python-headless`（cp37-abi3）、`curl-cffi`（cp310-abi3）、`httpx`/`httpx2`（纯 Python）、`pyinstaller`/`ruff`（`py3-none`）、`oshash`/`zhconv`（PyPI 上只有 sdist，但上游是**纯 Python**、无 C 扩展，不会编译）。核对口径：看 PyPI `releases[版本].urls` 的 tag 是否为 `cp315-*` / `*-abi3-*` / `*-none-*`，并读 `requires_python` 上界。改完依赖记得 `uv lock`（CI 用 `uv sync --locked` 强校验），`requires-python` 保持 `>=3.14`（不能带 upper bound），3.15 为当前构建目标、3.14 保留给 `build-py314.yml`。
+其余依赖已逐条核对，3.14/3.15 直接可用、无需动：`pyqt6`（cp39-abi3）、`opencv-contrib-python-headless`（cp37-abi3）、`curl-cffi`（cp310-abi3）、`httpx`/`httpx2`（纯 Python）、`pyinstaller`/`ruff`（`py3-none`）、`oshash`/`zhconv`（PyPI 上只有 sdist，但上游是**纯 Python**、无 C 扩展，不会编译）。核对口径：看 PyPI `releases[版本].urls` 的 tag 是否为 `cp315-*` / `*-abi3-*` / `*-none-*`，并读 `requires_python` 上界。改完依赖记得 `uv lock`（CI 用 `uv sync --locked` 强校验），`requires-python` 保持 `>=3.14`（不能带 upper bound），3.15 为当前构建与发版目标。
 
 已锁定的 131 个包里（含根项目本身）只有 `pyyaml`（纯 Python sdist + 无 cp315 wheel）需要源码编译；其余 129 个第三方包都不用编译——127 个有 cp315 / abi3 / 纯 Python wheel，`oshash` / `zhconv` 只有纯 Python sdist（无 C 扩展）；`pyyaml` 的处理见上面 PyYAML 顶替方案。
 

@@ -1,7 +1,7 @@
 """`check_version` 必须取 **tag 最大** 的 release，而不是列表第一条。
 
 背景（缺陷 A）：`/releases` 按 `created_at` 倒序返回，**不是按 tag 倒序**。发版工作流
-`build-py314.yml` 的四个 `Create Release` 步骤用**同一 tag + `overwrite: true`**
+`build-py315.yml` 的四个 `Create Release` 步骤用**同一 tag + `overwrite: true`**
 （`svenstaro/upload-release-action` 是先删后建），于是任何一次补发/重跑都会把那条
 release 的 `created_at` 刷成"当前时间"、顶到列表第一位。原实现
 `for release in releases: if tag.isdigit(): return int(tag)` 直接返回第一条 →

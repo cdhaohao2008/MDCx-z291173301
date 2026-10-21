@@ -13,7 +13,7 @@ name = "mdcx"
 version = "2.7.4"
 description = "mdcx"
 readme = "README.md"
-requires-python = ">=3.14" # 3.14 起可用（os.path.ALLOW_MISSING / 类型形参默认值）；3.15 为当前构建目标，3.14 保留给 build-py314.yml
+requires-python = ">=3.14" # 3.14 起可用（os.path.ALLOW_MISSING / 类型形参默认值）；3.15 为当前构建目标
 dependencies = [
     "aiofiles>=25.1.0",  # 24.1.0 早于 3.14; 25.1.0(2025-10-09)起官方测试并支持 Python 3.14/3.15
     "aiohttp>=3.14.5",  # GHSA-mfx4-hv73-q22v 等 HTTP smuggling/解析器漏洞修复

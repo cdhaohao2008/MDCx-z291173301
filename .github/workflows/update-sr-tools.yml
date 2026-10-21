@@ -2,7 +2,7 @@
 #
 # 工具二进制不入库：打包时由 scripts/fetch_sr_tools.py 从官方 GitHub Release 拉取，
 # 校验 sha256 后解压到 build/sr_tools。这里按月预热 actions/cache，
-# 让 build-py314.yml / build-py315.yml / package-trawl.yml 打包时免下载、提速构建。
+# 让 build-py315.yml / package-trawl.yml 打包时免下载、提速构建。
 #
 # 刷新失败（上游重新打包导致 sha256 不匹配）会让作业变红并保留旧缓存，
 # 避免坏包扩散到发布产物。

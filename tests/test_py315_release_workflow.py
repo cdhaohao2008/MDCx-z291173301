@@ -1,21 +1,23 @@
-"""唯一发版工作流 `.github/workflows/build-py314.yml` 的守卫。
+"""唯一发版工作流 `.github/workflows/build-py315.yml` 的守卫。
 
-背景：2026-09-28 起本工作流是**仓库里唯一的正式发版路径**——原 3.13 主流程
-`build-py313.yml`（更早叫 `release.yml`）连同单平台手动构建的 `build-windows.yml` /
-`build-linux.yml` 一并删除，多平台矩阵已完全覆盖后两者的功能。本工作流同时负责
-`push` tag `2*` 自动发版与 `workflow_dispatch` 手动补发，任何一处被改坏都会伤到发版
-或客户端自动更新：
+背景：2026-10-21 起程序整体迁移到 Python 3.15，本工作流接过了原 `build-py314.yml`
+（Python 3.14 发版主流程）的全部职责，`build-py314.yml` 一并删除——两条流程共用同一套
+纯数字 tag 命名空间且都按 `overwrite: true` 覆盖资产，同时发版会互相把对方的包刷掉。
+更早的 2026-09-28 起原 3.13 主流程 `build-py313.yml`（更早叫 `release.yml`）连同单平台
+手动构建的 `build-windows.yml` / `build-linux.yml` 一并删除，多平台矩阵已完全覆盖后两者的
+功能。本工作流同时负责 `push` tag `2*` 自动发版与 `workflow_dispatch` 手动补发，
+任何一处被改坏都会伤到发版或客户端自动更新：
 
 1. **tag 必须是纯数字**（= `mdcx/consts.py` 的 `LOCAL_VERSION`）：`mdcx/base/web.py` 的
    `check_version()` 遍历 releases（`per_page=10`）收集全部 `tag_name.isdigit()` 的值并
    取其中**最大**的一个，非纯数字 tag 会被跳过，自动更新就永久失效。故不得回退到早期
-   版本的 `py314-<版本号>` 预览 tag 方案。（取最大而非取第一条的理由见
+   版本的 `py314-<版本号>` / `py315-<版本号>` 预览 tag 方案。（取最大而非取第一条的理由见
    `tests/test_version_check_pick_latest.py`：`/releases` 按 `created_at` 倒序，本工作流
    各平台用同一 tag + `overwrite` 重建 release，补发旧 tag 会把它顶到第一条。）
-2. **必须监听 tag `2*`**：3.13 流程删除后，本工作流是唯一监听 tag 的地方；丢了
+2. **必须监听 tag `2*`**：3.13 / 3.14 流程删除后，本工作流是唯一监听 tag 的地方；丢了
    `push.tags` 就再没有自动发版路径了。同时保留 `workflow_dispatch` 供手动补发。
 3. **输入只有 tag 与 prerelease**：平台固定三平台（无 `platforms` 开关）、发版不再有
-   `publish` 勾选、relock 回退不再有 true/false 开关（3.14 恒允许回退）。
+   `publish` 勾选、relock 回退不再有 true/false 开关（3.15 恒允许回退）。
 4. **缺产物不发版**：`build-app` 带 `continue-on-error`，所以 `publish-release` 必须用
    `needs.build-app.result == 'success'` 把关（不能写 `success()`：`needs` 里任一失败腿
    都会让它整体跳过），并在上传前核对三个平台产物齐全——半成品 Release 比不发更糟。
@@ -26,6 +28,8 @@
    资产名同时写在 `docs/Development.md` 与 `DADA/MEMORY.md`，改一处要同步三处。
 6. **macOS Intel 腿已于 2026-10-20 退役**：macOS 放弃 x86_64，矩阵、产物核对项与
    `Create Release - macOS (Intel)` 三处必须同时消失（`_RETIRED_MACOS_INTEL`）。
+7. **必须用 Python 3.15 构建**：`UV_PYTHON` / `python-version` / 构建前断言三处锁 3.15，
+   编出来的包才与 `requires-python >=3.14`（3.15 为当前目标）匹配。
 
 按仓库惯例做文本断言（`tests/` 不引入 yaml 依赖），改工作流后请同步更新本文件。
 """
@@ -34,7 +38,7 @@ import re
 from pathlib import Path
 
 _ROOT = Path(__file__).parent.parent
-_WORKFLOW = _ROOT / ".github" / "workflows" / "build-py314.yml"
+_WORKFLOW = _ROOT / ".github" / "workflows" / "build-py315.yml"
 
 # 一次 Release 覆盖的平台资产（macOS 只剩 Apple Silicon 一条腿，文件名由 build-app 决定）
 _ASSET_FILES = (
@@ -74,8 +78,10 @@ _EXPECTED_ASSETS = (
     "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}",
 )
 
-# 2026-09-28 删掉的三个工作流，守卫它们别被无意中加回来
-_REMOVED_WORKFLOWS = ("build-py313.yml", "build-windows.yml", "build-linux.yml")
+# 已删除的工作流，守卫它们别被无意中加回来
+# 2026-09-28：3.13 主流程 `build-py313.yml` 与单平台构建 `build-windows.yml` / `build-linux.yml`
+# 2026-10-21：程序迁移到 3.15 后 `build-py314.yml` 也被本流程取代并删除
+_REMOVED_WORKFLOWS = ("build-py313.yml", "build-windows.yml", "build-linux.yml", "build-py314.yml")
 
 
 def _workflow() -> str:
@@ -91,17 +97,18 @@ def _workflow_code() -> str:
     return "\n".join(line for line in _workflow().splitlines() if not line.lstrip().startswith("#"))
 
 
-def test_tag_is_plain_numeric_not_py314_prefixed():
-    """Release tag 必须是纯数字版本号，不得回退到 `py314-` 前缀。"""
+def test_tag_is_plain_numeric_not_version_prefixed():
+    """Release tag 必须是纯数字版本号，不得回退到 `py314-` / `py315-` 前缀。"""
     text = _workflow()
 
-    assert re.search(r"tag=py314-", text) is None, (
-        "build-py314.yml 不得给 tag 加 py314- 前缀：非纯数字 tag 会被 check_version 的 "
-        "tag_name.isdigit() 跳过，客户端自动更新永久失效"
-    )
-    # 只查真正的配置行：工作流名/并发组里的 build-py314- 是合法的
-    assert re.search(r"(?m)^\s+asset_name:.*py314", text) is None, (
-        "资产名不得带 -py314- 段：客户端按 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>` 找资产"
+    for prefix in ("tag=py314-", "tag=py315-"):
+        assert re.search(re.escape(prefix), text) is None, (
+            f"build-py315.yml 不得给 tag 加 {prefix[4:]} 前缀：非纯数字 tag 会被 check_version 的 "
+            "tag_name.isdigit() 跳过，客户端自动更新永久失效"
+        )
+    # 只查真正的配置行：工作流名/并发组里的 build-release- 是合法的
+    assert re.search(r"(?m)^\s+asset_name:.*py31[45]", text) is None, (
+        "资产名不得带 -py314- / -py315- 段：客户端按 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>` 找资产"
     )
     assert 'echo "tag=$tag" >> "$GITHUB_OUTPUT"' in text, "metadata 步骤应回输出解析出的纯数字 tag"
     assert text.count("tag: ${{ steps.metadata.outputs.tag }}") == _RELEASE_STEP_COUNT, (
@@ -115,7 +122,7 @@ def test_workflow_listens_to_numeric_tag_pushes():
     text = _workflow()
 
     assert re.search(r"(?m)^  push:$", text) is not None, (
-        "build-py314.yml 必须监听 push：3.13 流程（build-py313.yml）已删除，本工作流是唯一的 tag 触发发版路径"
+        "build-py315.yml 必须监听 push：3.13 / 3.14 流程均已删除，本工作流是唯一的 tag 触发发版路径"
     )
     assert re.search(r"(?m)^    tags:\s*$", text) is not None, "push 触发必须限定在 tags 上，不能监听分支推送"
     assert re.search(r'(?m)^      - "2\*"\s*$', text) is not None, (
@@ -143,7 +150,7 @@ def test_only_tag_and_prerelease_inputs():
     text = _workflow()
 
     for removed in ("platforms:", "publish:", "allow_relock:"):
-        assert removed not in text, f"build-py314.yml 不应有 {removed} 输入"
+        assert removed not in text, f"build-py315.yml 不应有 {removed} 输入"
     for reference in ("inputs.platforms", "inputs.publish", "inputs.allow_relock"):
         assert reference not in text, f"不应再引用 {reference}"
     assert re.search(r"(?m)^      tag:$", text) is not None, "应保留 tag 输入"
@@ -185,18 +192,26 @@ def test_macos_intel_leg_is_gone():
     assert code.count("- name: Create Release - macOS") == 1, "macOS 只应有 Apple Silicon 一个 Create Release 步骤"
 
 
-def test_python_314_pins_and_relock_fallback():
-    """3.14 三处专属：解释器锁 3.14、构建前断言、uv sync 失败自动回退。"""
+def test_python_315_pins_and_relock_fallback():
+    """3.15 三处专属：解释器锁 3.15、构建前断言、uv sync 失败自动回退。"""
     text = _workflow()
 
-    assert 'python-version: "3.14"' in text, "必须用 Python 3.14 构建"
-    assert 'UV_PYTHON: "3.14"' in text, "需 UV_PYTHON 兜住 setup-python 之外的 uv 调用"
-    assert "Verify Python 3.14 in use" in text, "缺少解释器断言，uv 可能悄悄挑到别的版本"
-    assert "sys.version_info[:2] == (3, 14)" in text, "断言必须检查 sys.version_info"
+    assert 'python-version: "3.15"' in text, "必须用 Python 3.15 构建"
+    assert 'UV_PYTHON: "3.15"' in text, "需 UV_PYTHON 兜住 setup-python 之外的 uv 调用"
+    assert "Verify Python 3.15 in use" in text, "缺少解释器断言，uv 可能悄悄挑到别的版本"
+    assert "sys.version_info[:2] == (3, 15)" in text, "断言必须检查 sys.version_info"
     assert "uv sync --locked --all-extras --dev" in text, "仍需先用 --locked 严格校验"
-    assert re.search(r"if ! uv sync --locked --all-extras --dev; then.*uv sync --all-extras --dev", text, re.S), (
-        "uv sync --locked 失败必须自动回退重新解析（uv.lock 缺 cp314 wheel 时需要）"
+    assert re.search(
+        r"if ! uv sync --locked --all-extras --dev[^\n]*; then.*uv sync --all-extras --dev",
+        text,
+        re.S,
+    ), "uv sync --locked 失败必须自动回退重新解析（uv.lock 缺 cp315 wheel 时需要）"
+    # 3.15 专属：PyYAML 至今无 cp315 wheel，只能用 cp314 wheel 顶替
+    assert "--no-install-package pyyaml" in text, "3.15 下必须跳过 pyyaml（无 cp315 wheel，会退回源码编译）"
+    assert 'uv pip install --python "$VENV_PY" --python-version 3.14 --only-binary=:all: "pyyaml==6.0.3"' in text, (
+        "pyyaml 必须用 cp314 wheel 顶替装进 3.15 环境"
     )
+    assert 'UV_NO_SYNC: "1"' in text, "uv run 的隐式 sync 会把已装好的 pyyaml 判为需重新安装，必须关掉"
 
 
 def test_publish_requires_all_platform_artifacts():
@@ -274,9 +289,9 @@ def test_asset_version_segment_comes_from_version_name_without_v_prefix():
 
 
 def test_removed_workflows_are_gone():
-    """2026-09-28 删除的三个工作流不得被加回来（会与本流程抢发或重复构建）。"""
+    """已删除的四个工作流不得被加回来（会与本流程抢发或重复构建）。"""
     workflows = _ROOT / ".github" / "workflows"
 
     for name in _REMOVED_WORKFLOWS:
-        assert not (workflows / name).exists(), f"{name} 已删除（四平台矩阵 / 唯一发版流程已覆盖其职责），不应再加回来"
-    assert re.search(r"tag=py314-", _workflow()) is None
+        assert not (workflows / name).exists(), f"{name} 已删除（三平台矩阵 / 唯一发版流程已覆盖其职责），不应再加回来"
+    assert re.search(r"tag=py31[45]-", _workflow()) is None
