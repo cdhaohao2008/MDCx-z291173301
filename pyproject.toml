@@ -10,7 +10,7 @@ include = ["mdcx*", "scripts*"]
 
 [project]
 name = "mdcx"
-version = "2.7.4"
+version = "2.7.5"
 description = "mdcx"
 readme = "README.md"
 requires-python = ">=3.14" # 3.14 起可用（os.path.ALLOW_MISSING / 类型形参默认值）；3.15 为当前构建目标
@@ -75,7 +75,7 @@ dev = [
     "ipykernel>=7.4.0",
     "numpy>=2.5.4",
     "opencv-contrib-python-headless>=5.0.0.93",
-    "pre-commit>=4.7.0",  # 传递依赖 pyyaml 至今没有 cp315 wheel(6.0.3 只到 cp314): 3.15 下用 cp314 wheel 的纯 Python 实现顶替, 见 .github/workflows/build-py315.yml
+    "pre-commit>=4.7.0",  # 传递依赖 pyyaml 至今没有 cp315 wheel(6.0.3 只到 cp314): 用 PYYAML_FORCE_LIBYAML=0 让它产出纯 Python wheel, 见 .github/workflows/build-py315.yml
     "pyinstaller>=6.22.3,<7",  # 6.14.2 的 requires-python 是 <3.14, 在 3.14 上直接装不上; 6.16.0 起支持 3.14, 6.21.0 起放宽到 <3.16
     "pyright>=1.1.414",
     "pytest>=9.1.1",  # GHSA-6w46-j5rx-g56g tmpdir 处理漏洞 (dev)

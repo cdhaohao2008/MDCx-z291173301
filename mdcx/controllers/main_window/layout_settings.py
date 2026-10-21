@@ -5,8 +5,10 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtWidgets import (
     QWIDGETSIZE_MAX,
+    QLayout,
     QSizePolicy,
     QSpacerItem,
+    QWidget,
 )
 
 
@@ -297,46 +299,66 @@ class LayoutSettingsMixin:
                 clean.move(nx, clean.y())
 
     def _sync_reuse_meta_gap_align(self) -> None:
-        """刮削模式页：复用行「覆盖……元数据文件」与 STRM 行「覆盖……文本」同 x。
+        """刮削模式页：三行的右侧复选框严格同 x 上下对齐。
 
-        两行同处 gridLayout_2 第 1 列（左缘天然一致），差值只来自“首框宽度差 +
-        行内间距差”，由行内 gap spacer（第 1 项）补齐。sizeHint 在 show 前后会变
-        （初始化公式一次算不准，窄态实测差 6px），故按实测差值闭环收敛：量两框经
+        锚点是 STRM 行（其左右两个复选框之间只有布局间距，没有间隔占位），
+        复用行与整理模式间隔行的右侧复选框则各自带一个 gap spacer（第 1 项），
+        差值只来自“首框宽度差 + 行内间距差”，由 gap spacer 补齐。
+
+        三行同处 gridLayout_2 第 1 列（左缘天然一致）。sizeHint 在 show 前后会变
+        （初始化公式一次算不准，窄态实测差 6px），故按实测差值闭环收敛：量各框经
         content 中转的 x 差，残差就加多少，相等即 no-op。gap 钉 Fixed、行尾 spacer
         保持 Expanding，宽态富余只进尾部；gap 变宽不改变行总宽（尾部吸收），不触发
         新的 resize，不会自激。休眠页跳过（切页同拍收敛，无漂移可见）。
         """
         ui = self.Ui
         content = getattr(ui, "scrollAreaWidgetContents_guaxiaomoshi", None)
-        row = getattr(ui, "horizontalLayout_reuse_meta", None)
-        if content is None or row is None or not content.isVisibleTo(self):
+        if content is None or not content.isVisibleTo(self):
             return
         strm_box = getattr(ui, "checkBox_separate_overwrite_strm", None)
-        meta_box = getattr(ui, "checkBox_separate_overwrite_meta", None)
-        if strm_box is None or meta_box is None:
+        if strm_box is None:
             return
-        gap_item = row.itemAt(1)
-        gap = gap_item.spacerItem() if gap_item is not None else None
-        tail_item = row.itemAt(3)
-        tail = tail_item.spacerItem() if tail_item is not None else None
-        if gap is None or tail is None:
+        # 待收敛的行：右侧复选框 + 行内用于调节间距的 gap spacer（第 1 项）
+        rows: list[tuple[QWidget, QLayout, QSpacerItem]] = []
+        for box_name, row_name in (
+            ("checkBox_separate_overwrite_meta", "horizontalLayout_reuse_meta"),
+            ("checkBox_organize_netdisk_rest_interval", "horizontalLayout_organize_interval"),
+        ):
+            box = getattr(ui, box_name, None)
+            row = getattr(ui, row_name, None)
+            if box is None or row is None:
+                continue
+            gap_item = row.itemAt(1)
+            gap = gap_item.spacerItem() if gap_item is not None else None
+            if gap is None:
+                continue
+            # 行尾 spacer 保持 Expanding：gap 变宽不改变行总宽（富余由尾部吸收），
+            # 因此不会触发新的 resize，不会自激
+            tail_item = row.itemAt(3)
+            tail = tail_item.spacerItem() if tail_item is not None else None
+            if tail is not None and tail.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Expanding:
+                tail.changeSize(
+                    max(tail.sizeHint().width(), 0), 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+                )
+            rows.append((box, row, gap))
+        if not rows:
             return
-        if gap.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Fixed:
-            gap.changeSize(max(gap.sizeHint().width(), 0), 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
-        if tail.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Expanding:
-            tail.changeSize(
-                max(tail.sizeHint().width(), 0), 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
-            )
-        for _ in range(3):
+        for _box, _row, gap in rows:
+            if gap.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Fixed:
+                gap.changeSize(max(gap.sizeHint().width(), 0), 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        for _ in range(4):
             xs = strm_box.mapTo(content, QPoint(0, 0)).x()
-            xm = meta_box.mapTo(content, QPoint(0, 0)).x()
-            if xs == xm:
+            if all(box.mapTo(content, QPoint(0, 0)).x() == xs for box, _row, _gap in rows):
                 break
-            gap.changeSize(
-                max(gap.sizeHint().width() + (xs - xm), 0), 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum
-            )
-            row.invalidate()
-            row.activate()
+            for box, row, gap in rows:
+                xm = box.mapTo(content, QPoint(0, 0)).x()
+                if xm == xs:
+                    continue
+                gap.changeSize(
+                    max(gap.sizeHint().width() + (xs - xm), 0), 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum
+                )
+                row.invalidate()
+                row.activate()
 
     def _sync_javdb_tip_pos(self) -> None:
         """刮削模式页：Javdb 延时提示（label_26）上移一行并钉死。

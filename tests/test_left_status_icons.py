@@ -37,7 +37,9 @@ OLD_REPO = "cdlongbow/mdcx-diy"
 # 与 docs/Development.md「左下角状态区图标规范」保持同步，改规范先改文档再改此处。
 _REQUIRED_ICON_LITERALS = (
     "💡 单文件刮削",
-    "💠 {Flags.main_mode_text}",
+    # 模式行文案由 mode_text 决定：整理模式遇到「文件已在成功输出目录内」时
+    # 会自动转为读取模式，此时显示「读取模式」而不是配置里的「整理模式」。
+    "💠 {mode_text}",
     "💡 {manager.config.website_single} 刮削",
     "🍯 软链接·开",
     "🍯 硬链接·开",
@@ -110,3 +112,19 @@ def test_flags_reset_preserves_mode_texts():
         assert Flags.scrape_like_text == "字段优先", "reset() 清空了 scrape_like_text，模式行将只剩图标"
     finally:
         Flags.main_mode_text, Flags.scrape_like_text = old_main, old_like
+
+
+def test_mode_text_override_drives_status_line():
+    """整理模式自动转读取模式时，状态区显示「读取模式」而非「整理模式」。
+
+    mode_text_override 是单次运行态（每次整理开始时清空），reset() 必须清空它，
+    否则下一次整理会把上一次的「读取模式」文案带过来。
+    """
+    old_override = Flags.mode_text_override
+    try:
+        Flags.mode_text_override = "读取模式"
+        assert Flags.mode_text_override == "读取模式"
+        Flags.reset()
+        assert Flags.mode_text_override == "", "reset() 未清空 mode_text_override，下次运行会串文案"
+    finally:
+        Flags.mode_text_override = old_override

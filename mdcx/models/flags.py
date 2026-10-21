@@ -124,6 +124,10 @@ class _Flags:
     log_txt: Any = None
     scrape_like_text: str = ""
     main_mode_text: str = ""
+    # 单次运行的模式文案覆盖：整理模式遇到「文件已在成功输出目录内」时
+    # 自动转为读取模式，左下角显示「读取模式·…」而不是「整理模式·…」。
+    # 与 main_mode_text 不同，这是单次运行态，reset 时清空。
+    mode_text_override: str = ""
 
     single_file_path: Path = field(default_factory=Path)
 
@@ -185,6 +189,8 @@ class _Flags:
         self.start_time = 0.0
         self.file_mode = FileMode.Default
         self.log_txt = None
+        # 单次运行的模式文案覆盖（整理模式自动转读取模式），属于运行态，需要清空
+        self.mode_text_override = ""
         # 注意：scrape_like_text / main_mode_text 是配置派生的展示文案
         # （load/save_config 从持久化配置写入），不是单次运行态，reset 不得清空——
         # 否则刮削开始后左下角模式行只剩「💠 ·」光杆图标，没有文字说明（见 Development.md 左下角规范）。

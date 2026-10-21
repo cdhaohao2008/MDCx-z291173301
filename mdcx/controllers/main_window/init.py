@@ -1127,7 +1127,7 @@ def Init_Singal(self: MyMAinWindow):
         _grid.setColumnStretch(1, 1)
     _col0_w = 0
     for _grid, _rows in (
-        (self.Ui.gridLayout_2, range(10)),
+        (self.Ui.gridLayout_2, range(11)),
         (self.Ui.gridLayout_15, range(3)),
     ):
         for _r in _rows:
@@ -1146,6 +1146,11 @@ def Init_Singal(self: MyMAinWindow):
     self.Ui.checkBox_separate_overwrite_meta.toggled.connect(self.checkBox_separate_overwrite_meta_changed)
     # STRM：生成是覆盖的前提，未勾选生成时覆盖框置灰（不影响其勾选值）
     self.Ui.checkBox_separate_generate_strm.toggled.connect(self.checkBox_separate_generate_strm_changed)
+    # 整理模式：本地不限制间隔 / 网盘按自动休息间隔，两枚复选框互斥
+    self.Ui.checkBox_organize_local_no_interval.toggled.connect(self.checkBox_organize_local_no_interval_changed)
+    self.Ui.checkBox_organize_netdisk_rest_interval.toggled.connect(
+        self.checkBox_organize_netdisk_rest_interval_changed
+    )
     for _lbl in (
         self.Ui.label_11,
         self.Ui.label_organize_mode,

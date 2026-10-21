@@ -394,6 +394,46 @@ def drop_ignore_dir(ignore_dirs: list[Path], target: Path | None) -> list[Path]:
     return [item for item in ignore_dirs if _path_key(item) != key]
 
 
+def is_in_success_folder(file_path: Path | str, success_folder: Path | str | None) -> bool:
+    """判断文件是否已经位于「成功输出目录」之内。
+
+    整理模式专用：已经躺在成功输出目录里的文件就是上一轮整理的产物，再整理一遍
+    只会原地搬动自己（无谓的移动/复制，且网盘目录缓存未刷新时容易报错），
+    故这类文件直接按「读取模式」处理：只读 nfo 展示结果，不做任何移动/复制/重命名。
+    """
+    if success_folder is None:
+        return False
+    try:
+        return is_descendant(file_path, success_folder)
+    except OSError, ValueError:
+        return False
+
+
+def organize_netdisk_rest_enabled() -> bool:
+    """整理模式是否启用「网盘按照自动休息间隔整理文件」。
+
+    只有整理模式 + 勾选「网盘按照自动休息间隔」+ 未勾「本地存储不设置时间间隔」
+    时才生效（两枚复选框互斥，配置层已归一，这里再兜一层防手改配置）。
+    """
+    if not is_organize_mode():
+        return False
+    if manager.config.organize_local_no_interval:
+        return False
+    return bool(manager.config.organize_netdisk_rest_interval)
+
+
+def organize_rest_seconds() -> int:
+    """整理模式两次运行之间必须间隔的秒数（取「高级 → 间歇刮削 → 自动休息」）。
+
+    下限 40s：网盘目录缓存刷新有延迟，间隔太短整理会因目录缓存未刷新而报错
+    （见 `models.MIN_REST_TIME_SECONDS`）。
+    """
+    from .models import MIN_REST_TIME_SECONDS
+
+    seconds = int(manager.config.rest_time.total_seconds())
+    return max(seconds, MIN_REST_TIME_SECONDS)
+
+
 def need_clean(file_path: Path, file_name: str, file_ext: str) -> bool:
     # 判断文件是否需清理
     if not manager.computed.can_clean:

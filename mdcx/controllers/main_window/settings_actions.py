@@ -149,6 +149,17 @@ class SettingsActionsMixin:
     def checkBox_separate_generate_strm_changed(self, checked):
         self.Ui.checkBox_separate_overwrite_strm.setEnabled(bool(checked))
 
+    # 整理模式-本地/网盘间隔互斥：只允许同时选中一个。
+    # 与分离模式「复用/覆盖」互斥保持同一套交互：勾选其一自动去勾另一，
+    # 去勾不动作（两枚都没勾的中间态由配置层归一兜底：全关→按「本地不限间隔」保存）
+    def checkBox_organize_local_no_interval_changed(self, checked):
+        if checked:
+            self.Ui.checkBox_organize_netdisk_rest_interval.setChecked(False)
+
+    def checkBox_organize_netdisk_rest_interval_changed(self, checked):
+        if checked:
+            self.Ui.checkBox_organize_local_no_interval.setChecked(False)
+
     # 设置-刮削目录-同意清理(我已知晓/我已同意)
     def checkBox_i_agree_clean_clicked(self):
         if self.Ui.checkBox_i_understand_clean.isChecked() and self.Ui.checkBox_i_agree_clean.isChecked():

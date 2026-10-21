@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import json
 import time
 import traceback
 from dataclasses import dataclass
@@ -43,8 +44,11 @@ from ..config.extend import (
     eff_success_file_rename,
     get_movie_path_setting,
     get_separate_meta_root,
+    is_in_success_folder,
     is_organize_mode,
     mirror_meta_folder,
+    organize_netdisk_rest_enabled,
+    organize_rest_seconds,
     parse_media_paths,
     remap_meta_paths,
     should_generate_strm,
@@ -154,6 +158,29 @@ def get_scan_ignore_dirs(path_setting: MoviePathSetting) -> list[Path]:
     return list(path_setting.ignore_dirs)
 
 
+def load_organize_state() -> dict:
+    """读取整理模式的运行状态（目前只记录上次整理的结束时间）。
+
+    网盘目录缓存刷新有延迟（CloudDrive2 默认 40s、OpenList 默认 30min），
+    两次整理之间必须留出间隔，否则新写好的目录在扫描时还是旧缓存。
+    """
+    path = resources.u("organize_state.json")
+    try:
+        data = json.loads(path.read_text("UTF-8"))
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_organize_state(data: dict) -> None:
+    """写入整理模式的运行状态（目前只记录上次整理的结束时间）。"""
+    path = resources.u("organize_state.json")
+    try:
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), "UTF-8")
+    except Exception as e:
+        signal.show_traceback_log(f"整理状态写入失败: {e!s}")
+
+
 @dataclass(slots=True)
 class _OrganizeRetryTask:
     """整理移动失败的番号，等全部任务结束后统一做一次管理员重试。"""
@@ -217,6 +244,42 @@ class Scraper:
         self._pending_organize_retries: list[_OrganizeRetryTask] = []
         self._deferred_organize_paths: set[Path] = set()
         self._organize_index: OrganizeIndex | None = None
+
+    async def _wait_organize_interval(self) -> None:
+        """整理模式：距上次整理结束不足「自动休息」时间时，自动等待到间隔满足再开始。
+
+        网盘挂载成本地目录时目录缓存刷新有延迟（CloudDrive2 默认 40s、OpenList
+        默认 30min），间隔太短就整理会因目录缓存未刷新而报错（用户实测）。
+        勾选「网盘按照自动休息间隔整理文件」后启用；勾选「本地存储不设置时间间隔
+        整理文件」或首次运行时直接返回。
+        """
+        if not organize_netdisk_rest_enabled():
+            return
+        state = load_organize_state()
+        try:
+            last_end = float(state.get("last_run_end", 0) or 0)
+        except TypeError, ValueError:
+            last_end = 0.0
+        if last_end <= 0:
+            # 没有上一次整理记录：首次运行不等待
+            return
+        rest_seconds = organize_rest_seconds()
+        elapsed = time.time() - last_end
+        if elapsed >= rest_seconds:
+            return
+        wait_seconds = int(rest_seconds - elapsed)
+        signal.show_log_text(
+            f" ⏳ 网盘存储整理间隔：上次整理结束于 {get_real_time(last_end)}，"
+            f"需间隔 {rest_seconds} 秒，还需等待 {wait_seconds} 秒后自动开始整理..."
+        )
+        signal.show_scrape_info("🔎 正在刮削中...")
+        deadline = last_end + rest_seconds
+        while time.time() < deadline:
+            if signal.stop or Flags.stop_requested:
+                signal.show_log_text(" ⏹ 整理等待期间已收到停止指令，取消本次整理。")
+                return
+            await asyncio.sleep(1)
+        signal.show_log_text(" ✅ 整理间隔已满足，自动开始整理...")
 
     async def _prepare_organize_index(
         self,
@@ -443,6 +506,12 @@ class Scraper:
                 self._state_cache.close()
                 self._state_cache = None
             self._organize_index = None
+            # 整理模式：记录本次整理的结束时间。下次整理（网盘模式）以它为起点
+            # 计算「两次整理之间必须间隔的时间」，不足则自动等待（见 _wait_organize_interval）
+            if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+                organize_state = load_organize_state()
+                organize_state["last_run_end"] = time.time()
+                save_organize_state(organize_state)
             # 协程真正退出前兜底落盘一次最新剩余任务：停止/取消过程中最后
             # 完成/取消的任务变化不被 1.5s 定时器竞态吞掉（议题 #98）
             save_remain_list_now()
@@ -492,6 +561,11 @@ class Scraper:
         movie_path = path_settings.movie_path
         movie_paths = path_settings.movie_paths
 
+        # 整理模式 + 网盘存储：距上次整理结束不足「自动休息」时间时先自动等待，
+        # 保证「上一次整理结束 → 本次整理开始」的间隔达标（网盘目录缓存刷新延迟）
+        if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+            await self._wait_organize_interval()
+
         # 获取待刮削文件列表的相关信息
         # full_library_scan：本次是否全量扫描媒体库。调用方传入任务列表
         # （续刮 remain 子集 / Again / 单文件 / 工具页）时为 False——子集不能
@@ -500,6 +574,10 @@ class Scraper:
         full_library_scan = not movie_list
         organize_scan_roots: list[Path] = []
         organize_ignore_dirs: list[Path] = []
+        # 整理模式：统计「已经躺在成功输出目录内」的文件数量，
+        # 用于判断本次是否整体退化为读取模式（左下角文案随之切换）
+        organize_inplace_count = 0
+        organize_scanned_count = 0
         if not movie_list:
             signal.show_log_text("\n ⏰ Start time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
             movie_list = []
@@ -518,9 +596,35 @@ class Scraper:
                 if manager.config.main_mode == ORGANIZE_MAIN_MODE:
                     organize_scan_roots.append(scan_path)
                     organize_ignore_dirs.extend(scan_ignore_dirs)
-                movie_list.extend(await get_movie_list(file_mode, scan_path, scan_ignore_dirs))
+                scanned = await get_movie_list(file_mode, scan_path, scan_ignore_dirs)
+                if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+                    organize_scanned_count += len(scanned)
+                    organize_inplace_count += sum(
+                        1 for item in scanned if is_in_success_folder(item, current_paths.success_folder)
+                    )
+                movie_list.extend(scanned)
         else:
             signal.show_log_text("\n ⏰ Start time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+            if manager.config.main_mode == ORGANIZE_MAIN_MODE:
+                organize_scanned_count = len(movie_list)
+                organize_inplace_count = sum(
+                    1 for item in movie_list if is_in_success_folder(item, get_movie_path_setting(item).success_folder)
+                )
+
+        # 整理模式：待整理的文件已经全部躺在「成功输出目录」内 → 本次没有任何
+        # 可移动/可重命名的目标，整体退化为读取模式（不移动、不复制任何文件），
+        # 左下角文案同步由「整理模式」切换为「读取模式」。
+        if (
+            manager.config.main_mode == ORGANIZE_MAIN_MODE
+            and organize_scanned_count > 0
+            and organize_inplace_count >= organize_scanned_count
+        ):
+            Flags.mode_text_override = "读取模式"
+            signal.show_log_text(
+                f" 📖 整理模式：{organize_inplace_count} 个文件已全部位于成功输出目录内，"
+                "自动转为读取模式（不移动、不复制、不重命名任何文件）"
+            )
+            signal.show_scrape_info("🔎 正在刮削中...")
 
         # 断点续刮：过滤掉已完成且 mtime 未变的文件；恢复上次失败的未超限文件（跨会话重试）
         # 读取模式（5）/整理模式（6）本质是读已有结果，不参与断点续刮的跳过/恢复逻辑，
@@ -1207,6 +1311,18 @@ class Scraper:
                 if organize_mode:
                     # 整理模式完全离线：只读 nfo 字段并移动/重命名已有文件
                     file_can_download = False
+                    if is_in_success_folder(file_path, success_folder):
+                        # 文件已经躺在「成功输出目录」内 = 上一轮整理的产物，
+                        # 再整理一遍只会原地搬动自己（网盘目录缓存未刷新时容易报错），
+                        # 因此按「读取模式」处理：只读 nfo 展示结果，
+                        # 不做任何移动/复制/重命名操作。
+                        show_result(res, start_time)
+                        show_movie_info(file_info, nfo_data)
+                        LogBuffer.log().write(
+                            f"\n 🙉 [Movie] {file_path}\n 📖 文件已在成功输出目录内，按读取模式处理（未移动任何文件）"
+                        )
+                        await save_success_list(file_path, file_path)
+                        return nfo_data, info
                 else:
                     has_nfo_update = ReadMode.HAS_NFO_UPDATE in read_mode
                     should_update_nfo = ReadMode.READ_UPDATE_NFO in read_mode

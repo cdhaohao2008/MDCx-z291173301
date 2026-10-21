@@ -25,11 +25,14 @@ class SuccessListMixin:
     def show_scrape_info(self, before_info=""):
         try:
             before_info = before_info.strip()
+            # 整理模式遇到「文件已在成功输出目录内」时会自动转为读取模式，
+            # 此时左下角显示「读取模式·…」而不是配置里的「整理模式·…」
+            mode_text = Flags.mode_text_override or Flags.main_mode_text
             if Flags.file_mode == FileMode.Single:
                 website_label = self.Ui.comboBox_website_all.currentData() or self.Ui.comboBox_website_all.currentText()
-                scrape_info = f"💡 单文件刮削\n💠 {Flags.main_mode_text}·{website_label}"
+                scrape_info = f"💡 单文件刮削\n💠 {mode_text}·{website_label}"
             else:
-                scrape_info = f"💠 {Flags.main_mode_text}·{Flags.scrape_like_text}"
+                scrape_info = f"💠 {mode_text}·{Flags.scrape_like_text}"
                 if manager.config.scrape_like == "single":
                     scrape_info = f"💡 {manager.config.website_single} 刮削\n" + scrape_info
             if manager.config.soft_link == 1:

@@ -49,13 +49,16 @@ REPO = Path(__file__).resolve().parent.parent
 UI_PATH = REPO / "mdcx" / "views" / "MDCx.ui"
 PY_PATH = REPO / "mdcx" / "views" / "MDCx.py"
 
-# gridLayout_2 第 1 列同列复选框：STRM 生成 / STRM 覆盖 / 元数据复用 / 视频模式删除。
-# 四者同处第 1 列，左缘必须严格一致。
+# gridLayout_2 第 1 列同列复选框：STRM 生成 / STRM 覆盖 / 元数据复用 / 视频模式删除
+# + 整理模式间隔行（本地不限制间隔 / 网盘按自动休息间隔）。
+# 全部同处第 1 列，左缘必须严格一致。
 _MODE_CHECKBOXES = (
     "checkBox_separate_generate_strm",
     "checkBox_separate_overwrite_strm",
     "checkBox_separate_reuse_meta",
     "checkBox_sortmode_delpic",
+    "checkBox_organize_local_no_interval",
+    "checkBox_organize_netdisk_rest_interval",
 )
 
 # gridLayout_2 第 1 列 6 个描述 label：正常 / 整理 / 分离 / 视频 / 更新 / 读取。
@@ -246,11 +249,15 @@ def test_mode_checkboxes_left_aligned(win, app):
             "checkBox_separate_generate_strm",
             "checkBox_separate_reuse_meta",
             "checkBox_sortmode_delpic",
+            "checkBox_organize_local_no_interval",
         )
     }
     assert len(set(aligned.values())) == 1, f"同列复选框左缘不一致: {narrow}"
     assert narrow["checkBox_separate_overwrite_strm"] > narrow["checkBox_separate_generate_strm"], (
         f"覆盖框应同行居右: {narrow}"
+    )
+    assert narrow["checkBox_organize_netdisk_rest_interval"] > narrow["checkBox_organize_local_no_interval"], (
+        f"网盘间隔框应同行居右: {narrow}"
     )
     _resize(win, app, 1920, 1170)
     wide = snapshot()
@@ -283,6 +290,99 @@ def test_overwrite_meta_aligns_under_overwrite_strm(win, app):
     assert wide_meta[0] == wide_strm[0], "宽态两覆盖框不对齐"
     _resize(win, app, 1030, 753)
     assert pos("checkBox_separate_overwrite_meta") == narrow_meta, "窄→宽→窄往返未复原"
+
+
+def test_organize_interval_row_right_aligns_with_strm(win, app):
+    """整理间隔行的右侧复选框与 STRM/复用行的右侧复选框同 x 严格对齐。"""
+    ui = win.Ui
+    win.show()
+    _goto_guaxiaomoshi(win, app)
+
+    def pos(name):
+        p = getattr(ui, name).mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0))
+        return (p.x(), p.y())
+
+    _resize(win, app, 1030, 753)
+    narrow_netdisk = pos("checkBox_organize_netdisk_rest_interval")
+    narrow_strm = pos("checkBox_separate_overwrite_strm")
+    narrow_meta = pos("checkBox_separate_overwrite_meta")
+    assert narrow_netdisk[0] == narrow_strm[0], (
+        f"整理间隔行右侧框未与覆盖 STRM 框对齐: {narrow_netdisk} vs {narrow_strm}"
+    )
+    assert narrow_netdisk[0] == narrow_meta[0], (
+        f"整理间隔行右侧框未与覆盖元数据框对齐: {narrow_netdisk} vs {narrow_meta}"
+    )
+    assert narrow_netdisk[1] < narrow_strm[1], "整理间隔行应在 STRM 行上方"
+    _resize(win, app, 1920, 1170)
+    wide_netdisk = pos("checkBox_organize_netdisk_rest_interval")
+    assert wide_netdisk == narrow_netdisk, f"宽态整理间隔框位置变动: {narrow_netdisk} -> {wide_netdisk}"
+    _resize(win, app, 1030, 753)
+    assert pos("checkBox_organize_netdisk_rest_interval") == narrow_netdisk, "窄→宽→窄往返未复原"
+
+
+def test_organize_interval_checkboxes_mutually_exclusive(win, app):
+    """整理间隔两枚复选框互斥：勾选其一自动去勾另一，去勾不动作。"""
+    ui = win.Ui
+    win.show()
+    _goto_guaxiaomoshi(win, app)
+    _resize(win, app, 1030, 753)
+    local = ui.checkBox_organize_local_no_interval
+    netdisk = ui.checkBox_organize_netdisk_rest_interval
+    local.setChecked(False)
+    netdisk.setChecked(False)
+    app.processEvents()
+    local.setChecked(True)
+    app.processEvents()
+    assert local.isChecked() and not netdisk.isChecked(), "勾选本地不限制间隔后网盘框应自动去勾"
+    netdisk.setChecked(True)
+    app.processEvents()
+    assert netdisk.isChecked() and not local.isChecked(), "勾选网盘间隔后本地框应自动去勾"
+    netdisk.setChecked(False)
+    app.processEvents()
+    assert not netdisk.isChecked() and not local.isChecked(), "去勾不应影响另一方"
+    local.setChecked(False)
+    app.processEvents()
+
+
+def test_read_mode_options_not_squeezed(win, app):
+    """读取模式区的选项不能被压扁裁切（用户 2026-10-21 截图：两行文字被遮挡重叠）。
+
+    根因：gridLayout_2 的布局最小高度（482px）超过其容器 gridLayoutWidget_2 的设计高度
+    （447px），Qt 会把差出来的 35px 从最后一行（读取模式选项区 verticalLayout_5）硬挤掉，
+    该区只剩 87px（最小需要 122px），里面两行复选框被压到 6px/5px，文字互相裁切重叠。
+    修复：.ui 里把容器高度抬到 488px（下方分组整体下移 41px）。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_guaxiaomoshi(win, app)
+    widgets = (
+        "checkBox_read_has_nfo_update",
+        "checkBox_read_download_file_again",
+        "checkBox_read_update_nfo",
+        "checkBox_read_no_nfo_scrape",
+        "checkBox_nfo_merge_strategy",
+        "comboBox_nfo_merge_strategy",
+        "label_345",
+        "label_347",
+        "label_37",
+    )
+    for width, height in ((1030, 753), (860, 600)):
+        _resize(win, app, width, height)
+        for name in widgets:
+            widget = getattr(ui, name)
+            got = widget.height()
+            need = widget.minimumSizeHint().height()
+            assert got >= need, f"{width}x{height} 下 {name} 被压扁：{got} < 最小 {need}"
+        box = ui.verticalLayout_5
+        assert box.geometry().height() >= box.minimumSize().height(), (
+            f"{width}x{height} 下读取模式区高度 {box.geometry().height()} < 最小 {box.minimumSize().height()}"
+        )
+        first = ui.checkBox_read_download_file_again
+        second = ui.checkBox_read_update_nfo
+        assert (
+            first.mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0)).y() + first.height()
+            <= second.mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0)).y()
+        ), "读取模式区两行选项重叠"
 
 
 def test_reuse_overwrite_meta_mutually_exclusive(win, app):
@@ -366,17 +466,18 @@ def test_javdb_tip_moved_up_one_line_static():
         raise AssertionError("找不到 groupBox_53")
     assert _ui_geometry("label_26") == (146, 160, 513, 28), "label_26 设计几何被改动"
     assert _ui_geometry("gridLayoutWidget_15")[3] == 129, "grid 容器高不是 129"
+    # 刮削模式组与其后各组：读取模式区被裁切修复后整体下移 41px（详见 test_read_mode_options_not_squeezed）
     for name, y in (
         ("groupBox", 218),
-        ("groupBox_5", 728),
-        ("groupBox_2", 1208),
-        ("groupBox_18", 1438),
-        ("groupBox_27", 1568),
-        ("groupBox_15", 1698),
-        ("groupBox_30", 1828),
+        ("groupBox_5", 769),
+        ("groupBox_2", 1249),
+        ("groupBox_18", 1479),
+        ("groupBox_27", 1609),
+        ("groupBox_15", 1739),
+        ("groupBox_30", 1869),
     ):
         assert _ui_geometry(name)[1] == y, f"{name} 的 y 不是 {y}"
-    assert _ui_geometry("scrollAreaWidgetContents_guaxiaomoshi")[3] == 2028, "滚动内容高不是 2028"
+    assert _ui_geometry("scrollAreaWidgetContents_guaxiaomoshi")[3] == 2069, "滚动内容高不是 2069"
 
 
 def _content_pos(ui, widget):

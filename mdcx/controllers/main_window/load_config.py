@@ -28,6 +28,7 @@ from mdcx.config.enums import (
 )
 from mdcx.config.extend import get_movie_path_setting
 from mdcx.config.manager import manager
+from mdcx.config.models import MIN_REST_TIME_SECONDS
 from mdcx.config.resources import resources
 from mdcx.consts import GITHUB_ISSUES_URL, IS_WINDOWS, LOCAL_VERSION, SYSTEM_INFO, VERSION_NAME
 from mdcx.gen.field_enums import CrawlerResultFields
@@ -490,6 +491,16 @@ def load_config(self: MyMAinWindow):
             (self.Ui.radioButton_mode_read, "read"),
             default=self.Ui.radioButton_mode_common,
         )
+
+        # 整理模式：两次整理之间的时间间隔策略（两枚复选框互斥）
+        self.Ui.checkBox_organize_local_no_interval.setChecked(manager.config.organize_local_no_interval)
+        self.Ui.checkBox_organize_netdisk_rest_interval.setChecked(manager.config.organize_netdisk_rest_interval)
+        # 互斥兜底：手改配置若两开/两关，以「网盘按自动休息间隔」优先，
+        # 两关时退回「本地存储不限制间隔时间」（与迁移逻辑保持一致）
+        if self.Ui.checkBox_organize_netdisk_rest_interval.isChecked():
+            self.Ui.checkBox_organize_local_no_interval.setChecked(False)
+        elif not self.Ui.checkBox_organize_local_no_interval.isChecked():
+            self.Ui.checkBox_organize_local_no_interval.setChecked(True)
 
         # 有nfo，是否执行更新模式
         # region read_mode
@@ -1037,13 +1048,16 @@ def load_config(self: MyMAinWindow):
         # 直接取 seconds 会显示 00:00:00，再保存即静默归零（全库审查 B9）
         rest_time = manager.config.rest_time
         rest_total_seconds = int(rest_time.total_seconds())
+        # 自动休息时间下限 40 秒：网盘目录缓存刷新有延迟，间隔低于 40 秒必然出错，
+        # 低于下限的旧配置在此抬到下限并回显（用户看到的就是实际生效值）
+        rest_total_seconds = max(rest_total_seconds, MIN_REST_TIME_SECONDS)
         rest_hours = rest_total_seconds // 3600
         rest_minutes = (rest_total_seconds % 3600) // 60
         rest_seconds = rest_total_seconds % 60
         rest_time_str = f"{rest_hours:02d}:{rest_minutes:02d}:{rest_seconds:02d}"
         self.Ui.lineEdit_rest_time.setText(rest_time_str)
         # 换算（秒）
-        Flags.rest_time_convert = int(rest_time.total_seconds())
+        Flags.rest_time_convert = rest_total_seconds
 
         # 循环任务间隔时间 - 转换 timedelta 为字符串格式
         timed_interval = manager.config.timed_interval

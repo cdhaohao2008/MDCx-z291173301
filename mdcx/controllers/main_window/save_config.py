@@ -31,7 +31,7 @@ from mdcx.config.enums import (
 )
 from mdcx.config.extend import get_movie_path_setting
 from mdcx.config.manager import manager
-from mdcx.config.models import SiteConfig, normalize_site_list, str_to_list
+from mdcx.config.models import MIN_REST_TIME_SECONDS, SiteConfig, normalize_site_list, str_to_list
 from mdcx.consts import LOCAL_VERSION, SYSTEM_INFO, VERSION_NAME
 from mdcx.gen.field_enums import CrawlerResultFields
 from mdcx.models.flags import Flags
@@ -418,6 +418,19 @@ def save_config(self: MyMAinWindow):
     manager.config.separate_overwrite_strm = self.Ui.checkBox_separate_overwrite_strm.isChecked()
     manager.config.separate_reuse_metadata = self.Ui.checkBox_separate_reuse_meta.isChecked()
     manager.config.separate_overwrite_meta = self.Ui.checkBox_separate_overwrite_meta.isChecked()
+    # 整理模式：两次整理之间的时间间隔策略（两枚复选框互斥）
+    # 互斥兜底：两枚同时勾选时以「网盘按自动休息间隔」为准，两枚都没勾时按
+    # 「本地存储不限制间隔时间」处理（与配置迁移逻辑保持一致）
+    organize_netdisk = self.Ui.checkBox_organize_netdisk_rest_interval.isChecked()
+    organize_local = self.Ui.checkBox_organize_local_no_interval.isChecked()
+    if organize_netdisk:
+        organize_local = False
+    elif not organize_local:
+        organize_local = True
+    self.Ui.checkBox_organize_local_no_interval.setChecked(organize_local)
+    self.Ui.checkBox_organize_netdisk_rest_interval.setChecked(organize_netdisk)
+    manager.config.organize_local_no_interval = organize_local
+    manager.config.organize_netdisk_rest_interval = organize_netdisk
     manager.config.show_poster = self.Ui.checkBox_cover.isChecked()
     # endregion
 
@@ -728,9 +741,19 @@ def save_config(self: MyMAinWindow):
     rest_time_text = self.Ui.lineEdit_rest_time.text()  # 格式: HH:MM:SS
     if re.match(r"^\d{2,3}:\d{2}:\d{2}$", rest_time_text):
         h, m, s = map(int, rest_time_text.split(":"))
-        manager.config.rest_time = timedelta(hours=h, minutes=m, seconds=s)
+        rest_seconds = h * 3600 + m * 60 + s
     else:
-        manager.config.rest_time = timedelta(minutes=1, seconds=2)  # 默认值
+        rest_seconds = 62  # 默认值
+    # 自动休息时间下限 40 秒：网盘目录缓存刷新有延迟（CloudDrive2 默认 40s、
+    # OpenList 默认 30min），间隔太短整理会因目录缓存未刷新而报错
+    rest_seconds = max(rest_seconds, MIN_REST_TIME_SECONDS)
+    manager.config.rest_time = timedelta(seconds=rest_seconds)
+    # 换算（秒）：保存后立即生效，避免界面改了但运行态仍是旧值
+    Flags.rest_time_convert = rest_seconds
+    # 回显实际生效值（低于下限的输入已被抬到 40 秒）
+    self.Ui.lineEdit_rest_time.setText(
+        f"{rest_seconds // 3600:02d}:{(rest_seconds % 3600) // 60:02d}:{rest_seconds % 60:02d}"
+    )
 
     timed_interval_text = self.Ui.lineEdit_timed_interval.text()  # 格式: HH:MM:SS
     if re.match(r"^\d{2,3}:\d{2}:\d{2}$", timed_interval_text):

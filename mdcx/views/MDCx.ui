@@ -5192,7 +5192,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       <x>0</x>
                       <y>0</y>
                       <width>860</width>
-                      <height>2028</height>
+                      <height>2069</height>
                     </rect>
                   </property>
                   <widget class="QGroupBox" name="groupBox">
@@ -5201,7 +5201,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         <x>30</x>
                         <y>218</y>
                         <width>701</width>
-                        <height>491</height>
+                        <height>532</height>
                       </rect>
                     </property>
                     <property name="minimumSize">
@@ -5219,7 +5219,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           <x>50</x>
                           <y>30</y>
                           <width>631</width>
-                          <height>447</height>
+                          <height>488</height>
                         </rect>
                       </property>
                       <layout class="QGridLayout" name="gridLayout_2">
@@ -5329,6 +5329,108 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           </layout>
                         </item>
                         <item row="2" column="0">
+                          <widget class="QLabel" name="label_organize_interval_spacer">
+                            <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                <horstretch>0</horstretch>
+                                <verstretch>0</verstretch>
+                              </sizepolicy>
+                            </property>
+                            <property name="minimumSize">
+                              <size>
+                                <width>80</width>
+                                <height>30</height>
+                              </size>
+                            </property>
+                            <property name="layoutDirection">
+                              <enum>Qt::RightToLeft</enum>
+                            </property>
+                            <property name="frameShape">
+                              <enum>QFrame::NoFrame</enum>
+                            </property>
+                            <property name="text">
+                              <string />
+                            </property>
+                            <property name="alignment">
+                              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="2" column="1">
+                          <layout class="QHBoxLayout" name="horizontalLayout_organize_interval">
+                            <item>
+                              <widget class="QCheckBox" name="checkBox_organize_local_no_interval">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="minimumSize">
+                                  <size>
+                                    <width>0</width>
+                                    <height>0</height>
+                                  </size>
+                                </property>
+                                <property name="text">
+                                  <string>本地存储不设置时间间隔整理文件</string>
+                                </property>
+                                <property name="toolTip">
+                                  <string>勾选后：本地磁盘的整理任务不限制两次运行的间隔，随时可以开始整理</string>
+                                </property>
+                              </widget>
+                            </item>
+                            <item>
+                              <spacer name="horizontalSpacer_organize_interval_gap">
+                                <property name="orientation">
+                                  <enum>Qt::Horizontal</enum>
+                                </property>
+                                <property name="sizeHint" stdset="0">
+                                  <size>
+                                    <width>20</width>
+                                    <height>20</height>
+                                  </size>
+                                </property>
+                              </spacer>
+                            </item>
+                            <item>
+                              <widget class="QCheckBox" name="checkBox_organize_netdisk_rest_interval">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="minimumSize">
+                                  <size>
+                                    <width>0</width>
+                                    <height>0</height>
+                                  </size>
+                                </property>
+                                <property name="text">
+                                  <string>网盘按照自动休息间隔整理文件</string>
+                                </property>
+                                <property name="toolTip">
+                                  <string>勾选后：两次整理之间必须间隔「高级→间歇刮削→自动休息」的时间，不足则自动等待到间隔满足后再自动开始整理（网盘目录缓存刷新有延迟，间隔太短会整理失败）</string>
+                                </property>
+                              </widget>
+                            </item>
+                            <item>
+                              <spacer name="horizontalSpacer_organize_interval">
+                                <property name="orientation">
+                                  <enum>Qt::Horizontal</enum>
+                                </property>
+                                <property name="sizeHint" stdset="0">
+                                  <size>
+                                    <width>20</width>
+                                    <height>20</height>
+                                  </size>
+                                </property>
+                              </spacer>
+                            </item>
+                          </layout>
+                        </item>
+                        <item row="3" column="0">
                           <widget class="QRadioButton" name="radioButton_mode_separate">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -5347,7 +5449,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="2" column="1">
+                        <item row="3" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_separate_mode">
                             <item>
                               <widget class="QLabel" name="label_separate_mode">
@@ -5436,7 +5538,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </item>
                           </layout>
                         </item>
-<item row="3" column="1">
+<item row="4" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_strm">
                             <property name="spacing">
                               <number>14</number>
@@ -5497,7 +5599,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </item>
                           </layout>
                         </item>
-                        <item row="3" column="0">
+                        <item row="4" column="0">
                           <widget class="QLabel" name="label_strm_spacer">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -5525,7 +5627,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="4" column="1">
+                        <item row="5" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_reuse_meta">
                             <item>
                               <widget class="QCheckBox" name="checkBox_separate_reuse_meta">
@@ -5593,7 +5695,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </item>
                           </layout>
                         </item>
-                        <item row="4" column="0">
+                        <item row="5" column="0">
                           <widget class="QLabel" name="label_reuse_meta_spacer">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -5621,7 +5723,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="5" column="0">
+                        <item row="6" column="0">
                           <widget class="QRadioButton" name="radioButton_mode_sort">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -5640,7 +5742,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="9" column="0">
+                        <item row="10" column="0">
                           <widget class="QLabel" name="label_231">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -5668,7 +5770,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="8" column="1">
+                        <item row="9" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_122">
                             <item>
                               <widget class="QLabel" name="label_312">
@@ -5782,7 +5884,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="9" column="1">
+                        <item row="10" column="1">
                           <layout class="QVBoxLayout" name="verticalLayout_5">
                             <item>
                               <layout class="QHBoxLayout" name="horizontalLayout_127">
@@ -6009,7 +6111,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </item>
                           </layout>
                         </item>
-                        <item row="7" column="1">
+                        <item row="8" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_120">
                             <item>
                               <widget class="QLabel" name="label_36">
@@ -6098,7 +6200,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </item>
                           </layout>
                         </item>
-                        <item row="8" column="0">
+                        <item row="9" column="0">
                           <widget class="QRadioButton" name="radioButton_mode_read">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -6117,7 +6219,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="7" column="0">
+                        <item row="8" column="0">
                           <widget class="QRadioButton" name="radioButton_mode_update">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -6136,7 +6238,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="5" column="1">
+                        <item row="6" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_119">
                             <item>
                               <widget class="QLabel" name="label_15">
@@ -6225,7 +6327,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </item>
                           </layout>
                         </item>
-                        <item row="6" column="1">
+                        <item row="7" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_125">
                             <property name="spacing">
                               <number>2</number>
@@ -6267,7 +6369,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </item>
                           </layout>
                         </item>
-                        <item row="6" column="0">
+                        <item row="7" column="0">
                           <widget class="QLabel" name="label_344">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -6391,7 +6493,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1568</y>
+                        <y>1609</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -6571,7 +6673,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1698</y>
+                        <y>1739</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -6745,7 +6847,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1828</y>
+                        <y>1869</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -6919,7 +7021,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>728</y>
+                        <y>769</y>
                         <width>701</width>
                         <height>441</height>
                       </rect>
@@ -7502,7 +7604,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1438</y>
+                        <y>1479</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -8050,7 +8152,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1208</y>
+                        <y>1249</y>
                         <width>701</width>
                         <height>211</height>
                       </rect>

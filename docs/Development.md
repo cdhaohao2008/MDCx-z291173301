@@ -257,11 +257,15 @@ UI 层 (PyQt6)         → 界面展示、用户操作
    改 UI 一律先改 `MDCx.ui` 再用 pyuic 重编译 + `ruff format`，不要手工改 `MDCx.py`。
 3. **每行必须图标 + 文字同时存在**：不允许光杆图标（如 `💠 ·` 后面无文案），
    也不允许光杆文字（行首无图标）。模式行文案来自
-   `Flags.main_mode_text` / `Flags.scrape_like_text`，二者是配置派生的展示态
+   `mode_text = Flags.mode_text_override or Flags.main_mode_text` /
+   `Flags.scrape_like_text`，`main_mode_text` / `scrape_like_text` 是配置派生的展示态
    （`load/save_config` 从持久化配置写入），`Flags.reset()` 不得清空——
    刮削启停调 `reset()` 后文案必须保留，否则刮削完成后的状态区（读取/正常/
    整理/更新所有模式）模式行只剩图标。教训：`reset()` 曾清空二者，
    导致 `🎉 刮削完成` 之后模式行显示为 `💠 ·`。
+   `mode_text_override` 则是**单次运行态**：整理模式扫到的文件已全部位于
+   「成功输出目录」内时置为 `读取模式`（本次不移动任何文件），`reset()` 必须清空，
+   否则下一次运行会串用上一次的文案。
 4. 改本节规范时同步改 `tests/test_left_status_icons.py` 的
    `_REQUIRED_ICON_LITERALS`，文档与测试二者必须一致。
 
@@ -599,7 +603,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 
 - **格式化**：ruff（行宽 120，启用 isort/pyupgrade/flake8）
 - **类型检查**：mypy（全项目零 `disable_error_code`；`mdcx/controllers/main_window/` 下的 28 个 `*Mixin` 模块、`init.py`、`load_config.py`、`views/`、`gen/` 等豁免——注意这 28 个用的是 `pyproject.toml` 的 `[[tool.mypy.overrides]] module=[...] ignore_errors=true`，**不是** `exclude`（mypy 对被 import 的模块不认 `exclude`），CI `ci.yaml` 强制执行）；pyright 仅在 `pyproject.toml` 中保留配置，未纳入 CI 门禁
-- **Git 钩子**：项目不要求安装 pre-commit；统一使用 `uv run quick-check` 和 `uv run check --skip-hook-install` 完成检查
+- **Git 钩子**：项目不要求安装 pre-commit（`.pre-commit-config.yaml` 为历史遗留）；仓库自带 `.githooks/`（`pre-push` 快速门禁 + `prepare-commit-msg` 自动追加 co-author 署名），**一次性启用**：`git config core.hooksPath .githooks`（跑不带 `--skip-hook-install` 的 `uv run check` 会自动执行这条配置）。启用后 `git push` 自动跑 `ruff format/check` + `mypy` + 线程安全检查（不含 pytest），红了直接拦下推送；手动跑同款门禁用 `uv run check --skip-hook-install`。**Windows 四坑**：①Git Bash 里没有 `python3`、只有 `python.exe`，钩子已做 `uv` → `python3` → `python` 三级探测（pip 装依赖、不装 uv 的机器靠第三档）；②`.githooks/*` 在 `.gitattributes` 里钉了 `text eol=lf`，否则 `core.autocrlf=true` 检出的 CRLF 会让 sh 钩子在 Git Bash 里**静默失效**；③两个钩子入库模式是 100755（100644 时 Linux/macOS 上 git 因不可执行而**静默跳过**，Windows 反而照跑、掩盖了该问题）；④Windows 上 pip 常把 exe 装进用户目录（`%APPDATA%\Python\Python315\Scripts`，不在 PATH），`check.py` / `quick_check.py` 会在 PATH 里找不到 `ruff`/`mypy` 时自动退回 `当前解释器 -m ruff` / `-m mypy`，不必改 PATH 也能跑门禁
 - **检查和修复**：
   ```bash
   uv run ruff check .          # 代码检查
@@ -740,7 +744,7 @@ uv run build --debug
 
 上述约定由 `tests/test_py315_release_workflow.py`（12 项）与 `tests/test_workflow_action_pins.py` 守住（纯文本断言，不引入 yaml 依赖），改工作流后请一并跑 `uv run pytest tests/test_sr_bundling.py tests/test_py315_release_workflow.py tests/test_workflow_action_pins.py`。
 
-3.15 有一条 3.14 没有的坑：**PyYAML 至今没有任何 cp315 wheel**（6.0.3 只发到 cp314），3.15 下 `uv sync` 会退回源码编译（Windows runner 缺 MSVC 头文件直接失败，Linux/macOS 也要编译器链）。做法是 `uv sync --locked --all-extras --dev --no-install-package pyyaml` 跳过它，再 `uv pip install --python <venv> --python-version 3.14 --only-binary=:all: "pyyaml==6.0.3"` 把 cp314 wheel 装进 3.15 环境（6.0.3 的 cp314 wheel 覆盖 win_amd64 / macos arm64 / manylinux x86_64）；PyYAML 官方 wheel 里的 `_yaml` 只是可选的 C 加速，缺它时 PyYAML 会自动退回纯 Python 实现（`__with_libyaml__ = False`，`safe_load`/`dump` 行为与加速版一致），构建与使用都不受影响。以后 PyYAML 出了 cp315 wheel，把这两行兼容代码删掉即可。工作流还设了 `UV_NO_SYNC: "1"`：否则 `uv run` 的隐式 sync 会把已装好的 pyyaml 判定为「需重新安装」并再次失败，依赖统一在安装步骤显式 sync 一次。
+3.15 有一条 3.14 没有的坑：**PyYAML 至今没有任何 cp315 wheel**（6.0.3 只发到 cp314），3.15 下 `uv sync` 会退回源码编译（Windows runner 缺 MSVC 头文件直接失败，Linux/macOS 也要编译器链）。做法是给构建环境设 `PYYAML_FORCE_LIBYAML: "0"`：PyYAML 的 `setup.py` 读这个环境变量，值为 `0` 时直接跳过 `yaml._yaml` C 扩展，从 sdist 产出纯 Python 的 `py3-none-any` wheel——三平台都不需要编译器，产物还是通用 wheel（不掺别的 ABI 版本）。`uv sync` 与 `pip install -r requirements.txt` 两条路径都认这个变量，本机同理（先 `setx PYYAML_FORCE_LIBYAML 0`，再 `pip install -r requirements.txt`）。PyYAML 官方 wheel 里的 `_yaml` 只是可选的 C 加速，缺它时 PyYAML 会自动退回纯 Python 实现（`__with_libyaml__ = False`，`safe_load`/`dump` 行为与加速版一致），构建与使用都不受影响。以后 PyYAML 出了 cp315 wheel，把这个环境变量删掉即可。工作流还设了 `UV_NO_SYNC: "1"`：否则 `uv run` 的隐式 sync 每次都会重新解析并重建 pyyaml（拖慢构建），依赖统一在安装步骤显式 sync 一次。
 
 
 依赖版本下限按 Python 3.14/3.15 抬过（`tests/test_py314_dependency_floors.py` 逐条守着），改依赖时务必守住（否则流水线的 `uv sync --locked` 会硬失败）：
@@ -760,7 +764,7 @@ uv run build --debug
 
 其余依赖已逐条核对，3.14/3.15 直接可用、无需动：`pyqt6`（cp39-abi3）、`opencv-contrib-python-headless`（cp37-abi3）、`curl-cffi`（cp310-abi3）、`httpx`/`httpx2`（纯 Python）、`pyinstaller`/`ruff`（`py3-none`）、`oshash`/`zhconv`（PyPI 上只有 sdist，但上游是**纯 Python**、无 C 扩展，不会编译）。核对口径：看 PyPI `releases[版本].urls` 的 tag 是否为 `cp315-*` / `*-abi3-*` / `*-none-*`，并读 `requires_python` 上界。改完依赖记得 `uv lock`（CI 用 `uv sync --locked` 强校验），`requires-python` 保持 `>=3.14`（不能带 upper bound），3.15 为当前构建与发版目标。
 
-已锁定的 131 个包里（含根项目本身）只有 `pyyaml`（纯 Python sdist + 无 cp315 wheel）需要源码编译；其余 129 个第三方包都不用编译——127 个有 cp315 / abi3 / 纯 Python wheel，`oshash` / `zhconv` 只有纯 Python sdist（无 C 扩展）；`pyyaml` 的处理见上面 PyYAML 顶替方案。
+已锁定的 131 个包里（含根项目本身）没有一个需要真编译：129 个第三方包有 cp315 / abi3 / 纯 Python wheel，`oshash` / `zhconv` 只有纯 Python sdist（无 C 扩展）；唯一的例外是 `pyyaml`（无 cp315 wheel），靠 `PYYAML_FORCE_LIBYAML=0` 从 sdist 产出纯 Python wheel——处理见上面 PyYAML 一节。
 
 ## 迁移指南
 

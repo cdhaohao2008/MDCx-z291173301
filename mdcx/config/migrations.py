@@ -23,6 +23,34 @@ _LEGACY_MINNANO_CLEAN_RULES = {
 }
 
 
+_ORGANIZE_INTERVAL_KEYS = ("organize_local_no_interval", "organize_netdisk_rest_interval")
+"""整理模式「本地不限间隔 / 网盘按休息间隔」两个互斥开关的配置键。"""
+
+
+def _migrate_organize_interval_keys(data: dict[str, Any]) -> None:
+    """整理模式「本地存储不限间隔 / 网盘存储按自动休息间隔」互斥开关归一。
+
+    旧配置文件里没有这两个键 → 补出厂默认（本地不限间隔 = True，网盘按休息间隔
+    = False），保证老用户升级后行为与默认值一致。
+
+    手改成「两开」或「全关」时归一：两开以「网盘按自动休息间隔」为准（等待是安全
+    下限，网盘目录缓存没刷新就会整理失败）；全关则回到「本地不限间隔」（默认档）。
+    界面层两枚复选框互斥（勾其一自动取消另一），这里只是手改配置的兜底。
+    """
+    if not any(key in data for key in _ORGANIZE_INTERVAL_KEYS):
+        data["organize_local_no_interval"] = True
+        data["organize_netdisk_rest_interval"] = False
+        return
+    local = bool(data.get("organize_local_no_interval", True))
+    netdisk = bool(data.get("organize_netdisk_rest_interval", False))
+    if local and netdisk:
+        data["organize_local_no_interval"] = False
+        data["organize_netdisk_rest_interval"] = True
+    elif not local and not netdisk:
+        data["organize_local_no_interval"] = True
+        data["organize_netdisk_rest_interval"] = False
+
+
 def _migrate_actor_clean_rules(data: dict[str, Any]) -> None:
     """从存量配置的生效规则/默认规则里摘掉两条已退役的 minnano 占位规则。"""
     for key in ("actor_clean_rules", "actor_clean_rules_default"):

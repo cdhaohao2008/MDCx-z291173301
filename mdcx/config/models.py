@@ -33,7 +33,19 @@ from .enums import (
     Translator,
     Website,
 )
-from .migrations import _rename_site, migrate_config_data
+from .migrations import _migrate_organize_interval_keys, _rename_site, migrate_config_data
+
+MIN_REST_TIME_SECONDS = 40
+"""「高级 → 间歇刮削 → 自动休息」允许的最小值（秒）。
+
+网盘（CloudDrive2 / OpenList 等）挂成本地盘时目录缓存刷新有延迟（CloudDrive2 默认
+40s、OpenList 默认 30min），休息时间低于 40s 时缓存大概率还没刷新，整理模式移动
+文件会因「源文件不存在/目标已存在」报错。故休息时间一律不得低于 40s：小于该值
+的输入（界面手填或旧配置残留）在保存时统一抬到 40s。
+"""
+
+MIN_REST_TIME = timedelta(seconds=MIN_REST_TIME_SECONDS)
+"""`MIN_REST_TIME_SECONDS` 的 timedelta 形式（配置默认值与下限校验共用）。"""
 
 
 def str_to_list(v: str | list[Any] | None, sep: Literal[",", "|"] = ",", unique: bool = True) -> list[str]:
@@ -582,6 +594,13 @@ class Config(BaseModel):
     separate_overwrite_strm: bool = Field(default=False, title="分离模式覆盖已存在STRM")
     separate_reuse_metadata: bool = Field(default=False, title="分离模式复用数据存放目录元数据")
     separate_overwrite_meta: bool = Field(default=False, title="分离模式覆盖已存在视频元数据")
+    # 整理模式「两次运行间隔」互斥开关（界面层只许勾一个，运行时以 config 归一后的值为准）：
+    #   · organize_local_no_interval   —— 本地存储：不设置时间间隔整理文件
+    #   · organize_netdisk_rest_interval —— 网盘：按「高级→间歇刮削→自动休息」的间隔整理文件
+    # 网盘挂成本地盘时目录缓存刷新有延迟（CloudDrive2 默认 40s、OpenList 默认 30min），
+    # 不留间隔直接整理会因目录缓存未刷新而报错，故网盘侧强制按休息间隔等待。
+    organize_local_no_interval: bool = Field(default=True, title="整理模式本地存储不设置时间间隔")
+    organize_netdisk_rest_interval: bool = Field(default=False, title="整理模式网盘按自动休息间隔")
     show_poster: bool = Field(default=True, title="显示海报")
     download_files: list[DownloadableFile] = Field(
         default_factory=lambda: [
@@ -1065,7 +1084,7 @@ class Config(BaseModel):
     )
     timed_interval: timedelta = Field(default=timedelta(minutes=30), title="定时器间隔")
     rest_count: int = Field(default=20, title="休息计数")
-    rest_time: timedelta = Field(default=timedelta(), title="休息时间")
+    rest_time: timedelta = Field(default=MIN_REST_TIME, title="休息时间")
     # statement: int = Field(default=3, title="声明")
     # endregion
 
@@ -1278,6 +1297,9 @@ class Config(BaseModel):
         ):
             if _separate not in d:
                 d[_separate] = d.get(_left, True)
+        # 整理模式「本地不限间隔 / 网盘按休息间隔」互斥开关：旧配置文件里没有这两个键时
+        # 补上默认（本地不限间隔 = True），并把「两开/全关」的手改配置归一
+        _migrate_organize_interval_keys(d)
         # 处理旧版字段设置
         if "field_configs" not in d:
             Config._convert_field_configs(d)
@@ -1360,6 +1382,17 @@ class Config(BaseModel):
         if isinstance(v, str) and re.match(r"^\d{2,3}:\d{2}:\d{2}$", v):
             h, m, s = map(int, v.split(":"))
             return timedelta(hours=h, minutes=m, seconds=s)
+        return v
+
+    @field_validator("rest_time", mode="after")
+    def clamp_rest_time_to_minimum(cls, v):
+        """休息时间不得低于 40s：小于下限的输入（旧配置残留或界面手填）统一抬到 40s。
+
+        见 `MIN_REST_TIME_SECONDS`：网盘目录缓存刷新有延迟，休息时间过短会导致
+        整理模式移动文件时目录缓存尚未刷新而报错。
+        """
+        if v < MIN_REST_TIME:
+            return MIN_REST_TIME
         return v
 
     @classmethod

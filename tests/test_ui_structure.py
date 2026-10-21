@@ -1142,31 +1142,65 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
     elif _widget_string_prop(overwrite_meta, "text") != "覆盖本地保存的视频元数据文件":
         problems.append(f"覆盖元数据复选框文案被改: {_widget_string_prop(overwrite_meta, 'text')!r}")
 
+    # 整理模式间隔行：本地框居左 + gap spacer + 网盘框居右，末尾弹性 spacer
+    organize_hbox = _find_layout_by_name(root, "horizontalLayout_organize_interval")
+    if organize_hbox is None:
+        problems.append("horizontalLayout_organize_interval 不存在")
+    else:
+        kids = [item[0].get("name") for item in organize_hbox.findall("item") if len(item)]
+        if kids[:3] != [
+            "checkBox_organize_local_no_interval",
+            "horizontalSpacer_organize_interval_gap",
+            "checkBox_organize_netdisk_rest_interval",
+        ]:
+            problems.append(f"整理间隔行内顺序被改: {kids!r}")
+        for extra in kids[3:]:
+            if not extra.startswith("horizontalSpacer_"):
+                problems.append(f"整理间隔行内不允许出现非 spacer 部件: {extra!r}")
+    for nm, text in (
+        ("checkBox_organize_local_no_interval", "本地存储不设置时间间隔整理文件"),
+        ("checkBox_organize_netdisk_rest_interval", "网盘按照自动休息间隔整理文件"),
+    ):
+        box = _find_widget_by_name(root, nm)
+        if box is None:
+            problems.append(f"{nm} 不存在")
+        elif _widget_string_prop(box, "text") != text:
+            problems.append(f"{nm} 文案被改: {_widget_string_prop(box, 'text')!r}")
+
     grid = _find_layout_by_name(root, "gridLayout_2")
     if grid is None:
         problems.append("gridLayout_2 不存在")
     else:
-        if _grid_item_pos(grid, "horizontalLayout_strm") != ("3", "1"):
-            problems.append(f"STRM 行被移动（应在 row=3 col=1）: {_grid_item_pos(grid, 'horizontalLayout_strm')!r}")
-        if _grid_item_pos(grid, "horizontalLayout_reuse_meta") != ("4", "1"):
+        if _grid_item_pos(grid, "horizontalLayout_organize_interval") != ("2", "1"):
             problems.append(
-                f"复用行被移动（应在 row=4 col=1）: {_grid_item_pos(grid, 'horizontalLayout_reuse_meta')!r}"
+                f"整理间隔行被移动（应在 row=2 col=1）: {_grid_item_pos(grid, 'horizontalLayout_organize_interval')!r}"
             )
-        if _grid_item_pos(grid, "horizontalLayout_125") != ("6", "1"):
-            problems.append(f"删除行被移动（应在 row=6 col=1）: {_grid_item_pos(grid, 'horizontalLayout_125')!r}")
+        if _grid_item_pos(grid, "horizontalLayout_strm") != ("4", "1"):
+            problems.append(f"STRM 行被移动（应在 row=4 col=1）: {_grid_item_pos(grid, 'horizontalLayout_strm')!r}")
+        if _grid_item_pos(grid, "horizontalLayout_reuse_meta") != ("5", "1"):
+            problems.append(
+                f"复用行被移动（应在 row=5 col=1）: {_grid_item_pos(grid, 'horizontalLayout_reuse_meta')!r}"
+            )
+        if _grid_item_pos(grid, "horizontalLayout_125") != ("7", "1"):
+            problems.append(f"删除行被移动（应在 row=7 col=1）: {_grid_item_pos(grid, 'horizontalLayout_125')!r}")
         strm_spacer = _find_widget_by_name(root, "label_strm_spacer")
         del_spacer = _find_widget_by_name(root, "label_344")
-        if strm_spacer is None or del_spacer is None:
-            problems.append("label_strm_spacer / label_344 缺失")
+        organize_spacer = _find_widget_by_name(root, "label_organize_interval_spacer")
+        if strm_spacer is None or del_spacer is None or organize_spacer is None:
+            problems.append("label_strm_spacer / label_344 / label_organize_interval_spacer 缺失")
         else:
             widths = set()
-            for nm, w in (("label_strm_spacer", strm_spacer), ("label_344", del_spacer)):
+            for nm, w in (
+                ("label_strm_spacer", strm_spacer),
+                ("label_344", del_spacer),
+                ("label_organize_interval_spacer", organize_spacer),
+            ):
                 minimum = w.find("property[@name='minimumSize']/size/width")
                 widths.add(int(minimum.text) if minimum is not None else None)
                 if _grid_item_pos(grid, nm)[1] != "0":
                     problems.append(f"{nm} 不在 col=0: {_grid_item_pos(grid, nm)!r}")
             if widths != {80}:
-                problems.append(f"两行 col=0 空位宽度应同为 80: {sorted(widths, key=str)!r}")
+                problems.append(f"各行 col=0 空位宽度应同为 80: {sorted(widths, key=str)!r}")
     assert not problems, "STRM 行位置/顺序问题:\n" + "\n".join(problems)
 
 
