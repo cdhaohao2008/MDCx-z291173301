@@ -37,6 +37,10 @@
    `publish-release` 在第一个 Create Release 就崩——此时三个平台的包已经传上去，
    留下的是一条没有正文的半成品 Release。故正文落盘成 `release-notes.md`，再用
    `gh release edit --notes-file` 写入。
+9. **Release 标题格式**：`MDCx <日期版本号>`（如 `MDCx 20261022`），日期取自**软件
+   源代码**的 `mdcx/consts.py` `LOCAL_VERSION`（发版流程先 bump 它、再打同名的纯数字
+   tag，故与 tag 同源），不再带展示版本号与括号。标题只给人看——客户端 `check_version()`
+   只读 `tag_name`，标题改名不影响自动更新。
 
 按仓库惯例做文本断言（`tests/` 不引入 yaml 依赖），改工作流后请同步更新本文件。
 """
@@ -339,12 +343,30 @@ def test_asset_names_and_release_title():
     for asset_name in _EXPECTED_ASSETS:
         assert asset_name in text, f"缺少约定的资产名（客户端按此下载）：{asset_name}"
     assert "release_name: ${{ steps.metadata.outputs.name }}" in text, "标题应沿用 metadata 的解析结果"
-    assert 'release_name="MDCx ${asset_version} (${tag})"' in text, (
-        "Release 标题应为 `MDCx <展示版本号> (<tag>)`（如 `MDCx 2.7.4 (20261021)`）"
-    )
+    assert 'release_name="MDCx ${source_version}"' in text, "Release 标题应为 `MDCx <日期版本号>`（如 `MDCx 20261022`）"
     assert 'echo "name=$release_name" >> "$GITHUB_OUTPUT"' in text, "标题应写入 metadata 的 name 输出"
     assert "name=${version_name} (${tag})" not in text, (
         "标题不应再直接用带 v 前缀的 VERSION_NAME，否则列表里显示的是 `v2.7.4 (20261021)`"
+    )
+
+
+def test_release_title_date_comes_from_source_code():
+    """标题里的日期版本号必须取自软件源代码（`mdcx/consts.py` 的 `LOCAL_VERSION`）。
+
+    标题格式 `MDCx <日期版本号>`（如 `MDCx 20261022`）：日期是发版日，与 tag 同源，
+    少了它列表里就分不清是哪一版。标题只给人看——客户端只读 `tag_name`。
+    """
+    text = _workflow()
+
+    assert "source_version=$(grep -oE 'LOCAL_VERSION[[:space:]]*=[[:space:]]*[0-9]+' mdcx/consts.py" in text, (
+        "标题日期应从 mdcx/consts.py 的 LOCAL_VERSION 读出（软件源代码里的日期）"
+    )
+    assert "source_version=${source_version:-$tag}" in text, "读不到源码日期时应退回 tag，保证标题不缺日期"
+    assert 'if [ "$source_version" != "$tag" ]; then' in text, (
+        "源码日期与 tag 不一致时要显式处理（补发旧 tag 时标题日期按 tag 走，免得与 tag、正文区段对不上）"
+    )
+    assert 'release_name="MDCx ${asset_version} (${tag})"' not in text, (
+        "标题不应再带展示版本号与括号（旧格式 `MDCx <展示版本号> (<tag>)`）"
     )
 
 

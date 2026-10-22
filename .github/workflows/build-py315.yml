@@ -309,19 +309,32 @@ jobs:
 
           version_name=$(grep -oE 'VERSION_NAME[[:space:]]*=[[:space:]]*"[^"]+"' mdcx/consts.py | grep -oE '"[^"]+"' | tr -d '"')
 
-          # 展示版本号：VERSION_NAME 去掉 v 前缀（v2.7.4 → 2.7.4）。
+          # 展示版本号：VERSION_NAME 去掉 v 前缀（v3.0 → 3.0）。
           # 与 tag 是两回事——tag 必须纯数字（check_version 只认 tag_name.isdigit()），
-          # 展示版本号只进 Release 标题与文件名，不参与任何版本比较，故不受纯数字约束。
+          # 展示版本号只进资产文件名，不参与任何版本比较，故不受纯数字约束。
           asset_version=${version_name#v}
-          # 读不到 VERSION_NAME 时退回 tag，保证标题与文件名都不会缺一段
+          # 读不到 VERSION_NAME 时退回 tag，保证文件名不会缺一段
           asset_version=${asset_version:-$tag}
 
-          # Release 标题（/releases 列表里显示的那一行）：`MDCx <展示版本号> (<tag>)`，
-          # 例如 `MDCx 2.7.4 (20261021)`。刻意不写成 `v2.7.4 (20261021)`——列表里一排
-          # `vX.Y.Z` 分不清是本项目的包，带产品名才认得出。客户端只读 tag_name，
-          # `parse_release_version()` 又是用正则搜标题里的 `X.Y.Z` 段（带不带前缀都能
-          # 解析出），所以标题改名不影响自动更新。
-          release_name="MDCx ${asset_version} (${tag})"
+          # Release 标题（/releases 列表里显示的那一行）：`MDCx <日期版本号>`，
+          # 例如 `MDCx 20261022`——只留日期版本号，不再带展示版本号，也不再加括号。
+          #
+          # 日期版本号取自**软件源代码**：mdcx/consts.py 的 LOCAL_VERSION（发版流程先
+          # bump 它、再打同名的纯数字 tag，故它与 tag 同源）。标题日期因此与 tag、
+          # 正文那一段 changelog 的日期三者一致。
+          #
+          # 标题只给人看：客户端 check_version() 只读 tag_name；parse_release_version()
+          # 解析不出 `X.Y` 段时按其文档退回「只比日期」，故标题改名不影响自动更新。
+          source_version=$(grep -oE 'LOCAL_VERSION[[:space:]]*=[[:space:]]*[0-9]+' mdcx/consts.py | grep -oE '[0-9]+' | head -n 1)
+          # 读不到源码日期时退回 tag，保证标题不会缺日期
+          source_version=${source_version:-$tag}
+          if [ "$source_version" != "$tag" ]; then
+            # 补发旧 tag（手动指定 tag、源码已 bump 到更晚的日期）时，标题日期必须跟着
+            # tag 走：否则标题会写着别的日期，与这条 Release 的 tag、正文区段对不上。
+            echo "::warning::源码 LOCAL_VERSION（$source_version）与 tag（$tag）不一致，标题日期按 tag 取。"
+            source_version="$tag"
+          fi
+          release_name="MDCx ${source_version}"
 
           prerelease=false
           if [ "${{ github.event_name }}" ] = "workflow_dispatch" ] && [ "$DISPATCH_PRERELEASE" = "true" ]; then

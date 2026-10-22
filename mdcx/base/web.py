@@ -1189,7 +1189,8 @@ class RemoteVersion(NamedTuple):
     """GitHub 上的最新 release。
 
     `tag` 是纯数字日期版本号（YYYYMMDD，比较的主依据）；`name` 是展示用标题
-    （发版工作流写入的 `MDCx X.Y.Z (YYYYMMDD)`），仅用于版本号比较与提示文案。
+    （发版工作流写入的 `MDCx YYYYMMDD`，早前的标题是 `MDCx X.Y.Z (YYYYMMDD)`），
+    仅用于版本号比较与提示文案。
     """
 
     tag: int
@@ -1210,6 +1211,10 @@ def parse_release_version(name: str) -> tuple[int, int, int] | None:
     只搜标题里的 `X.Y[.Z]` 段，不锚定开头，故标题带不带 `MDCx ` / `v` 前缀都能解析出。
     第三段可省略（v3.0 这种两段版本号，v3.0.0 从 v3.0 升上来时也算同一个版本）：
     省略时补 0，故 `MDCx 3.0 (20261022)` 解析成 (3, 0, 0)。
+
+    现行的标题格式是 `MDCx YYYYMMDD`（如 `MDCx 20261022`，只留发版日期），里面没有
+    `X.Y` 段，故解析不出、返回 None——调用方（`is_remote_version_newer`）会按其文档
+    退回「只比日期」，而日期（tag）本来就是这个项目的版本比较依据。
     """
 
     matched = _RELEASE_VERSION_RE.search(str(name or ""))
@@ -1411,8 +1416,9 @@ def parse_release_atom(text: str) -> RemoteVersion | None:
     """从 `releases.atom` 解析最新 release，返回 `RemoteVersion`（解析不出返回 None）。
 
     与 API 那条路径同取 **tag 最大**的 entry（而非 feed 第一条）：atom 同样按发布时间
-    倒序，补发旧 tag 会把旧版本顶到第一条。标题走 HTML 反转义后作为 `name`，格式仍是
-    `MDCx X.Y.Z (YYYYMMDD)`，故 `parse_release_version` / `display` 的行为与 API 路径完全一致。
+    倒序，补发旧 tag 会把旧版本顶到第一条。标题走 HTML 反转义后作为 `name`，格式与
+    API 路径拿到的一致（现行是 `MDCx YYYYMMDD`），故 `parse_release_version` /
+    `display` 的行为与 API 路径完全一致。
     """
     remote: RemoteVersion | None = None
     for entry in _ATOM_ENTRY_RE.findall(text or ""):
