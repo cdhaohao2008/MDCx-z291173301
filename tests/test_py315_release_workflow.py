@@ -30,6 +30,13 @@
    `Create Release - macOS (Intel)` 三处必须同时消失（`_RETIRED_MACOS_INTEL`）。
 7. **必须用 Python 3.15 构建**：`UV_PYTHON` / `python-version` / 构建前断言三处锁 3.15，
    编出来的包才与 `requires-python >=3.14`（3.15 为当前目标）匹配。
+8. **Release 正文必须走文件，不能塞进 action 的 `body` 输入**：JS action 的每个 `with:`
+   输入都会被 runner 变成一个 `INPUT_*` 环境变量，而 Linux 对单个环境变量有 128 KiB
+   硬上限（`MAX_ARG_STRLEN`）。changelog 改按日期分段后单段可以很大（`## 2026-10-20`
+   那段 340+ KiB），一超限 runner 连 node 进程都起不来，报 "Argument list too long"，
+   `publish-release` 在第一个 Create Release 就崩——此时三个平台的包已经传上去，
+   留下的是一条没有正文的半成品 Release。故正文落盘成 `release-notes.md`，再用
+   `gh release edit --notes-file` 写入。
 
 按仓库惯例做文本断言（`tests/` 不引入 yaml 依赖），改工作流后请同步更新本文件。
 """
@@ -250,6 +257,76 @@ def test_release_uploads_are_idempotent():
         "Create Release 步骤需要 overwrite: true，重跑时才不会失败"
     )
     assert "contents: write" in text, "创建 Release 需要 permissions: contents: write"
+    assert text.count("- name: Create Release - ") == _RELEASE_STEP_COUNT, (
+        f"应有 {_RELEASE_STEP_COUNT} 个 Create Release 步骤（macOS Apple Silicon + Windows + Linux）"
+    )
+
+
+def test_release_notes_go_through_file_not_action_input():
+    """Release 正文必须走文件，不能塞进 action 的 `body` 输入。
+
+    2026-10-24 修：改 tag 20261020 补发时 `publish-release` 报
+    "An error occurred trying to start process '.../node24/bin/node' ...
+    Argument list too long"。根因是 changelog 正文被当成 JS action 的 `body` 输入传给
+    `svenstaro/upload-release-action@v2`：runner 会把每个 `with:` 输入变成一个
+    `INPUT_*` 环境变量，而 Linux 单个环境变量上限 128 KiB（`MAX_ARG_STRLEN`），
+    `## 2026-10-20` 那段 changelog 有 340+ KiB，一超限 execve 直接 E2BIG，
+    node 进程都起不来。此时三个平台的包已经传上去，Release 是半成品。
+    """
+    text = _workflow()
+
+    # 旧写法（正文进 step output 再进 action 输入）必须彻底消失
+    assert "steps.changelog.outputs.CHANGELOG" not in text, (
+        "Release 正文不得再经 step output 传给 action：单个 INPUT_* 环境变量上限 128 KiB，"
+        "changelog 单段超限时 runner 会报 'Argument list too long'，发版在第一个 "
+        "Create Release 就崩，留下没有正文的半成品 Release"
+    )
+    # 正文落盘，只回小字段
+    assert 'notes_file="release-notes.md"' in text, "changelog 正文应落盘成文件，不走 step output"
+    assert '> "$notes_file"' in text, "changelog 区段应被写入 notes_file"
+    assert 'echo "date=$date_str" >> "$GITHUB_OUTPUT"' in text, "changelog 步骤只应回日期等小字段"
+    assert 'echo "notes_file=$notes_file" >> "$GITHUB_OUTPUT"' in text, "changelog 步骤应回 notes_file 路径"
+    # 正文用 gh CLI 按文件写入（gh 是 GitHub-hosted runner 自带，正文走 HTTP 请求体）
+    assert "- name: Publish release notes" in text, "缺少写入 Release 正文的步骤"
+    assert 'gh release edit "$TAG"' in text, "正文应用 gh release edit 写入"
+    assert '--notes-file "$body_file"' in text, "正文必须用 --notes-file 按文件写入"
+    assert "GH_TOKEN: ${{ github.token }}" in text, "gh 需要 token 才有权改 Release"
+    # 预发布状态要显式写：重跑同一 tag 时 gh 的 --prerelease 不传就不改
+    assert "--prerelease" in text and "--prerelease=false" in text, (
+        "预发布状态需显式写一次（重跑补发时状态可能与上次不一致）"
+    )
+
+
+def test_release_notes_respect_github_body_length_limit():
+    """正文还得过 GitHub 的 125,000 字符上限，超了 API 直接 422。
+
+    变更日志按日期分段后单段可以远超这个上限（`## 2026-10-20` 那段近 30 万字符），
+    正文原样塞过去 API 会拒（"body is too long"），Release 仍是没正文的半成品。
+    故按行截断到 120,000 字符（给截断提示留余量），并注明完整内容在哪。
+    """
+    text = _workflow()
+
+    assert "LIMIT = 120_000" in text, "正文应按 120,000 字符上限截断（GitHub 硬上限 125,000）"
+    assert "125,000" in text, "应写明 GitHub 的 125,000 字符硬上限"
+    assert "release-body.md" in text, "截断后的正文应落到单独文件"
+    assert "125,000-character limit" in text, "截断处应注明正文被截断"
+    assert "docs/Changelog.md" in text, "截断处应指出完整内容的去处"
+    # 截断后写正文用的是截断文件，不是原始文件
+    assert '--notes-file "$body_file"' in text, "gh 应读取截断后的正文文件"
+    assert 'body_file="$NOTES_FILE"' in text, "未超限时直接用原文件，不做无谓改写"
+
+
+def test_release_notes_step_runs_after_all_create_release_steps():
+    """`Publish release notes` 必须在三个 Create Release 之后。
+
+    `svenstaro/upload-release-action` 每次都会用 `body` 覆盖 Release 正文，
+    提前写正文会被它抹掉。
+    """
+    text = _workflow()
+
+    notes_idx = text.index("- name: Publish release notes")
+    last_create = text.rindex("- name: Create Release - ")
+    assert notes_idx > last_create, "写正文的步骤必须放在所有 Create Release 之后：svenstaro 每次都会用 body 覆盖正文"
     assert text.count("- name: Create Release - ") == _RELEASE_STEP_COUNT, (
         f"应有 {_RELEASE_STEP_COUNT} 个 Create Release 步骤（macOS Apple Silicon + Windows + Linux）"
     )

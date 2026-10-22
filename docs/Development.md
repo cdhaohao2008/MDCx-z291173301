@@ -702,7 +702,7 @@ CloudFlare 绕过服务（TRAWL、FlareSolverr）与 mdcx 所需的 cf_bypasser 
 1. 在 `docs/Changelog.md` 顶部按**日期**写条目：当天没有段就新建 `## YYYY-MM-DD` 段（段内按 `### 总结` / `### 改进` / `### 更新` 等类别分块），已有段就并进当天的段；已发版旧段保留，未发版段被后续议题取代时合并重写成最终形态。
 2. `uv run bump --version <YYYYMMDD>` 同步 `LOCAL_VERSION` 与 changelog 首个日期段的日期（`--dry-run` 预览、`--force` 免交互）；展示版本名 v3.0 起固定，只有真的要改展示版本号时才加 `--name X.Y[.Z]`（会连带同步 `pyproject.toml` 与 `uv.lock` 根包版本）。只校验用 `uv run bump --check`。
 3. 复核 `uv run pytest tests/test_version_consistency.py tests/test_version_metadata.py`。
-4. 打**纯数字** tag（= `LOCAL_VERSION`）触发 `.github/workflows/build-py315.yml`（Release 正文取 changelog 里与 tag 同日期的那一段）。「已发版」的判据是数字 tag 已推送，而非 changelog 有没有该段。同一版本号重复触发会覆盖更新同一条 Release（`overwrite: true`），不会多出第二条。
+4. 打**纯数字** tag（= `LOCAL_VERSION`）触发 `.github/workflows/build-py315.yml`（Release 正文取 changelog 里与 tag 同日期的那一段，正文按文件写入，见「构建」节）。「已发版」的判据是数字 tag 已推送，而非 changelog 有没有该段。同一版本号重复触发会覆盖更新同一条 Release（`overwrite: true`），不会多出第二条。
 
 版本号归属维护者，不擅自开新段。`scripts/build.py` 与主窗口不留版本常量：build 从 `consts.py` 读 `LOCAL_VERSION`（`--version` 可覆盖），界面统一展示 `VERSION_NAME (LOCAL_VERSION)`。
 
@@ -757,8 +757,10 @@ Release 标题（`/releases` 列表里显示的那一行）是 `MDCx <展示版�
 1. **缺产物不发版**：`build-app` 带 `continue-on-error`，`publish-release` 用 `if: !cancelled() && needs.build-app.result == 'success'` 把关（不能写 `success()`：`needs` 里任一失败腿都会让它整体跳过），并在上传前核对三个平台产物齐全——半成品 Release 比不发更糟。
 2. **并发不互杀**：`concurrency` 按 ref 分组且 `cancel-in-progress: false`，半路取消会留下缺资产的 Release。
 3. **重跑幂等**：三个 Create Release 步骤都带 `overwrite: true`，同一版本号重复发版只更新同名资产，不新建。
+4. **Release 正文按文件写，不走 action 的 `body` 输入**（2026-10-23 修）：变更日志改按日期分段后单段可以很大（`## 2026-10-20` 那段 340+ KiB），而 runner 会把 JS action 的每个 `with:` 输入变成一个 `INPUT_*` 环境变量，Linux 单个环境变量上限 **128 KiB**（`MAX_ARG_STRLEN`）——正文一超限，node 进程都起不来（`execve` E2BIG，报 "An error occurred trying to start process '.../node24/bin/node' ... Argument list too long"），`publish-release` 在第一个 Create Release 就崩，而三个平台的包此时**已经传上去**，留下的是一条没有正文的半成品 Release。故 `Extract current changelog` 把正文落到工作区文件 `release-notes.md`（只回 `date` / `notes_file` 两个小字段），最后新增的 `Publish release notes` 步骤用 runner 自带的 `gh release edit --notes-file` 写入正文（走 HTTP 请求体，不受命令行长度限制），并显式写一次预发布状态（重跑补发时状态可能与上次不一致）。**该步骤必须排在三个 `Create Release` 之后**：svenstaro 每次都会用 `body` 覆盖正文，提前写会被抹掉。`svenstaro/upload-release-action@v2` 没有 `body_file` 输入，故正文只能由 `gh` 事后写。
+5. **正文还有 125,000 字符上限**：超了 API 直接 422（"body is too long"），正文一个字都写不进去，Release 同样只剩半成品。变更日志按日期分段后单段可达近 30 万字符（`## 2026-10-20` 那段 298,401 字符），故写入前按行截到 **120,000** 字符（给截断提示留余量），末尾注明「完整内容见 `docs/Changelog.md` 的 `## <日期>` 段」。截断由 `python3`（GitHub-hosted Ubuntu runner 自带）做，找不到 `python3` 时跳过截断并告警。
 
-上述约定由 `tests/test_py315_release_workflow.py`（12 项）与 `tests/test_workflow_action_pins.py` 守住（纯文本断言，不引入 yaml 依赖），改工作流后请一并跑 `uv run pytest tests/test_sr_bundling.py tests/test_py315_release_workflow.py tests/test_workflow_action_pins.py`。
+上述约定由 `tests/test_py315_release_workflow.py`（15 项）与 `tests/test_workflow_action_pins.py` 守住（纯文本断言，不引入 yaml 依赖），改工作流后请一并跑 `uv run pytest tests/test_sr_bundling.py tests/test_py315_release_workflow.py tests/test_workflow_action_pins.py`。
 
 3.15 有一条 3.14 没有的坑：**PyYAML 至今没有任何 cp315 wheel**（6.0.3 只发到 cp314），3.15 下 `uv sync` 会退回源码编译（Windows runner 缺 MSVC 头文件直接失败，Linux/macOS 也要编译器链）。做法是给构建环境设 `PYYAML_FORCE_LIBYAML: "0"`：PyYAML 的 `setup.py` 读这个环境变量，值为 `0` 时直接跳过 `yaml._yaml` C 扩展，从 sdist 产出纯 Python 的 `py3-none-any` wheel——三平台都不需要编译器，产物还是通用 wheel（不掺别的 ABI 版本）。`uv sync` 与 `pip install -r requirements.txt` 两条路径都认这个变量，本机同理（先 `setx PYYAML_FORCE_LIBYAML 0`，再 `pip install -r requirements.txt`）。PyYAML 官方 wheel 里的 `_yaml` 只是可选的 C 加速，缺它时 PyYAML 会自动退回纯 Python 实现（`__with_libyaml__ = False`，`safe_load`/`dump` 行为与加速版一致），构建与使用都不受影响。以后 PyYAML 出了 cp315 wheel，把这个环境变量删掉即可。工作流还设了 `UV_NO_SYNC: "1"`：否则 `uv run` 的隐式 sync 每次都会重新解析并重建 pyyaml（拖慢构建），依赖统一在安装步骤显式 sync 一次。
 

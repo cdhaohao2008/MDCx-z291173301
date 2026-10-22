@@ -354,6 +354,13 @@ jobs:
           fi
           ls -l dist
 
+      # changelog 正文**落盘**，不回 step output、不进 action 的 `body` 输入。
+      # 根因：JS action 的每个 `with:` 输入都会被 runner 变成一个 `INPUT_*` 环境变量，
+      # 而 Linux 对单个环境变量有 128 KiB 硬上限（MAX_ARG_STRLEN）。changelog 改按日期
+      # 分段后单段可以很大（`## 2026-10-20` 那段就有 340+ KiB），一超限 runner 连 node
+      # 进程都起不来，报 "An error occurred trying to start process '.../node24/bin/node'
+      # ... Argument list too long"，publish-release 在第一个 Create Release 就崩，
+      # 而三个平台的包此时已经传上去（半成品 Release）。详见「Publish release notes」。
       - name: Extract current changelog
         id: changelog
         shell: bash
@@ -371,12 +378,16 @@ jobs:
             echo "::error::changelog 中缺少 ${date_str}（版本 ${version_name}）区段。"
             exit 1
           fi
-          delimiter="__MDCX_CHANGELOG_EOF__"
-          {
-            echo "CHANGELOG<<$delimiter"
-            awk -v date="${date_str}" '$0 ~ "^## " date "( |$)" {found=1; print; next} found && /^## / {exit} found {print}' docs/Changelog.md
-            echo "$delimiter"
-          } >> "$GITHUB_OUTPUT"
+          notes_file="release-notes.md"
+          awk -v date="${date_str}" '$0 ~ "^## " date "( |$)" {found=1; print; next} found && /^## / {exit} found {print}' docs/Changelog.md > "$notes_file"
+          if [ ! -s "$notes_file" ]; then
+            echo "::error::changelog 区段提取为空：$notes_file"
+            exit 1
+          fi
+          echo "changelog 区段已落盘：$notes_file（$(wc -c <"$notes_file") 字节）"
+          # 只回小字段（日期与文件路径），正文本身永远不进 step output。
+          echo "date=$date_str" >> "$GITHUB_OUTPUT"
+          echo "notes_file=$notes_file" >> "$GITHUB_OUTPUT"
 
       - name: Create Release - macOS (Apple Silicon)
         uses: svenstaro/upload-release-action@v2
@@ -386,7 +397,7 @@ jobs:
           asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg
           file: dist/MDCx-aarch64.dmg
           prerelease: ${{ steps.metadata.outputs.prerelease }}
-          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          body: "完整变更日志见 docs/Changelog.md 的 ${{ steps.changelog.outputs.date }} 区段，正文由「Publish release notes」步骤写入。"
           tag: ${{ steps.metadata.outputs.tag }}
 
       - name: Create Release - Windows
@@ -397,7 +408,7 @@ jobs:
           asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-windows-x86_64-${{ github.sha }}.exe
           file: dist/MDCx.exe
           prerelease: ${{ steps.metadata.outputs.prerelease }}
-          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          body: "完整变更日志见 docs/Changelog.md 的 ${{ steps.changelog.outputs.date }} 区段，正文由「Publish release notes」步骤写入。"
           tag: ${{ steps.metadata.outputs.tag }}
 
       - name: Create Release - Linux
@@ -408,5 +419,91 @@ jobs:
           asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}
           file: dist/MDCx
           prerelease: ${{ steps.metadata.outputs.prerelease }}
-          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          body: "完整变更日志见 docs/Changelog.md 的 ${{ steps.changelog.outputs.date }} 区段，正文由「Publish release notes」步骤写入。"
           tag: ${{ steps.metadata.outputs.tag }}
+
+      # Release 正文（changelog 区段）必须走文件，不能走 action 的 `body` 输入。
+      # 根因：JS action 的每个 `with:` 输入都会被 runner 变成一个 `INPUT_*` 环境变量，
+      # 而 Linux 对单个环境变量有 128 KiB 硬上限（MAX_ARG_STRLEN）。changelog 改按日期
+      # 分段后单段可以很大（`## 2026-10-20` 那段 340+ KiB），一超限 runner 连 node 进程
+      # 都起不来，报 "An error occurred trying to start process '.../node24/bin/node' ...
+      # Argument list too long"，publish-release 在第一个 Create Release 就崩——而此时三个
+      # 平台的包已经传上去，留下的是一条没有正文的半成品 Release。
+      # 改法：changelog 落盘成 release-notes.md（见「Extract current changelog」），
+      # 正文用 `gh release edit --notes-file` 写——gh 是 GitHub-hosted runner 自带的
+      # GitHub CLI，正文走文件与 HTTP 请求体，不受命令行长度限制。
+      # 放在三个 Create Release **之后**：svenstaro 每次都会用 `body` 覆盖正文，
+      # 提前写会被它抹掉。
+      - name: Publish release notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.metadata.outputs.tag }}
+          RELEASE_TITLE: ${{ steps.metadata.outputs.name }}
+          RELEASE_DATE: ${{ steps.changelog.outputs.date }}
+          PRERELEASE: ${{ steps.metadata.outputs.prerelease }}
+          NOTES_FILE: ${{ steps.changelog.outputs.notes_file }}
+        run: |
+          set -euo pipefail
+          if ! command -v gh >/dev/null 2>&1; then
+            echo "::error::未找到 gh（GitHub CLI），无法写入 Release 正文。"
+            exit 1
+          fi
+          if [ ! -s "$NOTES_FILE" ]; then
+            echo "::error::Release 正文文件缺失或为空：$NOTES_FILE"
+            exit 1
+          fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release '$TAG' 不存在，前面的 Create Release 步骤应已创建它。"
+            exit 1
+          fi
+          # GitHub 对 Release 正文另有 **125,000 字符**硬上限，超了 API 直接 422
+          # "body is too long"，正文一个字都写不进去。变更日志按日期分段后单段可以
+          # 远超它（`## 2026-10-20` 那段近 30 万字符），故按行截到 120,000 字符
+          # （留出下面那段提示的余量），并注明完整内容在哪。
+          body_file="$NOTES_FILE"
+          if command -v python3 >/dev/null 2>&1; then
+            cat > "$RUNNER_TEMP/truncate_notes.py" <<'PY'
+          import pathlib
+          import sys
+
+          src = pathlib.Path(sys.argv[1])
+          date = sys.argv[2]
+          LIMIT = 120_000
+          FOOTER = (
+              "\n\n---\n\n"
+              "> Release notes truncated to fit GitHub's 125,000-character limit; "
+              f"the complete version is in the `## {date}` section of `docs/Changelog.md` "
+              "in the repository.\n"
+          )
+
+          text = src.read_text(encoding="utf-8")
+          if len(text) <= LIMIT:
+              print(src)
+          else:
+              head = text[:LIMIT]
+              cut = head.rfind("\n")
+              if cut > 0:
+                  head = head[:cut]
+              out = src.with_name("release-body.md")
+              out.write_text(head.rstrip() + FOOTER, encoding="utf-8")
+              print(
+                  f"changelog 区段 {date} 共 {len(text)} 字符，超过 {LIMIT} 字符上限，"
+                  f"已截断为 {len(head)} 字符并写入 {out}",
+                  file=sys.stderr,
+              )
+              print(out)
+          PY
+            body_file="$(python3 "$RUNNER_TEMP/truncate_notes.py" "$NOTES_FILE" "$RELEASE_DATE")"
+          else
+            echo "::warning::未找到 python3，跳过正文截断；若正文超过 125,000 字符，写入会被 API 拒绝。"
+          fi
+          echo "写入 Release 正文：$body_file（$(wc -c <"$body_file") 字节）"
+          # 预发布状态显式写一次：重跑同 tag 时可能与上次的状态不一致（gh 的
+          # --prerelease 不传就不改，传 false 才显式置回正式版）。
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release edit "$TAG" --title "$RELEASE_TITLE" --notes-file "$body_file" --prerelease
+          else
+            gh release edit "$TAG" --title "$RELEASE_TITLE" --notes-file "$body_file" --prerelease=false
+          fi
