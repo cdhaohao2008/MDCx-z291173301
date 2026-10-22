@@ -1,7 +1,8 @@
 """图片后缀与主图路径工具（整理模式、普通/更新模式共用）。
 
-poster / thumb / fanart 三张主图不再局限于 .jpg：本地已有的 png / webp / bmp /
-gif / avif 等格式同样能被识别为主图，搬走时保留源文件的真实扩展名
+poster / thumb / fanart 三张主图不再局限于 .jpg：本地已有的 jpg / jpeg / jfif /
+png / gif / webp / bmp / tif / tiff / tga / ico / pcx / avif / heic / jxr 等格式
+同样能被识别为主图，搬走时保留源文件的真实扩展名
 （poster.png → poster.png，fanart.gif → fanart.gif），避免"改扩展名"造成的
 格式伪装与动图变静图。
 
@@ -19,7 +20,25 @@ import aiofiles.os
 from .file import delete_file_async
 
 # 受支持的图片后缀（按查找优先级排列，.jpg 在前，保证既有行为完全不变）
-IMAGE_SUFFIX_ORDER: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".avif")
+# 覆盖 jpg / jpeg / jfif / png / gif / webp / bmp / tif / tiff / tga / ico / pcx /
+# avif / heic / jxr 等常见格式：主图不局限于 jpg，读取模式与整理模式都能识别并展示。
+IMAGE_SUFFIX_ORDER: tuple[str, ...] = (
+    ".jpg",
+    ".jpeg",
+    ".jfif",
+    ".png",
+    ".gif",
+    ".webp",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".tga",
+    ".ico",
+    ".pcx",
+    ".avif",
+    ".heic",
+    ".jxr",
+)
 IMAGE_SUFFIXES: frozenset[str] = frozenset(IMAGE_SUFFIX_ORDER)
 
 

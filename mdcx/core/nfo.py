@@ -30,6 +30,7 @@ from ..number import get_number_letters
 from ..utils import get_used_time, parse_score_number
 from ..utils.file import delete_file_async, write_file_atomic_async
 from ..utils.language import is_japanese
+from ..utils.picture import resolve_existing_image
 from ..utils.xml import build_cdata, escape_xml_text, normalize_xml_text
 from .naming import NameRenderOptions, NamingTarget, decompose_rendered_title, render_name
 from .nfo_merger import should_merge_nfo
@@ -659,30 +660,17 @@ async def get_nfo_data(file_path: Path, movie_number: str) -> tuple[CrawlersResu
     tag_only = ",".join(only_tag_list)
 
     # 获取本地图片路径
-    poster_path_1 = file_path.with_name(file_path.stem + "-poster.jpg")
-    poster_path_2 = file_folder / "poster.jpg"
-    thumb_path_1 = file_path.with_name(file_path.stem + "-thumb.jpg")
-    thumb_path_2 = file_folder / "thumb.jpg"
-    fanart_path_1 = file_path.with_name(file_path.stem + "-fanart.jpg")
-    fanart_path_2 = file_folder / "fanart.jpg"
-    if await aiofiles.os.path.isfile(poster_path_1):
-        poster_path = poster_path_1
-    elif await aiofiles.os.path.isfile(poster_path_2):
-        poster_path = poster_path_2
-    else:
-        poster_path = None
-    if await aiofiles.os.path.isfile(thumb_path_1):
-        thumb_path = thumb_path_1
-    elif await aiofiles.os.path.isfile(thumb_path_2):
-        thumb_path = thumb_path_2
-    else:
-        thumb_path = None
-    if await aiofiles.os.path.isfile(fanart_path_1):
-        fanart_path = fanart_path_1
-    elif await aiofiles.os.path.isfile(fanart_path_2):
-        fanart_path = fanart_path_2
-    else:
-        fanart_path = None
+    # 主图不局限于 jpg：png/webp/bmp/gif/avif 等格式同样能识别（优先级 jpg 在前，
+    # 既有行为不变）；读取模式下目录里的 thumb.gif / poster.webp 也能正常显示。
+    poster_path = await resolve_existing_image(file_path.with_name(file_path.stem + "-poster.jpg"))
+    if poster_path is None:
+        poster_path = await resolve_existing_image(file_folder / "poster.jpg")
+    thumb_path = await resolve_existing_image(file_path.with_name(file_path.stem + "-thumb.jpg"))
+    if thumb_path is None:
+        thumb_path = await resolve_existing_image(file_folder / "thumb.jpg")
+    fanart_path = await resolve_existing_image(file_path.with_name(file_path.stem + "-fanart.jpg"))
+    if fanart_path is None:
+        fanart_path = await resolve_existing_image(file_folder / "fanart.jpg")
 
     # 返回数据
     json_data.title = title

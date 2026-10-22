@@ -92,6 +92,31 @@ def _is_animated_reader(reader: QImageReader) -> bool:
         return False
 
 
+def _pillow_to_qimage(pic_path: Path) -> tuple[QImage, int, int, bool] | None:
+    """用 Pillow 兜底解码 Qt 不支持的图片格式（pcx / avif 等）。
+
+    Qt 自带的图片插件能读 bmp / gif / ico / jfif / jpeg / jpg / png / tga /
+    tif / tiff / webp，pcx、avif 这类格式则要靠 Pillow 兜底，否则界面缩略图
+    与封面图会显示不出来。返回 (QImage, 宽, 高, 是否动图)。
+    """
+    try:
+        with Image.open(pic_path) as image:
+            image.load()
+            animated = bool(getattr(image, "n_frames", 1) > 1)
+            frame = image.convert("RGBA")
+            width, height = frame.size
+            raw = frame.tobytes("raw", "RGBA")
+    except Exception:
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    # QImage 不会自己持有 bytes 的所有权，这里立刻 copy 一份脱离底层缓冲区
+    qimage = QImage(raw, width, height, width * 4, QImage.Format.Format_RGBA8888).copy()
+    if qimage.isNull():
+        return None
+    return qimage, width, height, animated
+
+
 def is_animated_image(path: Path) -> bool:
     """图片是否为动图（多帧 gif / webp 等）。
 
@@ -180,16 +205,19 @@ class PreviewImageLoader(QObject):
 
             reader = QImageReader(pic_path.as_posix())
             reader.setAutoTransform(True)
-            if not reader.canRead():
-                return _preview_placeholder(poster, "封面图损坏" if poster else "缩略图损坏")
-
             original_size = reader.size()
             target_size = _preview_target_size(original_size.width(), original_size.height(), poster)
             # 动图（多帧 gif 等）读到的只是首帧，额外标记出来由界面层用 QMovie 播放
             animated = _is_animated_reader(reader)
             image = reader.read()
             if image.isNull():
-                return _preview_placeholder(poster, "封面图损坏" if poster else "缩略图损坏")
+                # Qt 的图片插件读不了的格式（pcx / avif 等）用 Pillow 兜底
+                fallback = _pillow_to_qimage(pic_path)
+                if fallback is None:
+                    return _preview_placeholder(poster, "封面图损坏" if poster else "缩略图损坏")
+                image, width, height, animated = fallback
+                original_size = QSize(width, height)
+                target_size = _preview_target_size(width, height, poster)
 
             msg = f"{pic_from.title()}: {original_size.width()}*{original_size.height()}/{int(stat.st_size / 1024)}KB"
             entry = _PreviewCacheEntry(
