@@ -6,9 +6,10 @@ from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QFontMetricsF,
+    QMovie,
     QPixmap,
 )
 from PyQt6.QtWidgets import (
@@ -217,6 +218,10 @@ class MyMAinWindow(
         # (最大化时框同步放大图片随之放大; resize/切番共用同一缩放出口)
         self._poster_src_pixmap: QPixmap | None = None
         self._thumb_src_pixmap: QPixmap | None = None
+        # 动图（gif 等多帧图）预览：kind -> QMovie（QLabel 持有所有权），
+        # 以及动图原始尺寸（用于按 label 几何等比缩放）
+        self._preview_movies: dict[str, QMovie] = {}
+        self._preview_movie_natural: dict[str, QSize] = {}
         self._did_apply_initial_size = False
         self._user_initiated_close = False  # 标记是否为用户主动关闭窗口
         self._naming_design: dict | None = None  # type: ignore[assignment, annotation-unchecked]  # 命名页模板预览区：首次登记的设计几何基准

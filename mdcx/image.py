@@ -30,6 +30,7 @@ class _PreviewCacheEntry:
     width: int
     height: int
     bytes_size: int
+    animated: bool = False
 
 
 class _PreviewImageCache:
@@ -80,7 +81,30 @@ def _preview_target_size(original_width: int, original_height: int, poster: bool
 def _preview_placeholder(poster: bool, text: str | None = None) -> list:
     max_size = POSTER_PREVIEW_SIZE if poster else THUMB_PREVIEW_SIZE
     default_text = "暂无封面图" if poster else "暂无缩略图"
-    return [False, QImage(), text or default_text, max_size.width(), max_size.height()]
+    return [False, QImage(), text or default_text, max_size.width(), max_size.height(), None, False]
+
+
+def _is_animated_reader(reader: QImageReader) -> bool:
+    """读取器里的图片是否为动图（多帧 gif / webp 等）。"""
+    try:
+        return reader.imageCount() > 1
+    except Exception:
+        return False
+
+
+def is_animated_image(path: Path) -> bool:
+    """图片是否为动图（多帧 gif / webp 等）。
+
+    QImageReader.read() 只会取到首帧，动图要用 QMovie 播放才能看到动画效果，
+    故这里单独判断帧数，交给界面层决定是否走 QMovie。
+    """
+    try:
+        reader = QImageReader(path.as_posix())
+        if not reader.canRead():
+            return False
+        return _is_animated_reader(reader)
+    except Exception:
+        return False
 
 
 class PreviewImageLoader(QObject):
@@ -144,7 +168,15 @@ class PreviewImageLoader(QObject):
             if not force_reload:
                 cached = self._cache.get(key)
                 if cached is not None:
-                    return [True, cached.image, cached.msg, cached.width, cached.height]
+                    return [
+                        True,
+                        cached.image,
+                        cached.msg,
+                        cached.width,
+                        cached.height,
+                        str(pic_path),
+                        cached.animated,
+                    ]
 
             reader = QImageReader(pic_path.as_posix())
             reader.setAutoTransform(True)
@@ -153,6 +185,8 @@ class PreviewImageLoader(QObject):
 
             original_size = reader.size()
             target_size = _preview_target_size(original_size.width(), original_size.height(), poster)
+            # 动图（多帧 gif 等）读到的只是首帧，额外标记出来由界面层用 QMovie 播放
+            animated = _is_animated_reader(reader)
             image = reader.read()
             if image.isNull():
                 return _preview_placeholder(poster, "封面图损坏" if poster else "缩略图损坏")
@@ -164,9 +198,10 @@ class PreviewImageLoader(QObject):
                 width=target_size.width(),
                 height=target_size.height(),
                 bytes_size=max(image.sizeInBytes(), 0),
+                animated=animated,
             )
             self._cache.put(key, entry)
-            return [True, image, msg, target_size.width(), target_size.height()]
+            return [True, image, msg, target_size.width(), target_size.height(), str(pic_path), animated]
         except Exception:
             signal.show_log_text(traceback.format_exc())
             return _preview_placeholder(poster, "加载失败")

@@ -416,6 +416,9 @@ class ResultActionsMixin:
             # 几何归 _sync_page_layouts 管辖, 此处不再 resize 设计尺寸
             self._poster_src_pixmap = None
             self._thumb_src_pixmap = None
+            # 动图（gif）也要停, 否则会在占位文本上继续播放动画
+            self._stop_preview_movie("poster")
+            self._stop_preview_movie("thumb")
             self.Ui.label_poster_size.setText("")
             self.Ui.label_thumb_size.setText("")
         else:

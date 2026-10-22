@@ -474,6 +474,12 @@ class WindowOpsMixin:
                 signal_qt.show_traceback_log(traceback.format_exc())
         if hasattr(self, "preview_image_loader"):
             self.preview_image_loader.shutdown()
+        # 动图（gif）播放也要停，避免退出前 QMovie 继续跑
+        for _kind in ("poster", "thumb"):
+            try:
+                self._stop_preview_movie(_kind)
+            except Exception:
+                pass
         if hasattr(self, "tray_icon"):
             self.tray_icon.hide()
         signal_qt.show_traceback_log("\n\n\n\n************ 程序正常退出！************\n")

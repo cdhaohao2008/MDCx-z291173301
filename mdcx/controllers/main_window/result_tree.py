@@ -11,10 +11,11 @@ from typing import Literal
 from PyQt6.QtCore import (
     QItemSelectionModel,
     QRect,
+    QSize,
     Qt,
     QTimer,
 )
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QMovie, QPixmap
 from PyQt6.QtWidgets import (
     QFileDialog,
     QMessageBox,
@@ -265,11 +266,15 @@ class ResultTreeMixin:
 
         缩放规则 KeepAspectRatio(等比、不裁剪、居中留白由 QLabel 对齐负责),
         design 尺寸与原行为一致; 缓存为空(占位文本态)时跳过。
+        动图(gif)走 QMovie, 这里只同步它的缩放尺寸, 不再 setPixmap。
         """
-        for src, label in (
-            (self._poster_src_pixmap, self.Ui.label_poster),
-            (self._thumb_src_pixmap, self.Ui.label_thumb),
+        for src, label, kind in (
+            (self._poster_src_pixmap, self.Ui.label_poster, "poster"),
+            (self._thumb_src_pixmap, self.Ui.label_thumb, "thumb"),
         ):
+            if kind in self._preview_movies:
+                self._sync_preview_movie(kind)
+                continue
             if src is None or src.isNull():
                 continue
             size = label.size()
@@ -283,14 +288,120 @@ class ResultTreeMixin:
                 )
             )
 
+    # region 主界面动图（gif）预览
+    @staticmethod
+    def _preview_source_path(preview: list | None) -> Path | None:
+        """从预览结果里取回源文件路径（第 6 项，缺省表示旧格式结果）。"""
+        if not preview or len(preview) < 6 or not preview[5]:
+            return None
+        try:
+            return Path(preview[5])
+        except Exception:
+            return None
+
+    @staticmethod
+    def _preview_source_animated(preview: list | None) -> bool:
+        """预览结果是否为动图（第 7 项）。"""
+        try:
+            return bool(preview[6]) if preview and len(preview) > 6 else False
+        except Exception:
+            return False
+
+    def _preview_movie_label(self, kind: str):
+        """动图所属的显示控件：poster=封面图，thumb=缩略图。"""
+        return self.Ui.label_poster if kind == "poster" else self.Ui.label_thumb
+
+    def _stop_preview_movie(self, kind: str) -> None:
+        """停掉封面/缩略图上的动图播放，并释放 QMovie（所有权在 QLabel）。"""
+        movie = self._preview_movies.pop(kind, None)
+        self._preview_movie_natural.pop(kind, None)
+        if movie is None:
+            return
+        label = self._preview_movie_label(kind)
+        try:
+            movie.stop()
+            if label.movie() is movie:
+                label.setMovie(None)
+            movie.deleteLater()
+        except Exception:
+            if not signal_qt.stop:
+                signal_qt.show_traceback_log(traceback.format_exc())
+
+    def _start_preview_movie(self, kind: str, preview: list | None) -> None:
+        """动图（gif 等多帧图）用 QMovie 播放，静态图只负责停掉旧动图。"""
+        self._stop_preview_movie(kind)
+        if not self._preview_source_animated(preview):
+            return
+        path = self._preview_source_path(preview)
+        if path is None:
+            return
+        label = self._preview_movie_label(kind)
+        try:
+            if not path.is_file():
+                return
+            movie = QMovie(path.as_posix())
+            if not movie.isValid():
+                return
+            # 小文件整帧缓存播放更顺滑；大文件按默认逐帧解码，避免占用过多内存
+            try:
+                if path.stat().st_size <= 5 * 1024 * 1024:
+                    movie.setCacheMode(QMovie.CacheMode.CacheAll)
+            except OSError:
+                pass
+            movie.frameChanged.connect(lambda *_, k=kind: self._sync_preview_movie(k))
+            label.setMovie(movie)
+            movie.start()
+        except Exception:
+            if not signal_qt.stop:
+                signal_qt.show_traceback_log(traceback.format_exc())
+            return
+        self._preview_movies[kind] = movie
+        self._sync_preview_movie(kind)
+
+    def _sync_preview_movie(self, kind: str) -> None:
+        """按 label 当前尺寸重算动图的等比缩放尺寸并同步给 QMovie。"""
+        movie = self._preview_movies.get(kind)
+        if movie is None:
+            return
+        label = self._preview_movie_label(kind)
+        try:
+            box = label.size()
+            if box.width() <= 0 or box.height() <= 0:
+                return
+            natural = self._preview_movie_natural.get(kind)
+            if natural is None:
+                image = movie.currentImage()
+                if image.isNull():
+                    return
+                natural = image.size()
+                if natural.width() <= 0 or natural.height() <= 0:
+                    return
+                self._preview_movie_natural[kind] = natural
+            if natural.width() / natural.height() > box.width() / box.height():
+                width = box.width()
+                height = int(box.width() * natural.height() / natural.width())
+            else:
+                height = box.height()
+                width = int(box.height() * natural.width() / natural.height())
+            scaled = QSize(max(width, 1), max(height, 1))
+            if scaled != movie.scaledSize():
+                movie.setScaledSize(scaled)
+        except Exception:
+            if not signal_qt.stop:
+                signal_qt.show_traceback_log(traceback.format_exc())
+
+    # endregion
+
     def resize_label_and_setpixmap(self, poster_pix, thumb_pix):
         if poster_pix is not None:
             if poster_pix[0]:
                 self._poster_src_pixmap = (
                     poster_pix[1] if isinstance(poster_pix[1], QPixmap) else QPixmap.fromImage(poster_pix[1])
                 )
+                self._start_preview_movie("poster", poster_pix)
             else:
                 self._poster_src_pixmap = None
+                self._stop_preview_movie("poster")
                 self.Ui.label_poster.clear()
                 self.Ui.label_poster.setText(poster_pix[2])
 
@@ -299,8 +410,10 @@ class ResultTreeMixin:
                 self._thumb_src_pixmap = (
                     thumb_pix[1] if isinstance(thumb_pix[1], QPixmap) else QPixmap.fromImage(thumb_pix[1])
                 )
+                self._start_preview_movie("thumb", thumb_pix)
             else:
                 self._thumb_src_pixmap = None
+                self._stop_preview_movie("thumb")
                 self.Ui.label_thumb.clear()
                 self.Ui.label_thumb.setText(thumb_pix[2])
 
