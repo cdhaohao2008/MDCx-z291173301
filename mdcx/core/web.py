@@ -39,6 +39,7 @@ from ..models.model_types import CrawlersResult, OtherInfo
 from ..models.mosaic import has_leak_mark, has_umr_mark
 from ..utils import get_used_time, split_path
 from ..utils.file import check_pic_async, copy_file_async, delete_file_async, move_file_async
+from ..utils.picture import image_path_with_suffix
 from .amazon import (
     _detect_amazon_barcode_candidates_from_image_bytes_with_reason,
     _extract_amazon_barcode_label_roi,
@@ -992,10 +993,12 @@ async def thumb_download(
             and await aiofiles.os.path.exists(done_thumb_path)
             and split_path(done_thumb_path)[0] == split_path(thumb_final_path)[0]
         ):
-            await copy_file_async(done_thumb_path, thumb_final_path)
+            # 复制分集封面时保留源文件扩展名（.jpg / .png / .gif 等）
+            thumb_target = image_path_with_suffix(thumb_final_path, Path(done_thumb_path).suffix)
+            await copy_file_async(done_thumb_path, thumb_target)
             LogBuffer.log().write(f"\n 🍀 Thumb done! (copy cd-thumb)({get_used_time(start_time)}s) ")
             result.thumb_from = "copy cd-thumb"
-            other.thumb_path = thumb_final_path
+            other.thumb_path = thumb_target
             return True
 
     # 下载图片
@@ -1383,9 +1386,11 @@ async def poster_download(
             and await aiofiles.os.path.exists(done_poster_path)
             and split_path(done_poster_path)[0] == split_path(poster_final_path)[0]
         ):
-            await copy_file_async(done_poster_path, poster_final_path)
+            # 复制分集封面时保留源文件扩展名（.jpg / .png / .gif 等）
+            poster_target = image_path_with_suffix(poster_final_path, Path(done_poster_path).suffix)
+            await copy_file_async(done_poster_path, poster_target)
             result.poster_from = "copy cd-poster"
-            other.poster_path = poster_final_path
+            other.poster_path = poster_target
             LogBuffer.log().write(f"\n 🍀 Poster done! (copy cd-poster)({get_used_time(start_time)}s)")
             return True
 
@@ -1393,10 +1398,12 @@ async def poster_download(
     if thumb_path:
         copy_flag = _get_poster_copy_policy(result, download_files)
         if copy_flag:
-            await copy_file_async(thumb_path, poster_final_path)
+            # 复制缩略图时保留源文件扩展名（.jpg / .png / .gif 等）
+            poster_target = image_path_with_suffix(poster_final_path, Path(thumb_path).suffix)
+            await copy_file_async(thumb_path, poster_target)
             other.poster_marked = other.thumb_marked
             result.poster_from = "copy thumb"
-            other.poster_path = poster_final_path
+            other.poster_path = poster_target
             LogBuffer.log().write(
                 f"\n 🍀 Poster done! (copy thumb, {result.scraping_type.value})({get_used_time(start_time)}s)"
             )
@@ -1599,11 +1606,13 @@ async def fanart_download(
         ):
             if fanart_path:
                 await delete_file_async(fanart_path)
-            ok, copy_err = await copy_file_async(done_fanart_path, fanart_final_path)
+            # 复制分集封面时保留源文件扩展名（.jpg / .png / .gif 等）
+            fanart_target = image_path_with_suffix(fanart_final_path, Path(done_fanart_path).suffix)
+            ok, copy_err = await copy_file_async(done_fanart_path, fanart_target)
             if not ok:
                 LogBuffer.log().write(f"\n 🔴 Fanart copy failed! 分集复制失败: {copy_err}")
                 return False
-            other.fanart_path = fanart_final_path
+            other.fanart_path = fanart_target
             LogBuffer.log().write(f"\n 🍀 Fanart done! (copy cd-fanart)({get_used_time(start_time)}s)")
             return True
 
@@ -1611,7 +1620,9 @@ async def fanart_download(
     if thumb_path:
         if fanart_path:
             await delete_file_async(fanart_path)
-        ok, copy_err = await copy_file_async(thumb_path, fanart_final_path)
+        # 复制缩略图时保留源文件扩展名（.jpg / .png / .gif 等）
+        fanart_target = image_path_with_suffix(fanart_final_path, Path(thumb_path).suffix)
+        ok, copy_err = await copy_file_async(thumb_path, fanart_target)
         if not ok:
             LogBuffer.log().write(f"\n 🔴 Fanart copy failed! 复制失败: {copy_err}")
             if DownloadableFile.IGNORE_PIC_FAIL in download_files:
@@ -1621,11 +1632,11 @@ async def fanart_download(
                 "\n 🔴 Fanart failed! 你可以到「软件设置」-「下载」，勾选「图片下载失败时，不视为失败！」 "
             )
             return False
-        other.fanart_path = fanart_final_path
+        other.fanart_path = fanart_target
         other.fanart_marked = other.thumb_marked
         LogBuffer.log().write(f"\n 🍀 Fanart done! (copy thumb)({get_used_time(start_time)}s)")
         if cd_part:
-            Flags.file_done_dic[number].update({"fanart": fanart_final_path})
+            Flags.file_done_dic[number].update({"fanart": fanart_target})
         return True
     # 本地有 fanart 时，不下载
     if fanart_path:

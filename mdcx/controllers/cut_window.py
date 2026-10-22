@@ -17,6 +17,7 @@ from ..models.mosaic import has_leak_mark, has_umr_mark, has_uncensored_mark, is
 from ..ui_theme import get_theme_tokens
 from ..utils import executor
 from ..utils.file import delete_file_sync
+from ..utils.picture import resolve_existing_image_sync
 from ..views.posterCutTool import Ui_Dialog_cut_poster
 
 if TYPE_CHECKING:
@@ -423,7 +424,10 @@ class CutWindow(QDialog):
             self.showimage(Path(img_path))
 
     def _poster_path_of(self, img_path: Path, pic_name: bool) -> Path:
-        """按 MDCx 命名规则推导同目录下的 poster 路径（与 showimage 原有推导一致）。"""
+        """按 MDCx 命名规则推导同目录下的 poster 路径（与 showimage 原有推导一致）。
+
+        poster 可能是 jpg/png/webp/gif 等其它格式，找不到规范名时按受支持后缀回退。
+        """
         poster_path = img_path.with_name("poster.jpg")
         if not pic_name and "-" in img_path.stem:  # 文件名-poster.jpg
             poster_path = img_path.with_name(
@@ -433,7 +437,7 @@ class CutWindow(QDialog):
                 .replace(img_path.suffix, "")
                 + "-poster.jpg"
             )
-        return poster_path
+        return resolve_existing_image_sync(poster_path) or poster_path
 
     def _prefer_larger_poster(self, img_path: Path, pic_name: bool) -> Path:
         """「封面替换缩略图」勾选时，裁剪改用更大的 poster 大尺寸图作为原始图。

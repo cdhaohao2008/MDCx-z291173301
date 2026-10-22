@@ -79,6 +79,7 @@ from ..utils.dataclass import update
 from ..utils.file import copy_file_async, move_file_async
 from ..utils.image import compress_images_in_folder_async
 from ..utils.path import is_any_descendant
+from ..utils.picture import resolve_main_image
 from .file import (
     _generate_file_name,
     _get_folder_path,
@@ -484,12 +485,12 @@ class Scraper:
         if await aiofiles.os.path.exists(task.file_new_path):
             task.file_info.file_path = task.file_new_path
         await save_success_list(task.file_path, task.file_new_path)
-        if await aiofiles.os.path.exists(task.poster_final_path):
-            task.other.poster_path = task.poster_final_path
-        if await aiofiles.os.path.exists(task.fanart_final_path):
-            task.other.fanart_path = task.fanart_final_path
-        if await aiofiles.os.path.exists(task.thumb_final_path):
-            task.other.thumb_path = task.thumb_final_path
+        if found := await resolve_main_image(task.poster_final_path):
+            task.other.poster_path = found
+        if found := await resolve_main_image(task.fanart_final_path):
+            task.other.fanart_path = found
+        if found := await resolve_main_image(task.thumb_final_path):
+            task.other.thumb_path = found
         elif task.other.fanart_path is not None:
             task.other.thumb_path = task.other.fanart_path
 
@@ -1991,12 +1992,13 @@ class Scraper:
             await save_success_list(file_path, organized_media_path)
 
             if poster_final_path is not None:
-                if await aiofiles.os.path.exists(poster_final_path):
-                    other.poster_path = poster_final_path
-                if await aiofiles.os.path.exists(fanart_final_path):
-                    other.fanart_path = fanart_final_path
-                if await aiofiles.os.path.exists(thumb_final_path):
-                    other.thumb_path = thumb_final_path
+                # 主图可能是 png/webp/gif 等其它格式，这里按实际落位路径记录
+                if found := await resolve_main_image(poster_final_path):
+                    other.poster_path = found
+                if found := await resolve_main_image(fanart_final_path):
+                    other.fanart_path = found
+                if found := await resolve_main_image(thumb_final_path):
+                    other.thumb_path = found
                 elif other.fanart_path is not None:
                     other.thumb_path = other.fanart_path
             return res, other
@@ -2095,17 +2097,19 @@ class Scraper:
 
         # json添加封面缩略图路径（仅指向实际存在的文件；按删除策略删掉的文件必须置 None，
         # 否则 UI 预览与其他消费者会拿到指向已删除文件的过期路径）
+        # 主图可能是 png/webp/gif 等其它格式，这里按实际落位路径记录；
+        # 若本次下载已写出规范名（.jpg），同名的其它后缀副本属于残留，一并清掉。
         if poster_final_path is not None:
-            if await aiofiles.os.path.exists(poster_final_path):
-                other.poster_path = poster_final_path
+            if found := await resolve_main_image(poster_final_path, drop_other_variants=True):
+                other.poster_path = found
             else:
                 other.poster_path = None
-            if await aiofiles.os.path.exists(fanart_final_path):
-                other.fanart_path = fanart_final_path
+            if found := await resolve_main_image(fanart_final_path, drop_other_variants=True):
+                other.fanart_path = found
             else:
                 other.fanart_path = None
-            if await aiofiles.os.path.exists(thumb_final_path):
-                other.thumb_path = thumb_final_path
+            if found := await resolve_main_image(thumb_final_path, drop_other_variants=True):
+                other.thumb_path = found
             elif other.fanart_path is not None:
                 other.thumb_path = other.fanart_path
             else:

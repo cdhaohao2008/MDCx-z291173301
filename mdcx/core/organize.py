@@ -14,11 +14,8 @@ from ..config.manager import manager
 from ..models.log_buffer import LogBuffer
 from ..number import get_file_number
 from ..utils.file import elevated_move_file, move_file_async
+from ..utils.picture import IMAGE_SUFFIXES, image_path_with_suffix
 
-_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
-# 动图等其它图片格式同样要跟着整理，但 poster/thumb/fanart 的目标名固定为 .jpg，
-# 所以它们只作为「普通图片」搬运（保持原文件名），不参与主图候选。
-_EXTRA_IMAGE_SUFFIXES = {".gif", ".avif"}
 _ORGANIZE_BACKUP_MARK = ".mdcx_organize_backup_"
 _ASSET_FOLDER_NAMES = ("extrafanart", "backdrops", "behind the scenes", "trailers")
 # 剧照类目录名关键词：容忍 extarfanart、extrafanart_copy 等非标准写法
@@ -751,14 +748,7 @@ async def _build_plan(
     image_entries = [
         entry
         for entry in entries
-        if _safe_is_file(entry) and entry.suffix.lower() in _IMAGE_SUFFIXES and not _is_backup_name(entry.name)
-    ]
-    # 动图（gif 等）：目标主图名固定为 .jpg，动图只按原文件名整体搬运，
-    # 否则 fanart.gif 会被改名成 fanart.jpg 而无法播放。
-    extra_image_entries = [
-        entry
-        for entry in entries
-        if _safe_is_file(entry) and entry.suffix.lower() in _EXTRA_IMAGE_SUFFIXES and not _is_backup_name(entry.name)
+        if _safe_is_file(entry) and entry.suffix.lower() in IMAGE_SUFFIXES and not _is_backup_name(entry.name)
     ]
     for kind, final_path in (
         ("poster", poster_final_path),
@@ -783,11 +773,13 @@ async def _build_plan(
                 path.name.lower(),
             )
         )
-        add(candidates[0], final_path)
+        # 主图保留源文件的真实扩展名：poster.png → poster.png、fanart.gif → fanart.gif。
+        # 不改成 .jpg 是为了不做"格式伪装"，也保住 gif 动图。
+        add(candidates[0], image_path_with_suffix(final_path, candidates[0].suffix))
         for extra in candidates[1:]:
             add_variant(extra, folder_new_path / extra.name)
 
-    for entry in [*image_entries, *extra_image_entries]:
+    for entry in image_entries:
         if entry in seen_sources or not belongs(entry):
             continue
         add_variant(entry, folder_new_path / entry.name)
@@ -866,7 +858,7 @@ async def _build_plan(
             add_variant(source, folder_new_path / target_name / relative)
 
     # 其余与文件同名的伴生文件（不含媒体、nfo、json，它们已单独处理）。
-    handled_suffixes = media_types | {".nfo", ".json"} | set(sub_types) | _IMAGE_SUFFIXES | _EXTRA_IMAGE_SUFFIXES
+    handled_suffixes = media_types | {".nfo", ".json"} | set(sub_types) | IMAGE_SUFFIXES
     for entry in entries:
         if not _safe_is_file(entry) or entry in seen_sources or not belongs(entry):
             continue

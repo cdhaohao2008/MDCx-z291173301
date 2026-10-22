@@ -79,14 +79,14 @@ _RETIRED_MACOS_INTEL = (
 )
 
 # 客户端依赖的资产名，逐条写死（唯一发版流程，没有第二份可对照，改名即破坏下载链接）。
-# 形如 `MDCx-<展示版本号>-<tag>-<平台>-<架构>-<sha>.<ext>`，例如
-# `MDCx-2.4.7-20261020-windows-x86_64-<40位sha>.exe`：两个版本段并存——`asset_version`
-# 是 `VERSION_NAME` 去 v 前缀（只给人看），`tag` 是纯数字 `LOCAL_VERSION`（`check_version()`
-# 的 `int(tag_name)` 比较走的是它）。
+# 形如 `MDCx-<tag>-<平台>-<架构>-<sha>.<ext>`，例如
+# `MDCx-20261022-windows-x86_64-<40位sha>.exe`：资产名里只留日期版本号（tag），
+# 不再带展示版本号（3.0）那一段——`tag` 是纯数字 `LOCAL_VERSION`，`check_version()`
+# 的 `int(tag_name)` 比较走的是它。
 _EXPECTED_ASSETS = (
-    "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg",
-    "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-windows-x86_64-${{ github.sha }}.exe",
-    "asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}",
+    "asset_name: MDCx-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg",
+    "asset_name: MDCx-${{ steps.metadata.outputs.tag }}-windows-x86_64-${{ github.sha }}.exe",
+    "asset_name: MDCx-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}",
 )
 
 # 已删除的工作流，守卫它们别被无意中加回来
@@ -370,27 +370,22 @@ def test_release_title_date_comes_from_source_code():
     )
 
 
-def test_asset_version_segment_comes_from_version_name_without_v_prefix():
-    """资产名里的展示版本号段必须是 `VERSION_NAME` 去 v 前缀，且三个发布步骤都引用它。"""
+def test_asset_name_only_carries_date_version_tag():
+    """资产名里只留日期版本号（tag），不再带展示版本号（3.0）那一段。"""
     text = _workflow()
 
-    assert "asset_version=${version_name#v}" in text, (
-        "展示版本号应由 VERSION_NAME 去掉 v 前缀得到（v2.4.7 → 2.4.7），不能直接拼带 v 的原值"
+    assert "steps.metadata.outputs.asset_version" not in text, (
+        "资产名不应再引用展示版本号 asset_version（否则文件名会变成 MDCx-3.0-20261022-...）"
     )
-    assert 'echo "asset_version=$asset_version" >> "$GITHUB_OUTPUT"' in text, (
-        "metadata 步骤应回输出 asset_version，三个 Create Release 步骤都靠它拼文件名"
+    assert "asset_version=" not in text, "metadata 步骤不应再输出已无人引用的 asset_version"
+    assert text.count("steps.metadata.outputs.tag") >= _RELEASE_STEP_COUNT, (
+        "三个 Create Release 步骤都应引用 tag 拼文件名"
     )
-    assert "asset_version=${asset_version:-$tag}" in text, "读不到 VERSION_NAME 时应退回 tag，保证资产文件名不会缺一段"
-    assert text.count("steps.metadata.outputs.asset_version") == _RELEASE_STEP_COUNT, (
-        f"三个 Create Release 步骤都应引用 asset_version（当前 {text.count('steps.metadata.outputs.asset_version')} 处）"
-    )
-    # asset_version 只进文件名，绝不能被写回 tag——tag 必须保持纯数字
-    assert 'echo "tag=$tag"' in text and "asset_version=$tag" not in text, (
-        "asset_version 不得覆盖 tag：tag 必须纯数字，否则 check_version 的 int(tag_name) 失效"
-    )
-    # build-app 的 Windows 预检步骤独立算了一遍展示版本号，日志里的文件名必须与真名一致
-    assert "$versionName.TrimStart('v')" in text, (
-        "Windows 预检步骤应按同一算法（去 v 前缀）算出计划发布文件名，否则日志与实际上传名对不上"
+    # tag 必须保持纯数字：客户端 check_version() 用 int(tag_name) 比较
+    assert 'echo "tag=$tag"' in text, "tag 必须原样输出，不得被其它版本号覆盖"
+    # Windows 预检步骤算出的计划文件名必须与上传名逐字一致
+    assert '$expectedAssetName = "MDCx-${releaseTag}-${platform}-${arch}-${sha}.exe"' in text, (
+        "Windows 预检步骤应按同一套拼法（只带 tag）算出计划发布文件名，否则日志与实际上传名对不上"
     )
 
 

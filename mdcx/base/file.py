@@ -40,6 +40,7 @@ from ..models.log_buffer import LogBuffer
 from ..ui_hooks import ui_hooks
 from ..utils import executor, get_current_time, get_used_time
 from ..utils.file import copy_file_async, copy_file_sync, delete_file_async, delete_file_sync, move_file_async
+from ..utils.picture import resolve_existing_image
 
 LARGE_LIST_SORT_THRESHOLD = 50000
 _large_list_warned: set[str] = set()
@@ -269,12 +270,15 @@ async def pic_some_deal(number: str, thumb_final_path: Path, fanart_final_path: 
         keep_files=manager.config.keep_files,
     )
     if thumb_policy.should_remove_existing:
-        if await aiofiles.os.path.exists(fanart_final_path):
-            Flags.file_done_dic[number]["thumb"] = fanart_final_path
+        # 主图可能是 png/webp/gif 等其它格式，按实际落位路径判断与清理
+        existing_fanart = await resolve_existing_image(fanart_final_path)
+        existing_thumb = await resolve_existing_image(thumb_final_path)
+        if existing_fanart is not None:
+            Flags.file_done_dic[number]["thumb"] = existing_fanart
         else:
             Flags.file_done_dic[number]["thumb"] = None
-        if await aiofiles.os.path.exists(thumb_final_path):
-            await delete_file_async(thumb_final_path)
+        if existing_thumb is not None:
+            await delete_file_async(existing_thumb)
             LogBuffer.log().write("\n 🍀 Thumb delete done!")
     elif not thumb_policy.should_download:
         # thumb 未勾选下载、但 poster/fanart 需要中间源时，thumb_download 会下载
@@ -285,12 +289,14 @@ async def pic_some_deal(number: str, thumb_final_path: Path, fanart_final_path: 
             local_thumb = Flags.file_done_dic.get(number, cast(FileDoneDict, {})).get("local_thumb")
         except Exception:
             local_thumb = None
-        if not local_thumb and await aiofiles.os.path.exists(thumb_final_path):
-            if await aiofiles.os.path.exists(fanart_final_path):
-                Flags.file_done_dic[number]["thumb"] = fanart_final_path
+        existing_thumb = await resolve_existing_image(thumb_final_path)
+        if not local_thumb and existing_thumb is not None:
+            existing_fanart = await resolve_existing_image(fanart_final_path)
+            if existing_fanart is not None:
+                Flags.file_done_dic[number]["thumb"] = existing_fanart
             else:
                 Flags.file_done_dic[number]["thumb"] = None
-            await delete_file_async(thumb_final_path)
+            await delete_file_async(existing_thumb)
             LogBuffer.log().write("\n 🍀 Thumb delete done! (temp)")
 
 

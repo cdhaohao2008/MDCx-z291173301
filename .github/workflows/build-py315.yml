@@ -214,18 +214,11 @@ jobs:
           $sha = "${{ github.sha }}"
           $artifactPath = "dist/MDCx.exe"
 
-          # 展示版本号（VERSION_NAME 去 v 前缀），与 publish-release 的 asset_version 同源同算法。
-          # 两处各算一遍而不是跨 job 传递：build-app 的 outputs 未定义，且这个值一旦算错
-          # 只会让日志里的「计划发布文件名」与真正上传的名字对不上，属于可读性问题。
-          $versionName = ""
-          if (Test-Path -LiteralPath "mdcx/consts.py") {
-            $m = Select-String -Path "mdcx/consts.py" -Pattern 'VERSION_NAME\s*=\s*"([^"]+)"' | Select-Object -First 1
-            if ($m) { $versionName = $m.Matches[0].Groups[1].Value }
-          }
-          $versionName = $versionName.TrimStart('v')
-          if ([string]::IsNullOrWhiteSpace($versionName)) { $versionName = $releaseTag }
-
-          $expectedAssetName = "MDCx-${versionName}-${releaseTag}-${platform}-${arch}-${sha}.exe"
+          # 资产文件名只带日期版本号（tag），不再带展示版本号（3.0）那一段：
+          # MDCx-<tag>-<platform>-<arch>-<sha>.exe
+          # 与 publish-release 的 asset_name 同一套拼法，日志里的「计划发布文件名」
+          # 必须与真正上传的名字逐字一致。
+          $expectedAssetName = "MDCx-${releaseTag}-${platform}-${arch}-${sha}.exe"
 
           Write-Host "检查发布产物：$artifactPath"
           Write-Host "计划发布文件名：$expectedAssetName"
@@ -307,15 +300,6 @@ jobs:
             echo "::warning::tag '$tag' 已存在，本次是覆盖更新该 Release 的资产（overwrite: true），不是新建。"
           fi
 
-          version_name=$(grep -oE 'VERSION_NAME[[:space:]]*=[[:space:]]*"[^"]+"' mdcx/consts.py | grep -oE '"[^"]+"' | tr -d '"')
-
-          # 展示版本号：VERSION_NAME 去掉 v 前缀（v3.0 → 3.0）。
-          # 与 tag 是两回事——tag 必须纯数字（check_version 只认 tag_name.isdigit()），
-          # 展示版本号只进资产文件名，不参与任何版本比较，故不受纯数字约束。
-          asset_version=${version_name#v}
-          # 读不到 VERSION_NAME 时退回 tag，保证文件名不会缺一段
-          asset_version=${asset_version:-$tag}
-
           # Release 标题（/releases 列表里显示的那一行）：`MDCx <日期版本号>`，
           # 例如 `MDCx 20261022`——只留日期版本号，不再带展示版本号，也不再加括号。
           #
@@ -342,7 +326,6 @@ jobs:
           fi
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "asset_version=$asset_version" >> "$GITHUB_OUTPUT"
           echo "name=$release_name" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
@@ -407,7 +390,7 @@ jobs:
         with:
           overwrite: true
           release_name: ${{ steps.metadata.outputs.name }}
-          asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg
+          asset_name: MDCx-${{ steps.metadata.outputs.tag }}-macos-aarch64-${{ github.sha }}.dmg
           file: dist/MDCx-aarch64.dmg
           prerelease: ${{ steps.metadata.outputs.prerelease }}
           body: "完整变更日志见 docs/Changelog.md 的 ${{ steps.changelog.outputs.date }} 区段，正文由「Publish release notes」步骤写入。"
@@ -418,7 +401,7 @@ jobs:
         with:
           overwrite: true
           release_name: ${{ steps.metadata.outputs.name }}
-          asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-windows-x86_64-${{ github.sha }}.exe
+          asset_name: MDCx-${{ steps.metadata.outputs.tag }}-windows-x86_64-${{ github.sha }}.exe
           file: dist/MDCx.exe
           prerelease: ${{ steps.metadata.outputs.prerelease }}
           body: "完整变更日志见 docs/Changelog.md 的 ${{ steps.changelog.outputs.date }} 区段，正文由「Publish release notes」步骤写入。"
@@ -429,7 +412,7 @@ jobs:
         with:
           overwrite: true
           release_name: ${{ steps.metadata.outputs.name }}
-          asset_name: MDCx-${{ steps.metadata.outputs.asset_version }}-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}
+          asset_name: MDCx-${{ steps.metadata.outputs.tag }}-linux-x86_64-${{ github.sha }}
           file: dist/MDCx
           prerelease: ${{ steps.metadata.outputs.prerelease }}
           body: "完整变更日志见 docs/Changelog.md 的 ${{ steps.changelog.outputs.date }} 区段，正文由「Publish release notes」步骤写入。"

@@ -29,6 +29,7 @@ from mdcx.models.model_types import CrawlersResult, FileInfo
 from mdcx.signals import signal_qt
 from mdcx.utils import executor, get_current_time
 from mdcx.utils.file import delete_file_sync, open_file_thread
+from mdcx.utils.picture import resolve_existing_image_sync
 from mdcx.utils.qt_text import anchor_if_idle
 from mdcx.views.nfo_preview_window import NfoPreviewWindow
 
@@ -775,19 +776,19 @@ def pushButton_nfo_lib_crop_clicked(self: MyMAinWindow) -> None:
         QMessageBox.warning(self, "提示", "请先选择一个 NFO 文件")
         return
 
-    # 尝试找到同目录的封面图
-    poster_path = nfo_path.with_name(nfo_path.stem + "-poster.jpg")
-    if not poster_path.is_file():
-        poster_path = nfo_path.parent / "poster.jpg"
-    if not poster_path.is_file():
+    # 尝试找到同目录的封面图（可能是 jpg/png/webp/gif 等其它格式）
+    poster_path = resolve_existing_image_sync(nfo_path.with_name(nfo_path.stem + "-poster.jpg"))
+    if poster_path is None:
+        poster_path = resolve_existing_image_sync(nfo_path.parent / "poster.jpg")
+    if poster_path is None:
         # 尝试 thumb
-        thumb_path = nfo_path.with_name(nfo_path.stem + "-thumb.jpg")
-        if thumb_path.is_file():
+        thumb_path = resolve_existing_image_sync(nfo_path.with_name(nfo_path.stem + "-thumb.jpg"))
+        if thumb_path is not None:
             poster_path = thumb_path
         else:
-            poster_path = nfo_path.parent / "thumb.jpg"
+            poster_path = resolve_existing_image_sync(nfo_path.parent / "thumb.jpg")
 
-    if not poster_path.is_file():
+    if poster_path is None:
         QMessageBox.warning(self, "提示", "未找到可裁剪的封面图文件")
         return
 
@@ -815,12 +816,16 @@ _NFO_LIB_IMAGE_LABEL = {"poster": "封面", "thumb": "缩略图"}
 
 
 def _resolve_nfo_image(nfo_path: Path, kind: str) -> Path | None:
-    """按 core/nfo.py 的命名规则定位 nfo 同目录下的封面 / 缩略图。"""
+    """按 core/nfo.py 的命名规则定位 nfo 同目录下的封面 / 缩略图。
+
+    主图可能是 jpg/png/webp/gif 等其它格式，规范名找不到时按受支持后缀回退。
+    """
     named = nfo_path.with_name(nfo_path.stem + _NFO_LIB_IMAGE_SUFFIX.get(kind, "-poster.jpg"))
     fallback = nfo_path.parent / _NFO_LIB_IMAGE_FALLBACK.get(kind, "poster.jpg")
     for candidate in (named, fallback):
-        if candidate.is_file():
-            return candidate
+        found = resolve_existing_image_sync(candidate)
+        if found is not None:
+            return found
     return None
 
 

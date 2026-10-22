@@ -41,6 +41,11 @@ from ..utils.file import (
     move_file_async,
 )
 from ..utils.path import safe_rmtree, showFilePath
+from ..utils.picture import (
+    image_path_candidates,
+    image_path_with_suffix,
+    resolve_existing_image,
+)
 from .naming import FIELD_DESCRIPTIONS, NameRenderOptions, NamingTarget, render_name
 
 
@@ -140,10 +145,11 @@ async def creat_folder(
     # 二者指向同一个文件
     if os.path.samestat(fn_stat, f_stat):
         other.dont_move_movie = True
-        if await aiofiles.os.path.exists(thumb_new_path_with_filename):
-            other.thumb_path = thumb_new_path_with_filename
-        if await aiofiles.os.path.exists(poster_new_path_with_filename):
-            other.poster_path = poster_new_path_with_filename
+        # 主图可能是 png/webp/gif 等其它格式，按实际落位路径记录
+        if found := await resolve_existing_image(thumb_new_path_with_filename):
+            other.thumb_path = found
+        if found := await resolve_existing_image(poster_new_path_with_filename):
+            other.poster_path = found
         return True
     # 「移动文件」策略（设置 → 高级 → 移动文件）优先于原有的「同名即报错中止」。
     # 只在整理模式与视频模式下生效（需求指定这两个模式复用该选择）：
@@ -876,17 +882,19 @@ async def _migrate_picture_resource(
     old_path_with_filename: Path,
     old_path_no_filename: Path,
     local_key: str,
-) -> tuple[bool, bool]:
-    """迁移单张封面图片到最终路径，返回 (exists, done_path_copy).
+) -> tuple[bool, bool, Path | None]:
+    """迁移单张封面图片到最终路径，返回 (exists, done_path_copy, 实际落位路径).
 
     处理逻辑（poster/thumb/fanart 三块完全一致）:
     1. 若 done_path 已存在且与 final_path 同目录，标记 done_path_copy=False，下载函数负责处理
-    2. 若 final_path 已存在则跳过
+    2. 若 final_path 已存在则跳过（.jpg/.jpeg/.png/.webp/.bmp/.gif/.avif 任意一种都算）
     3. 依次尝试移动: new_path_with_filename -> old_path_with_filename -> old_path_no_filename
+       （每个位置都按受支持后缀依次查找，搬走时保留源文件真实扩展名，不做格式伪装）
     4. 全部不存在则 exists=False，尝试从 file_done_dic 的 local_* 复制
     """
     done_path_copy = True
     exists = True
+    actual_path: Path | None = None
     try:
         if (
             done_path
@@ -894,38 +902,49 @@ async def _migrate_picture_resource(
             and split_path(done_path)[0] == split_path(final_path)[0]
         ):
             done_path_copy = False
-        elif await aiofiles.os.path.exists(final_path):
-            pass
+            actual_path = await resolve_existing_image(final_path) or final_path
+        elif existing := await resolve_existing_image(final_path):
+            actual_path = existing
         else:
             # 同 final_path 的并发迁移（多 CD 分集共用 poster/thumb/fanart.jpg）串行化，
             # 避免"检查不存在→移动"的 TOCTOU 竞态导致后写覆盖先写；锁内复查 final_path，先到先得
             async with Flags._pic_catch_lock:
-                if not await aiofiles.os.path.exists(final_path):
-                    if new_path_with_filename != final_path and await aiofiles.os.path.exists(new_path_with_filename):
-                        moved, _ = await move_file_async(new_path_with_filename, final_path, overwrite=True)
-                        if not moved:
-                            exists = False
-                    elif old_path_with_filename != final_path and await aiofiles.os.path.exists(old_path_with_filename):
-                        moved, _ = await move_file_async(old_path_with_filename, final_path, overwrite=True)
-                        if not moved:
-                            exists = False
-                    elif old_path_no_filename != final_path and await aiofiles.os.path.exists(old_path_no_filename):
-                        moved, _ = await move_file_async(old_path_no_filename, final_path, overwrite=True)
-                        if not moved:
-                            exists = False
+                if await aiofiles.os.path.exists(final_path):
+                    actual_path = final_path
+                else:
+                    for source_base in (new_path_with_filename, old_path_with_filename, old_path_no_filename):
+                        source = await resolve_existing_image(source_base)
+                        if source is None:
+                            continue
+                        target = image_path_with_suffix(final_path, source.suffix)
+                        if str(source).lower() != str(target).lower():
+                            moved, _ = await move_file_async(source, target, overwrite=True)
+                            if not moved:
+                                exists = False
+                                continue
+                        actual_path = target
+                        exists = True
+                        break
                     else:
                         exists = False
 
         if exists and number in Flags.file_done_dic:
-            cast(dict[str, Path | None], Flags.file_done_dic[number])[local_key] = final_path
-            for old_path in (old_path_with_filename, old_path_no_filename, new_path_with_filename):
-                if str(old_path).lower() != str(final_path).lower() and await aiofiles.os.path.exists(old_path):
-                    await delete_file_async(old_path)
+            cast(dict[str, Path | None], Flags.file_done_dic[number])[local_key] = actual_path or final_path
+            # 清理旧位置残留（同名不同扩展名也算），保留实际落位的那一张
+            keep = actual_path or final_path
+            for old_base in (old_path_with_filename, old_path_no_filename, new_path_with_filename):
+                for old_path in image_path_candidates(old_base):
+                    if str(old_path).lower() == str(keep).lower():
+                        continue
+                    if await aiofiles.os.path.exists(old_path):
+                        await delete_file_async(old_path)
         elif p := cast(Path | None, Flags.file_done_dic.get(number, cast(FileDoneDict, {})).get(local_key)):
-            await copy_file_async(p, final_path)
+            target = image_path_with_suffix(final_path, p.suffix)
+            await copy_file_async(p, target)
+            actual_path = target
     except Exception:
         log_console.log_text(traceback.format_exc())
-    return exists, done_path_copy
+    return exists, done_path_copy, actual_path
 
 
 async def deal_old_files(
@@ -978,6 +997,11 @@ async def deal_old_files(
     file_path_list = {
         nfo_old_path,
         nfo_new_path,
+        trailer_old_file_path_with_filename,
+        trailer_new_file_path_with_filename,
+    }
+    # 图片路径按受支持后缀一并纳入（poster.png 等其它格式也要清理）
+    for image_path in (
         thumb_old_path_with_filename,
         thumb_old_path_no_filename,
         thumb_new_path_with_filename,
@@ -990,9 +1014,8 @@ async def deal_old_files(
         fanart_old_path_no_filename,
         fanart_new_path_with_filename,
         fanart_final_path,
-        trailer_old_file_path_with_filename,
-        trailer_new_file_path_with_filename,
-    }
+    ):
+        file_path_list.update(image_path_candidates(image_path))
     folder_path_list = {
         extrafanart_old_path,
         extrafanart_new_path,
@@ -1068,7 +1091,7 @@ async def deal_old_files(
     最终的图片处理：在最终的 rename pic 环节，如果最终路径有内容，则删除非最终路径的内容；如果最终路径没内容，表示图片是刚下载的，要改成最终路径。
     """
 
-    poster_exists, done_poster_path_copy = await _migrate_picture_resource(
+    poster_exists, done_poster_path_copy, poster_actual_path = await _migrate_picture_resource(
         number,
         Flags.file_done_dic.get(number, cast(FileDoneDict, {})).get("poster"),
         poster_final_path,
@@ -1077,7 +1100,7 @@ async def deal_old_files(
         poster_old_path_no_filename,
         "local_poster",
     )
-    thumb_exists, done_thumb_path_copy = await _migrate_picture_resource(
+    thumb_exists, done_thumb_path_copy, thumb_actual_path = await _migrate_picture_resource(
         number,
         Flags.file_done_dic.get(number, cast(FileDoneDict, {})).get("thumb"),
         thumb_final_path,
@@ -1086,7 +1109,7 @@ async def deal_old_files(
         thumb_old_path_no_filename,
         "local_thumb",
     )
-    fanart_exists, done_fanart_path_copy = await _migrate_picture_resource(
+    fanart_exists, done_fanart_path_copy, fanart_actual_path = await _migrate_picture_resource(
         number,
         Flags.file_done_dic.get(number, cast(FileDoneDict, {})).get("fanart"),
         fanart_final_path,
@@ -1096,10 +1119,10 @@ async def deal_old_files(
         "local_fanart",
     )
 
-    # 更新图片地址
-    info.poster_path = poster_final_path if poster_exists and done_poster_path_copy else None
-    info.thumb_path = thumb_final_path if thumb_exists and done_thumb_path_copy else None
-    info.fanart_path = fanart_final_path if fanart_exists and done_fanart_path_copy else None
+    # 更新图片地址（主图可能不是 .jpg，这里记录实际落位路径）
+    info.poster_path = (poster_actual_path or poster_final_path) if poster_exists and done_poster_path_copy else None
+    info.thumb_path = (thumb_actual_path or thumb_final_path) if thumb_exists and done_thumb_path_copy else None
+    info.fanart_path = (fanart_actual_path or fanart_final_path) if fanart_exists and done_fanart_path_copy else None
 
     # nfo 处理
     try:
