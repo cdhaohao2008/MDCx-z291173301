@@ -13531,7 +13531,7 @@ class Ui_MDCx(object):
         self.checkBox_separate_overwrite_strm.setToolTip(
             _translate(
                 "MDCx",
-                "需先勾选「为本地视频文件生成STRM链接文本」；勾选后，已存在的STRM链接文本将被覆盖，不勾选则跳过已存在项",
+                "勾选本项会自动勾选「为本地视频文件生成STRM链接文本」（没有生成就没有可覆盖的）；已存在的STRM链接文本将被覆盖，不勾选则跳过已存在项",
             )
         )
         self.checkBox_separate_reuse_meta.setText(_translate("MDCx", "复用数据存放目录中的元数据文件"))

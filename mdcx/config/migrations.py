@@ -51,6 +51,18 @@ def _migrate_organize_interval_keys(data: dict[str, Any]) -> None:
         data["organize_netdisk_rest_interval"] = False
 
 
+def _migrate_strm_overwrite_linkage(data: dict[str, Any]) -> None:
+    """分离模式 STRM 两开关归一：覆盖以生成为前提。
+
+    没有生成 STRM 文件就谈不上「覆盖本地已存在的 STRM 链接文本」，
+    故勾了覆盖却没勾生成的配置（老版本界面把覆盖框置灰但保留其勾选值、
+    手改配置都可能留下这种组合）补上生成，让覆盖真正能生效；
+    两个都没勾时保持原样（默认档＝既不生成也不覆盖）。
+    """
+    if bool(data.get("separate_overwrite_strm", False)) and not bool(data.get("separate_generate_strm", False)):
+        data["separate_generate_strm"] = True
+
+
 def _migrate_actor_clean_rules(data: dict[str, Any]) -> None:
     """从存量配置的生效规则/默认规则里摘掉两条已退役的 minnano 占位规则。"""
     for key in ("actor_clean_rules", "actor_clean_rules_default"):
@@ -624,6 +636,11 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     # 必须勾选其中一个（默认档＝本地不限间隔）。老配置没有这两个键时补出厂
     # 默认；手改成「两开」或「全关」时归一。
     _migrate_organize_interval_keys(data)
+
+    # 分离模式 STRM 两开关：「覆盖本地已存在的STRM链接文本」以「为本地视频文件
+    # 生成STRM链接文本」为前提，勾了覆盖却没勾生成的配置补上生成（否则覆盖
+    # 永远不生效）；两个都没勾则保持原样。
+    _migrate_strm_overwrite_linkage(data)
 
     # 无限次刮削开关（高级 → 保留任务右侧）：默认勾选，老配置缺键时自动补上
     # 不带 [迁移] 前缀即会被视为致命错误触发 _failed.json 保护分支，故此处静默补齐不告警

@@ -33,6 +33,7 @@ from mdcx.config.extend import (
     get_movie_path_setting,
     normalize_move_file_switches,
     normalize_organize_interval_policy,
+    normalize_strm_policy,
 )
 from mdcx.config.manager import manager
 from mdcx.config.models import MIN_REST_TIME_SECONDS, SiteConfig, normalize_site_list, str_to_list
@@ -418,8 +419,16 @@ def save_config(self: MyMAinWindow):
     manager.config.separate_failed_file_move = self.Ui.radioButton_separate_mode_fail_move_on.isChecked()
     manager.config.separate_success_file_rename = self.Ui.radioButton_separate_mode_succ_rename_on.isChecked()
     manager.config.separate_del_empty_folder = self.Ui.radioButton_separate_mode_del_empty_folder_on.isChecked()
-    manager.config.separate_generate_strm = self.Ui.checkBox_separate_generate_strm.isChecked()
-    manager.config.separate_overwrite_strm = self.Ui.checkBox_separate_overwrite_strm.isChecked()
+    # 分离模式 STRM：覆盖是生成的后置动作，勾了覆盖必须同时勾了生成
+    # （界面层已联动，这里再兜底归一一次，保证写盘的组合永远合法）
+    generate_strm, overwrite_strm = normalize_strm_policy(
+        self.Ui.checkBox_separate_generate_strm.isChecked(),
+        self.Ui.checkBox_separate_overwrite_strm.isChecked(),
+    )
+    self.Ui.checkBox_separate_generate_strm.setChecked(generate_strm)
+    self.Ui.checkBox_separate_overwrite_strm.setChecked(overwrite_strm)
+    manager.config.separate_generate_strm = generate_strm
+    manager.config.separate_overwrite_strm = overwrite_strm
     manager.config.separate_reuse_metadata = self.Ui.checkBox_separate_reuse_meta.isChecked()
     manager.config.separate_overwrite_meta = self.Ui.checkBox_separate_overwrite_meta.isChecked()
     # 整理模式：两次整理之间的时间间隔策略（两枚复选框互斥，必须勾选其中一个，

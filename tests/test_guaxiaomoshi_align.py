@@ -445,26 +445,35 @@ def test_reuse_overwrite_meta_mutually_exclusive(win, app):
     app.processEvents()
 
 
-def test_overwrite_strm_disabled_without_generate(win, app):
-    """生成是覆盖的前提：未勾选生成时覆盖框置灰，重新勾选生成后恢复（勾选值保留）。"""
+def test_overwrite_strm_links_generate_checkbox(win, app):
+    """覆盖是生成的后置动作：勾覆盖自动带上生成，取消生成则覆盖一并取消。
+
+    覆盖框不再置灰（用户要能先勾覆盖），改由勾选时的联动保证组合合法。
+    """
     ui = win.Ui
     win.show()
     _goto_guaxiaomoshi(win, app)
     generate = ui.checkBox_separate_generate_strm
     overwrite = ui.checkBox_separate_overwrite_strm
     generate.setChecked(False)
+    overwrite.setChecked(False)
     app.processEvents()
-    assert not overwrite.isEnabled(), "未勾选生成时覆盖框应置灰"
+    assert overwrite.isEnabled(), "覆盖框不应被置灰（勾选覆盖会自动带上生成）"
+
+    # 勾选覆盖 → 同步勾选生成
     overwrite.setChecked(True)
     app.processEvents()
-    generate.setChecked(True)
-    app.processEvents()
-    assert overwrite.isEnabled(), "勾选生成后覆盖框应恢复可用"
-    assert overwrite.isChecked(), "置灰期间覆盖框的勾选值应保留"
+    assert generate.isChecked(), "勾选覆盖时必须同步勾选生成"
+    assert overwrite.isEnabled(), "勾选生成后覆盖框应可用"
+
+    # 取消生成 → 覆盖一并取消
     generate.setChecked(False)
     app.processEvents()
-    assert not overwrite.isEnabled(), "取消生成后覆盖框应再次置灰"
+    assert not overwrite.isChecked(), "取消生成后覆盖项应同步取消"
+    assert overwrite.isEnabled(), "覆盖框不应被置灰"
+
     generate.setChecked(False)
+    overwrite.setChecked(False)
     app.processEvents()
 
 

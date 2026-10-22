@@ -145,9 +145,19 @@ class SettingsActionsMixin:
         if checked:
             self.Ui.checkBox_separate_reuse_meta.setChecked(False)
 
-    # 分离模式-STRM：生成是覆盖的前提，未勾选生成时覆盖项置灰（保留其勾选值，重新勾选生成后自动恢复）
+    # 分离模式-STRM：覆盖是生成的后置动作 —— 没有生成 STRM 文件就无从覆盖，
+    # 所以勾选「覆盖本地已存在的STRM链接文本」时同步勾选「为本地视频文件生成
+    # STRM链接文本」；反过来取消生成时覆盖一并取消（界面永远保持合法组合，
+    # 不再把覆盖框置灰，避免用户想先勾覆盖却点不动）
     def checkBox_separate_generate_strm_changed(self, checked):
-        self.Ui.checkBox_separate_overwrite_strm.setEnabled(bool(checked))
+        if not checked and self.Ui.checkBox_separate_overwrite_strm.isChecked():
+            # 没有生成就没有可覆盖的 STRM，覆盖项同步取消
+            self.Ui.checkBox_separate_overwrite_strm.setChecked(False)
+
+    def checkBox_separate_overwrite_strm_changed(self, checked):
+        if checked:
+            # 覆盖以生成为前提，勾选覆盖时同步勾选生成
+            self.Ui.checkBox_separate_generate_strm.setChecked(True)
 
     # 整理模式-本地/网盘间隔互斥：两者必须勾选其中一个（默认档＝「本地存储不设置
     # 时间间隔整理文件」）。勾选其一自动去勾另一；把唯一勾选的那枚取消时立即

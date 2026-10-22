@@ -31,6 +31,7 @@ from mdcx.config.extend import (
     normalize_move_file_policy,
     normalize_move_file_switches,
     normalize_organize_interval_policy,
+    normalize_strm_policy,
 )
 from mdcx.config.manager import manager
 from mdcx.config.models import MIN_REST_TIME_SECONDS
@@ -625,10 +626,14 @@ def load_config(self: MyMAinWindow):
             (self.Ui.radioButton_separate_mode_del_empty_folder_off, False),
             default=self.Ui.radioButton_separate_mode_del_empty_folder_off,
         )
-        # 分离模式：为本地视频生成STRM链接地址（覆盖项以其为前提，未生成时置灰）
-        self.Ui.checkBox_separate_generate_strm.setChecked(manager.config.separate_generate_strm)
-        self.Ui.checkBox_separate_overwrite_strm.setChecked(manager.config.separate_overwrite_strm)
-        self.Ui.checkBox_separate_overwrite_strm.setEnabled(self.Ui.checkBox_separate_generate_strm.isChecked())
+        # 分离模式：为本地视频生成STRM链接地址（覆盖项以其为前提：勾了覆盖必须带上生成）
+        generate_strm, overwrite_strm = normalize_strm_policy(
+            manager.config.separate_generate_strm, manager.config.separate_overwrite_strm
+        )
+        manager.config.separate_generate_strm = generate_strm
+        manager.config.separate_overwrite_strm = overwrite_strm
+        self.Ui.checkBox_separate_generate_strm.setChecked(generate_strm)
+        self.Ui.checkBox_separate_overwrite_strm.setChecked(overwrite_strm)
         self.Ui.checkBox_separate_reuse_meta.setChecked(manager.config.separate_reuse_metadata)
         self.Ui.checkBox_separate_overwrite_meta.setChecked(manager.config.separate_overwrite_meta)
         # 复用/覆盖互斥：手改配置若两开，以覆盖为准（运行时同样覆盖优先）

@@ -378,7 +378,8 @@ FileInfo → CrawlerInput → CrawlTask
 - **两个开关**：`separate_generate_strm`（为本地视频文件生成STRM链接文本）与 `separate_overwrite_strm`（覆盖本地已存在的STRM链接文本），默认 False。
 - **覆盖以生成为前提**：`extend.py: should_overwrite_strm()` = `is_separate_mode() and separate_generate_strm and separate_overwrite_strm`。不生成 STRM 自然不存在「覆盖」，故未勾选生成时勾选覆盖不生效（其他模式同理不生效，调用方不得直读 `manager.config.separate_overwrite_strm`）。
 - **生成条件**：`should_generate_strm(meta_root, skip_reorganize)` = 元数据根有效 + 非跳过整理 + 分离模式 + 已勾选生成。写入位置为元数据镜像目录 `meta_folder`（与 nfo/封面同目录），内容为视频最终绝对路径：开移动写 `file_new_path`，不开移动写 `file_path`（此时 `file_new_path` 指向未使用的目标目录）。
-- **界面联动**：`checkBox_separate_generate_strm_changed`（`settings_actions.py`）在生成框勾选状态变化时置灰/恢复 `checkBox_separate_overwrite_strm`（只改 enabled，保留其勾选值，故重新勾选生成即恢复）；`init.py` 接 `toggled`，`load_config.py` 回读后同步 enabled 状态；tooltip 写明前置条件。
+- **界面联动**：`checkBox_separate_overwrite_strm_changed`（`settings_actions.py`）在勾选「覆盖本地已存在的STRM链接文本」时**同步勾选**「为本地视频文件生成STRM链接文本」；`checkBox_separate_generate_strm_changed` 在取消生成时**一并取消覆盖**（没有生成就没有可覆盖的）。覆盖框**不再置灰**（用户要能先勾覆盖），改由勾选时的联动保证组合合法；`init.py` 接两个 `toggled` 信号，tooltip 写明自动联动。
+- **配置层归一**：`extend.py: normalize_strm_policy(generate, overwrite)` 是加载（`load_config.py`）与保存（`save_config.py`）共用的唯一口径——勾了覆盖必定补上生成，生成取消则覆盖一并取消，写盘的组合永远合法；`migrations.py: _migrate_strm_overwrite_linkage()` 把「只勾了覆盖」的旧配置（老版本界面置灰但保留勾选值、手改配置都可能留下）补上生成，否则覆盖永远不生效。
 - **.strm 属元数据**：`SEPARATE_META_EXTS` 含 `.strm`，`move_other_file` 因此把源目录已有 .strm 搬进数据目录而非跟随视频。
 
 ### 文件爬虫（mdcx/core/file_crawler.py）

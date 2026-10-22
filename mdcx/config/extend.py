@@ -232,6 +232,18 @@ def normalize_organize_interval_policy(local: bool, netdisk: bool) -> tuple[bool
     return local, netdisk
 
 
+def normalize_strm_policy(generate: bool, overwrite: bool) -> tuple[bool, bool]:
+    """分离模式 STRM 两个开关归一：覆盖是生成的后置动作。
+
+    没有生成 STRM 文件就谈不上「覆盖本地已存在的 STRM 链接文本」，
+    因此勾选覆盖必须同时勾选生成；生成被取消时覆盖自动取消，
+    保证界面上永远是「勾了覆盖 ⇒ 也勾了生成」的合法组合。
+    """
+    if overwrite:
+        return True, True
+    return generate, False
+
+
 def should_generate_strm(meta_root: Path | None, skip_reorganize: bool) -> bool:
     """是否生成 STRM：仅分离模式 + 已勾选 + 元数据根有效 + 非跳过整理时生效。
 
@@ -248,6 +260,8 @@ def should_overwrite_strm() -> bool:
     与 should_generate_strm 同门：未勾选「为本地视频文件生成STRM链接文本」时，
     根本不会生成 STRM，也就不存在「覆盖本地已存在的STRM链接文本」这件事，
     此时即使勾选覆盖开关也不生效（调用方不得直接读 manager.config.separate_overwrite_strm）。
+    配置层（界面联动 + normalize_strm_policy + 配置迁移）已保证「勾了覆盖 ⇒ 也勾了
+    生成」，这里只是运行时的最后一道兜底。
     """
     return is_separate_mode() and manager.config.separate_generate_strm and manager.config.separate_overwrite_strm
 
