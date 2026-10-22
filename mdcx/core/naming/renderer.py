@@ -19,6 +19,11 @@ _JINJA_TAG_PATTERN = re.compile(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", re.DOTALL)
 _FIELD_TOKEN_PATTERN = re.compile(r"\{\{(.*?)\}\}", re.DOTALL)
 _FIELD_NAME_PATTERN = re.compile(r"^\s*(?:fields\.)?([A-Za-z_][A-Za-z0-9_]*)")
 
+# 分析命名模板里 {{title}} 槽位时使用的占位符：渲染一次带哨兵的模板，就能知道
+# 标题前后各拼接了哪些固定内容（release/number 等），进而把「已渲染的标题」还原
+# 回纯标题，避免已渲染的标题再套一次模板导致字段重复叠加。
+TITLE_SENTINEL = "\x00mdcx-title\x00"
+
 
 class NamingTarget(Enum):
     FOLDER = "folder"
@@ -192,9 +197,10 @@ def _smart_truncate(
     return text, truncated_fields
 
 
-def render_name(
-    template: str, file_info: FileInfo, data: CrawlersResult, options: NameRenderOptions
-) -> NameRenderResult:
+def _build_values(
+    file_info: FileInfo, data: CrawlersResult, options: NameRenderOptions
+) -> tuple[NamingContext, dict[str, Any]]:
+    """构建命名上下文与模板变量表。"""
     context = build_naming_context(
         file_info,
         data,
@@ -205,6 +211,13 @@ def render_name(
     )
     values: dict[str, Any] = context.values.copy()
     values["fields"] = context.values
+    return context, values
+
+
+def render_name(
+    template: str, file_info: FileInfo, data: CrawlersResult, options: NameRenderOptions
+) -> NameRenderResult:
+    context, values = _build_values(file_info, data, options)
 
     text, truncated_fields = _smart_truncate(
         template,
@@ -216,3 +229,72 @@ def render_name(
     if not text:
         text = sanitize_name(fallback, allow_path_separator=False)
     return NameRenderResult(text=text, template=template, context=context, truncated_fields=truncated_fields)
+
+
+def _render_title_slot(template: str, values: dict[str, Any], target: NamingTarget) -> str:
+    """把模板里的 {{title}} 换成哨兵渲染一次，用于分析标题槽位前后的固定内容。"""
+    marker_values = dict(values)
+    marker_values["title"] = TITLE_SENTINEL
+    marker_values["fields"] = marker_values
+    return _render_with_values(template, marker_values, target)
+
+
+def _decompose_multi_title(text: str, marker: str) -> str:
+    """模板里 {{title}} 出现多次时，按固定分隔符把标题还原成唯一的那一份。"""
+    parts = marker.split(TITLE_SENTINEL)
+    prefix, suffix = parts[0], parts[-1]
+    seps = parts[1:-1]
+    middle = text
+    if prefix and middle.startswith(prefix):
+        middle = middle[len(prefix) :]
+    if suffix and middle.endswith(suffix):
+        middle = middle[: len(middle) - len(suffix)]
+    chunks = [middle]
+    for sep in seps:
+        if not sep:
+            continue
+        split_chunks: list[str] = []
+        for chunk in chunks:
+            if sep not in chunk:
+                return text
+            head, _, tail = chunk.partition(sep)
+            split_chunks.extend([head, tail])
+        chunks = split_chunks
+    titles = {chunk.strip() for chunk in chunks if chunk.strip()}
+    if len(titles) == 1:
+        return titles.pop()
+    return text
+
+
+def decompose_rendered_title(
+    title: str,
+    template: str,
+    file_info: FileInfo,
+    data: CrawlersResult,
+    options: NameRenderOptions,
+) -> str:
+    """把「已按模板渲染过的标题」还原成纯标题。
+
+    命名模板除 {{title}} 外还有 {{release}} / {{number}} 等固定字段，已经渲染过的标题
+    再套一次模板就会把这些字段重复叠加（例：模板 {{release}} {{number}} {{title}}，
+    标题 "2024-09-25 FC2-123 某某" 再渲染一次会变成
+    "2024-09-25 FC2-123 2024-09-25 FC2-123 某某"）。这里按模板结构剥掉固定部分，
+    还原后再渲染一次即可得到与原标题一致的结果，从而让标题渲染保持幂等。
+    """
+    text = str(title or "").strip()
+    if not text or not template:
+        return text
+    _context, values = _build_values(file_info, data, options)
+    marker = _render_title_slot(template, values, options.target)
+    count = marker.count(TITLE_SENTINEL)
+    if count == 0:
+        return text
+    if count > 1:
+        return _decompose_multi_title(text, marker)
+    prefix, _, suffix = marker.partition(TITLE_SENTINEL)
+    pure = text
+    if prefix and pure.startswith(prefix):
+        pure = pure[len(prefix) :]
+    if suffix and pure.endswith(suffix):
+        pure = pure[: len(pure) - len(suffix)]
+    return pure.strip()

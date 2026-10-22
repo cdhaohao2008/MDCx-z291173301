@@ -31,7 +31,7 @@ from ..utils import get_used_time, parse_score_number
 from ..utils.file import delete_file_async, write_file_atomic_async
 from ..utils.language import is_japanese
 from ..utils.xml import build_cdata, escape_xml_text, normalize_xml_text
-from .naming import NameRenderOptions, NamingTarget, render_name
+from .naming import NameRenderOptions, NamingTarget, decompose_rendered_title, render_name
 from .nfo_merger import should_merge_nfo
 from .tag_priority import prioritize_nfo_tags
 
@@ -83,6 +83,65 @@ def _build_generated_read_tags(
     return {tag for tag in generated_tags if tag}
 
 
+def nfo_title_template() -> str:
+    """NFO <title> 使用的命名模板（更新模式用「更新标题模板」，其余模式用「视频标题名」）。"""
+    if get_runtime_main_mode() == 4:
+        return manager.config.update_titletemplate
+    return manager.config.naming_media
+
+
+def _nfo_title_options() -> NameRenderOptions:
+    return NameRenderOptions(
+        target=NamingTarget.NFO_TITLE,
+        show_definition_suffix=False,
+        show_cnword_suffix=False,
+        show_moword_suffix=False,
+    )
+
+
+def _render_nfo_title(
+    template: str,
+    file_info: FileInfo,
+    data: CrawlersResult,
+    options: NameRenderOptions,
+    title: str,
+) -> str:
+    """用给定的标题值渲染命名模板（渲染期间临时替换 data.title，结束后还原）。"""
+    original = data.title
+    try:
+        data.title = title
+        return render_name(template, file_info, data, options).text
+    finally:
+        data.title = original
+
+
+def build_nfo_title(file_info: FileInfo, data: CrawlersResult, title: str | None = None) -> str:
+    """计算 NFO <title> 的最终文本（幂等：已渲染的标题不会被二次渲染）。
+
+    读取模式/整理模式下 data.title 本身就是从 NFO 读回来的「已渲染标题」，若再套一次
+    命名模板，{{release}} / {{number}} 等字段就会重复叠加（例：标题
+    "2024-09-25 FC2-123 某某" 再渲染一次会变成
+    "2024-09-25 FC2-123 2024-09-25 FC2-123 某某"）。这里先按模板结构把标题还原成
+    纯标题再渲染，渲染结果与原标题一致时直接沿用原标题，保证反复保存不会让标题变长。
+
+    title 不为 None 时以它为准（编辑 NFO 窗口标题栏里的文本），用于「所见即所得」。
+    """
+    template = nfo_title_template()
+    options = _nfo_title_options()
+    core = str(data.title or "") if title is None else str(title or "")
+    cd_suffix = ""
+    cd_part = file_info.cd_part
+    if cd_part and NfoInclude.TITLE_CD in manager.config.nfo_include_new:
+        cd_suffix = " " + cd_part[1:].upper()
+    if cd_suffix and core.endswith(cd_suffix):
+        core = core[: -len(cd_suffix)]
+    pure = decompose_rendered_title(core, template, file_info, data, options)
+    rendered = _render_nfo_title(template, file_info, data, options, pure)
+    if rendered.strip() == core.strip():
+        return core + cd_suffix
+    return rendered + cd_suffix
+
+
 async def write_nfo(
     file_info: FileInfo,
     data: CrawlersResult,
@@ -91,6 +150,7 @@ async def write_nfo(
     update=False,
     skip_merge=False,
     preserve_tag_order=False,
+    title_override: str | None = None,
 ) -> bool:
     start_time = time.time()
     download_files = manager.config.download_files
@@ -113,11 +173,6 @@ async def write_nfo(
 
         LogBuffer.log().write(f"\n 🍀 Nfo done! (old)({get_used_time(start_time)}s)")
         return True
-
-    if get_runtime_main_mode() == 4:
-        nfo_title_template = manager.config.update_titletemplate
-    else:
-        nfo_title_template = manager.config.naming_media
 
     # 本地NFO合并策略：勾选框开启且策略非 prefer_scraper 时读取现有 NFO 并按策略合并。
     # skip_merge=True（NFO 库表单编辑保存）时跳过合并，避免 PREFER_NFO 等策略用磁盘旧值覆盖用户表单修改。
@@ -167,21 +222,12 @@ async def write_nfo(
     def write_text_element(code: StringIO, tag_name: str, value: str, indent: str = "  ") -> None:
         print(f"{indent}<{tag_name}>{escape_xml_text(value)}</{tag_name}>", file=code)
 
-    show_4k = False
-    show_cnword = False
-    show_moword = False
     # 获取在媒体文件中显示的规则，不需要过滤Windows异常字符
-    nfo_title = render_name(
-        nfo_title_template,
-        file_info,
-        data,
-        NameRenderOptions(
-            target=NamingTarget.NFO_TITLE,
-            show_definition_suffix=show_4k,
-            show_cnword_suffix=show_cnword,
-            show_moword_suffix=show_moword,
-        ),
-    ).text
+    if title_override is not None and str(title_override).strip():
+        # 所见即所得：调用方（编辑 NFO 窗口）已经给出最终标题，原样写入，不再套命名模板
+        nfo_title = str(title_override).strip()
+    else:
+        nfo_title = build_nfo_title(file_info, data)
 
     # 获取字段
     nfo_include_new = manager.config.nfo_include_new
@@ -258,8 +304,6 @@ async def write_nfo(
         write_text_element(code, "num", number)
 
         # 输出标题
-        if cd_part and NfoInclude.TITLE_CD in nfo_include_new:
-            nfo_title += " " + cd_part[1:].upper()
         write_text_element(code, "title", nfo_title)
 
         # 输出原标题
@@ -427,6 +471,8 @@ async def write_nfo(
         print("</movie>", file=code)
 
         await write_file_atomic_async(nfo_file, code.getvalue())
+        # 记录本次写入的最终标题，供「编辑 NFO」窗口原样回显（所见即所得）
+        data.nfo_title = nfo_title
         LogBuffer.log().write(f"\n 🍀 Nfo done! (new)({get_used_time(start_time)}s)")
         return True
 
@@ -496,6 +542,9 @@ async def get_nfo_data(file_path: Path, movie_number: str) -> tuple[CrawlersResu
         json_data.outline = file_path.name
         json_data.tag = str(file_path)
         return None, None
+    # 原样记录 NFO 里的标题（含 CD 后缀 / [番号] 前缀）：「编辑 NFO」窗口按所见即所得
+    # 展示与回写，避免二次套用命名模板造成字段重复。
+    json_data.nfo_title = title
     # 剥离 CD 编号后缀（CD1/CD2/.../CD10+，兼容大小写/空格）；不剥离无 CD 前缀的结尾数字（避免误删"系列 5"）
     title = re.sub(r"\s*CD\s*\d+$", "", title, flags=re.IGNORECASE)
 

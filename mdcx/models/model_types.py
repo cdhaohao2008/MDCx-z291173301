@@ -409,6 +409,9 @@ class CrawlersResult(BaseCrawlerResult):
     # in FileInfo
     # 除 letters 不确定外, 其它字段是只读的, 所以后续流程可以直接从 FileInfo 获取
     letters: str  # 番号字母部分, 理论上 get_file_info 函数会返回这个字段
+    # NFO <title> 的最终文本（最近一次写入 / 从 NFO 读到的原始标题）。
+    # 「编辑 NFO」窗口按所见即所得展示与回写，避免二次套用命名模板造成字段重复。
+    nfo_title: str = ""
 
     @classmethod
     def empty(cls) -> CrawlersResult:

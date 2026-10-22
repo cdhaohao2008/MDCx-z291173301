@@ -6,7 +6,7 @@ import traceback
 
 from mdcx.config.enums import NfoInclude
 from mdcx.config.manager import manager
-from mdcx.core.nfo import write_nfo
+from mdcx.core.nfo import build_nfo_title, write_nfo
 from mdcx.signals import signal_qt
 from mdcx.utils import (
     executor,
@@ -27,6 +27,30 @@ class NfoEditorMixin:
         line_edit.setText(text or "")
         line_edit.setCursorPosition(0)
 
+    @staticmethod
+    def _nfo_title_text(file_info, json_data) -> str:
+        """标题栏展示的文本：所见即所得，等于最终写入 NFO 的 <title>。
+
+        NFO 里已经有标题时（读取模式从 NFO 读回来的原始标题 / 上次保存写入的标题）
+        直接展示它，保证「看到什么就保存什么」；还没有 NFO 标题时展示当前标题数据。
+        """
+        existing = str(getattr(json_data, "nfo_title", "") or "")
+        if existing:
+            return existing
+        return str(json_data.title or "")
+
+    @staticmethod
+    def _nfo_title_to_save(file_info, json_data, shown_title: str) -> str:
+        """保存时写入 NFO 的标题文本。
+
+        NFO 里已有标题时原样回写（所见即所得，不再套命名模板，避免
+        {{release}} / {{number}} 等字段重复叠加）；还没有 NFO 标题时才按命名模板
+        渲染一次，保留模板里的前缀字段。
+        """
+        if str(getattr(json_data, "nfo_title", "") or ""):
+            return shown_title
+        return build_nfo_title(file_info, json_data, title=shown_title)
+
     def _show_nfo_info(self):
         try:
             if not self.show_name:
@@ -42,7 +66,7 @@ class NfoEditorMixin:
             self._set_field_text(self.Ui.lineEdit_nfo_number, json_data.number)
             self._set_field_text(self.Ui.lineEdit_nfo_actor, actor)
             self._set_field_text(self.Ui.lineEdit_nfo_year, json_data.year)
-            self._set_field_text(self.Ui.lineEdit_nfo_title, json_data.title)
+            self._set_field_text(self.Ui.lineEdit_nfo_title, self._nfo_title_text(file_info, json_data))
             self._set_field_text(self.Ui.lineEdit_nfo_originaltitle, json_data.originaltitle)
             self.Ui.textEdit_nfo_outline.setPlainText(json_data.outline)
             self.Ui.textEdit_nfo_originalplot.setPlainText(json_data.originalplot)
@@ -79,7 +103,6 @@ class NfoEditorMixin:
                 json_data.all_actor = self.Ui.lineEdit_nfo_actor.text()
             json_data.actor = self.Ui.lineEdit_nfo_actor.text()
             json_data.year = self.Ui.lineEdit_nfo_year.text()
-            json_data.title = self.Ui.lineEdit_nfo_title.text()
             json_data.originaltitle = self.Ui.lineEdit_nfo_originaltitle.text()
             json_data.outline = self.Ui.textEdit_nfo_outline.toPlainText()
             json_data.originalplot = self.Ui.textEdit_nfo_originalplot.toPlainText()
@@ -95,7 +118,22 @@ class NfoEditorMixin:
             json_data.poster = self.Ui.lineEdit_nfo_poster.text()
             json_data.thumb = self.Ui.lineEdit_nfo_cover.text()
             json_data.trailer = self.Ui.lineEdit_nfo_trailer.text()
-            if executor.run(write_nfo(file_info, json_data, nfo_path, nfo_folder, update=True)):
+            # 标题栏所见即所得：NFO 里已有标题时原样回写（不再套命名模板），避免
+            # {{release}} / {{number}} 等字段被重复叠加；还没有 NFO 标题时才按命名
+            # 模板渲染一次（保持原有行为，不会丢掉模板里的前缀字段）。
+            shown_title = self.Ui.lineEdit_nfo_title.text()
+            nfo_title = self._nfo_title_to_save(file_info, json_data, shown_title)
+            if executor.run(
+                write_nfo(
+                    file_info,
+                    json_data,
+                    nfo_path,
+                    nfo_folder,
+                    update=True,
+                    title_override=nfo_title,
+                )
+            ):
+                json_data.nfo_title = nfo_title
                 self.Ui.label_save_tips.setText(f"已保存! {get_current_time()}")
                 self.set_main_info(show_data)
                 self._nfo_editor_snapshot = self._nfo_editor_field_values()
