@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.2 (2026-10-20)
+
+### Changed
+
+- built on pandorest 0.13.2. The SDKs' own error messages are reworded: "GetItems takes one options struct at most, not 2" is now "at most one options struct for GetItems, not 2", and "Translations answered no TranslationsAnswer" is now "no TranslationsAnswer answered by Translations"
+- Emby's `TranscodingInfo` fields `AverageCpuUsage`, `CpuHistory` and `CurrentCpuUsage` are marked deprecated, as Emby's own document says they are
+- a bare `make` formats and builds; it only built a lint tool
+
 ## 0.10.1 (2026-10-18)
 
 ### Changed
