@@ -236,6 +236,171 @@ async def test_organize_files_moves_all_companions(monkeypatch: pytest.MonkeyPat
 
 
 @pytest.mark.asyncio
+async def test_organize_files_moves_gif_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """整理模式必须搬运 gif 等动图，且保持原文件名（不能改名成 .jpg）。"""
+    monkeypatch.setattr(manager.config, "subtitle_add_chs", False)
+    monkeypatch.setattr(manager.config, "sub_type", [".srt"])
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "trailer_simple_name", True)
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart_copy")
+
+    old_folder = tmp_path / "old"
+    new_folder = tmp_path / "new"
+    old_folder.mkdir()
+    new_folder.mkdir()
+    video = old_folder / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    (old_folder / "ABS-040.nfo").write_text("<movie><title>ABS-040</title></movie>", encoding="utf-8")
+    (old_folder / "ABS-040-poster.jpg").write_bytes(b"poster")
+    (old_folder / "fanart.gif").write_bytes(b"fanart gif")
+    (old_folder / "thumb.gif").write_bytes(b"thumb gif")
+    (old_folder / "sample.gif").write_bytes(b"sample gif")
+    (old_folder / "ABS-040-1.gif").write_bytes(b"numbered gif")
+
+    moved, error = await organize_files(
+        file_path=video,
+        file_new_path=new_folder / "ABS-040.mp4",
+        folder_old_path=old_folder,
+        folder_new_path=new_folder,
+        nfo_new_path=new_folder / "ABS-040.nfo",
+        naming_rule="ABS-040",
+        number="ABS-040",
+        sub_list=[],
+        poster_final_path=new_folder / "poster.jpg",
+        thumb_final_path=new_folder / "thumb.jpg",
+        fanart_final_path=new_folder / "fanart.jpg",
+    )
+
+    assert moved, error
+    assert (new_folder / "fanart.gif").exists()
+    assert (new_folder / "thumb.gif").exists()
+    assert (new_folder / "sample.gif").exists()
+    assert (new_folder / "ABS-040-1.gif").exists()
+    # 动图不能被改名成主图名
+    assert not (new_folder / "fanart.jpg").exists()
+    assert not (new_folder / "thumb.jpg").exists()
+    assert not any(path.suffix == ".gif" for path in old_folder.iterdir())
+
+
+@pytest.mark.asyncio
+async def test_organize_files_moves_misspelled_extrafanart_folder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """剧照目录写成 extarfanart（拼写错误）时也必须整体搬迁，且目录名归一为 extrafanart。"""
+    monkeypatch.setattr(manager.config, "subtitle_add_chs", False)
+    monkeypatch.setattr(manager.config, "sub_type", [".srt"])
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "trailer_simple_name", True)
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart_copy")
+
+    old_folder = tmp_path / "old"
+    new_folder = tmp_path / "new"
+    old_folder.mkdir()
+    new_folder.mkdir()
+    video = old_folder / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    (old_folder / "ABS-040.nfo").write_text("<movie><title>ABS-040</title></movie>", encoding="utf-8")
+    extra = old_folder / "extarfanart"
+    extra.mkdir()
+    (extra / "fanart1.jpg").write_bytes(b"extra1")
+    (extra / "fanart2.gif").write_bytes(b"extra2")
+
+    moved, error = await organize_files(
+        file_path=video,
+        file_new_path=new_folder / "ABS-040.mp4",
+        folder_old_path=old_folder,
+        folder_new_path=new_folder,
+        nfo_new_path=new_folder / "ABS-040.nfo",
+        naming_rule="ABS-040",
+        number="ABS-040",
+        sub_list=[],
+        poster_final_path=new_folder / "poster.jpg",
+        thumb_final_path=new_folder / "thumb.jpg",
+        fanart_final_path=new_folder / "fanart.jpg",
+    )
+
+    assert moved, error
+    assert (new_folder / "extrafanart" / "fanart1.jpg").exists()
+    assert (new_folder / "extrafanart" / "fanart2.gif").exists()
+    # 错别字目录名不保留，搬走时归一成标准名
+    assert not (new_folder / "extarfanart").exists()
+    assert not any(path.is_file() for path in old_folder.rglob("*"))
+
+
+def test_canonical_asset_folder_name_normalizes_typos(monkeypatch: pytest.MonkeyPatch):
+    """错别字剧照目录名归一到标准名；标准名与自定义名保持原样。"""
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart_copy")
+
+    # 错别字按关键词归一
+    assert organize_module._canonical_asset_folder_name("extarfanart") == "extrafanart"
+    assert organize_module._canonical_asset_folder_name("extarfanart_copy") == "extrafanart_copy"
+    assert organize_module._canonical_asset_folder_name("backdropss") == "backdrops"
+    assert organize_module._canonical_asset_folder_name("trailer") == "trailers"
+    # 标准名 / 配置里的自定义名 / 与剧照无关的目录名原样保留
+    assert organize_module._canonical_asset_folder_name("extrafanart") == "extrafanart"
+    assert organize_module._canonical_asset_folder_name("extrafanart_copy") == "extrafanart_copy"
+    assert organize_module._canonical_asset_folder_name("my_shots") == "my_shots"
+
+
+@pytest.mark.asyncio
+async def test_organize_files_moves_unknown_companion_folder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """媒体目录下的伴生目录（不认识的目录名）也必须整体搬迁。"""
+    monkeypatch.setattr(manager.config, "subtitle_add_chs", False)
+    monkeypatch.setattr(manager.config, "sub_type", [".srt"])
+    monkeypatch.setattr(manager.config, "media_type", [".mp4"])
+    monkeypatch.setattr(manager.config, "trailer_simple_name", True)
+    monkeypatch.setattr(manager.config, "extrafanart_folder", "extrafanart_copy")
+
+    old_folder = tmp_path / "old"
+    new_folder = tmp_path / "new"
+    old_folder.mkdir()
+    new_folder.mkdir()
+    video = old_folder / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    (old_folder / "ABS-040.nfo").write_text("<movie><title>ABS-040</title></movie>", encoding="utf-8")
+    shots = old_folder / "my_shots"
+    shots.mkdir()
+    (shots / "shot1.jpg").write_bytes(b"shot")
+    (shots / "nested").mkdir()
+    (shots / "nested" / "shot2.gif").write_bytes(b"shot2")
+
+    moved, error = await organize_files(
+        file_path=video,
+        file_new_path=new_folder / "ABS-040.mp4",
+        folder_old_path=old_folder,
+        folder_new_path=new_folder,
+        nfo_new_path=new_folder / "ABS-040.nfo",
+        naming_rule="ABS-040",
+        number="ABS-040",
+        sub_list=[],
+        poster_final_path=new_folder / "poster.jpg",
+        thumb_final_path=new_folder / "thumb.jpg",
+        fanart_final_path=new_folder / "fanart.jpg",
+    )
+
+    assert moved, error
+    assert (new_folder / "my_shots" / "shot1.jpg").exists()
+    assert (new_folder / "my_shots" / "nested" / "shot2.gif").exists()
+    assert not any(path.is_file() for path in old_folder.rglob("*"))
+
+
+def test_build_organize_index_detects_companion_dirs(tmp_path: Path):
+    """索引要把非标准命名的剧照目录识别为伴生目录，并把里面的文件归属到媒体。"""
+    title = tmp_path / "title"
+    title.mkdir()
+    video = title / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    extra = title / "extarfanart"
+    extra.mkdir()
+    extra_file = extra / "fanart1.jpg"
+    extra_file.write_bytes(b"extra")
+
+    index = build_organize_index([title])
+
+    assert index.media_count == 1
+    assert index.owner_of(extra_file) == video
+    assert extra in index.asset_dirs_in(title)
+
+
+@pytest.mark.asyncio
 async def test_organize_files_rolls_back_when_video_move_fails(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     from mdcx.utils.file import move_file_async as real_move_file_async
 

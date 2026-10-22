@@ -16,8 +16,13 @@ from ..number import get_file_number
 from ..utils.file import elevated_move_file, move_file_async
 
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+# 动图等其它图片格式同样要跟着整理，但 poster/thumb/fanart 的目标名固定为 .jpg，
+# 所以它们只作为「普通图片」搬运（保持原文件名），不参与主图候选。
+_EXTRA_IMAGE_SUFFIXES = {".gif", ".avif"}
 _ORGANIZE_BACKUP_MARK = ".mdcx_organize_backup_"
 _ASSET_FOLDER_NAMES = ("extrafanart", "backdrops", "behind the scenes", "trailers")
+# 剧照类目录名关键词：容忍 extarfanart、extrafanart_copy 等非标准写法
+_ASSET_NAME_HINTS = ("fanart", "backdrop", "scene", "trailer")
 
 
 def _name_key(name: str) -> str:
@@ -76,6 +81,52 @@ def _configured_asset_folder_keys() -> set[str]:
     """整理时会整体搬走的伴生目录（名称按大小写不敏感比较）。"""
     names = [*_ASSET_FOLDER_NAMES, manager.config.extrafanart_folder]
     return {_name_key(str(name)) for name in names if name}
+
+
+def _looks_like_asset_folder(name: str, known_keys: set[str] | None = None) -> bool:
+    """判断目录名是否属于剧照类目录。
+
+    除了配置里的标准名，还按关键词识别，容忍 extarfanart、extrafanart_copy
+    这类非标准写法——否则剧照目录会整体漏搬。
+    """
+    key = _name_key(str(name))
+    if not key:
+        return False
+    if known_keys is None:
+        known_keys = _configured_asset_folder_keys()
+    if key in known_keys:
+        return True
+    return any(hint in key for hint in _ASSET_NAME_HINTS)
+
+
+# 非标准剧照目录名归一化目标：extarfanart（错别字）→ extrafanart
+_ASSET_CANONICAL_NAMES = (
+    ("fanart", "extrafanart"),
+    ("backdrop", "backdrops"),
+    ("scene", "behind the scenes"),
+    ("trailer", "trailers"),
+)
+
+
+def _canonical_asset_folder_name(name: str) -> str:
+    """把剧照目录的非标准写法归一到标准目录名。
+
+    已经是标准名（或配置里自定义的名，如 extrafanart_copy）的原样保留；
+    像 extarfanart 这种错别字按关键词归一到 extrafanart，搬走时目录名一并改对。
+    """
+    raw = str(name)
+    key = _name_key(raw)
+    if not key:
+        return raw
+    if key in _configured_asset_folder_keys():
+        return raw
+    for hint, canonical in _ASSET_CANONICAL_NAMES:
+        if hint not in key:
+            continue
+        if key.endswith("_copy"):
+            return f"{canonical}_copy"
+        return canonical
+    return raw
 
 
 def _matches_alias(name_key: str, alias_key: str) -> bool:
@@ -139,7 +190,7 @@ class OrganizeIndex:
         self._file_count = 0
         self._media_types = _configured_media_suffixes()
         self._asset_folder_keys = _configured_asset_folder_keys()
-        self._roots: tuple[Path, ...] = ()
+        self._asset_dirs: set[Path] = set()
 
     @property
     def file_count(self) -> int:
@@ -194,28 +245,54 @@ class OrganizeIndex:
 
     def _in_asset_folder(self, path: Path) -> bool:
         """剧照/预告片目录里的视频是附件，不应成为独立的整理主体。"""
-        for root in self._roots:
-            try:
-                relative = path.relative_to(root)
-            except ValueError:
-                continue
-            return any(_name_key(part) in self._asset_folder_keys for part in relative.parts[:-1])
-        return False
+        return any(parent in self._asset_dirs for parent in path.parents)
 
-    def _finalize(self) -> None:
+    def _is_asset_dir_name(self, name: str) -> bool:
+        return _looks_like_asset_folder(name, self._asset_folder_keys)
+
+    def _refresh_asset_dirs(self) -> bool:
+        """计算「剧照/附件目录」：媒体所在目录下的直接子目录。
+
+        目录名疑似剧照（fanart/backdrop/scene/trailer）或其中不含媒体文件时，
+        视为当前番号的伴生目录，整体搬迁时保持原目录名。返回目录集合是否变化。
+        """
+        dirs_with_media: set[Path] = set()
+        for media_path in self._media:
+            parent = media_path.parent
+            while True:
+                dirs_with_media.add(parent)
+                if parent == parent.parent:
+                    break
+                parent = parent.parent
+
+        asset_dirs: set[Path] = set()
+        for folder in self._media_by_folder:
+            for child in self._child_dirs.get(folder, set()):
+                if _is_backup_name(child.name):
+                    continue
+                if child in dirs_with_media and not self._is_asset_dir_name(child.name):
+                    # 自身还含媒体的子目录是「另一部作品」的目录，不属于当前番号
+                    continue
+                asset_dirs.add(child)
+        if asset_dirs == self._asset_dirs:
+            return False
+        self._asset_dirs = asset_dirs
+        return True
+
+    def _detect_media(self) -> dict[Path, _OrganizeMedia]:
+        """识别媒体主体（视频/STRM），剧照目录里的视频不算独立主体。"""
+        media: dict[Path, _OrganizeMedia] = {}
         for path, entry in self._entries.items():
             if entry.is_dir or _is_backup_name(path.name):
                 continue
-            if (
-                path.suffix.lower() not in self._media_types
-                or _is_trailer_stem(path.stem)
-                or self._in_asset_folder(path)
-            ):
+            if path.suffix.lower() not in self._media_types or _is_trailer_stem(path.stem):
+                continue
+            if self._in_asset_folder(path):
                 continue
             number = _extract_media_number(path)
             number_key = _name_key(number)
             aliases = tuple(dict.fromkeys(alias for alias in (entry.name_key, number_key) if alias))
-            media = _OrganizeMedia(
+            media[path] = _OrganizeMedia(
                 path=path,
                 folder=entry.folder,
                 stem=path.stem,
@@ -224,17 +301,31 @@ class OrganizeIndex:
                 number_key=number_key,
                 aliases=aliases,
             )
-            entry.is_media = True
-            self._media[path] = media
-            self._media_by_folder[entry.folder].append(path)
-            if number_key:
-                self._numbers.add(number_key)
-                self._media_by_number[number_key].append(path)
+        return media
 
+    def _apply_media(self, media: dict[Path, _OrganizeMedia]) -> None:
+        self._media = media
+        self._media_by_folder = defaultdict(list)
+        self._media_by_number = defaultdict(list)
+        self._numbers = set()
+        for path, item in media.items():
+            self._media_by_folder[item.folder].append(path)
+            if item.number_key:
+                self._numbers.add(item.number_key)
+                self._media_by_number[item.number_key].append(path)
         for paths in (*self._media_by_folder.values(), *self._media_by_number.values()):
             paths.sort(key=lambda path: (_name_key(path.name), str(path)))
 
+    def _finalize(self) -> None:
+        # 剧照目录与媒体主体互相影响（剧照目录里的视频不算主体，剧照目录本身
+        # 又是媒体所在目录的子目录），迭代到稳定为止。
+        for _ in range(3):
+            self._apply_media(self._detect_media())
+            if not self._refresh_asset_dirs():
+                break
+
         for entry in self._entries.values():
+            entry.is_media = entry.path in self._media
             if entry.is_dir or entry.is_media:
                 continue
             media_paths = self._media_by_folder.get(entry.folder) or self._context_media(entry)
@@ -251,7 +342,7 @@ class OrganizeIndex:
                     relative = entry.path.relative_to(parent)
                 except ValueError:
                     return []
-                if relative.parts and _name_key(relative.parts[0]) in self._asset_folder_keys:
+                if relative.parts and (parent / relative.parts[0]) in self._asset_dirs:
                     return media_paths
                 return []
             child, parent = parent, parent.parent
@@ -326,6 +417,13 @@ class OrganizeIndex:
         child_dirs = sorted(self._child_dirs.get(folder, set()), key=lambda path: _name_key(path.name))
         return [*self._direct_files.get(folder, []), *child_dirs]
 
+    def asset_dirs_in(self, folder: Path) -> list[Path]:
+        """返回该目录下的剧照/附件子目录（保持原目录名，整体搬迁）。"""
+        return sorted(
+            (path for path in self._asset_dirs if path.parent == folder),
+            key=lambda path: _name_key(path.name),
+        )
+
     def files_under(self, folder: Path) -> list[Path]:
         """返回原始快照中该目录及其子目录的全部文件。"""
         result: list[Path] = []
@@ -382,7 +480,6 @@ def build_organize_index(
     index = OrganizeIndex()
     ignored = {Path(os.path.abspath(path)) for path in ignore_dirs}
     deduped_roots = _dedupe_roots(roots)
-    index._roots = tuple(deduped_roots)
     for root in deduped_roots:
         if _safe_is_file(root):
             index._register_file(root)
@@ -656,6 +753,13 @@ async def _build_plan(
         for entry in entries
         if _safe_is_file(entry) and entry.suffix.lower() in _IMAGE_SUFFIXES and not _is_backup_name(entry.name)
     ]
+    # 动图（gif 等）：目标主图名固定为 .jpg，动图只按原文件名整体搬运，
+    # 否则 fanart.gif 会被改名成 fanart.jpg 而无法播放。
+    extra_image_entries = [
+        entry
+        for entry in entries
+        if _safe_is_file(entry) and entry.suffix.lower() in _EXTRA_IMAGE_SUFFIXES and not _is_backup_name(entry.name)
+    ]
     for kind, final_path in (
         ("poster", poster_final_path),
         ("thumb", thumb_final_path),
@@ -683,7 +787,7 @@ async def _build_plan(
         for extra in candidates[1:]:
             add_variant(extra, folder_new_path / extra.name)
 
-    for entry in image_entries:
+    for entry in [*image_entries, *extra_image_entries]:
         if entry in seen_sources or not belongs(entry):
             continue
         add_variant(entry, folder_new_path / entry.name)
@@ -749,29 +853,20 @@ async def _build_plan(
             add(entry, dst)
 
     # 剧照、背景图等文件夹，保持相对目录结构。
-    folder_names = ["extrafanart", manager.config.extrafanart_folder, "backdrops", "behind the scenes", "trailers"]
-    handled_folders: set[str] = set()
-    for folder_name in folder_names:
-        if not folder_name:
-            continue
-        folder_key = _name_key(str(folder_name))
-        if folder_key in handled_folders:
-            continue
-        handled_folders.add(folder_key)
-        source_folder = find(str(folder_name))
-        if source_folder is None or not _safe_is_dir(source_folder):
-            source_folder = folder_old_path / str(folder_name)
-        if not _safe_is_dir(source_folder):
-            continue
+    # 目录来源是索引动态识别出的「媒体目录下的伴生子目录」，因此像 extarfanart
+    # 这类非标准写法的剧照目录同样会被整体搬走；目录名按标准名归一
+    # （extarfanart → extrafanart），文件本身保持原文件名与相对层级。
+    for source_folder in index.asset_dirs_in(folder_old_path):
+        target_name = _canonical_asset_folder_name(source_folder.name)
         for source in index.files_under(source_folder):
             # 共用目录中只移动索引归属当前媒体的剧照，避免动到其它番号。
             if _is_backup_name(source.name) or not belongs(source):
                 continue
             relative = source.relative_to(source_folder)
-            add(source, folder_new_path / str(folder_name) / relative)
+            add_variant(source, folder_new_path / target_name / relative)
 
     # 其余与文件同名的伴生文件（不含媒体、nfo、json，它们已单独处理）。
-    handled_suffixes = media_types | {".nfo", ".json"} | set(sub_types) | _IMAGE_SUFFIXES
+    handled_suffixes = media_types | {".nfo", ".json"} | set(sub_types) | _IMAGE_SUFFIXES | _EXTRA_IMAGE_SUFFIXES
     for entry in entries:
         if not _safe_is_file(entry) or entry in seen_sources or not belongs(entry):
             continue
