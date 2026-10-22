@@ -985,12 +985,15 @@
   "netdisk_path": "",
   "localdisk_path": "",
   "window_title": "hide",
+  "organize_local_no_interval": true,
+  "organize_netdisk_rest_interval": false,
   "switch_on": [
     "remain_task",
     "infinite_scrape",
     "copy_netdisk_nfo",
     "show_logs",
-    "hide_mini"
+    "hide_mini",
+    "move_keep"
   ],
   "timed_interval": "PT40M",
   "rest_count": 500,

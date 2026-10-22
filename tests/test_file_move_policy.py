@@ -409,13 +409,16 @@ async def test_move_movie_overwrite_policy_replaces_target(monkeypatch: pytest.M
 
 
 class _FakeCheckBox:
-    """只实现 setChecked 的假复选框，用于单测互斥处理器。"""
+    """只实现 setChecked / isChecked 的假复选框，用于单测互斥处理器。"""
 
     def __init__(self) -> None:
         self.checked = False
 
     def setChecked(self, value: bool) -> None:
         self.checked = bool(value)
+
+    def isChecked(self) -> bool:
+        return self.checked
 
 
 class _FakeUi:
@@ -430,7 +433,7 @@ class _FakeHost:
 
 
 def test_ui_handlers_keep_move_switches_mutually_exclusive():
-    """界面层互斥：勾选其一自动去勾另一；去勾不动作（两枚都不勾是合法中间态）。"""
+    """界面层互斥：勾选其一自动去勾另一；取消勾选时回落到默认档「保留旧文件」。"""
     from mdcx.controllers.main_window.settings_actions import SettingsActionsMixin
 
     host = _FakeHost()
@@ -449,13 +452,18 @@ def test_ui_handlers_keep_move_switches_mutually_exclusive():
     assert keep.checked is True
     assert overwrite.checked is False
 
-    # 去勾不动作：两枚都不勾是合法中间态（保持原有移动行为）
+    # 取消「覆盖旧文件」→ 另一枚「保留旧文件」保持勾选（不会两枚都不勾）
     overwrite.checked = False
-    keep.checked = False
     SettingsActionsMixin.checkBox_move_overwrite_changed(host, False)
-    SettingsActionsMixin.checkBox_move_keep_changed(host, False)
+    assert keep.checked is True
     assert overwrite.checked is False
-    assert keep.checked is False
+
+    # 取消「保留旧文件」且「覆盖旧文件」也没勾 → 回落到默认档「保留旧文件」
+    keep.checked = False
+    overwrite.checked = False
+    SettingsActionsMixin.checkBox_move_keep_changed(host, False)
+    assert keep.checked is True
+    assert overwrite.checked is False
 
 
 def test_ui_has_move_policy_checkboxes_in_advanced_page():

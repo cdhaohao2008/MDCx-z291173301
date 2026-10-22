@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from mdcx.base.file import get_movie_list, move_mediainfo
+from mdcx.config.enums import Switch
 from mdcx.config.extend import (
     ORGANIZE_MAIN_MODE,
     drop_ignore_dir,
@@ -395,6 +396,12 @@ async def test_get_movie_list_respects_ignore_dirs_in_organize_mode(monkeypatch:
 
 @pytest.mark.asyncio
 async def test_organize_commit_removes_overwritten_backup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """「覆盖旧文件」策略：目标同名文件被覆盖，commit 后备份文件被删除。
+
+    默认档是「保留旧文件」（目标同名就不搬），所以这里显式切到覆盖策略，
+    专门验证「备份 → 覆盖 → commit 删备份」这条链路。
+    """
+    monkeypatch.setattr(manager.config, "switch_on", [Switch.MOVE_OVERWRITE])
     monkeypatch.setattr(manager.config, "subtitle_add_chs", False)
     monkeypatch.setattr(manager.config, "sub_type", [".srt"])
     monkeypatch.setattr(manager.config, "media_type", [".mp4"])

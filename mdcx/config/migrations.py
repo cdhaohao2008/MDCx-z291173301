@@ -478,6 +478,34 @@ def _ensure_switch_exclusive(data: dict[str, Any], keep: str, drop: str) -> None
             data["switch_on"] = [item for item in current if str(_enum_value(item)) != drop]
 
 
+def _ensure_switch_one_of(data: dict[str, Any], options: tuple[str, ...], default: str) -> None:
+    """互斥开关组：保证组内有且只有一个被勾选（老配置升级用）。
+
+    - 组内一个都没勾 → 补上 default（默认档）。
+    - 组内勾了多个 → 只保留 default（默认档＝更安全的一档）。
+    - 组内只勾了一个 → 原样保留（尊重用户的显式选择）。
+
+    switch_on 在 v2 json 里是 list，兼容 str（逗号分隔）形态。
+    """
+    current = data.get("switch_on")
+    if isinstance(current, str):
+        items = _str_to_list(current, ",")
+        present = [option for option in options if option in items]
+        if not present:
+            data["switch_on"] = ",".join([*items, default])
+        elif len(present) > 1:
+            drop = [option for option in present if option != default]
+            data["switch_on"] = ",".join(item for item in items if item not in drop)
+    elif isinstance(current, list | set | tuple):
+        values = [str(_enum_value(item)) for item in current]
+        present = [option for option in options if option in values]
+        if not present:
+            data["switch_on"] = [*current, default]
+        elif len(present) > 1:
+            drop = [option for option in present if option != default]
+            data["switch_on"] = [item for item in current if str(_enum_value(item)) not in drop]
+
+
 def migrate_config_data(data: dict[str, Any]) -> list[str]:
     """
     统一处理配置结构变更.
@@ -592,6 +620,11 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     if note := _migrate_main_mode(data):
         warnings.append(note)
 
+    # 整理模式「本地存储不限间隔 / 网盘存储按自动休息间隔」两个互斥开关：
+    # 必须勾选其中一个（默认档＝本地不限间隔）。老配置没有这两个键时补出厂
+    # 默认；手改成「两开」或「全关」时归一。
+    _migrate_organize_interval_keys(data)
+
     # 无限次刮削开关（高级 → 保留任务右侧）：默认勾选，老配置缺键时自动补上
     # 不带 [迁移] 前缀即会被视为致命错误触发 _failed.json 保护分支，故此处静默补齐不告警
     _ensure_switch(data, "infinite_scrape")
@@ -601,10 +634,11 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     # 保留原有的 sort_del（不改变旧行为），去掉新开关 sort_move。
     _ensure_switch_exclusive(data, "sort_del", "sort_move")
 
-    # 文件移动策略（高级 → 移动文件）：「覆盖旧文件」与「保留旧文件」互斥
-    # （同一时刻只能选中一个）。老配置两者都没有，默认都不勾选＝保持原有行为；
-    # 手改配置若两个都勾上，保留更安全的 move_keep（不覆盖已有文件），去掉 move_overwrite。
-    _ensure_switch_exclusive(data, "move_keep", "move_overwrite")
+    # 文件移动策略（高级 → 移动文件）：「覆盖旧文件」与「保留旧文件」互斥且必须
+    # 勾选其中一个（默认档＝保留旧文件）。老配置两者都没有 → 补上 move_keep；
+    # 手改配置若两个都勾上，保留更安全的 move_keep（不覆盖已有文件），去掉
+    # move_overwrite；只勾了覆盖旧文件则原样保留（尊重用户的显式选择）。
+    _ensure_switch_one_of(data, ("move_keep", "move_overwrite"), "move_keep")
 
     data["config_version"] = CURRENT_CONFIG_VERSION
     return warnings

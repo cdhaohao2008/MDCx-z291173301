@@ -5375,6 +5375,9 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 <property name="text">
                                   <string>本地存储不设置时间间隔整理文件</string>
                                 </property>
+                                <property name="checked">
+                                  <bool>true</bool>
+                                </property>
                                 <property name="toolTip">
                                   <string>勾选后：本地磁盘的整理任务不限制两次运行的间隔，随时可以开始整理</string>
                                 </property>
@@ -24880,6 +24883,9 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                     </property>
                                     <property name="text">
                                       <string>保留旧文件</string>
+                                    </property>
+                                    <property name="checked">
+                                      <bool>true</bool>
                                     </property>
                                   </widget>
                                 </item>

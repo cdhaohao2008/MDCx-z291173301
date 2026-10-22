@@ -2322,6 +2322,7 @@ class Ui_MDCx(object):
         sizePolicy.setHeightForWidth(self.checkBox_organize_local_no_interval.sizePolicy().hasHeightForWidth())
         self.checkBox_organize_local_no_interval.setSizePolicy(sizePolicy)
         self.checkBox_organize_local_no_interval.setMinimumSize(QtCore.QSize(0, 0))
+        self.checkBox_organize_local_no_interval.setChecked(True)
         self.checkBox_organize_local_no_interval.setObjectName("checkBox_organize_local_no_interval")
         self.horizontalLayout_organize_interval.addWidget(self.checkBox_organize_local_no_interval)
         spacerItem = QtWidgets.QSpacerItem(
@@ -11978,6 +11979,7 @@ class Ui_MDCx(object):
         self.horizontalLayout_move_file.addWidget(self.checkBox_move_overwrite)
         self.checkBox_move_keep = QtWidgets.QCheckBox(parent=self.layoutWidget_move_file)
         self.checkBox_move_keep.setMinimumSize(QtCore.QSize(0, 30))
+        self.checkBox_move_keep.setChecked(True)
         self.checkBox_move_keep.setObjectName("checkBox_move_keep")
         self.horizontalLayout_move_file.addWidget(self.checkBox_move_keep)
         self.gridLayout_20.addWidget(self.frame_move_file, 6, 1, 1, 1)

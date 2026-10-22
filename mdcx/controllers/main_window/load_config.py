@@ -26,7 +26,12 @@ from mdcx.config.enums import (
     Translator,
     Website,
 )
-from mdcx.config.extend import get_movie_path_setting
+from mdcx.config.extend import (
+    get_movie_path_setting,
+    normalize_move_file_policy,
+    normalize_move_file_switches,
+    normalize_organize_interval_policy,
+)
 from mdcx.config.manager import manager
 from mdcx.config.models import MIN_REST_TIME_SECONDS
 from mdcx.config.resources import resources
@@ -492,15 +497,15 @@ def load_config(self: MyMAinWindow):
             default=self.Ui.radioButton_mode_common,
         )
 
-        # 整理模式：两次整理之间的时间间隔策略（两枚复选框互斥）
-        self.Ui.checkBox_organize_local_no_interval.setChecked(manager.config.organize_local_no_interval)
-        self.Ui.checkBox_organize_netdisk_rest_interval.setChecked(manager.config.organize_netdisk_rest_interval)
-        # 互斥兜底：手改配置若两开/两关，以「网盘按自动休息间隔」优先，
-        # 两关时退回「本地存储不限制间隔时间」（与迁移逻辑保持一致）
-        if self.Ui.checkBox_organize_netdisk_rest_interval.isChecked():
-            self.Ui.checkBox_organize_local_no_interval.setChecked(False)
-        elif not self.Ui.checkBox_organize_local_no_interval.isChecked():
-            self.Ui.checkBox_organize_local_no_interval.setChecked(True)
+        # 整理模式：两次整理之间的时间间隔策略（两枚复选框互斥，必须勾选其中一个，
+        # 默认档＝「本地存储不设置时间间隔整理文件」）
+        organize_local, organize_netdisk = normalize_organize_interval_policy(
+            manager.config.organize_local_no_interval, manager.config.organize_netdisk_rest_interval
+        )
+        manager.config.organize_local_no_interval = organize_local
+        manager.config.organize_netdisk_rest_interval = organize_netdisk
+        self.Ui.checkBox_organize_local_no_interval.setChecked(organize_local)
+        self.Ui.checkBox_organize_netdisk_rest_interval.setChecked(organize_netdisk)
 
         # 有nfo，是否执行更新模式
         # region read_mode
@@ -1140,13 +1145,24 @@ def load_config(self: MyMAinWindow):
             self.Ui.checkBox_sortmode_delpic.setChecked(True)
             self.Ui.checkBox_sortmode_movefile.setChecked(False)
 
-        # 高级页「移动文件」：覆盖旧文件与保留旧文件互斥。老配置两者都没有
-        # （自动升级为都不勾选＝保持原有移动行为）；手改配置若两个都勾上，
-        # 保留更安全的「保留旧文件」、去掉「覆盖旧文件」。
-        if Switch.MOVE_OVERWRITE in switch_on and Switch.MOVE_KEEP in switch_on:
-            manager.config.switch_on = [item for item in switch_on if item != Switch.MOVE_OVERWRITE]
-            self.Ui.checkBox_move_overwrite.setChecked(False)
-            self.Ui.checkBox_move_keep.setChecked(True)
+        # 高级页「移动文件」：覆盖旧文件与保留旧文件必须勾选其中一个（默认档＝
+        # 保留旧文件）。老配置两者都没有 → 按默认档补上「保留旧文件」；手改配置
+        # 若两个都勾上 → 保留更安全的「保留旧文件」、去掉「覆盖旧文件」。
+        move_overwrite, move_keep = normalize_move_file_policy(
+            Switch.MOVE_OVERWRITE in switch_on, Switch.MOVE_KEEP in switch_on
+        )
+        if (move_overwrite, move_keep) != (
+            Switch.MOVE_OVERWRITE in switch_on,
+            Switch.MOVE_KEEP in switch_on,
+        ):
+            switch_on = normalize_move_file_switches(
+                switch_on,
+                Switch.MOVE_OVERWRITE in switch_on,
+                Switch.MOVE_KEEP in switch_on,
+            )
+            manager.config.switch_on = switch_on
+        self.Ui.checkBox_move_overwrite.setChecked(move_overwrite)
+        self.Ui.checkBox_move_keep.setChecked(move_keep)
 
         # 定时刮削设置
         if Switch.TIMED_SCRAPE in switch_on:

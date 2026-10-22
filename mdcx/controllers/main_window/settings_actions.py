@@ -149,12 +149,15 @@ class SettingsActionsMixin:
     def checkBox_separate_generate_strm_changed(self, checked):
         self.Ui.checkBox_separate_overwrite_strm.setEnabled(bool(checked))
 
-    # 整理模式-本地/网盘间隔互斥：只允许同时选中一个。
-    # 与分离模式「复用/覆盖」互斥保持同一套交互：勾选其一自动去勾另一，
-    # 去勾不动作（两枚都没勾的中间态由配置层归一兜底：全关→按「本地不限间隔」保存）
+    # 整理模式-本地/网盘间隔互斥：两者必须勾选其中一个（默认档＝「本地存储不设置
+    # 时间间隔整理文件」）。勾选其一自动去勾另一；把唯一勾选的那枚取消时立即
+    # 回落到默认档，保证界面上永远有且只有一枚被勾选（保存时还有配置层兜底校验）
     def checkBox_organize_local_no_interval_changed(self, checked):
         if checked:
             self.Ui.checkBox_organize_netdisk_rest_interval.setChecked(False)
+        elif not self.Ui.checkBox_organize_netdisk_rest_interval.isChecked():
+            # 两枚都没勾 → 回落到默认档「本地存储不设置时间间隔整理文件」
+            self.Ui.checkBox_organize_local_no_interval.setChecked(True)
 
     def checkBox_organize_netdisk_rest_interval_changed(self, checked):
         if checked:
@@ -171,16 +174,23 @@ class SettingsActionsMixin:
         if checked:
             self.Ui.checkBox_sortmode_delpic.setChecked(False)
 
-    # 高级页-文件移动策略互斥：覆盖旧文件 / 保留旧文件只能同时选中一个。
-    # 勾选其一自动去勾另一（toggled(False) 不动作，故无信号回环）；
-    # 两枚都不勾选是合法中间态：保持原有移动行为（目标同名即报错中止）。
+    # 高级页-文件移动策略互斥：覆盖旧文件 / 保留旧文件必须勾选其中一个
+    # （默认档＝「保留旧文件」）。勾选其一自动去勾另一；把唯一勾选的那枚取消时
+    # 立即回落到默认档，保证界面上永远有且只有一枚被勾选（保存时还有配置层
+    # 兜底校验：未勾选按默认档校正后写盘）
     def checkBox_move_overwrite_changed(self, checked):
         if checked:
             self.Ui.checkBox_move_keep.setChecked(False)
+        elif not self.Ui.checkBox_move_keep.isChecked():
+            # 两枚都没勾 → 回落到默认档「保留旧文件」
+            self.Ui.checkBox_move_keep.setChecked(True)
 
     def checkBox_move_keep_changed(self, checked):
         if checked:
             self.Ui.checkBox_move_overwrite.setChecked(False)
+        elif not self.Ui.checkBox_move_overwrite.isChecked():
+            # 「保留旧文件」是默认档，取消勾选后立即回落（另一枚也没勾时）
+            self.Ui.checkBox_move_keep.setChecked(True)
 
     # 设置-刮削目录-同意清理(我已知晓/我已同意)
     def checkBox_i_agree_clean_clicked(self):

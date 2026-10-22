@@ -29,7 +29,11 @@ from mdcx.config.enums import (
     Translator,
     Website,
 )
-from mdcx.config.extend import get_movie_path_setting
+from mdcx.config.extend import (
+    get_movie_path_setting,
+    normalize_move_file_switches,
+    normalize_organize_interval_policy,
+)
 from mdcx.config.manager import manager
 from mdcx.config.models import MIN_REST_TIME_SECONDS, SiteConfig, normalize_site_list, str_to_list
 from mdcx.consts import LOCAL_VERSION, SYSTEM_INFO, VERSION_NAME
@@ -418,15 +422,13 @@ def save_config(self: MyMAinWindow):
     manager.config.separate_overwrite_strm = self.Ui.checkBox_separate_overwrite_strm.isChecked()
     manager.config.separate_reuse_metadata = self.Ui.checkBox_separate_reuse_meta.isChecked()
     manager.config.separate_overwrite_meta = self.Ui.checkBox_separate_overwrite_meta.isChecked()
-    # 整理模式：两次整理之间的时间间隔策略（两枚复选框互斥）
-    # 互斥兜底：两枚同时勾选时以「网盘按自动休息间隔」为准，两枚都没勾时按
-    # 「本地存储不限制间隔时间」处理（与配置迁移逻辑保持一致）
-    organize_netdisk = self.Ui.checkBox_organize_netdisk_rest_interval.isChecked()
-    organize_local = self.Ui.checkBox_organize_local_no_interval.isChecked()
-    if organize_netdisk:
-        organize_local = False
-    elif not organize_local:
-        organize_local = True
+    # 整理模式：两次整理之间的时间间隔策略（两枚复选框互斥，必须勾选其中一个，
+    # 默认档＝「本地存储不设置时间间隔整理文件」；未勾选时按默认档校正后写盘，
+    # 与配置迁移逻辑保持一致）
+    organize_local, organize_netdisk = normalize_organize_interval_policy(
+        self.Ui.checkBox_organize_local_no_interval.isChecked(),
+        self.Ui.checkBox_organize_netdisk_rest_interval.isChecked(),
+    )
     self.Ui.checkBox_organize_local_no_interval.setChecked(organize_local)
     self.Ui.checkBox_organize_netdisk_rest_interval.setChecked(organize_netdisk)
     manager.config.organize_local_no_interval = organize_local
@@ -807,10 +809,17 @@ def save_config(self: MyMAinWindow):
     if Switch.SORT_DEL in manager.config.switch_on and Switch.SORT_MOVE in manager.config.switch_on:
         manager.config.switch_on = [item for item in manager.config.switch_on if item != Switch.SORT_MOVE]
 
-    # 高级页「移动文件」：覆盖旧文件与保留旧文件互斥（界面层已保证只勾一个，
-    # 这里再兜一层，防止手改配置或异常状态把两个都写进配置文件）
-    if Switch.MOVE_OVERWRITE in manager.config.switch_on and Switch.MOVE_KEEP in manager.config.switch_on:
-        manager.config.switch_on = [item for item in manager.config.switch_on if item != Switch.MOVE_OVERWRITE]
+    # 高级页「移动文件」：覆盖旧文件与保留旧文件必须勾选其中一个（默认档＝
+    # 保留旧文件）。保存时校验：两个都没勾（手改配置或异常状态）就按默认档
+    # 「保留旧文件」校正，两个都勾上则去掉更激进的「覆盖旧文件」，校正结果
+    # 随本方法后面的 manager.save() 一并写盘。
+    manager.config.switch_on = normalize_move_file_switches(
+        manager.config.switch_on,
+        Switch.MOVE_OVERWRITE in manager.config.switch_on,
+        Switch.MOVE_KEEP in manager.config.switch_on,
+    )
+    self.Ui.checkBox_move_overwrite.setChecked(Switch.MOVE_OVERWRITE in manager.config.switch_on)
+    self.Ui.checkBox_move_keep.setChecked(Switch.MOVE_KEEP in manager.config.switch_on)
 
     # 日志设置
     manager.config.show_web_log = get_checkbox(self.Ui.checkBox_show_web_log)

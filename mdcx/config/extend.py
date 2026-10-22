@@ -147,10 +147,12 @@ def get_file_move_policy() -> str:
     返回值：
     - ``FILE_MOVE_OVERWRITE``（"overwrite"）：目标目录已有同名文件时，用被移动文件直接覆盖。
     - ``FILE_MOVE_KEEP``（"keep"）：目标目录已有同名文件时，保留目标文件，被移动文件留在原目录。
-    - 空字符串：未选择任一策略，保持原有的移动行为。
+    - 空字符串：未选择任一策略（正常不会发生：默认档＝保留旧文件，加载/保存/迁移
+      三层都会把「两者都没勾」校正为「保留旧文件」），此时保持原有的移动行为。
 
     「覆盖旧文件」与「保留旧文件」互斥（同一时刻只能选中一个），配置层已归一：
-    两个都勾上时保留更安全的 move_keep、去掉 move_overwrite。
+    两个都勾上时保留更安全的 move_keep、去掉 move_overwrite；两个都没勾时补上
+    move_keep（默认档）。口径见 :func:`normalize_move_file_policy`。
     """
     switch_on = manager.config.switch_on
     if Switch.MOVE_OVERWRITE in switch_on:
@@ -168,6 +170,66 @@ def is_file_move_overwrite() -> bool:
 def is_file_move_keep() -> bool:
     """是否启用了「保留旧文件」策略。"""
     return get_file_move_policy() == FILE_MOVE_KEEP
+
+
+def normalize_move_file_policy(overwrite: bool, keep: bool) -> tuple[bool, bool]:
+    """校正「移动文件」两个互斥复选框的勾选状态（设置 → 高级 → 移动文件）。
+
+    返回 ``(覆盖旧文件, 保留旧文件)``：
+
+    - 两个都没勾 → 按默认档校正为「保留旧文件」（默认档＝更安全的一档：不覆盖已有文件）。
+    - 两个都勾 → 只保留「保留旧文件」。
+    - 只勾一个 → 原样返回（尊重用户的显式选择）。
+
+    界面层（互斥 + 取消勾选后回落默认）、配置层（保存时校验校正）、迁移层（老配置
+    升级）三处共用这一份口径，避免同一条规则散落出三套实现。
+    """
+    if overwrite and keep:
+        return False, True
+    if not overwrite and not keep:
+        return False, True
+    return overwrite, keep
+
+
+def normalize_move_file_switches(switch_on: list[Switch], overwrite: bool, keep: bool) -> list[Switch]:
+    """校正高级页「移动文件」两个互斥开关，返回校正后的开关列表。
+
+    「覆盖旧文件」与「保留旧文件」必须勾选其中一个（默认档＝保留旧文件）：
+
+    - 两个都没勾 → 补上「保留旧文件」；
+    - 两个都勾 → 去掉更激进的「覆盖旧文件」，只留「保留旧文件」；
+    - 只勾一个 → 原样保留（尊重用户的显式选择）。
+
+    加载配置（回填界面）与保存配置（写盘前校验）共用这一份口径。
+    """
+    move_overwrite, move_keep = normalize_move_file_policy(overwrite, keep)
+    if (move_overwrite, move_keep) == (overwrite, keep):
+        return switch_on
+    normalized: list[Switch] = [item for item in switch_on if item not in (Switch.MOVE_OVERWRITE, Switch.MOVE_KEEP)]
+    if move_overwrite:
+        normalized.append(Switch.MOVE_OVERWRITE)
+    if move_keep:
+        normalized.append(Switch.MOVE_KEEP)
+    return normalized
+
+
+def normalize_organize_interval_policy(local: bool, netdisk: bool) -> tuple[bool, bool]:
+    """校正整理模式「本地/网盘间隔」两个互斥复选框的勾选状态。
+
+    返回 ``(本地存储不设置时间间隔整理文件, 网盘按照自动休息间隔整理文件)``：
+
+    - 两个都没勾 → 按默认档校正为「本地存储不设置时间间隔整理文件」。
+    - 两个都勾 → 只保留「网盘按照自动休息间隔整理文件」（等待是安全下限：网盘目录
+      缓存没刷新就会整理失败）。
+    - 只勾一个 → 原样返回（尊重用户的显式选择）。
+
+    与迁移层 ``_migrate_organize_interval_keys`` 的口径保持一致。
+    """
+    if local and netdisk:
+        return False, True
+    if not local and not netdisk:
+        return True, False
+    return local, netdisk
 
 
 def should_generate_strm(meta_root: Path | None, skip_reorganize: bool) -> bool:

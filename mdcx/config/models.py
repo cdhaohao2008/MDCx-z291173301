@@ -1072,6 +1072,7 @@ class Config(BaseModel):
             Switch.INFINITE_SCRAPE,
             Switch.SHOW_DIALOG_STOP_SCRAPE,
             Switch.SORT_DEL,
+            Switch.MOVE_KEEP,
             Switch.THEPORNDB_NO_HASH,
             Switch.HIDE_DOCK,
             Switch.HIDE_MENU,
