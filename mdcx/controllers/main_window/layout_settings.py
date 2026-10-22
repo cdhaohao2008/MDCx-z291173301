@@ -299,13 +299,13 @@ class LayoutSettingsMixin:
                 clean.move(nx, clean.y())
 
     def _sync_reuse_meta_gap_align(self) -> None:
-        """刮削模式页：三行的右侧复选框严格同 x 上下对齐。
+        """刮削模式页：四行的右侧复选框严格同 x 上下对齐。
 
         锚点是 STRM 行（其左右两个复选框之间只有布局间距，没有间隔占位），
-        复用行与整理模式间隔行的右侧复选框则各自带一个 gap spacer（第 1 项），
-        差值只来自“首框宽度差 + 行内间距差”，由 gap spacer 补齐。
+        复用行、整理模式间隔行、视频模式行的右侧复选框则各自带一个 gap spacer
+        （第 1 项），差值只来自“首框宽度差 + 行内间距差”，由 gap spacer 补齐。
 
-        三行同处 gridLayout_2 第 1 列（左缘天然一致）。sizeHint 在 show 前后会变
+        四行同处 gridLayout_2 第 1 列（左缘天然一致）。sizeHint 在 show 前后会变
         （初始化公式一次算不准，窄态实测差 6px），故按实测差值闭环收敛：量各框经
         content 中转的 x 差，残差就加多少，相等即 no-op。gap 钉 Fixed、行尾 spacer
         保持 Expanding，宽态富余只进尾部；gap 变宽不改变行总宽（尾部吸收），不触发
@@ -323,6 +323,7 @@ class LayoutSettingsMixin:
         for box_name, row_name in (
             ("checkBox_separate_overwrite_meta", "horizontalLayout_reuse_meta"),
             ("checkBox_organize_netdisk_rest_interval", "horizontalLayout_organize_interval"),
+            ("checkBox_sortmode_movefile", "horizontalLayout_125"),
         ):
             box = getattr(ui, box_name, None)
             row = getattr(ui, row_name, None)

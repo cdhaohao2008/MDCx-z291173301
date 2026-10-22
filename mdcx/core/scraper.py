@@ -30,6 +30,7 @@ from ..config.enums import (
     FixedScrapingType,
     KeepableFile,
     NfoInclude,
+    NoEscape,
     ReadMode,
     Switch,
     TagInclude,
@@ -86,6 +87,7 @@ from .file import (
     get_file_info_v2,
     get_output_name,
     move_movie,
+    remove_empty_folders,
 )
 from .file_crawler import FileScraper, classify_existing_scrape_result, classify_scrape_task
 from .image import add_mark, replace_thumb_fanart_with_poster
@@ -251,6 +253,8 @@ class Scraper:
         self._pending_organize_retries: list[_OrganizeRetryTask] = []
         self._deferred_organize_paths: set[Path] = set()
         self._organize_index: OrganizeIndex | None = None
+        # 视频模式：本次运行搬走视频的源目录（收尾时删除已变空的那些）
+        self._video_source_folders: set[Path] = set()
 
     async def _wait_organize_interval(self) -> None:
         """整理模式：距上次整理结束不足「自动休息」时间时，自动等待到间隔满足再开始。
@@ -317,6 +321,7 @@ class Scraper:
     async def _run_tasks_with_limit(self, movie_list: list[Path], task_count: int, thread_number: int) -> None:
         self._pending_organize_retries.clear()
         self._deferred_organize_paths.clear()
+        self._video_source_folders.clear()
         task_iter = iter(enumerate(movie_list, 1))
         running_tasks: set[asyncio.Task[None]] = set()
         batch_size = self._organize_batch_size if self._organize_batch_size > 0 else task_count
@@ -405,6 +410,32 @@ class Scraper:
 
         if self._pending_organize_retries:
             await self._retry_pending_organize_files()
+
+    async def _cleanup_video_empty_folders(self) -> None:
+        """视频模式收尾：删除本次搬移后变空的源目录。
+
+        视频模式把视频搬到新目录后，原目录往往只剩空壳；勾选「移动已下载图片和
+        文件到新目录」时，图片/信息文件/json/字幕等伴生文件也一起搬走，原目录
+        必然变空。这里只删除「本次运行确实搬空」的目录：目录仍非空就跳过，扫描
+        根目录本身永不删除，roots 之外的目录也不动。
+
+        与通用「删除空目录」开关无关——那是全量扫描式清理，这里是本次搬移的
+        收尾（视频模式搬走文件必然留下空壳，属于搬移本身的一部分）。
+        """
+        if NoEscape.FOLDER in manager.config.no_escape:
+            # 用户勾了「目录」豁免：不删任何目录
+            self._video_source_folders.clear()
+            return
+        folders = {Path(folder) for folder in self._video_source_folders}
+        self._video_source_folders.clear()
+        if not folders:
+            return
+        roots = [Path(path) for path in get_movie_path_setting().movie_paths]
+        removed = await remove_empty_folders(folders, roots)
+        for folder in removed:
+            signal.show_log_text(f" 🗑 已删除空目录: {folder}")
+        if removed:
+            signal.show_log_text(f" 🗑 视频模式清理空目录：共删除 {len(removed)} 个空目录")
 
     async def _retry_pending_organize_files(self) -> None:
         """其他番号全部处理完后，对整理失败的番号统一做一次管理员重试。"""
@@ -797,6 +828,10 @@ class Scraper:
                 if meta_root is not None:
                     # 数据存放目录下的空目录：走右侧分离模式开关
                     await _clean_empty_folders(meta_root, file_mode, allow_empty=eff_del_empty_folder())
+        # 视频模式：所有任务完成后，删除被搬空后的源目录（勾选「移动已下载图片和
+        # 文件到新目录」时伴生文件也一起搬走，原目录必然变空）
+        if get_runtime_main_mode() == VIDEO_MAIN_MODE:
+            await self._cleanup_video_empty_folders()
         end_time = time.time()
         used_time = str(round((end_time - Flags.start_time), 2))
         average_time = str(round((end_time - Flags.start_time) / task_count, 2)) if task_count else used_time
@@ -1860,6 +1895,9 @@ class Scraper:
                 if not moved:
                     LogBuffer.error().write(error)
                     return None, None
+                # 伴生文件与视频都搬走后，原目录会变成空壳：登记源目录，
+                # 所有任务结束后统一删除（视频模式空目录收尾）
+                self._video_source_folders.add(folder_old_path)
                 await save_success_list(file_path, file_new_path)  # 保存成功列表
                 return res, other
             # 移动文件
@@ -1880,6 +1918,8 @@ class Scraper:
                         fanart_final_path,
                         naming_rule,
                     )  # 清理旧的thumb、poster、fanart、nfo
+                # 登记源目录：视频搬走（且旧图片/信息文件已删）后原目录可能变空
+                self._video_source_folders.add(folder_old_path)
                 await save_success_list(file_path, file_new_path)  # 保存成功列表
                 return res, other
             # 返回MDCx1_1main, 继续处理下一个文件

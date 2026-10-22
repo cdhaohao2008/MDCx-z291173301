@@ -2794,6 +2794,10 @@ class Ui_MDCx(object):
         self.checkBox_sortmode_delpic.setMinimumSize(QtCore.QSize(0, 0))
         self.checkBox_sortmode_delpic.setObjectName("checkBox_sortmode_delpic")
         self.horizontalLayout_125.addWidget(self.checkBox_sortmode_delpic)
+        spacerItem5 = QtWidgets.QSpacerItem(
+            20, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
+        )
+        self.horizontalLayout_125.addItem(spacerItem5)
         self.checkBox_sortmode_movefile = QtWidgets.QCheckBox(parent=self.gridLayoutWidget_2)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -2803,10 +2807,10 @@ class Ui_MDCx(object):
         self.checkBox_sortmode_movefile.setMinimumSize(QtCore.QSize(0, 0))
         self.checkBox_sortmode_movefile.setObjectName("checkBox_sortmode_movefile")
         self.horizontalLayout_125.addWidget(self.checkBox_sortmode_movefile)
-        spacerItem5 = QtWidgets.QSpacerItem(
+        spacerItem6 = QtWidgets.QSpacerItem(
             20, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
         )
-        self.horizontalLayout_125.addItem(spacerItem5)
+        self.horizontalLayout_125.addItem(spacerItem6)
         self.gridLayout_2.addLayout(self.horizontalLayout_125, 7, 1, 1, 1)
         self.label_344 = QtWidgets.QLabel(parent=self.gridLayoutWidget_2)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
@@ -4021,10 +4025,10 @@ class Ui_MDCx(object):
         self.label_323.setWordWrap(True)
         self.label_323.setObjectName("label_323")
         self.gridLayout_36.addWidget(self.label_323, 15, 1, 1, 3)
-        spacerItem6 = QtWidgets.QSpacerItem(
+        spacerItem7 = QtWidgets.QSpacerItem(
             20, 9, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
         )
-        self.gridLayout_36.addItem(spacerItem6, 12, 0, 1, 4)
+        self.gridLayout_36.addItem(spacerItem7, 12, 0, 1, 4)
         self.label_dongman_sites = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -4074,14 +4078,14 @@ class Ui_MDCx(object):
         self.pushButton_priority_website_dongman.setMinimumSize(QtCore.QSize(0, 28))
         self.pushButton_priority_website_dongman.setObjectName("pushButton_priority_website_dongman")
         self.gridLayout_36.addWidget(self.pushButton_priority_website_dongman, 13, 3, 1, 1)
-        spacerItem7 = QtWidgets.QSpacerItem(
-            20, 9, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
-        )
-        self.gridLayout_36.addItem(spacerItem7, 14, 0, 1, 4)
         spacerItem8 = QtWidgets.QSpacerItem(
             20, 9, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
         )
-        self.gridLayout_36.addItem(spacerItem8, 16, 0, 1, 4)
+        self.gridLayout_36.addItem(spacerItem8, 14, 0, 1, 4)
+        spacerItem9 = QtWidgets.QSpacerItem(
+            20, 9, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
+        )
+        self.gridLayout_36.addItem(spacerItem9, 16, 0, 1, 4)
         self.label_154 = QtWidgets.QLabel(parent=self.layoutWidget_6)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -5075,10 +5079,10 @@ class Ui_MDCx(object):
         self.label_field_priority_try_all_images.setIndent(4)
         self.label_field_priority_try_all_images.setObjectName("label_field_priority_try_all_images")
         self.horizontalLayout_field_priority_options.addWidget(self.label_field_priority_try_all_images)
-        spacerItem9 = QtWidgets.QSpacerItem(
+        spacerItem10 = QtWidgets.QSpacerItem(
             40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
         )
-        self.horizontalLayout_field_priority_options.addItem(spacerItem9)
+        self.horizontalLayout_field_priority_options.addItem(spacerItem10)
         self.gridLayout_28.addWidget(self.widget_field_priority_options, 2, 1, 1, 1)
         self.pushButton_scrape_note = QtWidgets.QPushButton(parent=self.groupBox_11)
         self.pushButton_scrape_note.setGeometry(QtCore.QRect(529, 140, 151, 26))
@@ -7237,10 +7241,10 @@ class Ui_MDCx(object):
         )
         self.label_80.setObjectName("label_80")
         self.gridLayout_32.addWidget(self.label_80, 3, 0, 1, 1)
-        spacerItem10 = QtWidgets.QSpacerItem(
+        spacerItem11 = QtWidgets.QSpacerItem(
             20, 0, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding
         )
-        self.gridLayout_32.addItem(spacerItem10, 7, 0, 1, 2)
+        self.gridLayout_32.addItem(spacerItem11, 7, 0, 1, 2)
         self.groupBox_llm = QtWidgets.QGroupBox(parent=self.scrollAreaWidgetContents_fanyi)
         self.groupBox_llm.setGeometry(QtCore.QRect(30, 354, 701, 601))
         self.groupBox_llm.setObjectName("groupBox_llm")
@@ -9006,10 +9010,10 @@ class Ui_MDCx(object):
         self.checkBox_nfo_criticrating.setSizePolicy(sizePolicy)
         self.checkBox_nfo_criticrating.setObjectName("checkBox_nfo_criticrating")
         self.gridLayout_66.addWidget(self.checkBox_nfo_criticrating, 0, 1, 1, 1)
-        spacerItem11 = QtWidgets.QSpacerItem(
+        spacerItem12 = QtWidgets.QSpacerItem(
             20, 8, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
         )
-        self.gridLayout_66.addItem(spacerItem11, 1, 0, 1, 2)
+        self.gridLayout_66.addItem(spacerItem12, 1, 0, 1, 2)
         self.checkBox_nfo_actor = QtWidgets.QCheckBox(parent=self.layoutWidget_10)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -9037,10 +9041,10 @@ class Ui_MDCx(object):
         self.checkBox_nfo_actor_tmdbid = QtWidgets.QCheckBox(parent=self.layoutWidget_10)
         self.checkBox_nfo_actor_tmdbid.setObjectName("checkBox_nfo_actor_tmdbid")
         self.gridLayout_66.addWidget(self.checkBox_nfo_actor_tmdbid, 3, 1, 1, 1)
-        spacerItem12 = QtWidgets.QSpacerItem(
+        spacerItem13 = QtWidgets.QSpacerItem(
             20, 19, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed
         )
-        self.gridLayout_66.addItem(spacerItem12, 4, 0, 1, 2)
+        self.gridLayout_66.addItem(spacerItem13, 4, 0, 1, 2)
         self.checkBox_nfo_series = QtWidgets.QCheckBox(parent=self.layoutWidget_10)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -10405,10 +10409,10 @@ class Ui_MDCx(object):
         self.radioButton_actor_info_ja = QtWidgets.QRadioButton(parent=self.gridLayoutWidget_14)
         self.radioButton_actor_info_ja.setObjectName("radioButton_actor_info_ja")
         self.horizontalLayout_92.addWidget(self.radioButton_actor_info_ja)
-        spacerItem13 = QtWidgets.QSpacerItem(
+        spacerItem14 = QtWidgets.QSpacerItem(
             20, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
         )
-        self.horizontalLayout_92.addItem(spacerItem13)
+        self.horizontalLayout_92.addItem(spacerItem14)
         self.gridLayout_14.addLayout(self.horizontalLayout_92, 0, 1, 1, 1)
         self.frame_8 = QtWidgets.QFrame(parent=self.gridLayoutWidget_14)
         self.frame_8.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
@@ -10456,10 +10460,10 @@ class Ui_MDCx(object):
         self.pushButton_select_actor_info_db.setMinimumSize(QtCore.QSize(110, 40))
         self.pushButton_select_actor_info_db.setObjectName("pushButton_select_actor_info_db")
         self.horizontalLayout_155.addWidget(self.pushButton_select_actor_info_db)
-        spacerItem14 = QtWidgets.QSpacerItem(
+        spacerItem15 = QtWidgets.QSpacerItem(
             20, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
         )
-        self.horizontalLayout_155.addItem(spacerItem14)
+        self.horizontalLayout_155.addItem(spacerItem15)
         self.gridLayout_14.addLayout(self.horizontalLayout_155, 3, 1, 1, 1)
         self.frame_9 = QtWidgets.QFrame(parent=self.gridLayoutWidget_14)
         self.frame_9.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
@@ -10497,10 +10501,10 @@ class Ui_MDCx(object):
         self.horizontalLayout_160.setObjectName("horizontalLayout_160")
         self.horizontalLayout_159.addLayout(self.horizontalLayout_160)
         self.horizontalLayout_1581.addLayout(self.horizontalLayout_159)
-        spacerItem15 = QtWidgets.QSpacerItem(
+        spacerItem16 = QtWidgets.QSpacerItem(
             20, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
         )
-        self.horizontalLayout_1581.addItem(spacerItem15)
+        self.horizontalLayout_1581.addItem(spacerItem16)
         self.gridLayout_14.addLayout(self.horizontalLayout_1581, 4, 1, 1, 1)
         self.label_291 = QtWidgets.QLabel(parent=self.gridLayoutWidget_14)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
@@ -10558,10 +10562,10 @@ class Ui_MDCx(object):
         self.label_106.setObjectName("label_106")
         self.horizontalLayout_100.addWidget(self.label_106)
         self.horizontalLayout_98.addLayout(self.horizontalLayout_100)
-        spacerItem16 = QtWidgets.QSpacerItem(
+        spacerItem17 = QtWidgets.QSpacerItem(
             20, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
         )
-        self.horizontalLayout_98.addItem(spacerItem16)
+        self.horizontalLayout_98.addItem(spacerItem17)
         self.gridLayout_14.addLayout(self.horizontalLayout_98, 2, 1, 1, 1)
         self.pushButton_add_actor_info = QtWidgets.QPushButton(parent=self.groupBox_64)
         self.pushButton_add_actor_info.setGeometry(QtCore.QRect(155, 320, 181, 40))
@@ -10954,10 +10958,10 @@ class Ui_MDCx(object):
         self.checkBox_use_proxy = QtWidgets.QCheckBox(parent=self.gridLayoutWidget_9)
         self.checkBox_use_proxy.setObjectName("checkBox_use_proxy")
         self.horizontalLayout_17.addWidget(self.checkBox_use_proxy)
-        spacerItem17 = QtWidgets.QSpacerItem(
+        spacerItem18 = QtWidgets.QSpacerItem(
             40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
         )
-        self.horizontalLayout_17.addItem(spacerItem17)
+        self.horizontalLayout_17.addItem(spacerItem18)
         self.checkBox_proxy_route_all = QtWidgets.QCheckBox(parent=self.gridLayoutWidget_9)
         self.checkBox_proxy_route_all.setObjectName("checkBox_proxy_route_all")
         self.horizontalLayout_17.addWidget(self.checkBox_proxy_route_all)
@@ -12734,10 +12738,10 @@ class Ui_MDCx(object):
         self.pushButton_about.setMaximumSize(QtCore.QSize(16777215, 40))
         self.pushButton_about.setObjectName("pushButton_about")
         self.verticalLayout.addWidget(self.pushButton_about)
-        spacerItem18 = QtWidgets.QSpacerItem(
+        spacerItem19 = QtWidgets.QSpacerItem(
             20, 0, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding
         )
-        self.verticalLayout.addItem(spacerItem18)
+        self.verticalLayout.addItem(spacerItem19)
         self.left_backgroud_widget = QtWidgets.QWidget(parent=self.widget_setting)
         self.left_backgroud_widget.setGeometry(QtCore.QRect(0, 0, 210, 720))
         self.left_backgroud_widget.setObjectName("left_backgroud_widget")

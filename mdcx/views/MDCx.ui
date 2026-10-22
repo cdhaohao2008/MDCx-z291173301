@@ -6352,6 +6352,19 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               </widget>
                             </item>
                             <item>
+                              <spacer name="horizontalSpacer_sortmode_movefile_gap">
+                                <property name="orientation">
+                                  <enum>Qt::Orientation::Horizontal</enum>
+                                </property>
+                                <property name="sizeHint" stdset="0">
+                                  <size>
+                                    <width>20</width>
+                                    <height>20</height>
+                                  </size>
+                                </property>
+                              </spacer>
+                            </item>
+                            <item>
                               <widget class="QCheckBox" name="checkBox_sortmode_movefile">
                                 <property name="sizePolicy">
                                   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">

@@ -292,6 +292,42 @@ def test_overwrite_meta_aligns_under_overwrite_strm(win, app):
     assert pos("checkBox_separate_overwrite_meta") == narrow_meta, "窄→宽→窄往返未复原"
 
 
+def test_video_move_checkbox_aligns_with_overwrite_strm(win, app):
+    """视频模式「移动已下载图片和文件到新目录」与「覆盖本地已存在的STRM链接文本」严格上下对齐。
+
+    锚点框（覆盖 STRM）位置保持不变，只把新复选框右移到与它同 x；
+    该 x 与复用行、整理间隔行的右侧框一致（同一列的右对齐基准）。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_guaxiaomoshi(win, app)
+
+    def pos(name):
+        p = getattr(ui, name).mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0))
+        return (p.x(), p.y())
+
+    _resize(win, app, 1030, 753)
+    narrow_move = pos("checkBox_sortmode_movefile")
+    narrow_strm = pos("checkBox_separate_overwrite_strm")
+    narrow_meta = pos("checkBox_separate_overwrite_meta")
+    narrow_netdisk = pos("checkBox_organize_netdisk_rest_interval")
+    narrow_delete = pos("checkBox_sortmode_delpic")
+    assert narrow_move[0] == narrow_strm[0], f"移动框未与覆盖 STRM 框对齐: {narrow_move} vs {narrow_strm}"
+    assert narrow_move[0] == narrow_meta[0] == narrow_netdisk[0], (
+        f"移动框未与其它行右侧框对齐: {narrow_move} vs {narrow_meta} / {narrow_netdisk}"
+    )
+    # 锚点框位置保持不变：仍与同列其它右侧框同 x
+    assert narrow_strm[0] == narrow_meta[0] == narrow_netdisk[0], f"覆盖 STRM 框位置被改动: {narrow_strm}"
+    # 移动框在「删除…」框右侧（同行的第二枚复选框）
+    assert narrow_move[0] > narrow_delete[0], f"移动框应在删除框右侧: {narrow_move} vs {narrow_delete}"
+    _resize(win, app, 1920, 1170)
+    assert pos("checkBox_sortmode_movefile") == narrow_move, f"宽态移动框位置变动: {narrow_move}"
+    assert pos("checkBox_separate_overwrite_strm") == narrow_strm, f"宽态覆盖 STRM 框位置变动: {narrow_strm}"
+    _resize(win, app, 1030, 753)
+    assert pos("checkBox_sortmode_movefile") == narrow_move, "窄→宽→窄往返未复原"
+    assert pos("checkBox_separate_overwrite_strm") == narrow_strm, "窄→宽→窄往返未复原"
+
+
 def test_organize_interval_row_right_aligns_with_strm(win, app):
     """整理间隔行的右侧复选框与 STRM/复用行的右侧复选框同 x 严格对齐。"""
     ui = win.Ui

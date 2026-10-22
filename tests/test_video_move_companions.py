@@ -341,3 +341,75 @@ def test_ui_handlers_keep_delete_and_move_mutually_exclusive():
     SettingsActionsMixin.checkBox_sortmode_delpic_changed(host, False)
     assert delete.checked is False
     assert move.checked is False
+
+
+@pytest.mark.asyncio
+async def test_remove_empty_folders_only_deletes_emptied_dirs(tmp_path: Path):
+    """空目录收尾：只删空目录，空父目录连带删，扫描根目录与非空目录保留。"""
+    from mdcx.core.file import remove_empty_folders
+
+    root = tmp_path / "media"
+    emptied = root / "ABS-040"
+    emptied.mkdir(parents=True)
+    nested = root / "ABS-041" / "CD1"
+    nested.mkdir(parents=True)
+    busy = root / "ABS-042"
+    busy.mkdir()
+    (busy / "ABS-042.mp4").write_bytes(b"video")
+
+    removed = await remove_empty_folders([emptied, nested, busy, root], [root])
+
+    assert not emptied.exists(), "搬空后的源目录应被删除"
+    assert not nested.exists(), "空目录应被删除"
+    assert not (root / "ABS-041").exists(), "空父目录应连带删除"
+    assert busy.exists(), "仍非空的目录不能删"
+    assert (busy / "ABS-042.mp4").exists(), "非空目录里的文件不能动"
+    assert root.exists(), "扫描根目录不能删"
+    assert root not in removed, "扫描根目录不能出现在删除列表里"
+
+
+@pytest.mark.asyncio
+async def test_video_mode_cleanup_removes_emptied_source_folder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """视频模式所有任务完成后：搬空后的源目录被删除，非空目录与扫描根目录保留。"""
+    from mdcx.core import scraper as scraper_module
+
+    root = tmp_path / "media"
+    source = root / "ABS-040"
+    source.mkdir(parents=True)
+    busy = root / "ABS-041"
+    busy.mkdir()
+    (busy / "ABS-041.mp4").write_bytes(b"video")
+
+    monkeypatch.setattr(manager.config, "media_path", str(root))
+    monkeypatch.setattr(manager.config, "no_escape", [])
+    monkeypatch.setattr(scraper_module.signal, "show_log_text", lambda text: None)
+
+    scraper = scraper_module.Scraper(crawler_provider=None)  # type: ignore[arg-type]
+    scraper._video_source_folders.update({source, busy, root})
+    await scraper._cleanup_video_empty_folders()
+
+    assert not source.exists(), "视频模式收尾应删除搬空后的源目录"
+    assert busy.exists(), "仍非空的目录不能删"
+    assert root.exists(), "扫描根目录不能删"
+    assert not scraper._video_source_folders, "收尾后登记表应清空"
+
+
+@pytest.mark.asyncio
+async def test_video_mode_cleanup_respects_no_escape_folder(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """勾了「目录」豁免（NoEscape.FOLDER）时，视频模式收尾不删任何目录。"""
+    from mdcx.config.enums import NoEscape
+    from mdcx.core import scraper as scraper_module
+
+    root = tmp_path / "media"
+    source = root / "ABS-040"
+    source.mkdir(parents=True)
+
+    monkeypatch.setattr(manager.config, "media_path", str(root))
+    monkeypatch.setattr(manager.config, "no_escape", [NoEscape.FOLDER])
+    monkeypatch.setattr(scraper_module.signal, "show_log_text", lambda text: None)
+
+    scraper = scraper_module.Scraper(crawler_provider=None)  # type: ignore[arg-type]
+    scraper._video_source_folders.add(source)
+    await scraper._cleanup_video_empty_folders()
+
+    assert source.exists(), "勾了目录豁免就不该删目录"

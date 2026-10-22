@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import traceback
+from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
@@ -232,6 +233,55 @@ async def move_movie(other: OtherInfo, file_info: FileInfo, file_path: Path, fil
         return True
     LogBuffer.log().write(f"\n 🔴 移动视频文件到成功文件夹失败!\n    {error_info}")
     return False
+
+
+def _norm_dir_key(path: Path) -> str:
+    """目录比较用的规范化键（统一大小写、去掉冗余分隔符与 ..）。"""
+    return os.path.normcase(os.path.normpath(os.path.abspath(str(path))))
+
+
+def _is_inside_dir(key: str, root: str) -> bool:
+    """key 是否严格位于 root 之内（root 本身不算，不同盘符也不算）。"""
+    if key == root:
+        return False
+    try:
+        rel = os.path.relpath(key, root)
+    except ValueError:
+        # Windows 下不同盘符 relpath 会抛 ValueError
+        return False
+    return rel != os.curdir and not rel.startswith(os.pardir) and not os.path.isabs(rel)
+
+
+async def remove_empty_folders(folders: Iterable[Path], roots: Iterable[Path]) -> list[Path]:
+    """删除已变空的目录（视频模式把文件搬走后的收尾）。
+
+    - 只删空目录：目录不存在或仍有内容一律跳过，绝不误删有文件的目录
+    - 向上连带：删掉空目录后，若其父目录也空了则继续删，直到 roots 边界为止
+      （扫描根目录本身永远保留，roots 之外的目录一律不动）
+    - 返回实际被删除的目录列表
+    """
+    root_keys = [_norm_dir_key(Path(root)) for root in roots]
+
+    def task() -> list[Path]:
+        removed: list[Path] = []
+        for folder in folders:
+            current = Path(folder)
+            while True:
+                key = _norm_dir_key(current)
+                if not any(_is_inside_dir(key, root) for root in root_keys):
+                    # 扫描根目录本身或根目录之外：一律不删
+                    break
+                try:
+                    if not current.is_dir() or any(current.iterdir()):
+                        break
+                    current.rmdir()
+                except OSError:
+                    break
+                removed.append(current)
+                current = current.parent
+        return removed
+
+    return await asyncio.to_thread(task)
 
 
 def _get_folder_path(success_folder: Path, file_info: FileInfo, res: CrawlersResult) -> tuple[Path, str]:
