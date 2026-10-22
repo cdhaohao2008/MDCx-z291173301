@@ -3,7 +3,7 @@ import os
 import time
 import unicodedata
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -579,8 +579,13 @@ async def _build_plan(
     thumb_final_path: Path,
     fanart_final_path: Path,
     index: OrganizeIndex | None = None,
+    include_media: bool = True,
 ) -> list[tuple[Path, Path]]:
-    """生成整理计划：只包含当前番号真实存在的关联文件。"""
+    """生成整理计划：只包含当前番号真实存在的关联文件。
+
+    ``include_media=False`` 时不把视频/STRM 主体放进计划（视频模式自行搬运
+    视频本体，伴生文件先落位、主体后搬）。
+    """
     plan: list[tuple[Path, Path]] = []
     seen_sources: set[Path] = set()
     destinations: dict[Path, Path] = {}
@@ -773,7 +778,9 @@ async def _build_plan(
         add_variant(entry, folder_new_path / f"{naming_rule}{suffix}")
 
     # 视频/STRM 最后移动，其余资源全部落位后再移动主体文件。
-    add(file_path, file_new_path)
+    # include_media=False 时主体不参与本次计划（视频模式自己搬视频本体）。
+    if include_media:
+        add(file_path, file_new_path)
     return plan
 
 
@@ -873,4 +880,110 @@ async def organize_files(
 
     await transaction.commit()
     LogBuffer.log().write(f"\n 🍀 Organize done: {file_path} -> {file_new_path}")
+    return True, ""
+
+
+async def organize_companion_files(
+    *,
+    file_path: Path,
+    file_new_path: Path,
+    folder_old_path: Path,
+    folder_new_path: Path,
+    nfo_new_path: Path,
+    naming_rule: str,
+    number: str,
+    sub_list: list[str],
+    poster_final_path: Path,
+    thumb_final_path: Path,
+    fanart_final_path: Path,
+    move_media: Callable[[], Awaitable[bool]],
+    index: OrganizeIndex | None = None,
+    elevated: bool = False,
+) -> tuple[bool, str]:
+    """视频模式「移动已下载图片和文件到新目录」：按番号关联事务式搬运伴生文件。
+
+    与整理模式共用同一套「计划 → 事务 → 校验 → 回滚」机制，只有两点不同：
+
+    1. 伴生文件先落位、视频本体最后搬（``move_media`` 由调用方提供，保留
+       视频模式原有的软链接/硬链接语义）；
+    2. 视频本体搬运失败时，已经搬走的伴生文件一并回滚，保证「全有或全无」。
+
+    搬运范围与整理模式一致：NFO、图片（poster/thumb/fanart 及同番号全部图片）、
+    JSON（含 ``-mediainfo.json``，按新命名规则改名）、字幕、种子、bif、
+    单文件预告片、剧照目录（保持相对结构）、其余同名前缀伴生文件。
+
+    与整理模式不同：这里**不套用「成功输出目录」过滤**——视频模式的目标目录
+    就在成功输出目录里，用户要的正是「伴生文件跟着视频一起搬」；若沿用整理
+    模式的「源文件在成功输出目录内就不动」，扫描成功输出目录时会一个都不搬。
+
+    返回 ``(成功, 错误信息)``。失败时伴生文件已回滚到原目录。
+    """
+    try:
+        plan = await _build_plan(
+            file_path=file_path,
+            file_new_path=file_new_path,
+            folder_old_path=folder_old_path,
+            folder_new_path=folder_new_path,
+            nfo_new_path=nfo_new_path,
+            naming_rule=naming_rule,
+            number=number,
+            sub_list=sub_list,
+            poster_final_path=poster_final_path,
+            thumb_final_path=thumb_final_path,
+            fanart_final_path=fanart_final_path,
+            index=index,
+            include_media=False,
+        )
+    except OrganizePlanError as e:
+        LogBuffer.error().write(f"移动失败：{e}")
+        return False, str(e)
+    except Exception as e:
+        LogBuffer.error().write(f"移动失败：生成移动计划时出错：{e}")
+        return False, str(e)
+
+    if not plan:
+        # 没有可搬的伴生文件：视频本体仍要按视频模式规则搬过去
+        if not await move_media():
+            message = "视频文件移动失败"
+            LogBuffer.error().write(message)
+            return False, message
+        return True, ""
+
+    transaction = OrganizeTransaction(elevated=elevated)
+    try:
+        for src, dst in plan:
+            ok, error = await transaction.move_file(src, dst)
+            if not ok:
+                await transaction.rollback()
+                message = f"移动失败，已回滚到原目录：{src} -> {dst}; {error}"
+                LogBuffer.error().write(message)
+                return False, message
+    except Exception as e:
+        await transaction.rollback()
+        message = f"移动失败，已回滚到原目录：{e}"
+        LogBuffer.error().write(message)
+        return False, message
+
+    try:
+        missing = [dst for _, dst in plan if not await _exists_settled(dst)]
+    except OSError as e:
+        await transaction.rollback()
+        message = f"移动失败，无法确认目标文件，已回滚到原目录：{e}"
+        LogBuffer.error().write(message)
+        return False, message
+    if missing:
+        await transaction.rollback()
+        message = f"移动失败，目标文件缺失，已回滚到原目录：{missing[0]}"
+        LogBuffer.error().write(message)
+        return False, message
+
+    # 伴生文件全部落位后再搬视频本体；视频搬运失败时伴生文件一并回滚
+    if not await move_media():
+        await transaction.rollback()
+        message = "视频文件移动失败，伴生文件已回滚到原目录"
+        LogBuffer.error().write(message)
+        return False, message
+
+    await transaction.commit()
+    LogBuffer.log().write(f"\n 🍀 Companion files done: {folder_old_path} -> {folder_new_path}")
     return True, ""

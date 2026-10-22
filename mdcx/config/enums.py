@@ -388,6 +388,9 @@ class Switch(Enum):
     SHOW_DIALOG_EXIT = "show_dialog_exit"
     SHOW_DIALOG_STOP_SCRAPE = "show_dialog_stop_scrape"
     SORT_DEL = "sort_del"
+    SORT_MOVE = "sort_move"
+    """视频模式：把本地已下载的图片/信息/字幕等伴生文件按番号关联搬到新目录。"""
+
     QT_DIALOG = "qt_dialog"
     THEPORNDB_NO_HASH = "theporndb_no_hash"
     HIDE_DOCK = "hide_dock"
@@ -417,6 +420,7 @@ class Switch(Enum):
             "Show Dialog Exit",
             "Show Dialog Stop Scrape",
             "Sort Del",
+            "Sort Move",
             "Qt Dialog",
             "Theporndb No Hash",
             "Hide Dock",

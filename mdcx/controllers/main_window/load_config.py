@@ -1125,7 +1125,18 @@ def load_config(self: MyMAinWindow):
             (self.Ui.checkBox_copy_netdisk_nfo, Switch.COPY_NETDISK_NFO),
             (self.Ui.checkBox_theporndb_hash, Switch.THEPORNDB_NO_HASH),
             (self.Ui.checkBox_sortmode_delpic, Switch.SORT_DEL),
+            (self.Ui.checkBox_sortmode_movefile, Switch.SORT_MOVE),
         )
+
+        # 视频模式：「删除本地已下载的图片和信息文件」与「移动已下载图片和文件到新目录」
+        # 互斥。老配置只可能有 sort_del（自动升级为只勾删除、不勾移动）；
+        # 手改配置若两个都勾上，保留原有的 sort_del、不改变旧行为。
+        # 注：上面的 set_checkboxes 是逐个 setChecked 的，两个都勾时后一个会把前一个
+        # 顶掉（互斥信号联动），故这里按归一后的配置把两枚复选框重新钉死。
+        if Switch.SORT_DEL in switch_on and Switch.SORT_MOVE in switch_on:
+            manager.config.switch_on = [item for item in switch_on if item != Switch.SORT_MOVE]
+            self.Ui.checkBox_sortmode_delpic.setChecked(True)
+            self.Ui.checkBox_sortmode_movefile.setChecked(False)
 
         # 定时刮削设置
         if Switch.TIMED_SCRAPE in switch_on:

@@ -462,6 +462,22 @@ def _ensure_switch(data: dict[str, Any], value: str) -> None:
     # switch_on 缺失（全新默认配置）时不动：走 pydantic default_factory，本身已默认勾选
 
 
+def _ensure_switch_exclusive(data: dict[str, Any], keep: str, drop: str) -> None:
+    """两个互斥开关同时出现时只保留 keep（老配置升级用）。
+
+    switch_on 在 v2 json 里是 list，兼容 str（逗号分隔）形态。
+    """
+    current = data.get("switch_on")
+    if isinstance(current, str):
+        items = _str_to_list(current, ",")
+        if keep in items and drop in items:
+            data["switch_on"] = ",".join(item for item in items if item != drop)
+    elif isinstance(current, list | set | tuple):
+        values = [str(_enum_value(item)) for item in current]
+        if keep in values and drop in values:
+            data["switch_on"] = [item for item in current if str(_enum_value(item)) != drop]
+
+
 def migrate_config_data(data: dict[str, Any]) -> list[str]:
     """
     统一处理配置结构变更.
@@ -579,6 +595,11 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     # 无限次刮削开关（高级 → 保留任务右侧）：默认勾选，老配置缺键时自动补上
     # 不带 [迁移] 前缀即会被视为致命错误触发 _failed.json 保护分支，故此处静默补齐不告警
     _ensure_switch(data, "infinite_scrape")
+
+    # 视频模式：「删除本地已下载的图片和信息文件」与「移动已下载图片和文件到新目录」
+    # 互斥（同一时刻只能选中一个）。老配置只可能有 sort_del；手改配置若两个都勾上，
+    # 保留原有的 sort_del（不改变旧行为），去掉新开关 sort_move。
+    _ensure_switch_exclusive(data, "sort_del", "sort_move")
 
     data["config_version"] = CURRENT_CONFIG_VERSION
     return warnings

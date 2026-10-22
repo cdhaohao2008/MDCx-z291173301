@@ -6352,20 +6352,39 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               </widget>
                             </item>
                             <item>
-                              <widget class="QLabel" name="label_27">
+                              <widget class="QCheckBox" name="checkBox_sortmode_movefile">
                                 <property name="sizePolicy">
-                                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                                     <horstretch>0</horstretch>
                                     <verstretch>0</verstretch>
                                   </sizepolicy>
                                 </property>
-                                <property name="styleSheet">
-                                  <string notr="true">color: rgb(8, 128, 128);</string>
+                                <property name="minimumSize">
+                                  <size>
+                                    <width>0</width>
+                                    <height>0</height>
+                                  </size>
+                                </property>
+                                <property name="toolTip">
+                                  <string>把本地已下载的图片、信息文件、json、字幕等按番号关联移动到新目录（与「删除…」互斥）</string>
                                 </property>
                                 <property name="text">
-                                  <string>不勾选，不删除已下载图片和信息文件</string>
+                                  <string>移动已下载图片和文件到新目录</string>
                                 </property>
                               </widget>
+                            </item>
+                            <item>
+                              <spacer name="horizontalSpacer_sortmode_movefile">
+                                <property name="orientation">
+                                  <enum>Qt::Orientation::Horizontal</enum>
+                                </property>
+                                <property name="sizeHint" stdset="0">
+                                  <size>
+                                    <width>20</width>
+                                    <height>20</height>
+                                  </size>
+                                </property>
+                              </spacer>
                             </item>
                           </layout>
                         </item>

@@ -774,6 +774,7 @@ def save_config(self: MyMAinWindow):
         (self.Ui.checkBox_show_dialog_exit, Switch.SHOW_DIALOG_EXIT),
         (self.Ui.checkBox_show_dialog_stop_scrape, Switch.SHOW_DIALOG_STOP_SCRAPE),
         (self.Ui.checkBox_sortmode_delpic, Switch.SORT_DEL),
+        (self.Ui.checkBox_sortmode_movefile, Switch.SORT_MOVE),
         (self.Ui.checkBox_dialog_qt, Switch.QT_DIALOG),
         (self.Ui.checkBox_theporndb_hash, Switch.THEPORNDB_NO_HASH),
         (self.Ui.checkBox_hide_dock_icon, Switch.HIDE_DOCK),
@@ -798,6 +799,11 @@ def save_config(self: MyMAinWindow):
     )
 
     manager.config.switch_on = switch_actions
+
+    # 视频模式：删除/移动两个开关互斥（界面层已保证只勾一个，这里再兜一层，
+    # 防止手改配置或异常状态把两个都写进配置文件）
+    if Switch.SORT_DEL in manager.config.switch_on and Switch.SORT_MOVE in manager.config.switch_on:
+        manager.config.switch_on = [item for item in manager.config.switch_on if item != Switch.SORT_MOVE]
 
     # 日志设置
     manager.config.show_web_log = get_checkbox(self.Ui.checkBox_show_web_log)

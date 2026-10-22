@@ -38,6 +38,7 @@ from ..config.extend import (
     ORGANIZE_MAIN_MODE,
     READ_MAIN_MODE,
     SEPARATE_MAIN_MODE,
+    VIDEO_MAIN_MODE,
     MoviePathSetting,
     drop_ignore_dir,
     eff_del_empty_folder,
@@ -49,6 +50,7 @@ from ..config.extend import (
     is_in_success_folder,
     is_organize_selected,
     is_success_output_tree,
+    is_video_move_companions_enabled,
     mirror_meta_folder,
     organize_netdisk_rest_enabled,
     organize_rest_seconds,
@@ -89,7 +91,7 @@ from .file_crawler import FileScraper, classify_existing_scrape_result, classify
 from .image import add_mark, replace_thumb_fanart_with_poster
 from .media_resource import MediaResourceContext
 from .nfo import get_nfo_data, write_nfo
-from .organize import OrganizeIndex, build_organize_index, organize_files
+from .organize import OrganizeIndex, build_organize_index, organize_companion_files, organize_files
 from .super_resolution import maybe_upscale_poster
 from .translate import translate_actor, translate_info, translate_title_outline
 from .utils import (
@@ -291,22 +293,23 @@ class Scraper:
         movie_list: list[Path],
         scan_roots: list[Path],
         ignore_dirs: list[Path],
+        mode_label: str = "整理模式",
     ) -> None:
         """在移动任何文件前建立目录快照，固定番号与伴生文件的归属关系。"""
         roots = scan_roots or sorted({path.parent for path in movie_list}, key=str)
         if not roots:
             self._organize_index = None
             return
-        signal.show_log_text(" 🧭 整理模式预扫描：正在建立番号与文件关联索引...")
+        signal.show_log_text(f" 🧭 {mode_label}预扫描：正在建立番号与文件关联索引...")
         try:
             index = await asyncio.to_thread(build_organize_index, roots, ignore_dirs=ignore_dirs)
         except Exception as e:
             self._organize_index = None
-            signal.show_log_text(f" ⚠ 整理索引建立失败，将按单目录索引继续整理：{e}")
+            signal.show_log_text(f" ⚠ {mode_label}索引建立失败，将按单目录索引继续处理：{e}")
             return
         self._organize_index = index
         signal.show_log_text(
-            f" 🧭 整理索引完成：{index.file_count} 个文件，{index.media_count} 个视频/STRM，"
+            f" 🧭 {mode_label}索引完成：{index.file_count} 个文件，{index.media_count} 个视频/STRM，"
             f"{index.number_count} 个番号，{index.companion_count} 个关联文件，"
             f"{index.shared_count} 个未归属文件"
         )
@@ -583,8 +586,11 @@ class Scraper:
         # 拿去做全库 scrape_state 清理，否则不在子集里的合法记录会被误判
         # "源文件已不存在"而清光（议题 #98 2.4）。
         full_library_scan = not movie_list
-        organize_scan_roots: list[Path] = []
-        organize_ignore_dirs: list[Path] = []
+        # 「番号 ↔ 伴生文件」归属索引的扫描根：整理模式恒需要；视频模式勾选
+        # 「移动已下载图片和文件到新目录」时同样需要（伴生文件归属必须在任何
+        # 文件被搬走之前确定，否则媒体已搬走 → 归属丢失 → 伴生文件不被搬运）
+        companion_scan_roots: list[Path] = []
+        companion_ignore_dirs: list[Path] = []
         # 整理模式：统计「已经躺在成功输出目录内」的文件数量，
         # 用于判断本次是否整体退化为读取模式（左下角文案随之切换）
         organize_inplace_count = 0
@@ -607,11 +613,11 @@ class Scraper:
                         current_paths.softlink_path,
                     )
                     scan_path = current_paths.softlink_path
-                if is_organize_selected():
-                    organize_scan_roots.append(scan_path)
-                    organize_ignore_dirs.extend(scan_ignore_dirs)
-                    if is_success_output_tree(current_paths.movie_path):
-                        organize_scan_in_success_tree = True
+                if is_organize_selected() or is_video_move_companions_enabled():
+                    companion_scan_roots.append(scan_path)
+                    companion_ignore_dirs.extend(scan_ignore_dirs)
+                if is_organize_selected() and is_success_output_tree(current_paths.movie_path):
+                    organize_scan_in_success_tree = True
                 scanned = await get_movie_list(file_mode, scan_path, scan_ignore_dirs)
                 if is_organize_selected():
                     organize_scanned_count += len(scanned)
@@ -723,8 +729,14 @@ class Scraper:
             self._organize_batch_size = max(1, int(manager.config.rest_count))
 
         # 整理模式：先完成整目录预扫描并固定归属关系，再允许任何文件开始移动。
+        # 视频模式勾选「移动已下载图片和文件到新目录」时同样先建索引——
+        # 伴生文件与视频的归属关系必须在任何文件被搬走之前确定。
         if task_count and get_runtime_main_mode() == ORGANIZE_MAIN_MODE:
-            await self._prepare_organize_index(movie_list, organize_scan_roots, organize_ignore_dirs)
+            await self._prepare_organize_index(movie_list, companion_scan_roots, companion_ignore_dirs)
+        elif task_count and is_video_move_companions_enabled():
+            await self._prepare_organize_index(
+                movie_list, companion_scan_roots, companion_ignore_dirs, mode_label="视频模式"
+            )
 
         # 进度速率估算（纯呈现层：滑动窗口速率 → 预计剩余时间）
         from .scrape_progress import ScrapeRateEstimator
@@ -1401,7 +1413,7 @@ class Scraper:
         if organize_mode:
             update_nfo = False
         # 不写nfo的情况：
-        elif runtime_mode == 3 and Switch.SORT_DEL in manager.config.switch_on:
+        elif runtime_mode == VIDEO_MAIN_MODE and Switch.SORT_DEL in manager.config.switch_on:
             # 3模式勾选“删除本地已下载的nfo文件”（暂无效，会直接return）
             update_nfo = False
         elif runtime_mode in [1, 2, 3, 4] or (
@@ -1825,7 +1837,31 @@ class Scraper:
 
         # 视频模式（原来叫整理模式）
         # 视频模式（仅根据刮削数据把电影命名为番号并分类到对应目录名称的文件夹下）
-        if runtime_mode == 3:
+        if runtime_mode == VIDEO_MAIN_MODE:
+            # 「移动已下载图片和文件到新目录」：伴生文件（图片/信息文件/json/字幕等）
+            # 按番号关联事务式搬到新目录，视频本体最后搬（保留软/硬链接语义）。
+            # 与「删除本地已下载的图片和信息文件」互斥，界面层与配置层均已归一。
+            if Switch.SORT_MOVE in manager.config.switch_on:
+                moved, error = await organize_companion_files(
+                    file_path=file_path,
+                    file_new_path=file_new_path,
+                    folder_old_path=folder_old_path,
+                    folder_new_path=folder_new_path,
+                    nfo_new_path=nfo_new_path,
+                    naming_rule=naming_rule,
+                    number=movie_number or res.number,
+                    sub_list=sub_list,
+                    poster_final_path=poster_final_path,
+                    thumb_final_path=thumb_final_path,
+                    fanart_final_path=fanart_final_path,
+                    move_media=lambda: move_movie(other, file_info, file_path, file_new_path),
+                    index=self._organize_index,
+                )
+                if not moved:
+                    LogBuffer.error().write(error)
+                    return None, None
+                await save_success_list(file_path, file_new_path)  # 保存成功列表
+                return res, other
             # 移动文件
             if await move_movie(other, file_info, file_path, file_new_path):
                 if Switch.SORT_DEL in manager.config.switch_on:

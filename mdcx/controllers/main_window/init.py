@@ -1151,6 +1151,10 @@ def Init_Singal(self: MyMAinWindow):
     self.Ui.checkBox_organize_netdisk_rest_interval.toggled.connect(
         self.checkBox_organize_netdisk_rest_interval_changed
     )
+    # 视频模式：删除本地已下载的图片和信息文件 / 移动已下载图片和文件到新目录，
+    # 两枚复选框互斥（同一时刻只能选中一个；都不勾选=图片/nfo/字幕留在原目录）
+    self.Ui.checkBox_sortmode_delpic.toggled.connect(self.checkBox_sortmode_delpic_changed)
+    self.Ui.checkBox_sortmode_movefile.toggled.connect(self.checkBox_sortmode_movefile_changed)
     for _lbl in (
         self.Ui.label_11,
         self.Ui.label_organize_mode,

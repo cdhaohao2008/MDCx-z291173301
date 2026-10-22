@@ -4,7 +4,7 @@ from pathlib import Path
 
 from ..manual import ManualConfig
 from ..utils.path import is_descendant
-from .enums import Website
+from .enums import Switch, Website
 from .manager import manager
 from .models import CleanAction
 
@@ -44,6 +44,9 @@ def parse_media_paths(media_path: str | Path | None = None) -> list[Path]:
 
 SEPARATE_MAIN_MODE = 2
 """分离模式的 main_mode 值：视频与元数据分开存放，其余逻辑同正常模式。"""
+
+VIDEO_MAIN_MODE = 3
+"""视频模式的 main_mode 值：只刮削并重命名视频本体，不下载图片、不生成 nfo。"""
 
 ORGANIZE_MAIN_MODE = 6
 """整理模式的 main_mode 值：不联网刮削，读取同目录 nfo 字段后按命名规则重新整理文件。"""
@@ -121,6 +124,15 @@ def is_organize_mode() -> bool:
     运行时被临时切成读取模式后，本函数返回 False（本次运行不再整理文件）。
     """
     return get_runtime_main_mode() == ORGANIZE_MAIN_MODE
+
+
+def is_video_move_companions_enabled() -> bool:
+    """视频模式是否启用了「移动已下载图片和文件到新目录」。
+
+    该开关与「删除本地已下载的图片和信息文件」互斥（同一时刻只能选中一个），
+    配置层已归一：两个都勾上时保留原有的 sort_del、去掉 sort_move。
+    """
+    return get_runtime_main_mode() == VIDEO_MAIN_MODE and Switch.SORT_MOVE in manager.config.switch_on
 
 
 def should_generate_strm(meta_root: Path | None, skip_reorganize: bool) -> bool:
