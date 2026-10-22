@@ -1,192 +1,223 @@
 # 用户指令记忆
 
-本文件只记录长期有效的行为规范、构建发布流程、排错方法和环境约束。项目实现细节以代码、测试和文档为准。
+只记「以后每次都该怎么做」的规则。技术原理与架构见 `docs/Development.md`，版本变更见 `docs/Changelog.md`。
+
+---
 
 ## 协作与质量
 
-- Date: 2026-09-02（持续更新）
-- Category: 工作流协作
-- Instructions:
-  - 简体中文回复；面向小白说明按"现象和影响 → 原因 → 可执行步骤"组织；日期时间一律用北京时间 (UTC+8) 表述并显式注明。
-  - **本记忆文件不受 150 行长度限制**（用户 2026-09-06 明示覆盖系统规则）；但入选标准不变——只记"以后每次都该怎么做"，不记单次任务细节、不记读代码即可获知的内容。
-  - **遇到可记内容时主动记入本文件**（用户 2026-09-06 明确要求），不等提醒；每次任务收尾时自问"本轮有没有值得沉淀的行为模式/流程纪律/环境陷阱"，有则立即写入并合规自检。
-  - 改动前说明内容与原因；用户明确要求提交/推送后才执行，绝不擅自操作。直接在当前分支操作。
-  - **检查纪律**：每次代码改动后跑 `uv run quick-check`；提交前跑 `uv run check --skip-hook-install`。仅改 `docs/*.md` 或本文件时只需 `git diff --check`。全绿判定 = 退出码 0 + `grep -E "\.py:[0-9]+: error|Found [0-9]+ error"` 无输出（CI 连挂三次的教训：mypy 输出可被 tail 截断）。**`ruff check` 过 ≠ `ruff format --check` 过——改 .py 必须 `ruff format` 落地**（2026-09-09 四次 CI 挂全是 format 漂移）。**格式化必须用仓库锁定的 ruff 版本（2026-10-17 实证，同日已把仓库升到 0.17.1）**：`pyproject.toml` pin `ruff>=0.17.1,<0.18.0`、`uv.lock` 实锁 **0.17.1**，与本机系统 ruff 一致，裸 `ruff` / `uv run ruff` / `uvx ruff@0.17.1` 三者等价。**升版前**仓库锁 0.15.22 而系统是 0.17.1，那时用新版格式化会按新风格误改（如把多行 `default_path = (...)` 折行收成单行）并反过来制造 CI 漂移——教训是**pin 与本机版本不一致时只有 `uv run ruff`/`uvx ruff@<锁定版>` 安全，裸 `ruff` 只在两者一致时等价**；改 pin 后必须 `uv lock` + `uv sync`，再全量 `format` + `check`（新版本会新增规则，0.17.1 就新增了 `C416`，改完要重跑 `ruff check` 而不只 `format`）。`scripts/` 也在 check 范围。**xlsx 校验按路径跳过（2026-09-21）**：`check_actor_db` / `check_info_db` 只在对应出厂库或校验脚本有改动时跑（工作区 + 相对上游 diff）；`check_ui_layout` 已移出门禁（warning 不阻断，结构锁在 `test_ui_structure.py`），手工诊断仍可 `uv run python -m scripts.check_ui_layout`。**pre-push 钩子三注意（2026-09-20 实证）**：①`hooksPath` 是本地 git config，**环境重置后静默失效**——而日常跑的 `check --skip-hook-install` 恰恰跳过自动配置钩子那步，两者叠加导致失效无人察觉；重置后先 `git config core.hooksPath` 验证，为空则 `git config core.hooksPath .githooks` 补配置；②钩子生效时日常流程=「quick-check → commit → push（钩子自动跑快速门禁）」，**不要再手动多跑一次**（省 3 分钟）；③钩子失效期间推送前必须手动全量 check 兜底；④`.pre-commit-config.yaml` 为历史遗留、不依赖。**门禁积欠会静默堆积（2026-10-17 实证）**：`ci.yaml` 的 `on:` **只有 `pull_request: branches: [main]`，没有 push / workflow_dispatch**，所以直推 main **根本不触发 CI**——`ruff format` 漂移、`ruff check` 错误、`pytest` 既有失败可以在 main 上长期躺着没人拦（本次一口气挖出 21 个 format 漂移 + 13 个 lint + 3 个测试失败，全部来自上游旧提交）。`check.py` 的 ALWAYS 段顺序是 `ruff format --check` → `ruff check` → `mypy mdcx/` → `check_thread_safety`，**不含 pytest**——全量测试挪到 `--with-tests`（`ALL_WITH_TESTS = FAST + [TESTS]`），pre-push 钩子只调 `check --skip-hook-install` 走快速门禁（2026-10-19 实施，全量 pytest 一次 5 分钟以上、改个文案也得等，推送体验极差）。**要全量门禁时显式 `uv run check --skip-hook-install --with-tests`**。`-x` 遇首个失败即停，前面任一挂掉后面就测不到。**推 main 前要预期 pre-push 首次拦的往往不是自己这次的改动**——定位手法：`git stash` 后在干净树上复跑同一命令对比，或 `git worktree add --detach <tmp> <旧commit>` 做历史对照（比 stash 安全，不动工作区）。**mypy 也在 main 上积压 75 个错误**（`uv run mypy mdcx/`，本机已于 2026-10-17 装上裸 mypy 2.4.0，但门禁与 CI 的口径恒为 `uv run mypy mdcx/`，venv 内版本与系统版可能不同，判绿只认 `uv run` 那次），同样是 CI 不跑导致的；已分两类清完：①`exclude` 里已声明「不想查」的文件（`mdcx/views/*`、`controllers/main_window/init.py`、`core/network_check.py`）走**新增 `[[tool.mypy.overrides]] ignore_errors`**——因为 **`exclude` 只作用于递归发现，对「被 import 拉进来」的模块无效**，这 25 个错误纯属声明没落地；②其余是真错误，按类型分「真修 / 窄化 / 压标注」改代码：PyQt6 存根把 `document()`/`viewport()`/`verticalScrollBar()`/`clipboard()` 等一律标成 `X | None` 但运行时恒非 None，用 `cast` 或 `# type: ignore[union-attr]`；而 `fetch_actor_info_from_source` 返回 `object` 这类**标注过宽**的接口则改正签名（每条路径实际都返回同一实例）。**改 TOML 禁用 PowerShell `Set-Content -Encoding UTF8`（2026-10-17 踩坑）**：PS 5.1 的 UTF8 会写入 BOM，`tomllib`/mypy 解析失败后 mypy **静默退回默认配置**，症状是「配置改了却完全没效果、错误数纹丝不动」，极具误导性。用 `edit` 工具或 Python `read_bytes()`/`write_bytes()` 字节级读写；`git diff --numstat` 显示整文件变更即是嫌疑信号。**判断 mypy 有没有读到配置**：`uv run mypy -v mdcx/ 2>&1 | findstr "Config File"`——显示具体路径=已读，显示 `Default`=配置解析失败（几乎都是 BOM）。**「测试没失败却找不到汇总行」不是没跑完**：`tests/conftest.py` 的 `pytest_sessionfinish` 在全绿时直接 `os._exit(0)`，跳过汇总与 Qt 收尾析构，判全量绿**看退出码 0**。
-  - 提交前必看 `git status` 未跟踪文件：运行残留与中间产物不得 `git add -A` 入库，先 `.gitignore` 排除。
-  - **提交信息不要手写 Co-authored-by trailer**：`prepare-commit-msg` 署名 hook 每次 commit/amend 从 git config 的 `coauthor.*` 无条件追加，手写会重复。**hooksPath 双向坑（2026-09-20 实证）**：署名 hook 原在 `.git/hooks/`（不在 .githooks/），一旦 `git config core.hooksPath .githooks` 启用 pre-push，`.git/hooks` 下全部 hook 即被重定向**静默失效**（当天连丢 3 个提交的署名才发现）——现已把 prepare-commit-msg 收编进 `.githooks/` 入库（b1a726a0），两 hook 同目录自洽；环境重置后补一条 `git config core.hooksPath .githooks` 即同时恢复署名与推送自检。
-  - **pre-push 自检已于 2026-10-21 重新启用（Windows 本机实证）**：前提是「pyyaml 在 3.15 上装得上」——本机没装 MSVC，PyYAML 源码编译必失败，靠环境变量 `PYYAML_FORCE_LIBYAML=0` 让它跳过 `yaml._yaml` C 扩展、直接产出纯 Python wheel（`py3-none-any`），不需要编译器，此前本机 `core.hooksPath` 被指向本地目录 `.git/hooks-local`，那个包装目录只保留 prepare-commit-msg、**故意不跑 pre-push**；现已改回 `.githooks`（该本地目录已弃用删除）。**七个必须记住的坑**：①**Windows 的 Git Bash 里没有 `python3`、只有 `python.exe`**——钩子原来只写 `uv` → `python3` 两级兜底，pip 装依赖的本机（没装 uv）会以 "python3: command not found"（127）把**每一次推送都拦死**；`.githooks/pre-push` 已改成 `uv` → `python3` → `python` 三级探测，仓库标准仍是 uv。②**`.githooks/*` 必须在 `.gitattributes` 里钉 `text eol=lf`**：Windows 的 `core.autocrlf=true` 会把检出写成 CRLF，Git Bash 执行时每行末尾多一个 `\r` → 钩子**静默失效**（已补该规则）。③两个钩子原先入库是 100644，Linux/macOS 上 git 因不可执行而**静默跳过**（Windows 反而照跑，掩盖了这个问题）——已 `git update-index --chmod=+x` 改 100755。④`scripts/check.py` / `scripts/quick_check.py` 遇到缺失的 ruff/mypy 现在打印可执行提示并返回 127，不再抛 FileNotFoundError 堆栈。⑤**本机 pip 装到用户目录、脚本目录不在 PATH**：`C:\Program Files\Python315\Lib\site-packages` 不可写，pip 走 `--user` 装进 `%APPDATA%\Python\Python315\site-packages`，exe 落在 `%APPDATA%\Python\Python315\Scripts`——**该目录不在 PATH**，裸 `ruff` / `mypy` 永远 not found；已让 `check.py` / `quick_check.py` 用 `resolve_tool()` 兜底：PATH 里找不到就退回「当前解释器 `-m ruff` / `-m mypy`」（ruff wheel 自带 `__main__.py`，mypy 同理），**不必往 PATH 里加东西也能跑门禁**。⑥**mypy 2.4.0 的 `type: ignore` 要带 `annotation-unchecked`**：未注解函数体里的属性赋值，报错码是 `annotation-unchecked` 而非 `assignment`，只写 `# type: ignore[assignment]` 会报「Error code "annotation-unchecked" not covered by ...」——`main_window.py` 4 处已补成 `# type: ignore[assignment, annotation-unchecked]`（这 4 处在 HEAD 上就是 mypy 红的，只有冷缓存才暴露，`.mypy_cache` 会掩盖）。⑦**本机装依赖的两个环境坑（2026-10-21 实证）**：①**PyYAML 至今没有 cp315 wheel**，本机没装 MSVC，源码编译必失败（报 "Microsoft Visual C++ 14.0 or greater is required"）——用环境变量 `PYYAML_FORCE_LIBYAML=0` 让它的 setup.py 跳过 `yaml._yaml` C 扩展、直接产出纯 Python wheel（`py3-none-any`），**不需要编译器**；该变量已写成用户级环境变量，`uv sync` 与 `pip install -r requirements.txt` 两条路径都认。②**pip 缓存目录里有 ACL 被改坏的残留 wheel**（`%LOCALAPPDATA%\pip\cache\wheels` 下某个 `oshash` wheel，`Get-Acl` 直接抛 UnauthorizedAccessException），pip 复用它时报 `OSError [Errno 13] Permission denied`、整条安装失败——**换缓存目录绕开**：`pip install --cache-dir "$env:TEMP\pipcache-md" ...`。**钩子跑的是整个工作区**（含别人未提交的半成品），门禁红了先 `git status` 分清是谁的锅。
-  - **"本地全绿≠CI 通过"三维度**：输出截断 / 版本语义差异（模块级带值注解 3.13 立即求值 vs 3.14 PEP 649 延迟，单例声明一律无注解赋值）/ 平台差异。Windows runner 三坑：①`subprocess.run(text=True)` 一律显式 `encoding="utf-8", errors="replace"`（默认 GBK 遇 UTF-8 字节炸链）；②**glob 模式里 `[XX]` 是字符类不是字面量**，而 Windows 下 `pathlib.glob` 默认大小写不敏感（`pathlib/__init__.py`: 非 posix 即 case_sensitive=False），`glob("*[SR]*")` 会命中 `poster.jpg`（含小写 s）造成假红——断言"临时产物已清理"一律用 `[p for p in tmp_path.rglob("*") if "[SR]" in p.name]` 形式，别用 glob 通配符；③**Qt 多主窗收尾段错误（定案 2026-09-21）**：同一 pytest 进程内构造 ≥2 个 MyMAinWindow（各含 QSystemTrayIcon）→ 全部用例通过后解释器收尾段错误（Linux SIGSEGV 139 / Windows 退码 1），与 stub/patch/show 时机无关，rerun 不可消除——管道里跑 pytest 时 `$?` 被 tail 吃掉会长期掩盖 Linux 侧 139，**判定退出码必须 `cmd > file; echo $?`**。已双修：①集成测试不得构造第二实例（复用 fixture 窗口）；②conftest.py `pytest_sessionfinish` 全绿时 `os._exit(0)` 跳过析构（失败路径正常退出，双向验证过）。CI 红/绿对照二分用诊断 PR 探针（push 分支+开 PR 触发同一 workflow），**每档至少采样 2 次再定性**（幸存者偏差教训：#185 二分结论曾全盘推翻重来）。
-  - **`Windows fatal exception: access violation` 根因定性（2026-10-17 应用户要求修「Qt 收尾原生崩溃」时挖到，推翻了上面 ③ 的「收尾期析构」说法，结论已验证，**修复已于同日落地（见下面「已落地」段）**）：①**崩溃不在收尾期，而是跑到一半**——AV 发生在某个用例的 `app.processEvents()` 内，**位置随缘漂移**（原始 push 停在 97%，另一次崩在 `tests/test_nfo_library_filter_fields.py:135` 的 fixture 里）。**不能靠「输出尾部丢没丢」区分中途崩还是收尾崩**，异常终止同样丢缓冲，只能看 faulthandler 栈。②**真凶链**：测试里的 `deleteLater()` **从未生效**（`processEvents()` 按 Qt 语义不投递 DeferredDelete 事件，须显式 `sendPostedEvents(None, QEvent.Type.DeferredDelete)`）→ 40+ 个测试文件各自造 `MyMAinWindow` 全程泄漏 → 每个窗口挂着 `main_window.py:316` 的 **100ms 热表 `self.timer.start(100)`**（另有 `timer_scrape` / `timer_update.start(43200000)` / `timer_remain_task.start(1500)`）→ **而只有 `tests/test_window_state_matrix.py` 的 fixture 停了这 4 个表**（其注释自陈「保留运行中的 QTimer 会让 processEvents 触发网络/日志等无关副作用」，说明这个坑仓库自己知道、只是只修了一个文件）→ 任意后续用例的 `processEvents()` 都派发几百个陈旧回调 → 摸控件/写日志/发网络 → 某次状态不一致就 AV。③**拦路虎是生产代码既有缺陷**：`init.py:488` `_SiteComboTipFilter.eventFilter`（`:567`，`:570` 调 `self._combo.view()`）会**无限递归爆栈**，真析构对象时 faulthandler 最近 50 帧全是 `init.py:570`，崩成 `stack overflow` / `0xC0000409`，所以「补 `sendPostedEvents` 把对象清干净」这条路被堵死。④**三条走不通的路（都实测更差，别再走）**：补 `sendPostedEvents` 真析构 → 采样 1绿1崩；加 `TerminateProcess(GetCurrentProcess())` → 1绿2崩且**退出码被伪造成 0、输出里每轮糊一坨 dump**（实测 `TerminateProcess` 对当前进程调用**立即返回、不终止自身**：`Sleep(INFINITE)` 与 python sleep 死循环各 6/6 超时；它唯一的实际效果是杀掉别的线程、让主线程带着残缺运行时继续跑）；`GetModuleHandleExW(FLAG_PIN)` 钉 Qt/PyQt DLL → 探针 5 次崩 1 次、另 4 次是探针自身 argtypes 报错。⑤**教训**：15~20 个窗口规模的探针复现不出崩溃（`plain` 策略 5/5 全绿），唯一可信判据只有全量跑，而全量跑每轮约 4 分钟且本身可能崩也可能挂死——**这种间歇性原生崩溃不适合靠反复全量跑来验证**，投入产出比极差。⑥ 定性为**既有问题、与任何改动无关**（改动前就能复现）。
-  - **已落地（三处，缺一不可，2026-10-17）**：`483cee1` 给 `_SiteComboTipFilter.eventFilter` 加重入守卫（解掉 ③ 的爆栈）；`bab49bd` 让窗口隐藏/关闭时停掉四个轮询定时器（解掉 A 面触发条件）；`tests/conftest.py::_teardown_qt()` 补 `QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)`（连投两次 + `app.processEvents()`），并把 `topLevelWidgets()` 套 `list()` 后再遍历——**这一步才是 B 面的真正根因**：没有它，之前所有 `widget.deleteLater()` 全是空操作，300+ 个 Qt 对象活到进程退出，Windows 上 `os._exit` 触发的 Qt DLL detach 去析构它们必然 AV。**前两块修复的作用是拆掉「真析构」路上的两颗雷（爆栈 + 热表副作用），补上 `sendPostedEvents` 才真正把析构做实。**
-  - **教训（比结论更重要）**：`processEvents()` **不投递 DeferredDelete 事件**——Qt 里 `deleteLater()` 后只跟一个 `processEvents()` 等于什么都没销毁，这是个静默的 no-op、不会报任何错。仓库里 92 处 `deleteLater()`（约 35 个测试文件）**全是这么写的**，所以对象全程泄漏。排查这类「进程退出期原生崩溃」时，**先怀疑 C++ 对象有没有被真正销毁，而不是先怀疑退出方式**——我为此先后试过「补 sendPostedEvents」「加 TerminateProcess 硬杀」「DLL pinning」三条路，全部更差，纯粹因为一开始就在退出策略上打转而没回头看那句 `deleteLater()` 到底有没有生效。
-  - **崩溃要分 A/B 两面，别混为一谈**（2026-10-17 定案）：**A 面** = 跑到一半、某个用例的 `processEvents()` 里 AV，**退出码非 0 ⇒ 直接打红门禁**，是必须治的；**B 面** = `os._exit(0)` 内部 Qt DLL `DllMain(DLL_PROCESS_DETACH)` 析构存活对象导致 AV，退出码仍 0、只在输出里糊一坨 dump，**对门禁无害**。我曾把两者的修法混着试，浪费了好几轮——`_teardown_qt()` 补投递只能治 B 面，A 面得让**用例自己**的 `deleteLater()` 生效（conftest autouse fixture 每个用例后补投递）。
-  - **A 面的量级才是关键**：泄漏窗口不只是「内存占用高」，每个 `MyMAinWindow` 都带 QThread + 线程池 + asyncio 事件循环，`test_window_state_matrix.py` 单文件 128 个用例 ⇒ 几百个线程常驻 ⇒ 后续**任意**一次 `processEvents()` 都可能踩到状态不一致的控件而 AV，且**崩溃位置随缘漂移**（停在 97% / 崩在 `test_nfo_library_filter_fields` / 崩在 `test_window_state_matrix.py:1197`）。所以这类问题**不要用「反复全量跑」来验证**，先在单文件上做因果验证（单文件加投递后从「全量必崩」变 96 项全绿 = 因果成立），再下沉到 conftest。
-  - **changelog/版本纪律（2026-10-22 起改按日期分段）**：提交前把改动写进 `docs/Changelog.md` **当天的日期段** `## YYYY-MM-DD`（今天就写进 `## 2026-10-22`），段内再按 `### 总结` / `### 改进` / `### 更新` 等类别归位；**不再按版本号分段**（展示版本号固定 v3.0，版本号归属用户，不擅自改、不擅自开新段）。写法=用户视角发布说明（留议题号/现象/结果，删排查叙事与哈希）。版本同步用 `scripts/bump.py --version <YYYYMMDD>`（`--name` 可选），`bump.py --check` 与 `tests/test_version_consistency.py` 兜底。**`bump.py` 升展示版本时的坑（2026-10-17 实证）**：同一批 `LOCAL_VERSION`（时间标签不倒退，如 20261020 连发 2.5.1/2.5.2/2.5.3）再升 `VERSION_NAME` 会**必然失败**——`update_local_version()` 用「`re.sub` 结果 != 原文」判成功，`LOCAL_VERSION` 没变即判失败抛「版本号替换失败，请检查 consts.py 文件格式」，**跑不到 `VERSION_NAME` 那步**（报错文案指向 `consts.py` 格式，很有误导性，实则格式没问题）。出路：三个版本点（`consts.py` 的 `VERSION_NAME`、`pyproject.toml` 的 `version`、`uv.lock` 根包 `name = "mdcx"` 下一行的 `version`）手工改，再跑 `bump.py --check` + `test_version_consistency.py` 双复核。**Windows 下跑 `bump.py` 还要 UTF-8 包装**：rich 输出的 `✓` 触发 `UnicodeEncodeError: 'gbk'`，`.bat` 的 `set` 传不进子进程（见环境节），得用 Python 包装脚本同时设 `os.environ["PYTHONIOENCODING"]="utf-8"` **并** `sys.stdout.reconfigure(encoding="utf-8")`（只设前者仍会在 print 时炸）。**"已发版"判据 = 数字 tag 已推送（`git ls-remote --tags origin`），不是 changelog 有没有该段**；当前版本未发版时被后续议题取代的条目要合并重写成最终形态。
-  - **`LOCAL_VERSION`（发版日/tag）领先于当天是既定口径，不是缺陷——一切日期类疑问一律不要提示、不要建议改动（用户 2026-10-19 明示）**：`20261020` 还没到就是**故意的**，发版日允许领先于当天，**到期后由用户自己手动改**。因此下列都**不是**问题，以后碰到**不许**拿来提醒、也不许"顺手修正"：①`LOCAL_VERSION` 大于当天日期（没到）；②多个展示版本号共用同一 `LOCAL_VERSION`（2.6.4~2.6.7 都是 `20261020`，各自 changelog 段日期同为 `2026-10-20`）；③同 tag 复用时 `overwrite: true` 会把上一版那条 Release 重建，"同 tag 挂两个展示版本号"是已知且接受的结果；④`check_version()` 取数字 tag 最大值。**日期与 tag 相关的疑问一律先问用户**，别按自己的判断写进文档、changelog 或 commit message——v2.6.7 段的版本号条目曾写了"建议递增到 `20261022`"，同日按本条删掉（2026-10-19）。真正要守的只有版本号同步点一致：`scripts/bump.py --check` + `tests/test_version_consistency.py` + `tests/test_version_metadata.py`。
-  - 站点/爬虫/配置改动同步检查：UI 文案、README、docs、爬虫总数（`get_registered_crawler_sites()`）、**`config/migrations.py` 旧值清洗**（漏迁移 → pydantic 校验失败 → "保存不生效"）。
-  - **用户在安装目录（`D:\应用软件\工具软件\MDCx`）自己维护着多个并列配置文件：`actor.json` / `default.json` / `studios.json` / `theporndb.json`（同目录另有各一份 `*bak.txt` 备份），它们是用户针对不同命名方式、不同刮削网站分别做的独立配置，不是我方出厂的演员库/片商/片库数据文件。** 2026-10-19 我曾据「`ConfigManager.list_configs()` 把这四个都列进『切换配置』下拉框」推断用户想要过滤，**被明确否掉：「保留所有 json 文件」——过滤会直接毁掉用户的配置组织方式。**两个由此确立的纪律：①**在用户的安装目录里看到同名 json，不要凭仓库同名文件（`actor.json` 在仓库里是出厂演员库）就断定它是数据文件**，先看它有没有 `config_version` / `main_mode` 这类配置字段——有就是用户的配置；②`list_configs()` 无差别列出目录内所有 `.json`/`.ini` 供「切换配置」选用**是既有设计、不是缺陷**，没有用户要求就不要动它。手工改用户真配置时按**字节级单行替换**做（`ReadAllText`/`WriteAllText` + `UTF8Encoding($false)`，无 BOM、纯 CRLF），改完逐项回验：JSON 可解析、`main_mode` 等行为字段未变、键集合一致、差异行只有目标行、CRLF 计数不变；这三个 json 当前 `config_version` 均为 2、`main_mode` 分别是 1 / 1 / 5 / 5。
-- **门禁已知遗留红（2026-10-19 实测，提交前不必惊慌、也不属于当次改动）**：`tests/test_advanced_page_tail_align.py::test_wide_nav_row_survives_deferred_stage_one[1920-1170]` 断言「1920 宽下 anchor 应不等于 from（即阶段一整行放弃）」，实测 anchor 仍等于 from → 该回归守卫形同虚设。**已用 `git stash push -- <全部改动>` 在干净树上复跑确认必红**，来自上游旧提交（`ci.yaml` 只有 `pull_request: branches:[main]`，直推 main 不触发 CI，红灯可长期躺着，见上面「门禁积欠」条）。全量门禁的合格线因此是「**除这条外全绿**」，判定时先跑一次干净树对照，别把自己的改动当成元凶，也别顺手去「修」它（那是高级页行布局的独立议题，需真机逐档量几何）。
-  - **配置加载路径上的对象构造必须「无前置条件」（2026-10-19 用户实测崩溃后立的纪律）**：`Computed()` 在 `ConfigManager.load()` 里被**同步**构造，而 `manager = ConfigManager()` 是**模块级实例化**。这两点叠加出一条硬约束：**任何在 `Computed()` 里构造的外部客户端，其构造失败都不得抛异常**，否则第一次抛错被 `load()` 的 `except Exception` 抓住 → 回退 `_replace_config(Config())` → **用同样坏的输入再抛一次** → 这次无人接管 → 模块导入失败 → **软件连启动都进不去**。实例：`LLMClient.__init__` 原先无条件 `AsyncOpenAI(api_key=...)`，`llm_key` 为空（出厂默认就是空）时 OpenAI SDK 当场抛 `OpenAIError: Missing credentials`，`python main.py` 直接崩。**修法不是给密钥塞占位符，而是缺凭据就不构造客户端**（`self.client: ... | None = None`，`close()` 加空值保护，`ask()` 打可执行提示并返回 `None`）。**推广检查清单**：改动 `Computed.__init__` 或其下游构造链时，逐个问「它需要的凭据/网络/文件，用户没配时会抛吗」；会抛就改成惰性或兜底。**判据：可选功能（LLM 翻译、Emby、同步服务）的凭据永远不能是启动前置条件**。
-- **功能开关类配置项不得充当「逃生通道」的过滤器（2026-10-19 定规）**：「当前配置」下拉框必须列出配置目录下**每一个** `.json`，**不做任何有效性过滤**。缺键**不会**自动补（补齐逻辑已随 2026-10-19 的回退删除，见下一条），旧结构仍由 `migrate_config_data` 升级，剩下的不兼容项「有问题让用户改配置就好了」——但绝不能因为读不出来就把它从列表里抹掉：`load()` 在 `errors` 时会 `switch_to_failed_session()` 切到 `_failed.json`，**下拉框是用户唯一的切回通道**，过滤等于把用户锁死在坏配置上。**已落地**：`list_configs()` 只列 `.json`（`.ini` 是 1.0 废弃格式）、不做任何有效性过滤、目录读不到时 `OSError` 兜底返回 `[]`、结果按文件名排序。**尚未落地（2026-10-19 记录，别当成已修）**：①`load_config()` 的填表仍在 `if errors: switch_to_failed_session(); return` **之后**（`load_config.py:91-103`），配置一旦读不出来下拉框就是空的，切回通道事实上仍然是断的——**必须把填表提到 errors 分支之前**，届时可抽成 `_refresh_config_file_combos()`，**该函数目前并不存在**（曾有文档写成「已抽成」，属未兑现的描述，别照着文档去找）；②下标查找仍是裸 `all_config_files.index("config.json")`（`load_config.py:102`），目录里没有 `config.json` 时会 `ValueError`，应改为「当前配置 → `config.json` → 首项 → 清空」逐级兜底。**教训：凡是「失败时切到临时文件保护」的设计，都必须把「切回去」的 UI 通道放在失败分支之前构建**，否则保护机制自己把用户关在门外。
-- **⚠️ 互调型递归必须自带重入保护，终止条件不能建立在「下一次外部副作用恰好生效」上（2026-10-19 实战踩坑，程序直接起不来；**诊断已完成，修复尚未落地**，勿当成已修）**：`load_config()` 结尾在「读不到配置文件」时调 `self.pushButton_init_config_clicked()`（`load_config.py:1250`），后者 `manager.reset()` 完又调回 `self.load_config()`——**A 调 B、B 调回 A**，终止只靠「第二轮 `os.path.exists(config_path)` 变成 True」。而 `reset()` 补出来的文件**不保证**与 `config_path` 是同一个（标记文件 `MDCx.config` 指向已被系统清理的 Temp 目录时必然对不上），于是 else 分支永远成立 → 互调约百次 → `RecursionError`，连 `logger.error` 格式化日志都因栈太深再抛一次。**拟用修法（尚未实现）**：回调前置 `_xxx_in_progress` 标志，第二轮若前置条件仍不满足就**只做一次兜底然后 return**，绝不再回调；代码里目前**没有** `_creating_config` 这个标志。**注意这条现在是可达路径**：它此前一直被 LLM 那条崩溃挡在前面（`errors` 非空 → 早退 `return` → 走不到互调那行），2026-10-19 修好 LLM 之后它才第一次真正暴露，**这是本次 LLM 修复带来的唯一新增风险**。**三条配套纪律**：①**判定互调是否真循环，不要看栈尾**——栈尾只说明「栈耗尽时恰好在哪」，病灶常在栈中段；先把可疑的配置/输入单独喂给最深那层函数复现（本次把用户配置单独跑 `Config.model_validate` 并把递归上限压到 300，完全通过，这才证明是调用链而非数据的问题）。②**一处崩溃可能长期掩盖另一处**——LLM 那条崩溃让 `load_config()` 在早退分支就 return，永远走不到互调那行；修好第一条才暴露第二条，**别以为「不崩了」就是修完了**，每修一处都要重新端到端跑。③**本地状态文件会被探针污染**——仓库根未跟踪的 `MDCx.config` 曾残留 `C:\Users\...\Temp\mdcx-probe-*\123.json`，把源码启动指向临时目录。**排查「启动即崩」前先 `Get-Content MDCx.config` 看它指向哪**，指向 Temp/探针目录的一律先修回正常路径再复现，否则查的是假现场。
-- **`config_version` 永久固定为 2，一律不许再动（用户 2026-10-19 定规，覆盖 2026-10-18 那条「只在大框架变更时才升」）**：理由是「版本号一格一格往上叠，除了让人误以为框架变了没有任何实际作用，变来变去的没意思」。**以后无论新增配置项、新增列表枚举值、给旧配置补缺键，还是真的动了大配置框架，都不升它**，由 3 一统一下归到 2（存量 3 的配置下次启动被 `migrate_config_data` 末尾写回 2）。三个版本点必须一致：`migrations.py::CURRENT_CONFIG_VERSION`、`Config.config_version` 的默认值、`resources/config/default_config.json` 的 `config_version`；`tests/test_config_conversion.py::test_config_version_frozen_at_two_everywhere` 钉死三处 + 任意来源版本号都归 2。
-  - **连带后果（本条最容易踩的坑）：`config_version` 不能再当迁移判据**——`_migrate_main_mode()` 原本判 `version >= 3` 就跳过，冻结成 2 后该判据**恒假**，于是**每次启动**都会把已是新编号的配置再迁一遍：分离模式(2) 被推成视频(3)、再推成更新(4)、再推成读取(5) 后停住，**选了分离/视频/更新的用户连开三次软件就被改成「读取模式」**。现为**结构性判据** `_SEPARATE_MODE_KEYS`：分离模式的四个开关键（`separate_success_file_move` / `separate_failed_file_move` / `separate_success_file_rename` / `separate_del_empty_folder`）与新编号同批入列（2.2.3 起），新编号配置必然带、旧编号配置必然一个都没有；这四个键是真模型字段，能随 `save()` 落盘、也会被 `Config.update()` 的 `separate_*` 继承分支补上，故「只迁一次」成立。**规律：版本号一旦冻结（或不可靠），一切依赖它的迁移判据都要换成结构性判据——判据和它的前提必须一起改，只改一个就是埋雷。**
-  - **⚠️ 2026-10-19 回退记录（`git revert b04e2ec`，只退「旧配置自动升级」那一块，**不动**本条定规与它的结构性判据）**：曾实现、现已全部删除的符号（**不要照着记忆去找**）——`Config.factory_defaults()`、`migrations.backfill_missing_keys()` / `_migrate_missing_keys()`、`NEW_LIST_ITEMS` / `_ensure_list_items()` / `_migrate_new_list_items()`（以上均为补齐缺失键与列表新增项）、`ConfigManager._needs_upgrade_persist()` 及其「升级后写回磁盘」调用；`tests/test_config_auto_upgrade.py` 整个删除（其中 `test_legacy_main_mode_remapped_exactly_once` 已移回 `tests/test_config_conversion.py`）。**回退带来的代价**：旧配置缺失的顶层键、列表型配置项里新增的选项不再自动补齐；升级结果不再写回磁盘（只有用户保存时才落盘），所以 `config.json` 打开看仍是旧结构。**顺带记住一条通用教训**：取「字段声明层的默认值」只能像 `factory_defaults()` 那样遍历 `Config.model_fields`，**绝不能用 `Config().model_dump()`**——`model_post_init` 会调 `ensure_type_field_configs()` 把 `type_field_configs` 填成按 `website_*` 推导的 7 组，拿它当默认值会覆盖用户自定义的类型级站点优先级。日后若要重做补齐功能，这条仍适用。
-  - **仍未被回退波及的更早成果（回退范围容易搞混，记牢）**：`load_config.py` 里 `checkBox_ignore_duanju` / `checkBox_ignore_dongman` 两行回填、`Config.download_files` 出厂默认里的 `IGNORE_SUREN` / `IGNORE_DONGMAN`、`default_config.json` 里对应的 `ignore_suren` / `ignore_dongman`——全部来自 `aa2151f`；`_normalize_type_field_config()` 回退取**有序** `type_sites`（不能用 `list(type_site_set)`，set 序源自 `Website` 枚举 str 的 hash，Python 默认随机化 `PYTHONHASHSEED`，会让同一份配置每次启动得到不同的字段请求顺序）来自 `58faf8e`。**这些都还在。**
-  - **教训（比这套代码本身值钱）**：工作区里那份「看起来像回退」的未提交改动，**比 `revert` 两个提交宽得多**——它连 `aa2151f` / `58faf8e` 的成果一起撤了，直接把 `tests/test_field_skip.py` 里两条顺序回归测试打红，而且因为少了 `IGNORE_SUREN`/`IGNORE_DONGMAN` 的回填，`save_config.py` 仍在写这两项却启动恒未勾选，状态不自洽。**撤销一批范围不明的工作区改动，一律用 `git revert --no-commit <sha>` 让 Git 自己算，别手工照着 diff 一格格复原**；复现出来的 diff 必须逐条核对「这段是哪个提交引入的」，超范围的说明要撤销的其实是更早的东西。
-- **把常量/枚举值当判据时，改那个值必须连带 grep 所有读它的地方**：本条的前身就是只改了 `CURRENT_CONFIG_VERSION`（3→2）却没动读它的 `_migrate_main_mode()`，于是「判据恒假 = 每次启动重跑迁移」——用户无感一次，跑三次就毁数据。**没有幂等保护的迁移就是定时炸弹**；判据失效时不会报错、只会在几个月后以「我的设置怎么变了」的形式出现。
-  - **写死数字前 grep 代码核实**。高频漂移锚点：默认网站源顺序、代理域名列表、命名变量表、设置 Tab 名、字段优先级数、演员库列、指纹池、主窗口行数。README 爬虫数四处同步 + Features.md 标题是独立第五处。**Wiki 维护纪律**：`wiki/` 目录是 GitHub Wiki 内容源；每次回帖议题后把通用答案回填 FAQ；Wiki 仓库需用户先网页建首页才能克隆。
-  - **长时间任务标准做法**：① background_terminal 后台终端；② checkpoint 断点续传（state 落盘，后台终端 1 小时上限连 wrapper 一起回收，checkpoint 是唯一恢复手段）；③ 分批处理批间落盘；④ wrapper 45-50 分钟自重启；⑤ 进度看落盘文件不看终端日志（stdout 全缓冲可能 0 字节假象）。
-  - **功能移除类需求先调研证据再答**：查活跃度、底层共享依赖、移除成本；用户转述与代码证据矛盾时以代码为准。
+- 一律用简体中文回复。
+- 面向小白的说明按「现象和影响 → 原因 → 可执行步骤」三段写。
+- 日期时间用北京时间（UTC+8）并显式注明。
+- 本文件不受 150 行限制，只记可复用的做法，不记一次性事实。
+- 遇到值得记的内容主动记入，不用等用户提醒。
+- 改动前先说明「改什么、为什么」；用户明确要求才提交和推送。
+- 直接在当前分支操作，不擅自建分支或改分支策略。
 
-- **Qt 窗口生命周期四个必须记住的坑（2026-10-17 实测，源自上面那条 access violation 的根因修复）**：①**测试里写了 `w.deleteLater()` ≠ 销毁了**——`QCoreApplication.processEvents()` 按 Qt 语义**不投递 DeferredDelete 事件**，必须显式 `sendPostedEvents(None, QEvent.Type.DeferredDelete)`；所以全仓 92 处 `deleteLater()` 实际都没生效，会跨文件泄漏几百个顶层窗口。②**从未 `show()` 过的窗口调 `close()` 不发 `hideEvent`**——它本来就是 `WA_WState_Hidden` 态、`setVisible(false)` 直接早退；靠 `hideEvent` 做清理的窗口在这类测试里会漏网，`closeEvent` 必须一并兜住。③**`MyMAinWindow.closeEvent` 是 `WindowOpsMixin` 提供的（`window_ops.py`），末尾总是 `a0.ignore()`（窗口根本不真关），逻辑是「`HIDE_CLOSE` 开 → `hide()`，否则 → `ready_to_exit()`」**；要在主窗口加 `closeEvent` 清理**绝不能新写同名方法**，那会遮蔽 mixin、把托盘隐藏与退出流程变成死代码，正确做法是加在 `WindowOpsMixin.closeEvent` 内部（新增 `hideEvent` 则安全，mixin 没这个方法）。④多继承类里查某事件处理器归属用 `"closeEvent" not in MyMAinWindow.__dict__` 或 `WindowOpsMixin.closeEvent is MyMAinWindow.closeEvent`，别用 `isinstance` 比 `method` 与普通函数（恒 False）。
+## 检查与提交纪律
 
-- **并行会话可能同时改这个仓库（2026-10-17 撞到）**：工作区冒出我没碰过的成组改动、且修改时间与我的完全相同（疑似对方做了 stash/pop）。因此：**提交一律 `git add -- <具体文件>`，绝不用 `git add -A`**；绝不用 `git checkout -- <file>` 去动不是自己改的文件；推送前先 `git status` 分清哪些是自己的。pre-push 门禁跑的是整个工作区（含别人未提交的半成品），可能因此跑红或触发那个间歇性崩溃。
-  - **`edit` 工具会静默忽略缩进差异**：改 Python 代码块时 oldString/newString 若与文件真实缩进不一致，它可能照样报「1 replacement」却写坏了。**改完立刻 `read` 复核真实缩进**，别指望工具容错。
-  - **回归测试必须在撤掉修复后验证它会红**（`git stash push -- <生产文件>` → 跑 → `git stash pop`），否则排除不了「假测试」。写 Qt 重入类测试还要注意：复用「会顺带装好被测对象」的 helper 会让一次重入事件被两个实例各处理一次，量出的深度混进另一层，测的就不是被测对象了。
+- 改代码后跑 `uv run quick-check`。
+- 提交前跑 `uv run check --skip-hook-install`。
+- 只改 `docs/*.md` 或本文件时只需 `git diff --check`。
+- 全绿判定 = 退出码 0，且 `grep -E "\.py:[0-9]+: error|Found [0-9]+ error"` 无输出（mypy 输出可能被 tail 截断）。
+- `ruff check` 过 ≠ `ruff format --check` 过；改了 .py 必须 `ruff format` 落地。
+- 格式化必须用仓库锁定版 ruff（pyproject pin `ruff>=0.17.1,<0.18.0`，uv.lock 实锁 0.17.1）。裸 `ruff` 只在 pin 与本机版本一致时等价。
+- 升 ruff 版本后必须 `uv lock` + `uv sync`，再全量 format + check（新版本会新增规则，0.17.1 新增 `C416`）。
+- `scripts/` 也在 check 范围内。
+- xlsx 校验按路径跳过：`check_actor_db` / `check_info_db` 只在对应出厂库或校验脚本有改动时跑。
+- `check_ui_layout` 已移出门禁，只作手工诊断：`uv run python -m scripts.check_ui_layout`。
+- `check.py` 的 ALWAYS 段顺序 = `ruff format --check` → `ruff check` → `mypy mdcx/` → `check_thread_safety`（**不含 pytest**）。全量测试挪到 `--with-tests`。
+- 要全量门禁必须显式：`uv run check --skip-hook-install --with-tests`。
+- `ci.yaml` 的 `on:` 只有 `pull_request: branches: [main]`，**直推 main 不触发 CI**。门禁靠「PR + 本地自检」两道，别指望 CI 兜底。
+- `git add -- <具体文件>`，绝不用 `git add -A`。
+- 提交前看 `git status` 的未跟踪文件，运行残留与中间产物不得入库。
+- 不改不是自己改的文件（并行会话可能同时改本仓库）。
+- 提交信息不要手写 `Co-authored-by` trailer（`prepare-commit-msg` 会无条件追加，手写会重复）。
 
-## 议题定性与证据
+## pre-push 钩子
 
-- Date: 2026-09-02（持续更新）
-- Category: 排错调试
-- Instructions:
-  - **定性前必须看完用户附上的全部证据，尤其每张截图**（#73 教训：日志文本不是证据全集，未看的截图里就有真 bug）。定性"用户误读"=断言无 bug，错判代价大，须额外谨慎。
-  - **报错消息先验证是"真失败"还是"通知被误伤"**（#69：迁移警告被当校验失败）；消息产生端与消费端各自都要查。
-  - **版本定性用状态区指纹（配置文件名 + MDCx 数值版本）+ 日志/UI 特征串反推构建落点，不信用户自报版本号**（#151/#168 两实证）；先判"待修复"还是"已修复待发版"，避免给已解决问题重复动刀。
-  - **「关工具窗连带主进程退出」两条独立根因按触发条件分诊**（#159/#175）：①主窗藏托盘后关最后可见窗 → `quitOnLastWindowClosed`；②取数中关 `WA_DeleteOnClose` 对话框 → 工作线程未等齐被拆原生 abort。先核主窗可见性、关窗时有无工作线程，再对号入座；带工作线程的对话框 closeEvent 必须 cancel/等齐全部线程，超时 `setParent(None)` 卸父子再放行。
+- `hooksPath` 是本地 git config，环境重置后静默失效。重置后先 `git config core.hooksPath` 验证，为空则补 `git config core.hooksPath .githooks`。
+- 钩子生效时流程 = quick-check → commit → push，钩子会自动跑快速门禁，不要手动多跑。
+- 钩子失效期间，推送前手动全量 check 兜底。
+- `.pre-commit-config.yaml` 是历史遗留，不依赖。
+
+## 本机环境
+
+- Windows，Python 3.15 装在 `C:\Program Files\Python315`。
+- **本机没装 uv，用户 2026-10-21 明确不装** → 一律用 `python main.py`、`python -m pytest tests/ --tb=short -m "not network"`、`python scripts/quick_check.py`、`python scripts/check.py --skip-hook-install`。脚本自带 `resolve_tool()` 兜底退 `-m ruff` / `-m mypy`，不必改 PATH。
+- 仓库标准仍是 uv，**别把 CI 写法改成本机口径**。
+- 沙箱陷阱：①shell 直接调系统 python 触发 stdout 捕获异常 → 写 .bat 或 Python 包装脚本，命令内 `> file 2>&1` 落盘后再读文件；②`.bat` 里 `set VAR=value` 不传子进程 → 在 PowerShell 里先设 `$env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"`；③中文 Windows 子进程默认 GBK，控制台乱码只影响显示不影响数据；④用 `python -m ruff` / `python -m mypy` 走当前解释器。
+- pytest 成功时 conftest 的 `pytest_sessionfinish` 会 `os._exit(0)` 丢弃 stdout，**判定只认退出码**，要细节加 `--junitxml`。
+- PowerShell 7.6.7 可用（`C:\Program Files\PowerShell\7\pwsh.exe`）。曾因注册表 `HKCU:\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers` 给 pwsh.exe 打过 `~ RUNASADMIN` 导致 740 错误，已 `Remove-ItemProperty` 清除（其余 4 条 RUNASADMIN 按用户要求保留）。再报 740 先查这一层而不是重装，**别用 `-Verb RunAs`**（无头会话弹 UAC 会卡死）。
+- pwsh 三个收益：`Set-Content -Encoding utf8NoBOM` 可用（5.1 报 ValidateSet 错且**报错后仍继续执行**）、`$OutputEncoding` 默认 utf-8、`[Console]::OutputEncoding` 仍 gb2312。
+- 跨版本传参引号坑：5.1 里 `pwsh -Command '<含双引号脚本>'` 会被改写坏，复杂脚本写成 `.ps1` 再 `pwsh -NoProfile -File`。
+- PowerShell 5.1 的 `Set-Content -Encoding utf8NoBOM` 不可用；中文 commit message 一律用 write 工具落盘再 `git commit -F <file>`。
+- 仓库无 bash（`bash` 命令不存在）。
+
+## 议题定性
+
+- 定性前必须看完用户全部证据，尤其每张截图。日志文本不是证据全集。
+- 定性「用户误读」等于断言无 bug，代价很大。
+- 报错消息先验证是「真失败」还是「通知被误伤」。
+- 版本定性用状态区指纹（配置文件名 + MDCx 数值版本）+ 日志/UI 特征串反推构建落点，不信用户自报版本号。
+- 先判「待修复」还是「已修复待发版」。
+- 「关工具窗连带主进程退出」有两条独立根因，按触发条件分诊：①主窗藏托盘后关最后可见窗 → `quitOnLastWindowClosed`；②取数中关 `WA_DeleteOnClose` 对话框 → 工作线程未等齐被拆，原生 abort。带工作线程的对话框 closeEvent 必须 cancel / 等齐全部线程，超时 `setParent(None)` 卸父子再放行。
 
 ## GitHub 议题处理
 
-- Date: 2026-08-29
-- Category: 工作流协作
-- Instructions:
-  - 凭据：`TOKEN=$(printf "protocol=https\nhost=github.com\n\n" | git credential fill | sed -n 's/^password=//p')`，再 `GH_TOKEN` 或 curl 直连。`gh api user` 403 正常（integration 无权限）。凭据值禁止回显/落盘。未认证直连 api.github.com 撞 IP 级限流。
-  - 议题截图（user-attachments/assets/xxx）直接 `curl -sL` 下载后 Read 查看，无需认证；多图并行下载。
-  - 同一报告人连续多议题先横向看历史再定夺：诉求可能延续或与他人冲突，以代码证据和功能根因是否已修裁决。
-  - **报告人 z291173301 使用 Windows 原生边框**：界面几何类议题先问是否默认隐藏边框；非默认配置下的观感差异用隐藏边框下实测几何仲裁，不为其改代码，照顾靠说明性文案。
-  - 用户一段描述常夹多个独立诉求，回帖逐项回应不遗漏。回帖必须礼貌先行（先感谢/致歉再讲技术）。
-  - **回帖姿势**：JSON POST `-d @/tmp/x.json` + `Content-Type: application/json`（勿用 `-F` multipart）；多行中文 body 用引号 heredoc `python3 << 'PYEOF'` + `json.dump` 生成（裸 `\n`、中文引号、外层 shell 截断都踩过）；POST 失败先 `python3 -m json.tool` 校验；发送后验证 html_url。
-  - **采纳原则：以代码/文档证据 + 根因是否为真为准**，不以报告人语气/坚持次数为准。不合理时礼貌附代码依据给结论，仍欢迎补充复现再复查。用户引用我方既往回复推断事实时，先审查被引用回复本身是否措辞误导（#165 我方表述背锅案例）。
-  - **对不尊重开发者的报告人（如 z291173301，#178 辱骂性措辞），个性需求一律不采纳，回帖引导其 fork 自行开发；仅真 bug 才动代码——千万不能惯着**（用户 2026-09-20 明示指令，#180/#182 重审定案：#180 `<br>` 展示=真 bug 采纳；#182 窗口按钮/文案偏好/新功能=个性需求，回滚不实现）。判定"真 bug"标准：现有功能与自身设计/数据语义矛盾或渲染错误；与报告人个人审美/习惯不符=个性需求。**补充纪律（2026-09-20 全量盘点 97 议题后定案）**：①历史上为满足其偏好已发版的改动不回滚（已成为全体用户的产品行为，回滚=行为倒退+测试返工+token 成本），只把口径应用到新诉求；②对其议题回帖简短坚定、附依据即可，不做长篇逐条驳斥与大规模盘点返工。
-  - **诉求摇摆 = 高价值返工源，动手前先锁验收口径**（z291173301 系列盘点：同一用户改动约半为"个人审美包装成 bug"，返工集中在反复拉扯的两条）；同一块代码被改两次以上即停下来对齐需求；个人偏好类礼貌给 fork 出口。**施压型/纯验证型诉求用实测脚本定量证伪后关单，不改代码**（#168 量化脚本证伪"要滚动"）。
-  - **软件内说明文本的主句结构 = 用户眼中的事实清单**：覆盖面/例外写成显式注记，塞句尾等于没写。
+- 凭据：`TOKEN=$(printf "protocol=https\nhost=github.com\n\n" | git credential fill | sed -n 's/^password=//p')`。
+- 议题截图用 `curl -sL` 下载后 Read。
+- 同一报告人连续多议题，先横向看历史。
+- 报告人 z291173301 用 Windows 原生边框；界面几何类议题先问是否默认隐藏边框，非默认配置的观感差异用隐藏边框下实测几何仲裁。
+- 回帖逐项回应不遗漏，礼貌先行。
+- 回帖用 JSON POST：`-d @/tmp/x.json` + `Content-Type: application/json`（勿 `-F`）。多行中文 body 用 `python3` + `json.dump` 生成；POST 失败先 `python3 -m json.tool` 校验；发送后验证返回的 `html_url`。
+- 采纳原则：以代码/文档证据 + 根因是否为真为准，不以报告人语气或坚持次数为准。
+- **对不尊重开发者的报告人，其个性需求一律不采纳，回帖引导 fork**（用户 2026-09-20 明示）。
+- 「真 bug」标准 = 现有功能与自身设计/数据语义矛盾，或渲染错误。与个人审美不符 = 个性需求。
+- **历史上为满足其偏好已发版的改动不回滚**，只把口径应用到新诉求。
+- 对其议题回帖简短坚定，附依据。
+- 诉求摇摆 = 高价值返工源。动手前先锁验收口径；同一块代码被改两次以上就停下来对齐需求。
+- 施压型/纯验证型诉求用实测脚本定量证伪后关单，不改代码。
+- 软件内说明文本的主句结构 = 用户眼中的事实清单，覆盖面与例外写成显式注记。
+- `wiki/` 目录是 GitHub Wiki 内容源，每次回帖议题后把通用答案回填 FAQ。Wiki 仓库需用户先在网页建首页才能克隆。
 
 ## 排查与本地验证
 
-- Date: 2026-09-14（环境）
-- Category: 环境配置
-- Instructions:
-  - **环境重置后才需建环境**：`pip3 install --break-system-packages uv -i https://pypi.tuna.tsinghua.edu.cn/simple` → `uv sync`（大包约 20 分钟，后台 timeout 留足）；系统 python 3.11 而项目要 ≥3.13，先 `uv python install 3.13`（镜像 `UV_PYTHON_INSTALL_MIRROR=https://ghproxy.net/...`）；uv 侧 `export UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple`。PyQt6 测试前装 ci.yaml 的 apt 列表（先 `apt-get update`），必须 `QT_QPA_PLATFORM=offscreen`。
-  - **background_terminal 用 sh（dash）**：脚本含 `[[ ]]` 会空转，一律 POSIX 语法或 `bash -c` 包装；后台终端内 `git credential fill` 拿不到凭据，token 在前台 bash 获取。
-  - **本机（Windows）源码验证环境（2026-09-22 实证，2026-10-17 更新）**：系统 Python 在 `C:\Program Files\Python315`（3.15），ruff / pytest / mypy / PyQt6 / pydantic 齐全；**本机没有 uv，且用户 2026-10-21 明确「不装 uv」**（此前记的「uv 与 mypy 现均已可用」已作废）：一律**用本机 python 直接跑源码与测试**——`python main.py` 启动、`python -m pytest tests/ --tb=short -m "not network"` 跑全量、`python scripts/quick_check.py`（ruff format --check + ruff check + mypy）与 `python scripts/check.py --skip-hook-install` 跑门禁；两个脚本自带 `resolve_tool()` 兜底，PATH 里没有 ruff/mypy 时会退回「当前解释器 `-m ruff` / `-m mypy`」，**不必往 PATH 里加东西**。**仓库标准仍是 uv**（CI 与文档一律 `uv sync --locked`），本地只是缺 uv 这一个工具，别把 CI 写法改成本机口径。`requirements.txt` 的 dev 段已列 `mypy>=1.17.0`（源自 `pyproject.toml [dependency-groups].dev`；仓库**没有**独立的 `requirements-dev.txt`，装 dev 依赖就是装 requirements.txt）。仍需注意的沙箱陷阱：①OpenCode 的 shell 直接调系统 python 会触发 stdout 捕获异常（`StandardOutputEncoding is only supported when standard output is redirected` 或无输出）——一律写 `.bat` / Python 包装脚本、命令内 `> file 2>&1` 落盘后读文件；②**`.bat` 里 `set VAR=value` 不会传到子 python**（连 `PYTHONUTF8`/`PYTHONIOENCODING` 都进不去）——要注入环境变量最省事的是直接在 PowerShell 里先 `$env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"` 再调 `uv run`/`python`；③中文 Windows 子进程默认 GBK，控制台输出中文会显示成乱码（**只影响显示，不影响数据**，断言结果仍可信）；④`ruff`/`mypy` 用 `python -m ruff` / `python -m mypy` 走**当前解释器**（本机装的版本要与 `pyproject.toml` 的 pin 一致，pin 与本机版本不一致时格式化会漂移）。pytest 成功时 conftest `pytest_sessionfinish` 会 `os._exit(0)` 丢弃 stdout，**判定只认退出码**（多失败时因收尾段错误会退非 0/负值），要细节就加 `--junitxml`。
-  - **本机已装 PowerShell 7.6.7，`pwsh` 可直接调用（2026-10-18 用户告知 + 实证，`RUNASADMIN` 拦路虎同日已清）**：`C:\Program Files\PowerShell\7\pwsh.exe`，FileVersion **7.6.7.500**，`$PSVersionTable.PSVersion` 报 7.6.7。安装完整（整目录 295MB、`System.Management.Automation.dll` 19.6MB、locale 目录齐全；**`pwsh.dll` 只有 157KB 属正常**——那只是转发 shim，别据此判成残缺安装）。**首启失败过一次，根因是注册表兼容标记**：`HKCU\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers` 给该 pwsh.exe 打过 `~ RUNASADMIN`，而本 agent 的 shell 是非提升会话 → 启动被系统拒绝 `WinError 740 ERROR_ELEVATION_REQUIRED`（Python `subprocess` 报「请求的操作需要提升」；PowerShell 的 `&`/`Start-Process` 报「启动所需的参数不受支持」/ApplicationFailedException，**表现为无输出、`$LASTEXITCODE` 为空**）。已于 2026-10-18 执行 `Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers' -Name 'C:\Program Files\PowerShell\7\pwsh.exe'` 清除，**其余 4 条 `RUNASADMIN`（NFOEditor.exe / VideoSubtitleExtracts / Gfriends Inputer.exe / NSP_Client.exe）按用户要求保留未动**，现 `pwsh` 一切正常。**若将来又报 740，先查这一层而不是重装**：该 740 与本文件「环境」节记的 `.venv\python.exe` 那个 740 同根（UAC 提升在本环境不可用），既不是文件损坏也不是没装；**别改用 `-Verb RunAs`**（无头会话弹 UAC 会卡死）。**从 5.1 切到 pwsh 的三个已验证收益**：①`Set-Content -Encoding utf8NoBOM` 可用（5.1 报 ValidateSet 错，且**报错后仍继续执行后续命令**，极易把别处临时文件当刚写的而提交错消息——中文 commit message 一律用 write 工具落盘再 `git commit -F`）；②`$OutputEncoding` 默认 utf-8；③`[Console]::OutputEncoding` 仍是 gb2312，**中文控制台输出照旧乱码，只影响显示不影响数据**。**注意跨版本传参的引号坑**：在 5.1 里 `pwsh -Command '<含双引号的脚本>'` 会被 5.1 改写坏（实测 ParserError），复杂脚本写成 `.ps1` 再 `pwsh -NoProfile -File <path>`。
+- 仓库根的 `config.json` 是脏配置。验证配置/网络栈用 `Config()` 默认配置写临时文件，再指 `manager.path`。
+- 行为修复流程：先复现测试跑红 → 修 → 绿 → 反向验证。修复前把当前代码喂给测试确认转红，防止恒真。
+- 修复后反向审查边界与调用点语义。
+- pytest-asyncio strict 纪律：文件内全是 async 才用顶部 `pytestmark`；混有同步测试必须逐函数加 `@pytest.mark.asyncio`。
+- 测试必须喂生产形态数据，不手造。网页解析夹具用真实页面快照放 `tests/fixtures/`。
+- 结构约束类修复用 AST 哨兵锁位置，并反向喂哨兵确认判失败。
+- conftest dummy 双陷阱：实例属性会遮蔽真实 manager 属性；真实 manager 加新方法必须同步给 dummy 加同名，缺了在 Qt 测试里以 qFatal abort 爆。
+- **subagent 结论不可直接采信**（22 项宣称中 11 项编造/夸大）。要求它输出「已排除假设清单 + 理由」，修复前每条独立复现。
+- 数据质量治理前必须实证全量抽查，不靠代码推断。
+- 触发链「功能上可达」≠「正常路径会走到」。
+- `CancelledError` 在 task 收集点与 `Exception` 同级软着陆（记 CANCELLED 继续跑）。整轮取消只由 cancel_event 分支负责；`wait_for` 的 cancel 残留不得穿透。
+- **误判家族四条**：①「未命中/空结果」是业务常态，不得与「通道故障」混用（真实限流信号只有 403/429/连接异常）；②模型哨兵默认值（如 `"0000-00-00"`）是 truthy 会被放行，下发前按格式白名单归一化（宽松日期解析支持 `- / .`、年月日、紧凑 YYYYMMDD，补零后交 `date()` 真校验）；③集合合并类 bug 第一嫌疑永远是有无 dedupe；④「不标来源就报结果」的日志/汇总字段是诊断盲区。
+- Emby/Jellyfin 同步字段完整性：`UpdateItem` 对缺省 `Genres`/`Tags`/`ProviderIds` 空引用（上游 #17366），payload 三者恒非 null，日期/年份归一化收口在模型层 `dump()` / `update_person_info`。
+- **`Taglines` ≠ `Tags`**：演员管理器「标签」列与详情窗、行内编辑一律指 `Taglines`（短词条，替换规则作用对象）；`Tags` 是 Emby 元数据标签，UI 全程不展示、数据清洗不管它。
+- 持久化快照三必备：原子写（tmp + `os.replace`）、按快照比对才清 dirty、停止/退出路径强制落盘。传 `Flags` 全局列表一律 `list(...)` 快照。
+- 「日志说成功但文件不存在」第一嫌疑 = 写后无回验。防御模板：replace 后 exists 校验，不过退直写，仍不落则抛错（见 `_copy_file_atomic_sync` / `write_file_atomic`）。
+- WinError 123 先实测真实失败串再归因。常因云盘/映射盘文件名长度超限，出路是降 `folder_name_max` 或先刮本地盘。命名截断的目录级字段用「稳定预算」；番号识别第一锚点是日志 `[number]` 行。
+- 「开关组合不生效」先画清每个开关的写入端与读取端。
+- 测试耗时诊断：`--durations=15` → 单测 profile → 打桩计数。两大真凶 = 生产节流真实 sleep、单测偷跑网络。
+- 大范围撤回用 `git revert --no-commit <多提交>` 合并成单撤销提交；同域测试文件归一（哨兵被覆盖就删，同 fixture 复现测试并入主回归文件）。
+- TRAWL/分发包的打包布局与启动脚本入口假设必须端到点对账（发版前用解压后的真实布局实测一次启动）。大 zip 远程验尸用 HTTP Range 读中央目录。
+- cmd/bat 在 chcp 65001 下中文注释会字节错位，注释用 `rem`。
+- ruff B010/B009 与 mypy attr-defined 组合写法：`obj._x = v  # type: ignore[attr-defined] # noqa: SLF001` + `getattr(obj, "_x", None)  # noqa: B009`。
+- 还原/回程类回归用「三态对比探针」定性（fresh → 最大化 → 还原，并排 dump 几何）。复现 UI 几何时不得 stub QSS。
+- `edit` 工具会静默忽略缩进差异，改完立刻 `read` 复核真实缩进。
+- **回归测试必须在撤掉修复后验证它会红**（`git stash push -- <生产文件>` → 跑 → `git stash pop`），否则排除不了假测试。写 Qt 重入类测试要注意复用 helper 会让一次重入事件被两个实例各处理一次。
+- 门禁已知遗留红（2026-10-19 实测）：`tests/test_advanced_page_tail_align.py::test_wide_nav_row_survives_deferred_stage_one[1920-1170]` 在干净树上必红，来自上游旧提交。全量门禁合格线 =「除这条外全绿」；判定时先跑干净树对照，别把自己的改动当元凶，也别顺手去「修」它（需真机逐档量几何）。
 
-- Date: 2026-09-02（持续更新）
-- Category: 排错调试
-- Instructions:
-  - **仓库根 `config.json` 是脏配置**，验证配置/网络栈用 `Config()` 默认配置写临时文件再指 `manager.path`。
-  - **行为修复流程：先复现测试跑红 → 修 → 绿 → 反向验证**（修复前代码喂测试确认转红防恒真）；修复后反向审查边界与调用点语义。pytest-asyncio strict 标记纪律：文件内**全是** async 测试才用顶部 `pytestmark = pytest.mark.asyncio`；混有同步测试时必须逐函数加 `@pytest.mark.asyncio`，文件级 pytestmark 会给同步函数误打标记刷满 `PytestWarning`。
-  - **测试必须喂生产形态数据，不手造**（#174/#176 同族两实证）：回标链路 spec 的 `name`/`site`/`group` 从生产构建函数取或逐项对齐；网页解析夹具用真实页面快照入 `tests/fixtures/`（手写 HTML 在 get_text 拼接细节上漂移造成假红/假绿；真实快照还能锁模板级共性结构）。
-  - 结构约束类修复用 **AST 哨兵**锁位置（await 找 `ast.Await` 包装节点，无 `node.await`）；写完拿修复前代码反向喂哨兵确认判失败。
-  - **conftest dummy 双陷阱**：①实例属性遮蔽真实 manager 属性；②真实 manager 加新方法必须同步给 dummy 加同名（缺了在 Qt 测试以 qFatal abort 形态爆）。绕 dummy 用独立 `uv run python` 脚本或 AST 哨兵。
-  - **subagent 结论不可直接采信**（实证 22 项宣称 11 项编造/夸大）：要求输出"已排除假设清单+理由"，修复前每条独立复现脚本重现；典型证伪形态是断言的崩溃阈值/触发条件与实测不符。外部 AI 的源码分析结论同样独立验证后采纳。
-  - **数据质量治理前必须实证全量抽查，不纯代码推断**（dmm_cid_routes 差点误删 10.6% 真实系列）；测试锁定 bug 时以文档语义（UI 名称/description/docstring 三处一致）为仲裁。
-  - 触发链每一环落实："功能上可达"≠"正常路径会走到"（FC2 分类链案例）；泄漏/累积类先写最小复现脚本量化（gc/任务计数+对照实验）。
-  - **CancelledError 在 task 收集点与 Exception 同级软着陆**（单项记 CANCELLED 继续跑），整轮取消只由 cancel_event 分支负责；`wait_for` 的 cancel 残留不得穿透。
-  - **误判家族（同族四条，反复出现）**：①「未命中/空结果」是业务常态，不得与「通道故障」混同一跳过标记（#90 failed 集、404 不计错误率、外部探测先分类错误构成再设阈值——真实限流信号只有 403/429/连接异常）；②模型哨兵默认值（"0000-00-00"）是 truthy 会被放行，下发前必须按格式白名单归一化（#126/#145 宽松日期解析：支持 `- / .`、年月日、紧凑 `YYYYMMDD`，补零后交 `date()` 真校验）；③集合合并类 bug 第一嫌疑永远是有无 dedupe（#100）；④"不标来源就报结果"的日志/汇总字段是诊断盲区，把决策上下文（host/失败分类）带出来（#100-③/#101）。
-  - **Emby/Jellyfin 同步字段完整性**：`UpdateItem` 对缺省 `Genres`/`Tags`/`ProviderIds` 空引用（上游 #17366），payload 三者恒非 null（无新值回填旧值、ProviderIds 合并丢空）；日期/年份归一化收口在模型层 `dump()`/`update_person_info` 单一出口。
-  - **`Taglines` ≠ `Tags`，别混（2026-10-17 用户定案）**：演员管理器「标签」列（`_populate_table` 的 `eff_taglines`）与详情窗/行内编辑一律指 **`Taglines`**（短词条，**替换规则的作用对象**）；`Tags` 是 Emby 元数据标签，UI 全程不展示、用户无从编辑，**数据清洗不管它**，`clean_actor_data`/`update_person_info` 原样回填仅作 #148 空引用兜底。判断口径：用户说「标签」一律按 `Taglines` 理解，不要顺手把规则扩到 `Tags`。
-  - **持久化快照三必备**（#98-2）：原子写（tmp+`os.replace`）/ 按快照比对才清 dirty / 停止退出路径强制落盘；子集续跑不得拿子集做全库清理。传 `Flags` 全局列表一律 `list(...)` 快照。
-  - **「日志说成功但文件不存在」第一嫌疑 = 写后无回验**（映射云盘 `os.replace` 静默吞写实测）：replace 后 exists 校验、不过退直写、仍不落抛错；同盘历史坑（samefile 假阳性→复制用 `shutil.copyfileobj`、PermissionError 瞬时占用）防御模板在 `_copy_file_atomic_sync`/`write_file_atomic`。
-  - **WinError 123 先实测真实失败串再归因**：常是云盘/映射盘文件名**长度**超限而非非法字符（115/夸克）；出路是降 `folder_name_max` 或先刮本地盘，不硬改截断。命名截断的目录级字段用「稳定预算」（只由模板结构+最大长度决定），回归须两部同系列对比一级目录一致；番号识别第一锚点是日志 `[number]` 行。
-  - **「开关组合不生效」先画清每个开关的写入端/读取端**（#98-1：三开关写入端各自写、读取端共用单闸门）；结果标记行留 log 通道恒出，过程明细进 web 通道。
-  - **测试耗时诊断**：`--durations=15` 找头 → 单测 profile → 打桩计数。两大真凶=生产节流逻辑真实 sleep（autouse patch）与单测偷跑网络（conftest 断网桩）。删文件省不了几秒，修慢点收益 10 倍。
-  - **大范围撤回**用 `git revert --no-commit <多提交>` 合并单撤销提交。**同域测试文件归一**：哨兵被真实行为测试覆盖即删，同 fixture 复现测试并入主回归文件。
-  - **TRAWL/分发包**：打包布局与启动脚本入口假设必须端到端对账（发版前用解压后真实布局实测一次启动）；bun 按 cwd 安装依赖、模块解析穿透父级 node_modules。大 zip 远程验尸用 HTTP Range 读中央目录（HEAD 对 S3 可能返回 0，用 GET+Range）。
-  - cmd bat 在 chcp 65001 下中文注释字节错位，注释用 rem 且避开特殊结构。ruff B010/B009 与 mypy attr-defined 组合：动态属性 `obj._x = v  # type: ignore[attr-defined] # noqa: SLF001` + `getattr(obj, "_x", None)  # noqa: B009`。
-  - **还原/回程类回归用「三态对比探针」定性**（fresh→最大化→还原并排 dump 几何）；探针复现 UI 几何时不得 stub QSS（字体度量偏小缺陷不复现，须挂真实样式）。
+## Qt 生命周期
 
-## 并发与网络库行为
+- 测试里 `w.deleteLater()` ≠ 销毁。`processEvents()` 不投递 DeferredDelete，须显式 `sendPostedEvents(None, QEvent.Type.DeferredDelete)`。全仓 92 处 deleteLater 实际都没生效。
+- 从未 `show()` 过的窗口，`close()` 不发 `hideEvent`。
+- `MyMAinWindow.closeEvent` 由 `WindowOpsMixin` 提供，末尾总是 `a0.ignore()`。要在主窗口加 closeEvent 清理，**绝不能新写同名方法**（会遮蔽 mixin）；应加在 mixin 内部（新增 `hideEvent` 安全）。
+- 多继承查处理器归属用 `"closeEvent" not in MyMAinWindow.__dict__` 或 `WindowOpsMixin.closeEvent is MyMAinWindow.closeEvent`，别用 isinstance 比 method。
 
-- Date: 2026-08-29
-- Category: 排错调试
-- Instructions:
-  - **curl_cffi 0.16 流式关闭 = `quit_now.set()` + `await aclose()`**（单独 aclose 拉满响应体阻塞；单独 close 把 handle 置 None 后 cleanup 抛 TypeError）。**同步 close() 只是发起 abort**：内部 `perform()` 任务仍 pending，"Task was destroyed" 第一怀疑 = 某 cancel 没人消费/某内部任务没人等（shield 模式 cancel 后必须 gather）。
-  - **内网/自建服务（Emby/Jellyfin）不得复用爬虫重型指纹栈**（#133：只对 127.0.0.1 免检，真实内网 host 全被拖慢）：控制面 API 用轻量 httpx 直连客户端（无指纹/无池/无限流/显式超时），返回形状对齐 `(data, error)` 便于渐进切换；这类接口补耗时/失败日志。
-  - **「取消打断收尾」租约泄漏定性法**：看双客户端是否同时残留（双残留=Computed 级，单残留=CrawlerProvider 级）；防护三件套 = 释放路径 shield / try-finally 恒释放 / 逐实例 suppress；**`__exit__` 与 `__aexit__` 成对入口要成对审计**（#55 只修同步侧的教训）。
-  - **LogBuffer 任务树归因**：写入按 `_ROOT` contextvar，`process_one_file` 入口 `new_root()` 切断兄弟继承。
-  - **后台线程跑异步一律走全局 `AsyncBackgroundExecutor`**（app 持久后台循环），禁用 QThread 内自建一次性 loop（curl_cffi 定时器注册到死 loop → Windows 弹 "Python-CFFI error"）；AST 哨兵锁方法内不得出现 `new_event_loop`/`run_until_complete`。
-  - 并发范式：文件间 `asyncio.wait(FIRST_COMPLETED)` 滑动窗口，文件内多站点 `gather`；后台协程统一 `utils/qt_thread.py::run_in_background`，结果经 Qt signal 回主线程，新增后跑 `scripts/check_thread_safety.py`。
-  - 出厂模板在 `resources/userdata/`，运行时数据在 `manager.data_folder/userdata/`；devbox 代理 127.0.0.1:7890 可能无进程，排查网络时临时关闭代理。
-  - **asyncio 线程池归属**：`AsyncBackgroundExecutor` 的 default executor 与主 loop 是两个池，"嵌套 to_thread 死锁"先实测两池是否同一个。
+## 崩溃与内存
+
+- access violation 根因（2026-10-17 已修）：崩溃在跑到一半的 `app.processEvents()` 内，位置随缘漂移，不能靠输出尾部丢没丢区分。真凶链 = deleteLater 从未生效 → 40+ 测试文件各自造 MyMainWindow 泄漏 → 每个窗口挂 100ms 热表 `self.timer.start(100)`（另有 timer_scrape / timer_update.start(43200000) / timer_remain_task.start(1500)）→ 只有 `tests/test_window_state_matrix.py` fixture 停了这 4 个表 → 后续任意 processEvents 派发几百个陈旧回调 → AV；拦路虎是 `init.py:488 _SiteComboTipFilter.eventFilter` 无限递归爆栈（`stack overflow` / `0xC0000409`）。
+- 三条走不通的路（实测更差，别再走）：补 sendPostedEvents 真析构（采样 1 绿 1 崩）；`TerminateProcess(GetCurrentProcess())`（对当前进程调用立即返回不终止自身，副作用是杀别的线程，退出码被伪造成 0）；DLL pinning（探针 5 次崩 1 次）。
+- 教训：15~20 个窗口规模的探针复现不出崩溃，唯一可信判据是全量跑。间歇性原生崩溃**不适合靠反复全量跑来验证**。
+- 已落地三处缺一不可：`483cee1` 给 `_SiteComboTipFilter.eventFilter` 加重入守卫；`bab49bd` 让窗口隐藏/关闭时停掉四个轮询定时器；`tests/conftest.py::_teardown_qt()` 补 `sendPostedEvents(None, QEvent.Type.DeferredDelete)`（连投两次 + processEvents）并把 `topLevelWidgets()` 套 `list()`。
+- 崩溃分 A/B 面：A 面 = 跑到一半 processEvents 里 AV，退出码非 0，必须治；B 面 = `os._exit(0)` 内部 Qt DLL detach 析构存活对象导致 AV，退出码仍 0，对门禁无害。A 面的量级才关键（每个窗口带 QThread + 线程池 + asyncio 事件循环，几百个线程常驻）。验证要在单文件上做因果验证再下沉 conftest。
 
 ## UI 开发与排错
 
-- Date: 2026-09-02（持续更新）
-- Category: UI 开发与排查
-- Instructions:
-  - **改 UI 先改 `.ui`（唯一权威源）** → devbox 用 `uv run python -m PyQt6.uic.pyuic`（相对路径）+ `scripts/fix_qt_enums.py` + `ruff format` → `tests/test_ui_structure.py`。禁手工改 MDCx.py。
-  - **Qt 布局问题先写最小复现脚本验证 Qt 原生行为，再动项目代码**（#72/#74 教训：根因是 BoxLayout 缺末尾 Expanding spacer 而非 setVisible）；`setVisible(False)` 管不到 QSpacerItem 等非 widget 占位项，新加隐藏开关时审计布局全部非 widget 项。
-  - **`WA_DeleteOnClose` 对话框带工作线程时 closeEvent 必须等齐**（见议题定性节 #175 条）。
-  - **绝对定位同步军规（一族，#62/#66/#68/#82/#117/#123/#144 实证汇总）**：①`setGeometry` 不触发子组件 resizeEvent（须 `resize()`）；QStackedWidget 只 resize 当前页，`currentChanged` 统一同步且**先 resize 所有 pages 再算内部几何**；②容器几何变化后内部布局必须显式 `invalidate()+activate()`；③平移/拉伸一律「设计基准坐标+extra」固定公式、双向幂等（负 extra 即缩回），增量平移会累积漂移；④**同步清单与设计器控件清单一一对账**（先 grep 设计坐标穷举同族行/同组控件，不只补报错那个）；⑤min 尺寸：宽用 `layout.minimumSize()`（硬最小）、高用 `layout.sizeHint()`，**禁取自膨胀后的 childrenRect**；⑥底部余量是按页属性（设置页浮框侵入 63→默认 72，无遮挡页收紧），由 `set_content_bottom_margin()` 覆盖；⑦.ui 残留 maximumSize 会静默夹断自定义拉伸（删节点重编译）；⑧改公式前 grep 公式变量名全 `tests/` 同步既有断言，同顶控件用同一 y，增长量按当前几何实时 floor 算。
-  - **重影/重叠先问「渲染层还是定义层」**（#123）：定义层同 cell 多控件几何检测抓不到（`itemAtPosition` 只返回最后一个、包围盒假绿），须 .ui 文本级哨兵（插行后 grep 该 grid 全部 `<item row=` 确认严格递增）；实机截图是最终判据，与 offscreen 矛盾时以实机为准。抬高某行后同滚动内容兄弟 groupBox 与滚动容器高度按设计 y 顺序整体下移。
-  - **富余高度被「独占一行的 wordWrap 标签」吃掉（2026-10-08 翻译页「翻译引擎」组实证）**：绝对定位容器声明高 ≫ 网格自然高、且该网格**末尾没有 Expanding 间隔**时，`QGridLayout` 会把富余灌给「该行唯一控件且垂直策略非 Fixed」的项——典型就是 wordWrap `QLabel`（`Preferred` + `heightForWidth` 有效），表现为**文字垂直居中留白 + 其下各行被整体下推**（本次：容器 280 / 自然 218，多出的 62px 全进 `label_baidu_hint`，文字墨迹仅 15px）。两条同改才算根治：`.ui` 在该网格末尾补一条**垂直 Expanding 间隔**（防复发，富余此后只落在组底）+ 运行期把该行标签按**纯宽度函数**贴合、容器高钉成 `layout.sizeHint().height()`（`main_window.py::_sync_fanyi_group_spacing` 第 0 步，配套新增 `_FANYI_TRANS_BOT_PAD` / `_FANYI_TRANS_FOLLOW_GROUPS`）。**只改 `.ui` 静态高度不可行**：`QT_SCALE_FACTOR`（设置页「高分屏缩放」80%~300%）只放大字体、不放大 `.ui` 坐标，文字折行数又随容器宽度变（实测同一段提示词 ≥589 单行 / 441 两行），任何写死高度在窄窗或大缩放下必然裁字。
-  - **末尾 Expanding 间隔的 `sizeHint` 高度必须写 0（2026-10-08 同批第二次实证）**：补了间隔、富余不再灌进标签之后，空白只是**换了个地方出现**——`QGridLayout.sizeHint()` 会把间隔自身的 `sizeHint` 高度一并累加（`.ui` 默认 20×20），容器被钉成 `sizeHint()` 后那 20px 就变成「末行下方的死空白」（本次：容器 236 而各行只占 216，组底空白 20+10=30px，用户截图第二次标注「百度密钥下方多余空白」）。间隔要靠 `Expanding` 策略吸收富余，不需要任何 `sizeHint`，故高度写 **0**（`.ui` 里仓库已有多处 `0x0` Expanding 间隔可参照），`sizeHint()` 随之降到真实行高。**通用判据**：容器高钉成 `sizeHint()` 之前，先对一遍「`sizeHint()` 是否 == 各控件实际几何的末行底」，不等就说明 `sizeHint` 里混进了不该有的量（间隔、硬 `minimumSize`、`QLabel` 的 wordWrap 行盒高）。回归测试要把 `spacer.sizeHint().height() == 0` 与「容器高 == 末行底」一起钉死，否则改 `.ui` 时 Designer 一保存就把 20 写回去。
-  - **富余被「均分」吃掉时，先分清是哪一种（2026-10-08 翻译页「演员」组实证）**：同样是「容器声明高 ≫ 网格自然高」，`QGridLayout` 有两种截然不同的消化方式——① 灌给「该行唯一控件且垂直策略非 Fixed」的项（多为 wordWrap `QLabel`，表现为文字垂直居中留白，见上一条）；② **在「顶 / 行间 / 底」之间均分**（本次：`layoutWidget_20` 声明 418 / 自然 352，多出的 66px 摊成顶 16 / 行间各 +16 / 底 18，表现为**首行被整体顶下来一整行**、组底还剩一段底）。② 的治法与 ① 不同：**不要动容器高度逻辑，只要把行首留白显式收成常量并折进 `contentsMargins`**（本次 `_FANYI_ACTOR_TOP_PAD` 30→0，首行行顶 52→22 即容器设计 y），组高随即按「容器底 + 固定底留白」公式同步收紧，其后各组随 `delta` 上移、组间距不变，空出的高度既不会留在组底也不会变成组间空档——**用户说的「移动完成后删掉下方多出来的空白空间」在这一路径下是自动成立的**，不需要额外删空白代码。判据：`label.x()/y() + container.y()` 明显大于容器设计 y，且各行之间间距被摊大（实测 +16）而非只在某一处鼓包。
-  - **要真机字体度量就别用 offscreen**（同批实证）：本机 offscreen 插件下 `QFontDatabase.families()` 返回 **0 个字族**（所有字形同为 13px 前进宽，`heightForWidth` 曲线全是错的），据此下的任何结论都不能用来定 `.ui` 数值。改用**默认 windows 插件**（不 `show` 也能量 `QFontMetrics`/`heightForWidth`）：探针按 `tests/test_window_state_matrix.py` 的 `win` fixture 思路 monkeypatch 掉 `run_startup_health_checks`/`check_version`/`set_style` 等入口 + `chdir(tmp_path)`，`MyMAinWindow()` → 切 `page_setting` → 切 `tab_6` → `resize` + `processEvents()` + `_sync_page_layouts()`，再 `groupBox.grab().save(png)` **与用户截图对拍**、并连跑多宽度验幂等与往返复原（实测本改动 1030/900/1000/1280/1400/1920 六档 + 往返全部逐值复原）。注意该探针与 pytest 收尾一样会在 Windows 上抛 `access violation`（退出码 1，`DONE` 已打印即算通过，**改动前就存在**，不是回归）。
-  - **通用宽幅同步只改宽、不改高（2026-10-19 网络页「状态：留空不校验（默认）」下方大片空白实证）**：`CustomScrollArea.sync_wide_children_width()` 每遍都按 `_register_design_geometry()` 登记的**设计几何** `setGeometry`，**高度恒为设计值**。这对「行高不随宽度变」的页没问题，可一旦组里有 `wordWrap` 标签，窗口拉宽后折行数下降、文字所需高度变矮，省下的高度就在组内空出来——配 `alignment=Qt::AlignTop` 时全堆在网格底部，正是用户看到的空盒子，且**越宽越大**。判据：`container.childrenRect().bottom() + 1` 随窗口宽度单调变小，而容器高度纹丝不动。治法两条：①**静态 `.ui` 收紧只对设计宽度成立**（网络页上一轮正是这么收的，本轮仍被用户报出「最大化时又出现大片空白」，因为它只量了设计宽度那一档）；②**给该页挂 `_post_wide_sync_hook`**，按 `extra > 0` 判宽态、`invalidate()+activate()` **之后**再用 `childrenRect().bottom() + 1` 量内容真实底边（不重排量到的是拉宽前的旧底边，这是最容易踩空的一步），组框高 = 容器设计 y + 容器高（保住 `.ui` 那条 `627 = 30 + 597` 恒等式），其后各组按 `delta` 同步平移、组间距不变；窄态必须**显式复位**到设计几何，不能指望通用同步「顺带复位」。配套判别力：因离屏环境无 CJK 字体（见上一条），「哪一档窗宽开始收窄」测试环境与生产未必同档，断言只能写成与环境无关的等式，并另配一条「对照摘掉钩子的基线、至少一档确实变矮」防空转。
-  - **窗口状态汇聚点审计**（#79/#82/#132）：修窗口联动 bug 时 grep `setWindowState|activateWindow|showNormal|show|hide` 全库枚举汇聚点逐一加「可见且未最小化」守卫；配置保存/加载等业务函数不得顺手操控窗口状态；托盘隐藏后 eventFilter 不得自动 `show()`。
-  - **PyQt6 测试纪律**：每个含 Qt 的测试文件顶部（PyQt6 导入前）自持 `os.environ.setdefault("QT_QPA_PLATFORM","offscreen")`；fixture 构造后立即停全部 QTimer；qFatal abort（栈无 Python 行号）查 QTimer 槽与 dummy 桩缺方法。Qt 同名 API 重载签名不同，改前确认目标类签名；测试桩显式枚举属性方法。隔离配置目录用 `monkeypatch.chdir(tmp_path)`，勿把 dummy 的 Path 属性改 str。
-  - **主窗最小尺寸是动态的（2026-09-21 起）**：`init.py::Init_Ui` 按 primaryScreen 可用区算（`_adaptive_window_sizes`，offscreen 虚拟屏 800x800 → min 480x600、启动 720x680）。写矮窗口几何回归测试前必须 `win.setMinimumSize(0, 0)` 解耦，否则 resize 被最小高顶起、场景失真；断言 label 裁切一律用 `win.height()` 而非目标 resize 值。
-  - 主窗口全局绝对定位：长文本 QLabel 用 wordWrap 查 sizeHint；新增顶层控件纳入 resizeEvent 手动几何同步。QComboBox 装饰后缀：`addItem(icon, 文本, UserRole 纯值)`，消费点统一 `currentData()`，信号 handler 收文本须剥后缀。
+- 改 UI 先改 `.ui`（唯一权威源）→ `uv run python -m PyQt6.uic.pyuic`（相对路径）→ `scripts/fix_qt_enums.py` → `ruff format` → `tests/test_ui_structure.py`。禁止手工改 `MDCx.py`。
+- Qt 布局问题先写最小复现脚本验证 Qt 原生行为，再动项目代码。根因常是 BoxLayout 缺末尾 Expanding spacer，而非 setVisible。`setVisible(False)` 管不到 QSpacerItem 等非 widget 占位项。
+- `WA_DeleteOnClose` 对话框带工作线程时，closeEvent 必须等齐。
+- **重影/重叠先问「渲染层还是定义层」**。定义层同 cell 多控件的几何检测抓不到，须 .ui 文本级哨兵 grep 该 grid 全部 `<item row=` 确认严格递增。实机截图是最终判据。
+- **富余高度被独占一行的 wordWrap 标签吃掉**（翻译页「翻译引擎」组实证）：绝对定位容器声明高 ≫ 网格自然高且网格末尾没有 Expanding 间隔时，QGridLayout 把富余灌给该行唯一控件（垂直策略非 Fixed 的 wordWrap QLabel，表现为文字垂直居中留白 + 其下各行被整体下推）。根治要两处同改 = .ui 末尾补垂直 Expanding 间隔（防复发）+ 运行期把该行标签按纯宽度函数贴合、容器高钉成 `layout.sizeHint().height()`（`main_window.py::_sync_fanyi_group_spacing` 第 0 步，配套 `_FANYI_TRANS_BOT_PAD` / `_FANYI_TRANS_FOLLOW_GROUPS`）。
+- **末尾 Expanding 间隔的 `sizeHint` 高度必须写 0**（默认 20×20 会被 sizeHint 累加成末行下方死空白，仓库已有多处 `0x0` Expanding 间隔可参照）。通用判据 = 容器高钉成 sizeHint() 前先对一遍「sizeHint() 是否 == 各控件实际几何的末行底」；回归测试要把 `spacer.sizeHint().height() == 0` 与「容器高 == 末行底」一起钉死。
+- **富余被「均分」吃掉时先分清是哪一种**：①灌给该行唯一控件（见上）；②在「顶/行间/底」之间均分（表现为首行被整体顶下来、组底还剩底）。②的治法是不动容器高度逻辑，只要把行首留白显式收成常量并折进 `contentsMargins`（`_FANYI_ACTOR_TOP_PAD` 30→0），组高按「容器底 + 固定底留白」收紧，其后各组随 delta 上移，组间距不变。
+- **要真机字体度量就别用 offscreen**（offscreen 下 `QFontDatabase.families()` 返回 0 个字族），改用默认 windows 插件。探针按 `tests/test_window_state_matrix.py` 的 `win` fixture 思路 monkeypatch 掉 `run_startup_health_checks` / `check_version` / `set_style` + `chdir(tmp_path)`，再 `groupBox.grab().save(png)` 与用户截图对拍。
+- **通用宽幅同步只改宽不改高**（`CustomScrollArea.sync_wide_children_width()` 每遍按登记的设计几何 setGeometry，高度恒为设计值；组里有 wordWrap 标签时窗口拉宽折行减少、高度变矮，空出来的高度堆在网格底部且越宽越大）。治法 = 静态 .ui 收紧只对设计宽度成立（不够）+ 给该页挂 `_post_wide_sync_hook`（按 `extra > 0` 判宽态，`invalidate()+activate()` 之后用 `childrenRect().bottom() + 1` 量真实底边，组框高 = 容器设计 y + 容器高，其后各组按 delta 同步平移，窄态必须显式复位）。
+- **窗口状态汇聚点审计**：修窗口联动 bug 时，grep `setWindowState|activateWindow|showNormal|show|hide` 全库枚举汇聚点，逐一加「可见且未最小化」守卫。配置保存/加载等业务函数不得顺手操控窗口状态。托盘隐藏后 eventFilter 不得自动 `show()`。
+- **PyQt6 测试纪律**：每个含 Qt 的测试文件顶部（PyQt6 导入前）自持 `os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")`；fixture 构造后立即停全部 QTimer；qFatal abort（栈无 Python 行号）查 QTimer 槽与 dummy 桩缺方法；Qt 同名 API 重载签名不同，改前确认目标类签名；测试桩显式枚举属性方法；隔离配置目录用 `monkeypatch.chdir(tmp_path)`，勿把 dummy 的 Path 属性改成 str。
+- **主窗最小尺寸是动态的**（`init.py::Init_Ui` 按 primaryScreen 可用区算 `_adaptive_window_sizes`，offscreen 虚拟屏 800x800 → min 480x600、启动 720x680）。写矮窗口几何回归测试前必须 `win.setMinimumSize(0, 0)` 解耦；断言 label 裁切用 `win.height()` 而非目标 resize 值。
+- 主窗口全局绝对定位：长文本 QLabel 用 wordWrap 查 sizeHint；新增顶层控件要纳入 resizeEvent 手动几何同步；QComboBox 装饰后缀用 `addItem(icon, 文本, UserRole 纯值)`，消费点统一 `currentData()`，信号 handler 收文本须剥后缀。
+
+## 并发与网络库
+
+- curl_cffi 0.16 流式关闭 = `quit_now.set()` + `await aclose()`。单独 aclose 会拉满响应体阻塞；单独 close 把 handle 置 None 后 cleanup 抛 TypeError。
+- 同步 close() 只是发起 abort。「Task was destroyed」第一怀疑 = 某个 cancel 没人消费或某个内部任务没人等（shield 模式 cancel 后必须 gather）。
+- 内网/自建服务（Emby/Jellyfin）不得复用爬虫重型指纹栈（只对 127.0.0.1 免检）。控制面 API 用轻量 httpx 直连客户端（无指纹/无池/无限流/显式超时），返回形状对齐 `(data, error)`。
+- 「取消打断收尾」租约泄漏定性法：双残留 = Computed 级，单残留 = CrawlerProvider 级。防护三件套 = 释放路径 shield / try-finally 恒释放 / 逐实例 suppress；`__exit__` 与 `__aexit__` 成对入口要成对审计。
+- LogBuffer 任务树归因：写入按 `_ROOT` contextvar，`process_one_file` 入口 `new_root()` 切断兄弟继承。
+- 后台线程跑异步一律走全局 `AsyncBackgroundExecutor`（app 持久后台循环），禁用 QThread 内自建一次性 loop（curl_cffi 定时器注册到死 loop → Windows 弹 "Python-CFFI error"）。AST 哨兵锁方法内不得出现 `new_event_loop` / `run_until_complete`。
+- 并发范式：文件间用 `asyncio.wait(FIRST_COMPLETED)` 滑动窗口，文件内多站点用 `gather`；后台协程统一走 `utils/qt_thread.py::run_in_background`，结果经 Qt signal 回主线程。新增后跑 `scripts/check_thread_safety.py`。
+- asyncio 线程池归属：`AsyncBackgroundExecutor` 的 default executor 与主 loop 是两个池。「嵌套 to_thread 死锁」先实测两池是否同一个。
+- devbox 代理 127.0.0.1:7890 可能无进程。
 
 ## 站点与网络
 
-- Date: 2026-08-27
-- Category: 排错调试
-- Instructions:
-  - 各站探测番号与收录依据见爬虫类注释；javdb 仅搜 FC2 需要 Cookie。
-  - 站点 API 坑：missav_api Recombee 仅 POST；DMM Affiliate v3 必需 site/service/floor 且 keyword 用 content_id 形态；madouqu 域名动态维护（24h 缓存）；madou_club 番号无横杠；parsel Selector.get() 纯 JSON 返回 dict，解析兼容 str/dict/Selector 三态。
-  - 站点增删史：2026-08 删 15 站（48→33），后增 javfree/aventertainments/madou_club、getchu_dmm 并入 getchu、7mmtv 回归；**当前注册爬虫 36**（Features.md 同步）。数字开头模块名（7mmtv.py）用 `importlib.import_module` 加载。
-  - **站点收录边界**（默认名单只收「该站确实能查到该类型条目」的站，加错了只会给每条影片白挂一次请求）：
-    `AVEntertainments` 只有无码番号（正規無修正 DVD 販売/配信商城），2.5.6 起只留在无码组；
-    `Getchu` / `AVSEX` 对大陆 IP 过不了 CF 墙，第三方工具也过不了，2.5.6 起从六组全部移除；
-    `Official` 只在有码/无码两组（按番号前缀路由到片商官网，国产/欧美/FC2 没有收录）。
-    **「素人番号」类型已改名「国产短剧」**（枚举值/配置字段名仍是 `SUREN`/`website_suren`），2.6.0 起该组默认名单只剩 JavDay，短剧无番号格式、无法自动识别，只有锁定刮削类型才走这一组；**原素人番号（LUXU/SIRO/259LUXU 等）一律按有码番号刮削**，`_is_suren_number()` 自动分支已删除。
-    **七组名与「锁定刮削类型」下拉文案已按用户口径统一（2.6.0）**：组名 有码番号/无码番号/个摄番号/欧美视频/国产传媒/国产短剧/动漫里番；下拉八项 自动判断/有码番号/无码番号/个摄番号/欧美视频/国产传媒/国产短剧/动漫里番，**设置页行序与下拉序都把国产短剧放在国产传媒之后、动漫里番之前**。**候选区七个 chip 随后也按同一口径改了（2.6.0 第三轮）**：短名 有码/无码/个摄/欧美/传媒/短剧/动漫，`PALETTE_GROUP_TYPES` 的组序与设置页行序一致（`CONFIGURABLE_SCRAPING_TYPES` 只用于遍历配置项、次序无关，仍不动），`_CAPTION_HIDDEN_TYPES` 随短名改为 `("动漫", "个摄")`（它比的是 chip 短名）。悬停/下拉那行 `<定位>：<类型名单>` 与七个 chip 同源，所以 7mmtv 一类跨组站的名字段也会跟着变（如 `综合：有码/无码/欧美/传媒`）；不属任何类型组的站（MyWife/AVSEX/Getchu/FC2）落回爬虫自己的 `description`，不受短名影响。**下拉框顺序与枚举声明序不再相同**，`load_config.py`/`save_config.py` 的下标↔值映射改读 `FixedScrapingType.dropdown_values()`（顺序源 `dropdown_order()`，**不能写成类体里的常量**——Enum 会把它当成员报 `TypeError: too many arguments for str()`），换序时只要改这一处。
-    **「锁定类型」运行期只有一张真相表（2.6.2 审查后收敛）**：锁定分支查 `models.SCRAPING_TYPE_SITE_FIELDS`，**不再在 `core/file_crawler.py` 里自带一份硬编码的「类型 → `website_*` 字段」字典**（两份同源真相，新增类型漏改一处会一路走到 `_call_crawlers` 才报「站点名单为空」，错误信息指不到漏改处）。保留 `getattr(config, field, None)` 的惰性取值：旧配置与 `tests/` 里的桩类（`_ClassificationConfig`/`_SkipFieldConfig`）只带部分 `website_*` 属性、没有 `get_type_sites`，去掉会 AttributeError。**锁定分支只给 `GUOCHAN` 硬塞 `mosaic="国产"`**（对齐自动分支），其余档一律留空——给 `WUMA`/`DONGMAN` 加会被 `is_plain_uncensored_mosaic()` 推成 `wuma=True` 写成「无码」，动漫里番反被标成无码。**`type_field_configs` 回退到类型名单时必须用有序的 `get_type_sites()`，不能用 `list(set)`**（`Website` 枚举 str 的 hash 按进程随机化，`site_prority` 顺序随机＝每次重启命中不同站点）。
-  - 无码官网五站由 official_uncensored.py 统一路由，均需代理；1pondo/pacopacomama/10musume 的 dyn/phpauto JSON API 直通。
-  - 被墙站测试：`uv run python -m scripts.dev_proxy start|status|test <url>|stop`；日本 IP 限制站 `--port 7891 --regions "jp|日本"`。devbox 限制：超时≠站点死亡；连通性验证必须 curl_cffi impersonate；批量探测校验 data.title 防假阳性。
-  - **HTTP 4xx/5xx 错误串必须携带截断响应体**（#88：Emby 400 根因在 body JSON），保留 `"HTTP {status}"` 前缀不破坏匹配；定位顺序先看客户端实际发了什么。
-  - **番号归一化：前导单数字双重语义**（studio 名单数字保留 vs DMM 预约版 `9` 前缀剥掉），改正则前 grep 全部分支、改后跑相邻语义既有测试防双向误伤（#84）。
-  - **站点域名优先级/删站属产品取舍，查证给方案不擅动**（#85：域名顺序常有实测依据注释）；删站影响面 = 注册表 + Website 枚举 + 默认 proxy 列表 + migrations.py 清洗 + UI 列表；单站死活须真机实测，别用 devbox 结果判定。
-  - **javdb三源**：javdb（网页）/javdb_api（镜像站）/javdb_app（App API 免 CF 最稳）；**thejavdb 与 javdb 无关**。App 签名机制见 `docs/Javdb_App_Signature.md`，排障锚点=三主机同时 4xx 或 InvalidSignature；环境变量 `MDCX_JAVDB_APP_SIG_*` 免改码覆盖；搜索 limit≤50、分页须 `movie_sort_by=release`。
-  - **javdb 图源无水印体系**：`tp.spfcas.com` App 专用（单字节 XOR，首字节 key）vs `c0.jdbstatic.com` 带水印；解密/变换集中在 `base/web.py`；加密流尺寸探测 (0,0) 属预期勿当图失效。
+- 各站探测番号与收录依据见爬虫类注释。javdb 仅搜 FC2 时需要 Cookie。
+- 站点 API 坑：missav_api 的 Recombee 仅 POST；DMM Affiliate v3 必需 site/service/floor 且 keyword 用 content_id 形态；madouqu 域名动态维护（24h 缓存）；madou_club 番号无横杠；parsel `Selector.get()` 纯 JSON 返回 dict（解析要兼容 str/dict/Selector 三态）。
+- 站点增删史：2026-08 删 15 站（48→33），后增 javfree / aventertainments / madou_club，getchu_dmm 并入 getchu，7mmtv 回归。**当前注册爬虫 36**（Features.md 同步）。数字开头模块名（7mmtv.py）用 `importlib.import_module` 加载。
+- **站点收录边界**（同 `docs/Development.md` 10.8）：AVEntertainments 只在无码组；Getchu、AVSEX 大陆 IP 过不了 CF 墙故从六组移除；Official 只在有码/无码两组。
+- **「素人番号」已改名「国产短剧」**（枚举值/配置字段名仍是 `SUREN` / `website_suren`）。2.6.0 起该组默认名单只剩 JavDay。短剧无番号格式无法自动识别，只有锁定刮削类型才走这一组；原素人番号（LUXU/SIRO/259LUXU 等）一律按有码番号刮削，`_is_suren_number()` 自动分支已删除。
+- **七组名与「锁定刮削类型」下拉文案（2.6.0 统一）**：组名 = 有码番号/无码番号/个摄番号/欧美视频/国产传媒/国产短剧/动漫里番；下拉八项 = 自动判断/有码番号/无码番号/个摄番号/欧美视频/国产传媒/国产短剧/动漫里番。设置页行序与下拉序都把国产短剧放在国产传媒之后、动漫里番之前。候选区七个 chip 短名 = 有码/无码/个摄/欧美/传媒/短剧/动漫。`PALETTE_GROUP_TYPES` 组序与设置页行序一致（`CONFIGURABLE_SCRAPING_TYPES` 只用于遍历配置项，次序无关）。`_CAPTION_HIDDEN_TYPES` 随短名改为 `("动漫","个摄")`。悬停/下拉那行 `<定位>：<类型名单>` 与七个 chip 同源。不属任何类型组的站（MyWife/AVSEX/Getchu/FC2）落回爬虫自己的 `description`。
+- **下拉框顺序与枚举声明序不再相同**：`load_config.py` / `save_config.py` 的下标↔值映射改读 `FixedScrapingType.dropdown_values()`（顺序源 `dropdown_order()`，**不能写成类体里的常量** —— Enum 会当成员报 `TypeError: too many arguments for str()`）。
+- **「锁定类型」运行期只有一张真相表（2.6.2 收敛）**：锁定分支查 `models.SCRAPING_TYPE_SITE_FIELDS`，不再在 `core/file_crawler.py` 里自带硬编码的「类型 → website_* 字段」字典。保留 `getattr(config, field, None)` 惰性取值（旧配置与测试桩类 `_ClassificationConfig` / `_SkipFieldConfig` 只带部分 `website_*` 属性、没有 `get_type_sites`，去掉会 AttributeError）。锁定分支只给 `GUOCHAN` 硬塞 `mosaic="国产"`，其余档留空（给 WUMA/DONGMAN 加会被 `is_plain_uncensored_mosaic()` 推成 wuma=True 写成「无码」）。`type_field_configs` 回退到类型名单时必须用有序的 `get_type_sites()`，不能用 `list(set)`（Website 枚举 str 的 hash 按进程随机化，每次重启命中不同站点）。
+- 无码官网五站由 `official_uncensored.py` 统一路由，均需代理。1pondo / pacopacomama / 10musume 的 dyn/phpauto JSON API 直通。
+- 被墙站测试：`uv run python -m scripts.dev_proxy start|status|test <url>|stop`；日本 IP 限制站用 `--port 7891 --regions "jp|日本"`。devbox 限制：超时 ≠ 站点死亡；连通性验证必须用 curl_cffi impersonate；批量探测要校验 `data.title` 防假阳性。
+- **HTTP 4xx/5xx 错误串必须携带截断响应体**（保留 `"HTTP {status}"` 前缀不破坏匹配）。
+- **番号归一化：前导单数字双重语义**（studio 名单数字保留 vs DMM 预约版 `9` 前缀剥掉）。改正则前 grep 全部分支，改后跑相邻语义的既有测试。
+- **站点域名优先级与删站属产品取舍，查证给方案不擅动**。删站影响面 = 注册表 + Website 枚举 + 默认 proxy 列表 + `migrations.py` 清洗 + UI 列表。
+- **javdb 三源**：javdb（网页）/ javdb_api（镜像站）/ javdb_app（App API，免 CF 最稳）。thejavdb 与 javdb 无关。App 签名机制见 `docs/Javdb_App_Signature.md`，排障锚点 = 三主机同时 4xx 或 InvalidSignature，环境变量 `MDCX_JAVDB_APP_SIG_*` 可免改码覆盖。搜索 limit ≤ 50，分页须 `movie_sort_by=release`。
+- **javdb 图源无水印体系**：`tp.spfcas.com` 是 App 专用（单字节 XOR，首字节 key），`c0.jdbstatic.com` 带水印。解密/变换集中在 `base/web.py`。加密流尺寸探测 (0,0) 属预期。
 
 ## Windows 打包与发布
 
-- Date: 2026-08-24
-- Category: 环境配置
-- Instructions:
-  - **只有「字符串动态导入」（`importlib.import_module`/`__import__`）才必须显式 --hidden-import**；函数体内静态 import 会被正常收集。`tests/test_build_hidden_imports.py` 哨兵锁定全仓动态导入 ⊆ hidden-import；CI Windows job 有 PyInstaller 冒烟。
-  - **一体包硬失败后，所有调用 `scripts/build.py` 的 Windows/Linux 工作流必须先 `fetch_sr_tools`**（2026-09-21 `b077b07c` 实证）：Code Quality 与 Windows 测试全绿，冒烟步因缺 `build/sr_tools` 直接 BuildError。改 fail-closed 时 `ci.yaml` 冒烟与 `build-py315.yml` 两条打包入口一起补「cache + fetch 再 build」；`tests/test_sr_bundling.py::test_packaging_workflows_fetch_sr_tools_before_build` 锁顺序。目录存在但无 realesrgan/waifu2x 子目录同样硬失败（空 `--add-binary` 会静默漏打）。注：2026-09-28 删除 `build-py313.yml` / `build-windows.yml` / `build-linux.yml`、2026-10-21 删除 `build-py314.yml` 后，打包入口只剩这两条。
-  - **一体包内置资源的运行时查找也必须 fail-loud（2026-10-19 实证）**：`_builtin_dir()` 这类「包内找资源」的判定一旦返回 `None` 就静默降级成「在线下载」，用户只会看到「📥 首次使用，下载超分工具（约 30-60MB，仅一次）」，根本分不清是源码运行、旧版漏打包的产物、还是包真的缺文件。规矩：**①** 查找失败必须给原因码并打一条结论日志，冻结运行（`sys._MEIPASS` 非空）且平台属于内置平台（`_SR_BUNDLED_PLATFORMS`，即 Windows/Linux；macOS 不内嵌属设计）却找不到才算异常；**②** 释放到 userdata 后必须校验可执行文件真的落盘，否则空/残缺的内置目录会一路谎报「✅ 就绪」到执行时才炸；**③** 清理旧目录**禁用 `shutil.rmtree(..., ignore_errors=True)`**——Windows 上被占用的文件被静默吞掉后，紧接着的 `copytree` 必抛 `FileExistsError`，内置工具明明在包里却白白去下载 30-60MB；改用 `onexc` 收集失败项（只读属性先 chmod 再删）后抛错并点名。回归在 `tests/test_super_resolution.py`（`test_rmtree_force_*` / `test_explain_builtin_*` / `test_ensure_binary_logs_real_cause_before_downloading` / `test_ensure_binary_reports_copy_failure_reason`，共 10 条，撤 `mdcx/core/super_resolution.py` 改动后全红）。
-  - EXCLUDED_MODULES 中 rich/typer 只供构建/CLI；Windows curl_cffi.libs 需显式 --add-binary。
-  - **GitHub Actions 两坑**：①runner 标签会整体下线（macos-13 已关闭，接替者 `macos-15-intel` 也已于 2027 秋整体退役——本仓库干脆不再用 macOS Intel runner，macOS 只编 Apple Silicon）；②`astral-sh/setup-uv` 无裸主版本浮动标签（写 @v10 报错，须全版本号）。
-  - **Release 发版**：唯一发版工作流 `build-py315.yml`（Python 3.15，三平台一体包，2026-10-21 接管原 `build-py314.yml` 职责并把它删除）。推纯数字 tag `2*` 自动发正式版，或手动 `workflow_dispatch` 补发（`tag` 输入留空取 consts.py LOCAL_VERSION，`prerelease` 只对手动触发生效）。产物名 `MDCx-<tag>-<平台>-<arch>-<完整40位sha>.<exe|dmg>`（`<tag>` 仍是纯数字 `LOCAL_VERSION`；**2026-10-22 起去掉了原先的「展示版本号」段**——`VERSION_NAME` 已固定 v3.0 不会变，每版文件名都重复一遍 `3.0` 没有信息量，还多一处可能与 Release 标题对不上的地方；客户端只读 `tag_name` 不解析资产名，故去掉它对自动更新零影响），如 `MDCx-20261022-windows-x86_64-<sha>.exe`；Release 标题（`/releases` 列表里显示的那一行）是 `MDCx <日期版本号>`（如 `MDCx 20261022`；2026-10-22 起不再带展示版本号与括号），日期取自**软件源代码**的 `mdcx/consts.py` `LOCAL_VERSION`（发版流程先 bump 它、再打同名的纯数字 tag，故与 tag 同源，标题日期 / tag / 正文 changelog 段日期三者一致；补发旧 tag、源码已 bump 到更晚日期时工作流告警并按 tag 取）；标题只给人看（客户端只读 `tag_name`，`parse_release_version` 解析不出 `X.Y` 段时按其设计退回「只比日期」，日期本就是本项目的版本比较依据），改名不影响自动更新，格式由 `tests/test_py315_release_workflow.py::test_asset_names_and_release_title` 与 `…::test_release_title_date_comes_from_source_code` 钉住；macOS DMG 按架构命名，`overwrite: true` 故重跑只覆盖同名资产；Windows zip 版走 `package-trawl.yml` 单独管道。tag 必须纯数字（`check_version` 取 `tag_name.isdigit()`），且客户端只读 `tag_name` 不解析资产名——所以展示版本号段随便加也不影响自动更新。资产名同时写在 `docs/Development.md` 与 `tests/test_py315_release_workflow.py::_EXPECTED_ASSETS`，改一处要同步三处。发版前确认 consts.py 的 LOCAL_VERSION 与 changelog 当天日期段一致、VERSION_NAME 与 pyproject/uv.lock 一致（bump.py 见上）。原 3.13 主流程 `release.yml`→`build-py313.yml` 与 `build-windows.yml` / `build-linux.yml` 已于 2026-09-28 删除；`build-py314.yml` 已于 2026-10-21 随 3.15 迁移删除（**发版路径自始至终只有一条**：两条流程并存会共用纯数字 tag 命名空间且都 `overwrite: true`，同时发版会互相把对方的包刷掉、把 release 顶到 `/releases` 列表第一条，用户会下到错版本的一体包）；macOS Intel（`macos-15-intel` / x86_64）那条构建腿已于 2026-10-20 一并退役（macOS 放弃 x86_64），**矩阵项、产物核对项、Create Release 步骤三处必须同删**，只删矩阵项会因核对项永远缺 `dist/MDCx-x86_64.dmg` 而 exit 1、卡死全平台发版（守卫：`test_macos_intel_leg_is_gone`）。**Release 正文（changelog 同日期段）只能按文件写**（2026-10-22 修）：不得经 step output 塞进 `svenstaro/upload-release-action` 的 `body` 输入——runner 会把 JS action 的每个 `with:` 输入变成一个 `INPUT_*` 环境变量，Linux 单个环境变量上限 128 KiB（`MAX_ARG_STRLEN`），changelog 改按日期分段后单段可达 340+ KiB，一超限 node 进程都起不来（E2BIG，报 "Argument list too long"），发版在第一个 Create Release 就崩、而三个平台的包已传上去，留下无正文的半成品 Release。做法：changelog 落盘成 `release-notes.md`（只回 `date`/`notes_file` 小字段），最后一步用 runner 自带的 `gh release edit --notes-file` 写正文（`svenstaro/upload-release-action@v2` 无 `body_file` 输入）；该步必须排在三个 Create Release **之后**（svenstaro 每次都用 `body` 覆盖正文）；**正文另有 125,000 字符硬上限**（超了 API 422 "body is too long"），changelog 单段可达近 30 万字符（`## 2026-10-20` 那段 298,401 字符），故写入前按行截到 120,000 字符并注明完整内容在 `docs/Changelog.md` 的对应日期段；守卫见 `tests/test_py315_release_workflow.py::test_release_notes_go_through_file_not_action_input` / `…::test_release_notes_respect_github_body_length_limit` / `…::test_release_notes_step_runs_after_all_create_release_steps`。
-  - **Actions 版本**：Node 20 已于 2025-09-19 弃用，`actions/cache@v4` 在 runner 上会刷 deprecation 警告（不影响成败）。本仓库统一用 `actions/cache@v6`（v5 起转 node24 runtime，v6 是 ESM 迁移，输入 `path`/`key` 未变），最低要求 runner ≥ 2.327.1——本仓库全为 GitHub 托管 runner，无自建，故无风险。
+- 只有「字符串动态导入」才必须显式 `--hidden-import`（函数体内的静态 import 会被正常收集）。`tests/test_build_hidden_imports.py` 哨兵锁定全仓动态导入 ⊆ hidden-import，CI Windows job 有 PyInstaller 冒烟。
+- **一体包硬失败后，所有调用 `scripts/build.py` 的工作流必须先 `fetch_sr_tools`**（`tests/test_sr_bundling.py::test_packaging_workflows_fetch_sr_tools_before_build` 锁顺序）。目录存在但缺 realesrgan / waifu2x 子目录同样硬失败。
+- **一体包内置资源的运行时查找必须 fail-loud**：①查找失败给原因码并打结论日志，只有冻结运行（`sys._MEIPASS` 非空）且平台属于 `_SR_BUNDLED_PLATFORMS`（Windows/Linux；macOS 不内嵌属设计）却找不到才算异常；②释放到 userdata 后校验可执行文件真的落盘；③清理旧目录**禁用 `shutil.rmtree(..., ignore_errors=True)`**（Windows 上被占用文件被静默吞掉后紧接着 copytree 必抛 FileExistsError），改用 `onexc` 收集失败项（只读属性先 chmod 再删）后抛错并点名。回归在 `tests/test_super_resolution.py`（10 条）。
+- EXCLUDED_MODULES 中 rich/typer 只供构建/CLI。Windows 上 curl_cffi.libs 需显式 `--add-binary`。
+- **GitHub Actions 两坑**：①runner 标签会整体下线（macos-13 已关闭，macos-15-intel 已于 2027 秋整体退役，本仓库不再用 macOS Intel runner）；②`astral-sh/setup-uv` 无裸主版本浮动标签（写 `@v10` 报错，须全版本号）。
+- **Release 发版**：唯一工作流 `build-py315.yml`。推纯数字 tag `2*` 自动发正式版，或 `workflow_dispatch` 手动补发（tag 留空取 `consts.py::LOCAL_VERSION`，prerelease 只对手动触发生效）。资产名 `MDCx-<tag>-<平台>-<arch>-<40位sha>.<exe|dmg>`，Release 标题 `MDCx <日期版本号>`。tag 必须纯数字（`check_version` 取 `tag_name.isdigit()`），客户端只读 `tag_name` 不解析资产名。macOS DMG 按架构命名，`overwrite: true` 故重跑只覆盖同名资产。Windows zip 版走 `package-trawl.yml` 单独管道。
+- **Release 正文只能按文件写**（2026-10-22 修）：不得经 step output 塞进 action 的 `body` 输入。runner 会把每个 `with:` 变成 `INPUT_*` 环境变量，Linux 单个环境变量上限 128 KiB，正文一超限 node 进程起不来 → publish-release 在第一个 Create Release 就崩，而包已传上去，留下没正文的半成品 Release。改用 `gh release edit --notes-file`。
+- **Actions 版本**：Node 20 已于 2025-09-19 弃用，`actions/cache@v4` 会刷 deprecation 警告（不影响成败）。本仓库统一 `actions/cache@v6`（v5 起 node24 runtime，v6 是 ESM 迁移），最低要求 runner ≥ 2.327.1（全为 GitHub 托管 runner，无自建）。
+
+## 版本号与配置迁移
+
+- **版本号纪律**：`LOCAL_VERSION` 领先当天是既定口径、不是缺陷（用户 2026-10-19 明示，不许提醒、不许顺手改）。`LOCAL_VERSION` 大于当天日期、多个展示版本号共用同一 `LOCAL_VERSION`、同 tag 复用 `overwrite: true` 重建 Release、`check_version()` 取数字 tag 最大值 —— 这四类日期/版本疑问一律先问用户，别写进文档、changelog 或 commit message。真正要守的只有版本号同步点一致（`scripts/bump.py --check` + `tests/test_version_consistency.py` + `tests/test_version_metadata.py`）。
+- 提交前把变更写进当天日期段；用 `scripts/bump.py --version`。
+- bump 升展示版本号有坑：LOCAL_VERSION 未变会误报「版本号替换失败」，需手改三处。
+- Windows 跑 `bump.py` 需设 `PYTHONIOENCODING` 并 `stdout.reconfigure`。
+- 「已发版」判据 = 数字 tag 已推送。
+- **`config_version` 永久固定为 2**（用户 2026-10-19 定规）。三个版本点必须一致：`migrations.py::CURRENT_CONFIG_VERSION`、`Config.config_version` 默认值、`resources/config/default_config.json`，由 `tests/test_config_conversion.py::test_config_version_frozen_at_two_everywhere` 钉死。
+- **连带后果：`config_version` 不能再当迁移判据**。`_migrate_main_mode()` 原本判 `version >= 3` 恒假 → 每次启动都重迁 → 选了分离/视频/更新的用户连开三次软件被改成「读取模式」。现为结构性判据 `_SEPARATE_MODE_KEYS`（`separate_success_file_move` / `separate_failed_file_move` / `separate_success_file_rename` / `separate_del_empty_folder`，是真模型字段、随 save 落盘、也会被 `Config.update()` 的 `separate_*` 继承分支补上）。**规律：版本号一旦冻结（或不可靠），一切依赖它的迁移判据都要换成结构性判据 —— 判据和它的前提必须一起改。**
+- **2026-10-19 回退记录**（`git revert b04e2ec`，只退「旧配置自动升级」那一块）：已删除的符号（不要照着记忆去找）= `Config.factory_defaults()`、`migrations.backfill_missing_keys()` / `_migrate_missing_keys()`、`NEW_LIST_ITEMS` / `_ensure_list_items()` / `_migrate_new_list_items()`、`ConfigManager._needs_upgrade_persist()`，以及 `tests/test_config_auto_upgrade.py` 整个删除。回退代价 = 旧配置缺失的顶层键与列表新增项不再自动补齐、升级结果不再写回磁盘。教训 = 取「字段声明层的默认值」只能遍历 `Config.model_fields`，**绝不能用 `Config().model_dump()`**（`model_post_init` 会调 `ensure_type_field_configs()` 把 `type_field_configs` 填成 7 组，覆盖用户自定义）。仍未被回退波及的更早成果 = `load_config.py` 里 `checkBox_ignore_duanju` / `checkBox_ignore_dongman` 回填、`Config.download_files` 出厂默认里的 `IGNORE_SUREN` / `IGNORE_DONGMAN`、`default_config.json` 里的 `ignore_suren` / `ignore_dongman`（来自 `aa2151f`），`_normalize_type_field_config()` 回退取**有序** `type_sites`（不能用 `list(type_site_set)`）（来自 `58faf8e`）。教训 = 撤销一批范围不明的工作区改动一律用 `git revert --no-commit <sha>` 让 Git 自己算，复现的 diff 必须逐条核对「这段是哪个提交引入的」。
+- **功能开关类配置项不得充当「逃生通道」的过滤器**：「当前配置」下拉框必须列出配置目录下**每一个** `.json`，不做任何有效性过滤（`load()` 在 errors 时会 `switch_to_failed_session()` 切到 `_failed.json`，下拉框是用户唯一切回通道）。`list_configs()` 只列 `.json`、不做有效性过滤、目录读不到时 `OSError` 兜底返回 `[]`、按文件名排序。
+- **尚未落地（2026-10-19 记录，别当成已修）**：①`load_config()` 的填表仍在 `if errors: switch_to_failed_session(); return` 之后（`load_config.py:91-103`），必须把填表提到 errors 分支之前，届时可抽成 `_refresh_config_file_combos()`（**该函数目前并不存在**，曾有文档写成「已抽成」属未兑现描述）。②下标查找仍是裸 `all_config_files.index("config.json")`（`load_config.py:102`），目录里没有 config.json 时会 ValueError，应改「当前配置 → config.json → 首项 → 清空」逐级兜底。教训 = 凡是「失败时切到临时文件保护」的设计，都必须把「切回去」的 UI 通道放在失败分支之前构建。
+- **⚠️ 互调型递归必须自带重入保护，终止条件不能建立在「下一次外部副作用恰好生效」上**（2026-10-19 实战，诊断已完成、修复尚未落地，勿当成已修）：`load_config()` 结尾在「读不到配置文件」时调 `self.pushButton_init_config_clicked()`，后者 `manager.reset()` 完又调回 `self.load_config()`，终止只靠「第二轮 `os.path.exists(config_path)` 变成 True」，而 `reset()` 补出来的文件不保证与 config_path 同一个 → else 分支永远成立 → 互调约百次 → `RecursionError`。拟用修法 = 回调前置 `_xxx_in_progress` 标志，第二轮若前置条件仍不满足就只做一次兜底然后 return；代码里目前**没有** `_creating_config` 标志。三条配套纪律 = ①判定互调是否真循环不要看栈尾（先把可疑的配置/输入单独喂给最深那层函数复现）②一处崩溃可能长期掩盖另一处（别以为「不崩了」就是修完了）③本地状态文件会被探针污染（仓库根未跟踪的 `MDCx.config` 曾残留 Temp 目录路径，排查「启动即崩」前先 `Get-Content MDCx.config` 看它指向哪）。
+- **配置加载路径上的对象构造必须「无前置条件」**：`Computed()` 在 `ConfigManager.load()` 里被**同步**构造，而 `manager = ConfigManager()` 是**模块级实例化** → 任何在 `Computed()` 里构造的外部客户端构造失败都不得抛异常（否则第一次抛错被 load() 的 except 抓住 → 回退 `_replace_config(Config())` → 用同样坏的输入再抛一次 → 无人接管 → 模块导入失败 → 软件起不来）。实例 `LLMClient.__init__` 原先无条件 `AsyncOpenAI(api_key=...)`，`llm_key` 为空（出厂默认空）时 OpenAI SDK 抛 `OpenAIError: Missing credentials`。**修法不是给密钥塞占位符，而是缺凭据就不构造客户端**（`self.client: ... | None = None`，`close()` 加空值保护，`ask()` 打可执行提示并返回 None）。推广检查清单 = 改动 `Computed.__init__` 或其下游构造链时逐个问「它需要的凭据/网络/文件，用户没配时会抛吗」，会抛就改成惰性或兜底。**判据：可选功能（LLM 翻译、Emby、同步服务）的凭据永远不能是启动前置条件。**
+- 用户在安装目录自己维护多个并列配置 json（`actor.json` / `default.json` / `studios.json` / `theporndb.json` + 各 `*bak.txt`），是针对不同命名方式/刮削网站的独立配置，不是出厂数据文件。①在用户安装目录看到同名 json 不要凭仓库同名文件断定是数据文件，先看有没有 `config_version` / `main_mode` 这类配置字段。②`list_configs()` 无差别列出目录内所有 `.json` / `.ini` 供「切换配置」选用是既有设计不是缺陷，没有用户要求不要动。
+- 手工改用户真配置按**字节级单行替换**（`ReadAllText` / `WriteAllText` + `UTF8Encoding($false)`，无 BOM、纯 CRLF），改完逐项回验：JSON 可解析、`main_mode` 等行为字段未变、键集合一致、差异行只有目标行、CRLF 计数不变。
+
+## 通用纪律
+
+- 把常量/枚举值当判据时，改那个值必须连带 grep 所有读它的地方。没有幂等保护的迁移就是定时炸弹 —— 判据失效时不报错，几个月后以「我的设置怎么变了」出现。
+- 写死数字前 grep 代码核实。高频漂移锚点：默认网站源顺序、代理域名列表、命名变量表、设置 Tab 名、字段优先级数、演员库列、指纹池、主窗口行数。README 爬虫数四处同步，Features.md 标题是独立第五处。
+- 长时间任务标准做法：后台终端 + checkpoint 断点续传（state 落盘，后台终端 1 小时上限连 wrapper 一起回收）+ 分批处理批间落盘 + wrapper 45-50 分钟自重启。进度看落盘文件，不看终端日志（stdout 全缓冲可能 0 字节假象）。
+- 功能移除类需求先调研证据再答：查活跃度、底层共享依赖、移除成本。用户转述与代码证据矛盾时以代码为准。
 
 ## 日亚 ASIN 数据库与校验方法论
 
-- Date: 2026-09-02（治理工程收官重组）
-- Category: 排错调试
-- Instructions:
-  - **证据强度排序**：tenhow cid 结构化映射 > EAN/JAN 条码 > 标题 NFKC 系列互含 > 图像相似度（重压缩分数带重叠，只能兜底；`_cover_similarity` 三阈值 0.82/0.86/0.70）。
-  - **软校验架构**：免验/必验按发现路径分流——条码/EAN=hard 免验、ASIN 库命中=信任免验、软匹配=v2 三步链必验（cid 旁证→标题门+真合集词一票否决（BEST/コンプリート/N時間；特典/限定版不否决）→图像兜底）；入库时序延迟到采信点；演员名兜底是错挂重灾区全链必走。出厂库权威合并：同番号覆盖用户库 5 列、用户独有保留、出厂独有追加。
-  - **待修正 sheet 三分类**：①主表已有番号一致→残留直接删；②番号不同→主表番号反查标题比对裁决；③主表未有→标题法/cid 反查裁决。批量行先按 ASIN 去重再分类。
-  - **列写入走显式列号映射/查表，不手数 index**（注记写进 ASIN 列污染 9 行实证）；入库后 sanity check `r[1]` 应是纯 ASIN。出厂库更新仍须用户明确确认。
-  - **评估库存价值先问"生产会不会走到那一步"**；裁决图遍历全部候选取最高分（同番号 digital/mono 双封面并存为真）；番号规范化预检防缩位假冲突（比对 key = (系列字母, int(数字))）；批量导入 xlsx 必须走去重入口 `save_asin_to_excel`。
-  - cid→番号规则：`^(\d*)([a-z]+)(\d+)([a-z]?)$` → `系列大写-{int:03d}`；tenhow cid 离线索引 `resources/userdata/tenhow_asin_cids.json`（36441 条）。
-  - **外部归纳数据接入先做候选顺序回归**（覆盖率掩盖顺序污染）；防污染按"顺序影响"分级（append 兜底）而非二元弃用。DMM 路由表再生后必须先全量验证死链再推生产。
-  - **DMM cid 结构**：前缀映射 + 数字双态（5 位补零 digital 与 3 位 mono 同系列可并存）+ 双路径；DMM 图床站点下架 CDN 不删对象，占位图 200+<4KB 已拒收。日亚图：SL1500 物理无条码、老商品标题半角片假名（NFKC 必做）、日亚 DVD 封与 DMM digital 封版本不同（比对天花板 ~0.62）。tenhow.net 图床 `images/{ASIN}.jpg` 与日亚 SL1500 同源免代理直取。
-  - **ASIN 校验工程散点**：①数据治理前先 `Counter` 关键列识别导入批次残留；②openpyxl 迭代中 `delete_rows` 跳行，稳定模式=读出→去重→清空重写；③javbus 搜索不识别 ASIN，正查=番号→详情页标题比对；④**合并判定禁用 or 链**——`a.get(x) or b.get(x)` 短路吞判定值；#21 再现新形态：`if dict1.pop(k, None) is not None or dict2.pop(k, None) is not None` 短路使 dict2 的 pop 副作用不执行（冷却清零漏清），凡 or 链任一侧带副作用必须先求值再合并；⑤外部 API 错误码 marker 取响应原文字面值；⑥v2 裁决链覆盖 95%+，剩余人工行给用户一句话差什么证据。
+- **证据强度排序**：tenhow cid 结构化映射 > EAN/JAN 条码 > 标题 NFKC 系列互含 > 图像相似度（重压缩分数带重叠，只能兜底；`_cover_similarity` 三阈值 0.82 / 0.86 / 0.70）。
+- **软校验架构**：条码/EAN = hard 免验；ASIN 库命中 = 信任免验；软匹配 = v2 三步链必验（cid 旁证 → 标题门 + 真合集词一票否决（BEST/コンプリート/N時間；特典/限定版不否决）→ 图像兜底）。入库时序延迟到采信点。演员名兜底是错挂重灾区，全链必走。
+- **出厂库权威合并**：同番号覆盖用户库 5 列，用户独有保留，出厂独有追加。
+- **待修正 sheet 三分类**：①主表已有番号一致 → 残留直接删；②番号不同 → 主表番号反查标题比对裁决；③主表未有 → 标题法 / cid 反查裁决。批量行先按 ASIN 去重再分类。
+- **列写入走显式列号映射/查表，不手数 index**（注记写进 ASIN 列污染 9 行实证）。入库后 sanity check `r[1]` 应是纯 ASIN。出厂库更新仍须用户明确确认。
+- 评估库存价值先问「生产会不会走到那一步」。裁决图遍历全部候选取最高分（同番号 digital/mono 双封面并存为真）。番号规范化预检防缩位假冲突（比对 key = (系列字母, int(数字))）。批量导入 xlsx 必须走去重入口 `save_asin_to_excel`。
+- cid → 番号规则 `^(\d*)([a-z]+)(\d+)([a-z]?)$` → `系列大写-{int:03d}`。tenhow cid 离线索引 `resources/userdata/tenhow_asin_cids.json`（36441 条）。
+- **外部归纳数据接入先做候选顺序回归**（覆盖率会掩盖顺序污染）。防污染按「顺序影响」分级（append 兜底）而非二元弃用。DMM 路由表再生后必须先全量验证死链再推生产。
+- **DMM cid 结构**：前缀映射 + 数字双态（5 位补零 digital 与 3 位 mono 同系列可并存）+ 双路径。
+- DMM 图床站点下架时 CDN 不删对象，占位图 200+ 且 <4KB 已拒收。
+- 日亚图 SL1500 物理无条码；老商品标题是半角片假名（NFKC 必做）；日亚 DVD 封与 DMM digital 封版本不同（比对天花板 ~0.62）。tenhow.net 图床 `images/{ASIN}.jpg` 与日亚 SL1500 同源，免代理直取。
+- **ASIN 校验工程散点**：①数据治理前先 `Counter` 关键列识别导入批次残留；②openpyxl 迭代中 `delete_rows` 跳行，稳定模式 = 读出 → 去重 → 清空重写；③javbus 搜索不识别 ASIN，正查 = 番号 → 详情页标题比对；④**合并判定禁用 or 链**（`a.get(x) or b.get(x)` 短路吞判定值；`if dict1.pop(k, None) is not None or dict2.pop(k, None) is not None` 使 dict2 的 pop 副作用不执行。凡 or 链任一侧带副作用必须先求值再合并）；⑤外部 API 错误码 marker 取响应原文字面值；⑥v2 裁决链覆盖 95%+，剩余人工行给用户一句话差什么证据。
