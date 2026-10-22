@@ -12,7 +12,17 @@ import aiofiles.os
 
 from ..base.number import remove_escape_string
 from ..config.enums import CDChar, Switch
-from ..config.extend import READ_MAIN_MODE, eff_success_file_move, eff_success_file_rename, get_runtime_main_mode
+from ..config.extend import (
+    FILE_MOVE_KEEP,
+    FILE_MOVE_OVERWRITE,
+    ORGANIZE_MAIN_MODE,
+    READ_MAIN_MODE,
+    VIDEO_MAIN_MODE,
+    eff_success_file_move,
+    eff_success_file_rename,
+    get_file_move_policy,
+    get_runtime_main_mode,
+)
 from ..config.manager import manager
 from ..consts import IS_MAC, IS_WINDOWS
 from ..log_console import log_console
@@ -135,6 +145,23 @@ async def creat_folder(
         if await aiofiles.os.path.exists(poster_new_path_with_filename):
             other.poster_path = poster_new_path_with_filename
         return True
+    # 「移动文件」策略（设置 → 高级 → 移动文件）优先于原有的「同名即报错中止」。
+    # 只在整理模式与视频模式下生效（需求指定这两个模式复用该选择）：
+    #   覆盖旧文件：目标目录已有同名文件 → 交给后面的移动阶段直接覆盖；
+    #   保留旧文件：目标目录已有同名文件 → 保留目标文件，源文件留在原目录不移动。
+    move_policy = ""
+    if get_runtime_main_mode() in (VIDEO_MAIN_MODE, ORGANIZE_MAIN_MODE):
+        move_policy = get_file_move_policy()
+    if move_policy == FILE_MOVE_KEEP:
+        other.keep_existing_target = True
+        other.dont_move_movie = True
+        LogBuffer.log().write(
+            f"\n 🍀 Movie done! (目标已存在同名文件，按「保留旧文件」策略不移动) \n 🙉 [Movie] {file_path}"
+        )
+        return True
+    if move_policy == FILE_MOVE_OVERWRITE:
+        LogBuffer.log().write(f"\n 📖 目标已存在同名文件，按「覆盖旧文件」策略覆盖：{file_new_path}")
+        return True
     json_data.title = "成功文件夹已存在同名文件!"
     LogBuffer.error().write(f"成功文件夹已存在同名文件! \n ❗️ 当前文件: {file_path} \n ❗️ 已存在: {file_new_path} ")
     return False
@@ -151,6 +178,19 @@ async def move_movie(other: OtherInfo, file_info: FileInfo, file_path: Path, fil
         await delete_file_async(file_path)
         LogBuffer.log().write(f"\n 🍀 Movie done! \n 🙉 [Movie] {file_new_path}")
         file_info.file_path = file_new_path
+        return True
+
+    # 「保留旧文件」策略：目标目录已有同名文件 → 保留目标文件，源文件留在原目录不移动。
+    # 必须挡在软链接/硬链接分支之前：那两条分支会先删掉目标文件再建链接，
+    # 保留旧文件时绝不能删既有文件。
+    if (
+        get_runtime_main_mode() in (VIDEO_MAIN_MODE, ORGANIZE_MAIN_MODE)
+        and get_file_move_policy() == FILE_MOVE_KEEP
+        and await aiofiles.os.path.exists(file_new_path)
+    ):
+        LogBuffer.log().write(
+            f"\n 🍀 Movie done! (目标已存在同名文件，按「保留旧文件」策略不移动) \n 🙉 [Movie] {file_path}"
+        )
         return True
 
     # 软链接模式开时，先删除目标文件，再创建软链接(需考虑自身是软链接的情况)
@@ -215,7 +255,13 @@ async def move_movie(other: OtherInfo, file_info: FileInfo, file_path: Path, fil
             return False
 
     # 其他情况，就移动文件
-    result, error_info = await move_file_async(file_path, file_new_path)
+    # 「覆盖旧文件」策略：目标已存在同名文件时直接覆盖（move_file_async 默认会把
+    # 旧目标改名成 _conflict_ 副本保留，那属于「保留旧文件」，不是覆盖）。
+    move_overwrite = (
+        get_runtime_main_mode() in (VIDEO_MAIN_MODE, ORGANIZE_MAIN_MODE)
+        and get_file_move_policy() == FILE_MOVE_OVERWRITE
+    )
+    result, error_info = await move_file_async(file_path, file_new_path, overwrite=move_overwrite)
     if result:
         LogBuffer.log().write(f"\n 🍀 Movie done! \n 🙉 [Movie] {file_new_path}")
         if await aiofiles.os.path.islink(file_new_path):

@@ -1848,6 +1848,15 @@ class Scraper:
             ):
                 return None, None
 
+        # 「保留旧文件」策略（设置 → 高级 → 移动文件）：目标目录已有同名文件 →
+        # 本次整单不搬动，视频与伴生文件全部保持在原目录，避免视频与图片/nfo 被拆散。
+        if other.keep_existing_target:
+            LogBuffer.log().write(
+                f"\n 📖 目标目录已存在同名文件，按「保留旧文件」策略不移动（文件保持在原目录）：{file_new_path}"
+            )
+            await save_success_list(file_path, file_path)
+            return res, other
+
         # 分离模式：确保元数据镜像目录存在
         if meta_root is not None and not skip_reorganize and meta_folder != folder_new_path:
             try:

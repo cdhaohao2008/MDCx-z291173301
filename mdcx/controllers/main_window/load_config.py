@@ -1126,6 +1126,8 @@ def load_config(self: MyMAinWindow):
             (self.Ui.checkBox_theporndb_hash, Switch.THEPORNDB_NO_HASH),
             (self.Ui.checkBox_sortmode_delpic, Switch.SORT_DEL),
             (self.Ui.checkBox_sortmode_movefile, Switch.SORT_MOVE),
+            (self.Ui.checkBox_move_overwrite, Switch.MOVE_OVERWRITE),
+            (self.Ui.checkBox_move_keep, Switch.MOVE_KEEP),
         )
 
         # 视频模式：「删除本地已下载的图片和信息文件」与「移动已下载图片和文件到新目录」
@@ -1137,6 +1139,14 @@ def load_config(self: MyMAinWindow):
             manager.config.switch_on = [item for item in switch_on if item != Switch.SORT_MOVE]
             self.Ui.checkBox_sortmode_delpic.setChecked(True)
             self.Ui.checkBox_sortmode_movefile.setChecked(False)
+
+        # 高级页「移动文件」：覆盖旧文件与保留旧文件互斥。老配置两者都没有
+        # （自动升级为都不勾选＝保持原有移动行为）；手改配置若两个都勾上，
+        # 保留更安全的「保留旧文件」、去掉「覆盖旧文件」。
+        if Switch.MOVE_OVERWRITE in switch_on and Switch.MOVE_KEEP in switch_on:
+            manager.config.switch_on = [item for item in switch_on if item != Switch.MOVE_OVERWRITE]
+            self.Ui.checkBox_move_overwrite.setChecked(False)
+            self.Ui.checkBox_move_keep.setChecked(True)
 
         # 定时刮削设置
         if Switch.TIMED_SCRAPE in switch_on:

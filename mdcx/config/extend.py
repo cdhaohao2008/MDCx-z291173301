@@ -61,6 +61,12 @@ SEPARATE_META_EXTS = frozenset({".nfo", ".jpg", ".jpeg", ".png", ".webp", ".strm
 若跟随视频留在刮削目录会与「为本地视频文件生成STRM链接文本」的存放位置冲突。
 """
 
+FILE_MOVE_OVERWRITE = "overwrite"
+"""文件移动策略：目标目录已有同名文件时，用被移动文件直接覆盖目标文件。"""
+
+FILE_MOVE_KEEP = "keep"
+"""文件移动策略：目标目录已有同名文件时，保留目标文件，被移动文件留在原目录。"""
+
 
 _runtime_main_mode: int | None = None
 """运行时刮削模式覆盖：仅在本次运行内生效，绝不写回配置文件。
@@ -133,6 +139,35 @@ def is_video_move_companions_enabled() -> bool:
     配置层已归一：两个都勾上时保留原有的 sort_del、去掉 sort_move。
     """
     return get_runtime_main_mode() == VIDEO_MAIN_MODE and Switch.SORT_MOVE in manager.config.switch_on
+
+
+def get_file_move_policy() -> str:
+    """文件移动冲突策略（设置 → 高级 → 移动文件）。
+
+    返回值：
+    - ``FILE_MOVE_OVERWRITE``（"overwrite"）：目标目录已有同名文件时，用被移动文件直接覆盖。
+    - ``FILE_MOVE_KEEP``（"keep"）：目标目录已有同名文件时，保留目标文件，被移动文件留在原目录。
+    - 空字符串：未选择任一策略，保持原有的移动行为。
+
+    「覆盖旧文件」与「保留旧文件」互斥（同一时刻只能选中一个），配置层已归一：
+    两个都勾上时保留更安全的 move_keep、去掉 move_overwrite。
+    """
+    switch_on = manager.config.switch_on
+    if Switch.MOVE_OVERWRITE in switch_on:
+        return FILE_MOVE_OVERWRITE
+    if Switch.MOVE_KEEP in switch_on:
+        return FILE_MOVE_KEEP
+    return ""
+
+
+def is_file_move_overwrite() -> bool:
+    """是否启用了「覆盖旧文件」策略。"""
+    return get_file_move_policy() == FILE_MOVE_OVERWRITE
+
+
+def is_file_move_keep() -> bool:
+    """是否启用了「保留旧文件」策略。"""
+    return get_file_move_policy() == FILE_MOVE_KEEP
 
 
 def should_generate_strm(meta_root: Path | None, skip_reorganize: bool) -> bool:

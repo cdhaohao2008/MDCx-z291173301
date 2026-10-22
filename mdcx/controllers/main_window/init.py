@@ -1155,6 +1155,10 @@ def Init_Singal(self: MyMAinWindow):
     # 两枚复选框互斥（同一时刻只能选中一个；都不勾选=图片/nfo/字幕留在原目录）
     self.Ui.checkBox_sortmode_delpic.toggled.connect(self.checkBox_sortmode_delpic_changed)
     self.Ui.checkBox_sortmode_movefile.toggled.connect(self.checkBox_sortmode_movefile_changed)
+    # 高级页「移动文件」：覆盖旧文件 / 保留旧文件互斥（同一时刻只能选中一个；
+    # 都不勾选=保持原有移动行为）
+    self.Ui.checkBox_move_overwrite.toggled.connect(self.checkBox_move_overwrite_changed)
+    self.Ui.checkBox_move_keep.toggled.connect(self.checkBox_move_keep_changed)
     for _lbl in (
         self.Ui.label_11,
         self.Ui.label_organize_mode,

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import aiofiles.os
 
-from ..config.extend import is_in_success_folder
+from ..config.extend import FILE_MOVE_KEEP, FILE_MOVE_OVERWRITE, get_file_move_policy, is_in_success_folder
 from ..config.manager import manager
 from ..models.log_buffer import LogBuffer
 from ..number import get_file_number
@@ -480,7 +480,13 @@ class OrganizeTransaction:
                 pass
             if same:
                 return True, ""
+            if get_file_move_policy() == FILE_MOVE_KEEP:
+                # 「保留旧文件」：目标位置已有同名文件 → 保留目标文件，
+                # 被移动的源文件留在原目录不移动（不覆盖、不删除任何一方）。
+                LogBuffer.log().write(f"\n 📖 目标位置已存在同名文件，按「保留旧文件」策略不移动：{src}")
+                return True, ""
             # 保留目标位置已有文件，失败回滚时恢复；成功后删除备份。
+            # 「覆盖旧文件」策略下同样走这条路径：备份后覆盖，commit 时删除备份。
             backup = dst.with_name(f"{dst.stem}{_ORGANIZE_BACKUP_MARK}{time.time_ns()}{dst.suffix}")
             backup_ok, backup_error = await self._move_once(dst, backup)
             if not backup_ok:
@@ -842,8 +848,11 @@ async def organize_files(
             if is_in_success_folder(dst, success_folder) and await _exists_settled(dst):
                 # 目标位置已被「成功输出目录」内的既有文件占用 → 既有文件不移动、
                 # 不覆盖、不删除，本次也不搬动新文件（宁可留在原地也不动既有产物）
-                LogBuffer.log().write(f"\n 📖 目标位置已被成功输出目录内的文件占用，既有文件不移动、不覆盖：{dst}")
-                continue
+                if get_file_move_policy() != FILE_MOVE_OVERWRITE:
+                    LogBuffer.log().write(f"\n 📖 目标位置已被成功输出目录内的文件占用，既有文件不移动、不覆盖：{dst}")
+                    continue
+                # 「覆盖旧文件」策略：允许覆盖成功输出目录内的既有文件
+                LogBuffer.log().write(f"\n 📖 目标位置已被成功输出目录内的文件占用，按「覆盖旧文件」策略覆盖：{dst}")
             kept.append((src, dst))
         plan = kept
 

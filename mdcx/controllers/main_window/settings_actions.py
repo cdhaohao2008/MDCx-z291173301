@@ -171,6 +171,17 @@ class SettingsActionsMixin:
         if checked:
             self.Ui.checkBox_sortmode_delpic.setChecked(False)
 
+    # 高级页-文件移动策略互斥：覆盖旧文件 / 保留旧文件只能同时选中一个。
+    # 勾选其一自动去勾另一（toggled(False) 不动作，故无信号回环）；
+    # 两枚都不勾选是合法中间态：保持原有移动行为（目标同名即报错中止）。
+    def checkBox_move_overwrite_changed(self, checked):
+        if checked:
+            self.Ui.checkBox_move_keep.setChecked(False)
+
+    def checkBox_move_keep_changed(self, checked):
+        if checked:
+            self.Ui.checkBox_move_overwrite.setChecked(False)
+
     # 设置-刮削目录-同意清理(我已知晓/我已同意)
     def checkBox_i_agree_clean_clicked(self):
         if self.Ui.checkBox_i_understand_clean.isChecked() and self.Ui.checkBox_i_agree_clean.isChecked():

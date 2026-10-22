@@ -601,5 +601,10 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     # 保留原有的 sort_del（不改变旧行为），去掉新开关 sort_move。
     _ensure_switch_exclusive(data, "sort_del", "sort_move")
 
+    # 文件移动策略（高级 → 移动文件）：「覆盖旧文件」与「保留旧文件」互斥
+    # （同一时刻只能选中一个）。老配置两者都没有，默认都不勾选＝保持原有行为；
+    # 手改配置若两个都勾上，保留更安全的 move_keep（不覆盖已有文件），去掉 move_overwrite。
+    _ensure_switch_exclusive(data, "move_keep", "move_overwrite")
+
     data["config_version"] = CURRENT_CONFIG_VERSION
     return warnings

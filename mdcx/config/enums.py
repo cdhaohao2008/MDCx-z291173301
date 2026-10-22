@@ -390,6 +390,10 @@ class Switch(Enum):
     SORT_DEL = "sort_del"
     SORT_MOVE = "sort_move"
     """视频模式：把本地已下载的图片/信息/字幕等伴生文件按番号关联搬到新目录。"""
+    MOVE_OVERWRITE = "move_overwrite"
+    """移动文件时目标目录已有同名文件：用被移动文件直接覆盖目标目录的同名文件。"""
+    MOVE_KEEP = "move_keep"
+    """移动文件时目标目录已有同名文件：保留目标目录的同名文件，被移动文件留在原目录不移动。"""
 
     QT_DIALOG = "qt_dialog"
     THEPORNDB_NO_HASH = "theporndb_no_hash"
@@ -421,6 +425,8 @@ class Switch(Enum):
             "Show Dialog Stop Scrape",
             "Sort Del",
             "Sort Move",
+            "Move Overwrite",
+            "Move Keep",
             "Qt Dialog",
             "Theporndb No Hash",
             "Hide Dock",

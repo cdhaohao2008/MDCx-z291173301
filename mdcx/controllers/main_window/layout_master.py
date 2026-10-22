@@ -454,6 +454,10 @@ class LayoutMasterMixin:
         # **之后**：它末尾那批 gridLayout_20.activate() 会把两行重新排一遍，提前
         # 量到的是过期几何；且它自带早退分支，不能从里面挂钩子。
         self._sync_advanced_page_rest_interval_align(self._scroll_stretch_extra(self._adv_scroll) > 0)
+        # 高级页：「移动文件」行的「覆盖旧文件」「保留旧文件」与「界面外观」行的
+        # 「隐藏边框（美观样式）」「暗黑模式」严格上下对齐（锚点两枚不动）。
+        # 必须排在上面两个方法之后：它要量锚点行两枚复选框的终态坐标。
+        self._sync_advanced_page_move_file_align()
 
         # ============ page_setting / 演员页: 两行控件对齐到各自基准线 ============
         # 同样排在通用拉伸之后：本方法先落设计几何再按最大化分支覆盖。
@@ -942,6 +946,68 @@ class LayoutMasterMixin:
             lay_r.activate()
             ui.gridLayout_20.invalidate()
             ui.gridLayout_20.activate()
+
+    def _sync_advanced_page_move_file_align(self) -> None:
+        """高级页：「移动文件」行的两枚复选框与「界面外观」行严格上下对齐。
+
+        需求：「覆盖旧文件」与「隐藏边框（美观样式）」严格上下对齐、「保留旧文件」
+        与「暗黑模式」严格上下对齐，且锚点两枚自身位置保持不变。
+
+        做法：新行与「界面外观」行同构（QFrame → 普通子 QWidget → QHBoxLayout），
+        两行同处 gridLayout_20 的 col1，行左缘天然相等；只要把新行前导项
+        「覆盖旧文件」钉成与锚点前导项「隐藏边框（美观样式）」等宽，末位
+        「保留旧文件」就精确落在「暗黑模式」的竖线上（末位项吃掉行内全部余量，
+        自身左对齐绘制）。锚点行一个字都不动：只读它的实测宽度，不改它的约束。
+
+        容器宽度跟着锚点容器走（两行行内几何完全一致）；放不下时（剩余空间不足
+        末位项的 sizeHint，会裁字）宁可把容器加宽让字显示完整，也绝不压窄
+        末位项——压窄会改变它的左缘，需求就破了。容器是 frame 的普通子 QWidget，
+        允许与锚点容器一样略微溢出 frame（锚点容器本身就是 550 设计宽）。
+        """
+
+        ui = self.Ui
+        host = ui.gridLayoutWidget_20
+        if not host.isVisibleTo(self):
+            return
+
+        lw_c = ui.layoutWidget5  # 锚点容器（界面外观行）
+        lay_c = ui.horizontalLayout_62  # 锚点行内布局
+        lead_c = ui.checkBox_hide_window_title  # 锚点第 1 项（宽度即新行前导项的目标宽度）
+        lw_m = getattr(ui, "layoutWidget_move_file", None)  # 新行容器
+        lay_m = getattr(ui, "horizontalLayout_move_file", None)  # 新行行内布局
+        over = getattr(ui, "checkBox_move_overwrite", None)  # 新行第 1 项
+        keep = getattr(ui, "checkBox_move_keep", None)  # 新行末位项
+        if lw_m is None or lay_m is None or over is None or keep is None:
+            return
+
+        # 锚点行必须先落定：钉宽只改约束不重排，末位项的坐标要等布局真正
+        # activate 之后才是终态。
+        lay_c.invalidate()
+        lay_c.activate()
+
+        # 新行容器与锚点容器同起点同宽：两行的行内几何完全一致
+        if lw_m.width() != lw_c.width():
+            lw_m.setGeometry(lw_m.x(), lw_m.y(), lw_c.width(), lw_m.height())
+        lay_m.invalidate()
+        lay_m.activate()
+
+        margins = lay_m.contentsMargins()
+        spacing = lay_m.spacing()
+        # 末位「保留旧文件」要落在「暗黑模式」的竖线上 → 前导项宽度取锚点前导项宽度
+        pin = lead_c.width()
+        need = margins.left() + pin + spacing + keep.sizeHint().width() + margins.right()
+        if lw_m.width() < need:
+            # 装不下就把容器加宽（普通子 QWidget，允许略微溢出 frame），
+            # 绝不压窄末位项——压窄会改变它的左缘，需求就破了。
+            lw_m.setGeometry(lw_m.x(), lw_m.y(), need, lw_m.height())
+            lay_m.invalidate()
+            lay_m.activate()
+        ok = pin >= over.sizeHint().width()
+        if self._pin_row_lead_width(over, pin if ok else None):
+            lay_m.invalidate()
+            lay_m.activate()
+        # 末位项的最终左缘必须与「暗黑模式」一致，否则说明前导项宽度没生效
+        # （例如字体未就绪导致 sizeHint 变化），此时不强行改动锚点。
 
     def _sync_advanced_page_rest_interval_align(self, wide: bool) -> None:
         """还原态：「每次间隔」时长框右缘缩到与「间歇刮削」文件数框右缘严格对齐。
