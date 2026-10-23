@@ -48,6 +48,8 @@
 - **项目默认 Python = 3.15**（2026-10-23 起）：`requires-python = ">=3.15"`，3.14 及以下不再支持。版本声明五处同步改：`pyproject.toml`、`uv.lock` 的 `requires-python`、`requirements.txt` 头注、`README.md` 徽章、`docs/Development.md` 第 8 节；测试里的 `skipif(sys.version_info < (3, 15))` 守卫同步升版。改依赖下限仍守 cp315 wheel。
 - **本机没装 uv，用户 2026-10-21 明确不装** → 一律用 `python main.py`、`python -m pytest tests/ --tb=short -m "not network"`、`python scripts/quick_check.py`、`python scripts/check.py --skip-hook-install`。脚本自带 `resolve_tool()` 兜底退 `-m ruff` / `-m mypy`，不必改 PATH。
 - 仓库标准仍是 uv，**别把 CI 写法改成本机口径**。
+- **pre-push 钩子会命中哪个 python**：钩子按 uv → python3 → python 逐级兜底。WorkBuddy 会话的 PATH 里 `python3` 是托管版 3.13，而 `scripts/check.py` 用了 PEP 758 的 `except A, B:`（3.14+ 才支持）→ 钩子直接 SyntaxError 拦下推送，看着像代码坏了其实是解释器选错。正解：造一个 `python3` 垫片（`#!/bin/sh` + `exec "/c/Program Files/Python315/python.exe" "$@"`）临时前置到 PATH 再推，**别用 `--no-verify`**。
+- GitHub 网络：直连 `github.com:443` TCP 能连但 TLS 被 reset；本机 5915 代理对 github.com 返回 502；**Clash 7897 可用** → `git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 push origin main`。推送报 schannel「server closed abruptly」时先查是不是已经推上去了（`git ls-remote origin main` 对一下 SHA），别盲目重推。
 - 沙箱陷阱：①shell 直接调系统 python 触发 stdout 捕获异常 → 写 .bat 或 Python 包装脚本，命令内 `> file 2>&1` 落盘后再读文件；②`.bat` 里 `set VAR=value` 不传子进程 → 在 PowerShell 里先设 `$env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"`；③中文 Windows 子进程默认 GBK，控制台乱码只影响显示不影响数据；④用 `python -m ruff` / `python -m mypy` 走当前解释器。
 - pytest 成功时 conftest 的 `pytest_sessionfinish` 会 `os._exit(0)` 丢弃 stdout，**判定只认退出码**，要细节加 `--junitxml`。
 - PowerShell 7.6.7 可用（`C:\Program Files\PowerShell\7\pwsh.exe`）。曾因注册表 `HKCU:\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers` 给 pwsh.exe 打过 `~ RUNASADMIN` 导致 740 错误，已 `Remove-ItemProperty` 清除（其余 4 条 RUNASADMIN 按用户要求保留）。再报 740 先查这一层而不是重装，**别用 `-Verb RunAs`**（无头会话弹 UAC 会卡死）。
@@ -109,6 +111,8 @@
 - cmd/bat 在 chcp 65001 下中文注释会字节错位，注释用 `rem`。
 - ruff B010/B009 与 mypy attr-defined 组合写法：`obj._x = v  # type: ignore[attr-defined] # noqa: SLF001` + `getattr(obj, "_x", None)  # noqa: B009`。
 - 还原/回程类回归用「三态对比探针」定性（fresh → 最大化 → 还原，并排 dump 几何）。复现 UI 几何时不得 stub QSS。
+- QSS 里 `QComboBox` 的 `padding-right` 与 `::drop-down` 的宽度**重复占位**：QSS 样式下文本区 = 控件宽 − 左内边距 − 右内边距 − 边框 − 箭头宽（实测 102px 的框、`padding: 3px 30px 3px 8px` + 26px 箭头，文本区只剩 35px）。所以「宽度不许改、字要显示全」的正解 = 给该控件加 `#objectName` 限定规则把右内边距清零（外框宽与箭头位置都不动），不是加宽、也不是缩字号。全量改通用规则会平移所有下拉框的 sizeHint，别动。
+- 离屏平台的中文度量是退化的（4 个汉字只报 28px，真机 Microsoft YaHei UI 13px 报 52px）→ 涉及「裁字/放不下」的回归测试**别比字形宽**（会假红），比结构量：文本区右缘到箭头左缘的间隙、或钉死的 min/max 宽度。
 - `edit` 工具会静默忽略缩进差异，改完立刻 `read` 复核真实缩进。
 - **回归测试必须在撤掉修复后验证它会红**（`git stash push -- <生产文件>` → 跑 → `git stash pop`），否则排除不了假测试。写 Qt 重入类测试要注意复用 helper 会让一次重入事件被两个实例各处理一次。
 - 门禁已知遗留红（2026-10-19 实测）：`tests/test_advanced_page_tail_align.py::test_wide_nav_row_survives_deferred_stage_one[1920-1170]` 在干净树上必红，来自上游旧提交。全量门禁合格线 =「除这条外全绿」；判定时先跑干净树对照，别把自己的改动当元凶，也别顺手去「修」它（需真机逐档量几何）。
