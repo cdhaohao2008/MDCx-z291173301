@@ -114,9 +114,7 @@
   "thread_time": 1,
   "javdb_time": 10,
   "main_mode": 1,
-  "read_mode": [
-    "read_update_nfo"
-  ],
+  "read_mode": [],
   "update_mode": "c",
   "update_a_folder": "{{ actor }}",
   "update_b_folder": "{{ number }} {{ actor }}",
@@ -877,6 +875,8 @@
   "nfo_tag_studio": "片商: studio",
   "nfo_tag_publisher": "发行: publisher",
   "nfo_tag_actor": "actor",
+  "nfo_merge_enabled": false,
+  "nfo_merge_strategy": "fill_missing_only",
   "folder_name": "{{ actor }}/{{ number }}",
   "naming_file": "{{ number }}",
   "naming_media": "{% if number %}{{ number }}{% endif %}{% if title and title != number %} {{ title }}{% endif %}",

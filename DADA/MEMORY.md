@@ -222,6 +222,8 @@
 - **刮削模式值全表**（2026-10-23 起）：1 正常 / 2 分离 / 3 视频 / 4 更新 / 5 读取（只读展示）/ 6 整理 / 7 补全（本地优先、只补缺失）。新增或改动模式必须同步这些点：`config/extend.py` 常量与 `is_xxx_mode()/is_xxx_selected()`、`load_config.py` / `save_config.py` 的 `mode_mapping` 与 radio 映射、`MDCx.ui` 单选项与说明、`core/file.py` 的 `creat_folder` / `_get_folder_path` / `move_movie` 模式元组、`base/file.py::get_movie_list` 的 `include_success` 与 `.strm`、`core/scraper.py` 的断点续刮排除列表与扫描排除目录、`init.py` 提示词、软件内使用说明。
 - **番号 ↔ 伴生文件关联只在 `core/file_association.py`**（`OrganizeIndex` / `build_organize_index` / `collect_media_assets`），整理、视频、补全三种模式共用；`core/organize.py` 只保留「移动计划 + 事务 + 回滚」。改归属规则只改前者，别再往 organize.py 里加。
 - **补全模式的「先搬后补」顺序不能反**：先补字段/图片再搬，会把刚写好的 nfo 当成旧 nfo 再搬一次，补全结果被覆盖。已在成功输出目录内的文件走 `complete_inplace_locked`，只补内容不移动。
+- **补全模式下方选项 2026-10-23 已收敛**（详见 `docs/Development.md` 3.7）：删掉「允许更新 NFO 文件」「无 NFO 按正常模式重新刮削」两项（连同 `ReadMode` 的两个枚举值，旧配置由 `_migrate_read_mode_options` 清理）；NFO 合并策略删掉 `prefer_nfo` / `preserve_existing`，只剩 3 档且默认 `fill_missing_only`——它的含义已改成「本地已有值一律保留、只补本地空字段」，旧配置由 `_migrate_nfo_merge_strategy` 映射。**仍保留的已知冲突只有「按更新模式重新整理分类」**（会把文件放到成功输出目录之外、对目录内文件无效），改它之前先确认归档口径。
+- **「重新下载封面图片等文件」不存在「重下不打水印」缺陷**：下载函数每成功写出一张新图都会把对应 `*_marked` 复位为 False，`add_mark` 照常执行；给已存在图预标记 True 只是防二次水印。别按「修 bug」的思路去给它加 `READ_DOWNLOAD_AGAIN` 条件——那会让被「保留目标文件」挡住、根本没重下的旧图被重复打水印。
 
 ## 日亚 ASIN 数据库与校验方法论
 

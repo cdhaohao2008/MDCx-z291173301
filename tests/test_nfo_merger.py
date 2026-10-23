@@ -1,4 +1,9 @@
-"""NFO 合并策略测试：验证 5 种 MergeStrategy 的合并行为。"""
+"""NFO 合并策略测试：验证 3 种 MergeStrategy 的合并行为。
+
+2026-10-23 精简：删除 ``prefer_nfo``（本地信息优先）与 ``preserve_existing``
+（保留已有字段）——两者语义与「仅填补空字段」重合；``fill_missing_only`` 定为
+默认策略，含义改为「本地已有值一律保留，只把本地空着的字段用刮削值补上」。
+"""
 
 import pytest
 
@@ -46,17 +51,17 @@ def test_is_empty(value, expected):
 
 class TestMergeScalar:
     def test_both_empty(self):
-        val, src = _merge_scalar("outline", "", "", NfoMergeStrategy.PREFER_NFO)
+        val, src = _merge_scalar("outline", "", "", NfoMergeStrategy.FILL_MISSING_ONLY)
         assert val == ""
         assert src == "empty"
 
     def test_scraped_empty_nfo_has_value(self):
-        val, src = _merge_scalar("outline", "", "本地简介", NfoMergeStrategy.PREFER_NFO)
+        val, src = _merge_scalar("outline", "", "本地简介", NfoMergeStrategy.FILL_MISSING_ONLY)
         assert val == "本地简介"
         assert src == "nfo"
 
     def test_nfo_empty_scraped_has_value(self):
-        val, src = _merge_scalar("outline", "新简介", "", NfoMergeStrategy.PREFER_NFO)
+        val, src = _merge_scalar("outline", "新简介", "", NfoMergeStrategy.FILL_MISSING_ONLY)
         assert val == "新简介"
         assert src == "scraper"
 
@@ -65,26 +70,11 @@ class TestMergeScalar:
         assert val == "新简介"
         assert src == "scraper"
 
-    def test_both_have_value_prefer_nfo(self):
-        val, src = _merge_scalar("outline", "新简介", "本地简介", NfoMergeStrategy.PREFER_NFO)
-        assert val == "本地简介"
-        assert src == "nfo"
-
-    def test_both_have_value_preserve_existing(self):
-        val, src = _merge_scalar("outline", "新简介", "本地简介", NfoMergeStrategy.PRESERVE_EXISTING)
-        assert val == "本地简介"
-        assert src == "nfo"
-
-    def test_both_have_value_fill_missing_only(self):
-        """fill_missing_only："仅填补空字段"——新数据为主，两源都有值时取新数据。
-
-        原实现误与 preserve_existing 同分支（取本地旧值），与 UI 名称
-        "仅填补空字段"/models 描述/docstring 语义矛盾，导致两个选项行为完全重复
-        （全库审查 A3，测试原断言锁定的是 bug 行为，随修复反转）。
-        """
+    def test_both_have_value_fill_missing_only_keeps_local(self):
+        """fill_missing_only：本地已有值保留，刮削值只用来填本地空字段。"""
         val, src = _merge_scalar("outline", "新简介", "本地简介", NfoMergeStrategy.FILL_MISSING_ONLY)
-        assert val == "新简介"
-        assert src == "scraper"
+        assert val == "本地简介"
+        assert src == "nfo"
 
     def test_both_have_value_merge_arrays(self):
         val, src = _merge_scalar("outline", "新简介", "本地简介", NfoMergeStrategy.MERGE_ARRAYS)
@@ -93,7 +83,7 @@ class TestMergeScalar:
 
     def test_critical_field_both_empty_falls_back(self):
         """关键字段（title）两源都空时返回空但标记为 empty。"""
-        val, src = _merge_scalar("title", "", "", NfoMergeStrategy.PREFER_NFO)
+        val, src = _merge_scalar("title", "", "", NfoMergeStrategy.FILL_MISSING_ONLY)
         assert val == ""
         assert src == "empty"
 
@@ -137,8 +127,8 @@ class TestMergeArray:
         assert val == ["新标签"]
         assert src == "scraper"
 
-    def test_prefer_nfo_for_arrays(self):
-        val, src = _merge_array("tags", ["新标签"], ["本地标签"], NfoMergeStrategy.PREFER_NFO)
+    def test_fill_missing_only_for_arrays(self):
+        val, src = _merge_array("tags", ["新标签"], ["本地标签"], NfoMergeStrategy.FILL_MISSING_ONLY)
         assert val == ["本地标签"]
         assert src == "nfo"
 
@@ -158,46 +148,19 @@ class TestMergeNfoFields:
         assert result.outline == "新简介"
         assert result.tags == ["新标签"]
 
-    def test_prefer_nfo_uses_local_values(self):
-        scraped = _make_result(title="新标题", outline="新简介", tags=["新标签"], runtime="120")
-        nfo = _make_result(title="本地标题", outline="本地简介", tags=["本地标签"], runtime="")
-
-        result = merge_nfo_fields(scraped, nfo, NfoMergeStrategy.PREFER_NFO)
-
-        assert result.title == "本地标题"
-        assert result.outline == "本地简介"
-        assert result.tags == ["本地标签"]
-        # runtime 本地为空，用新数据
-        assert result.runtime == "120"
-
-    def test_fill_missing_only_preserves_all_existing(self):
-        """fill_missing_only 策略：新数据为主，刮削结果为空才从本地补。"""
-        scraped = _make_result(title="新标题", outline="", runtime="120", studio="新片商")
-        nfo = _make_result(title="本地标题", outline="本地简介", runtime="", studio="")
+    def test_fill_missing_only_keeps_local_and_fills_empty(self):
+        """fill_missing_only（默认）：本地有值保留，本地空着的字段用刮削值补。"""
+        scraped = _make_result(title="新标题", outline="新简介", runtime="120", studio="新片商")
+        nfo = _make_result(title="本地标题", outline="", runtime="", studio="")
 
         result = merge_nfo_fields(scraped, nfo, NfoMergeStrategy.FILL_MISSING_ONLY)
 
-        # 两源都有值：新数据
-        assert result.title == "新标题"
+        # 本地有值：保留本地
+        assert result.title == "本地标题"
+        # 本地为空：用刮削值补
+        assert result.outline == "新简介"
         assert result.runtime == "120"
         assert result.studio == "新片商"
-        # 刮削结果为空：从本地补
-        assert result.outline == "本地简介"
-
-    def test_preserve_existing_differs_from_fill_missing(self):
-        """preserve_existing（本地为主）与 fill_missing_only（新数据为主）标量行为相反。"""
-        scraped = _make_result(title="新标题", outline="新简介", runtime="120")
-        nfo = _make_result(title="本地标题", outline="本地简介", runtime="")
-
-        preserved = merge_nfo_fields(scraped, nfo, NfoMergeStrategy.PRESERVE_EXISTING)
-        assert preserved.title == "本地标题"
-        assert preserved.outline == "本地简介"
-        assert preserved.runtime == "120"
-
-        filled = merge_nfo_fields(scraped, nfo, NfoMergeStrategy.FILL_MISSING_ONLY)
-        assert filled.title == "新标题"
-        assert filled.outline == "新简介"
-        assert filled.runtime == "120"
 
     def test_merge_arrays_combines_tags_and_actors(self):
         """merge_arrays 策略：数组字段合并去重，标量用新数据。"""
@@ -216,7 +179,7 @@ class TestMergeNfoFields:
         """nfo 为 None 时直接返回 scraped。"""
         scraped = _make_result(title="新标题")
 
-        result = merge_nfo_fields(scraped, None, NfoMergeStrategy.PREFER_NFO)
+        result = merge_nfo_fields(scraped, None, NfoMergeStrategy.FILL_MISSING_ONLY)
 
         assert result.title == "新标题"
 
@@ -227,7 +190,7 @@ class TestMergeNfoFields:
         nfo = _make_result()
         nfo.actor_tmdb_ids = {"演员B": 456}
 
-        result = merge_nfo_fields(scraped, nfo, NfoMergeStrategy.PREFER_NFO)
+        result = merge_nfo_fields(scraped, nfo, NfoMergeStrategy.FILL_MISSING_ONLY)
 
         assert result.actor_tmdb_ids == {"演员A": 123, "演员B": 456}
 
@@ -236,7 +199,7 @@ class TestMergeNfoFields:
         scraped = _make_result(title="新标题", tags=["新标签"])
         nfo = _make_result(title="本地标题", tags=["本地标签"])
 
-        result = merge_nfo_fields(scraped, nfo, NfoMergeStrategy.PREFER_NFO)
+        result = merge_nfo_fields(scraped, nfo, NfoMergeStrategy.FILL_MISSING_ONLY)
 
         # 原始 scraped 不变
         assert scraped.title == "新标题"
@@ -254,14 +217,14 @@ class TestNfoMergeStrategyConfig:
         from mdcx.config.models import Config
 
         config = Config()
-        assert config.nfo_merge_strategy == NfoMergeStrategy.PREFER_SCRAPER
+        assert config.nfo_merge_strategy == NfoMergeStrategy.FILL_MISSING_ONLY
 
     def test_set_strategy(self):
         from mdcx.config.models import Config
 
         config = Config()
-        config.nfo_merge_strategy = NfoMergeStrategy.FILL_MISSING_ONLY
-        assert config.nfo_merge_strategy == NfoMergeStrategy.FILL_MISSING_ONLY
+        config.nfo_merge_strategy = NfoMergeStrategy.MERGE_ARRAYS
+        assert config.nfo_merge_strategy == NfoMergeStrategy.MERGE_ARRAYS
 
     def test_serialization(self):
         from mdcx.config.models import Config
@@ -274,18 +237,17 @@ class TestNfoMergeStrategyConfig:
     def test_deserialization(self):
         from mdcx.config.models import Config
 
-        data = {"nfo_merge_strategy": NfoMergeStrategy.PREFER_NFO}
+        data = {"nfo_merge_strategy": NfoMergeStrategy.PREFER_SCRAPER}
         config = Config.model_validate(data)
-        assert config.nfo_merge_strategy == NfoMergeStrategy.PREFER_NFO
+        assert config.nfo_merge_strategy == NfoMergeStrategy.PREFER_SCRAPER
 
 
 def test_nfo_merge_strategy_enum_values():
-    """NfoMergeStrategy 枚举值与预期一致。"""
+    """NfoMergeStrategy 只剩 3 档（2026-10-23 精简）。"""
     assert NfoMergeStrategy.PREFER_SCRAPER.value == "prefer_scraper"
-    assert NfoMergeStrategy.PREFER_NFO.value == "prefer_nfo"
     assert NfoMergeStrategy.MERGE_ARRAYS.value == "merge_arrays"
-    assert NfoMergeStrategy.PRESERVE_EXISTING.value == "preserve_existing"
     assert NfoMergeStrategy.FILL_MISSING_ONLY.value == "fill_missing_only"
+    assert [item.value for item in NfoMergeStrategy] == ["prefer_scraper", "merge_arrays", "fill_missing_only"]
 
 
 # ---------- 本地NFO合并策略勾选框（should_merge_nfo）----------
@@ -298,9 +260,7 @@ class TestShouldMergeNfo:
     @pytest.mark.parametrize(
         "strategy",
         [
-            NfoMergeStrategy.PREFER_NFO,
             NfoMergeStrategy.MERGE_ARRAYS,
-            NfoMergeStrategy.PRESERVE_EXISTING,
             NfoMergeStrategy.FILL_MISSING_ONLY,
         ],
     )
@@ -309,7 +269,7 @@ class TestShouldMergeNfo:
 
     # ---- 失败：勾选框未勾选 → 一律不合并，直接用新数据覆盖 ----
     def test_failure_disabled_skips_merge(self):
-        assert should_merge_nfo(enabled=False, strategy=NfoMergeStrategy.PREFER_NFO, nfo_exists=True) is False
+        assert should_merge_nfo(enabled=False, strategy=NfoMergeStrategy.FILL_MISSING_ONLY, nfo_exists=True) is False
 
     # ---- 失败：策略为 PREFER_SCRAPER（全新数据优先）→ 无需读本地 NFO ----
     def test_failure_prefer_scraper_skips_merge(self):
@@ -317,23 +277,23 @@ class TestShouldMergeNfo:
 
     # ---- 失败：本地无 NFO 文件 → 无内容可合并 ----
     def test_failure_no_local_nfo_skips_merge(self):
-        assert should_merge_nfo(enabled=True, strategy=NfoMergeStrategy.PREFER_NFO, nfo_exists=False) is False
+        assert should_merge_nfo(enabled=True, strategy=NfoMergeStrategy.FILL_MISSING_ONLY, nfo_exists=False) is False
 
     # ---- 失败：skip_merge（NFO 库表单编辑保存）→ 跳过合并 ----
     def test_failure_skip_merge_flag(self):
         assert (
             should_merge_nfo(
                 enabled=True,
-                strategy=NfoMergeStrategy.PREFER_NFO,
+                strategy=NfoMergeStrategy.FILL_MISSING_ONLY,
                 nfo_exists=True,
                 skip_merge=True,
             )
             is False
         )
 
-    # ---- 回归：勾选（enabled=True）时按下拉框策略合并，行为与改造前一致 ----
+    # ---- 回归：勾选（enabled=True）时按下拉框策略合并 ----
     def test_regression_enabled_preserves_old_behavior(self):
-        assert should_merge_nfo(enabled=True, strategy=NfoMergeStrategy.PREFER_NFO, nfo_exists=True) is True
+        assert should_merge_nfo(enabled=True, strategy=NfoMergeStrategy.FILL_MISSING_ONLY, nfo_exists=True) is True
         assert should_merge_nfo(enabled=True, strategy=NfoMergeStrategy.MERGE_ARRAYS, nfo_exists=True) is True
 
 
@@ -368,5 +328,30 @@ class TestNfoMergeEnabledConfig:
         from mdcx.config.models import Config
 
         # 旧配置无 nfo_merge_enabled 字段 → 默认不勾选（不合并）
-        config = Config.model_validate({"nfo_merge_strategy": NfoMergeStrategy.PREFER_NFO})
+        config = Config.model_validate({"nfo_merge_strategy": NfoMergeStrategy.FILL_MISSING_ONLY})
         assert config.nfo_merge_enabled is False
+
+
+# ---------- 旧配置升级 ----------
+
+
+class TestLegacyStrategyMigration:
+    """已删除的两个策略在加载旧配置时自动映射到「仅填补空字段」。"""
+
+    @pytest.mark.parametrize("legacy", ["prefer_nfo", "preserve_existing"])
+    def test_legacy_strategy_maps_to_fill_missing_only(self, legacy):
+        from mdcx.config.migrations import migrate_config_data
+        from mdcx.config.models import Config
+
+        data = {"nfo_merge_strategy": legacy}
+        migrate_config_data(data)
+        assert data["nfo_merge_strategy"] == "fill_missing_only"
+        config = Config.model_validate(data)
+        assert config.nfo_merge_strategy == NfoMergeStrategy.FILL_MISSING_ONLY
+
+    def test_kept_strategy_untouched(self):
+        from mdcx.config.migrations import migrate_config_data
+
+        data = {"nfo_merge_strategy": "merge_arrays"}
+        migrate_config_data(data)
+        assert data["nfo_merge_strategy"] == "merge_arrays"

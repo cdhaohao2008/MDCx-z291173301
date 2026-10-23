@@ -190,12 +190,13 @@ def complete_merge_strategy() -> NfoMergeStrategy:
     """补全模式写入 NFO 时使用的合并策略。
 
     补全模式的核心语义是「本地已有优先，只补缺失」，因此未勾选
-    「本地NFO合并及策略」时固定用 :attr:`NfoMergeStrategy.PREFER_NFO`；
-    勾选后按用户在补全模式下方选择的策略执行。
+    「本地NFO合并及策略」时固定用 :attr:`NfoMergeStrategy.FILL_MISSING_ONLY`
+    （本地已有值一律保留，只填本地空着的字段）；勾选后按用户在补全模式下方
+    选择的策略执行（默认档同样是「仅填补空字段」）。
     """
     if manager.config.nfo_merge_enabled:
         return manager.config.nfo_merge_strategy
-    return NfoMergeStrategy.PREFER_NFO
+    return NfoMergeStrategy.FILL_MISSING_ONLY
 
 
 def is_video_move_companions_enabled() -> bool:

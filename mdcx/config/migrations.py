@@ -26,6 +26,46 @@ _LEGACY_MINNANO_CLEAN_RULES = {
 _TASK_MODE_SWITCHES = ("task_store_local", "task_store_netdisk")
 """任务模式「本地存储文件 / 网盘存储文件」两个互斥开关的配置键。"""
 
+_REMOVED_READ_MODES = frozenset({"no_nfo_scrape", "read_update_nfo"})
+"""2026-10-23 删除的两个补全模式选项（旧配置里残留的值）。
+
+- ``no_nfo_scrape``：补全模式对无 nfo 的文件本来就无条件回退正常模式，开关无消费点；
+- ``read_update_nfo``：补全模式补到空字段即写回 nfo，读取模式只读展示不写 nfo。
+"""
+
+_LEGACY_NFO_MERGE_STRATEGIES = {
+    "prefer_nfo": "fill_missing_only",
+    "preserve_existing": "fill_missing_only",
+}
+"""2026-10-23 删除的两个合并策略 → 统一并到「仅填补空字段」。
+
+旧 ``prefer_nfo``（本地信息优先）与 ``preserve_existing``（保留已有字段）语义一致
+（本地有值就用本地），删除后由 ``fill_missing_only`` 承接：它的新定义就是
+「本地已有值一律保留，只把本地空着的字段用刮削值补上」。
+"""
+
+
+def _migrate_read_mode_options(data: dict[str, Any]) -> None:
+    """清理 ``read_mode`` 里已删除的两个选项（幂等，每次加载都可安全重跑）。"""
+    value = data.get("read_mode")
+    if isinstance(value, str):
+        # 极早期配置可能把多选项存成逗号分隔字符串
+        value = [item.strip() for item in re.split(r"[,，]", value) if item.strip()]
+    if not isinstance(value, list | tuple | set):
+        return
+    cleaned = [item for item in value if str(_enum_value(item)) not in _REMOVED_READ_MODES]
+    data["read_mode"] = cleaned
+
+
+def _migrate_nfo_merge_strategy(data: dict[str, Any]) -> None:
+    """把已删除的两个合并策略映射到「仅填补空字段」（幂等）。"""
+    value = data.get("nfo_merge_strategy")
+    if not isinstance(value, str):
+        return
+    mapped = _LEGACY_NFO_MERGE_STRATEGIES.get(value.strip().lower())
+    if mapped is not None:
+        data["nfo_merge_strategy"] = mapped
+
 
 def _migrate_task_mode_keys(data: dict[str, Any]) -> None:
     """任务模式「本地存储文件 / 网盘存储文件」互斥开关升级与归一。
@@ -539,6 +579,11 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     _migrate_builtin_naming_templates(data)
     _migrate_removed_hd_pic_sources(data)
     _migrate_actor_clean_rules(data)
+    # 补全模式选项与 NFO 合并策略精简（2026-10-23）：删掉的两个 read_mode 值、
+    # 两个合并策略都在这里清理/映射，必须在 Pydantic 强校验之前完成，
+    # 否则旧配置会因枚举值不存在而整份加载失败（走 _failed.json 保护分支）。
+    _migrate_read_mode_options(data)
+    _migrate_nfo_merge_strategy(data)
     if message := _migrate_official_uncensored_split(data):
         warnings.append(message)
 

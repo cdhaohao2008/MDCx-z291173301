@@ -106,6 +106,22 @@ MVC 分层：UI → 控制器 → 核心业务 → 爬虫框架 → 基础设施
 - manager 提供 `get_gfriends_index` / `_parse_graphis_html` / `fill_actor_info_from_sources`（local→wiki→minnano→db）/ `build_local_avatar_index` / `search_actor_info` / `from_graphis`。
 - `Minnano-av.com` 品牌显示名首字母大写（6 处），代理域名一律全小写。
 
+### 3.7 补全模式下方选项（2026-10-23 收敛后）
+
+补全模式（`main_mode == 7`）本身只做两件事：**本地已有优先**（nfo 字段、nfo 文件、图片、字幕、mediainfo 先读本地）+ **只补缺失**（缺的字段联网补、缺的图下载、缺的字幕从字幕目录复制）。
+
+2026-10-23 对下方五个迁移来的选项做过一次审计并收敛为两项 + 合并策略：
+
+| 现状 | 说明 |
+|---|---|
+| ① 按更新模式重新整理分类 | **保留，仍有已知冲突**：`extend.is_update_rules_active()` 为真时，`file._get_folder_path` 的 A/B/C/D 分支把基准目录换成文件当前位置，**不再指向成功输出目录**；已在成功目录内的文件走原地分支，该选项对它们无效。用户明确要求保留，改动前先确认归档位置口径 |
+| ② 重新下载封面图片等文件 | 保留。关掉 `web.keep_local_image()` 的保留语义，回到「设置→下载/保留」的下载口径。**复核结论：不存在「重下不打水印」缺陷**——下载函数每成功写出一张新图都会把 `*_marked` 复位为 False，`add_mark` 照常执行；被「保留目标文件」挡住没重下的旧图标记保持 True，正好避免二次水印 |
+| ③ 允许更新 NFO 文件 | **已删除**。补全模式补到空字段即写回（`update_nfo` 在合并结果处定稿），不再需要单独开关；原先由它控制的两处读侧行为改为：标题/简介按「设置→翻译」的字段语言决定取原文还是译文，tag 剥离改为「非读取模式一律剥离」（读取模式只展示、不重建标签） |
+| ④ 无 NFO 按正常模式重新刮削 | **已删除**。无 nfo 时本来就无条件回退正常模式，该开关全仓无消费点 |
+| ⑤ 本地 NFO 合并及策略 | 保留，**收敛为 3 档**：全新数据优先 / 合并数组去重 / 仅填补空字段（默认）。`prefer_nfo`、`preserve_existing` 已删除（与 fill_missing_only 语义重合），旧配置自动映射到 `fill_missing_only`；`fill_missing_only` 的含义改为「本地已有值一律保留，只把本地空着的字段用刮削值补上」 |
+
+配置升级见 `config/migrations.py::_migrate_read_mode_options` / `_migrate_nfo_merge_strategy`（每次加载都跑，幂等）。
+
 ---
 
 ## 4. 爬虫框架

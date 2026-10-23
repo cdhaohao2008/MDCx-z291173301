@@ -796,9 +796,9 @@ class Config(BaseModel):
     nfo_tag_actor: str = Field(default="actor", title="NFO演员标签")
     nfo_merge_enabled: bool = Field(default=False, title="NFO合并")
     nfo_merge_strategy: NfoMergeStrategy = Field(
-        default=NfoMergeStrategy.PREFER_SCRAPER,
+        default=NfoMergeStrategy.FILL_MISSING_ONLY,
         title="NFO合并策略",
-        description="重新刮削时如何处理已有NFO: prefer_scraper=全新数据优先(默认), prefer_nfo=本地信息优先, merge_arrays=合并数组去重, preserve_existing=保留已有字段, fill_missing_only=仅填补空字段",
+        description="重新刮削时如何处理已有NFO: fill_missing_only=仅填补空字段(默认，本地已有值保留、只补本地空着的字段), merge_arrays=合并数组去重, prefer_scraper=全新数据优先",
     )
     folder_name: str = Field(default="{{ actor }}/{{ number }} {{ actor }}", title="目录名称")
     naming_file: str = Field(default="{{ number }}", title="文件命名")

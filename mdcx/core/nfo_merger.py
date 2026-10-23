@@ -2,12 +2,13 @@
 
 借鉴 javinizer-go internal/nfo 的 MergeStrategy 设计，适配 mdcx 的 CrawlersResult 数据结构。
 
-5 种策略：
-- prefer_scraper: 全新数据优先（当前默认行为）
-- prefer_nfo: 本地信息优先，新数据仅填空
-- merge_arrays: 合并数组去重，标量字段用新数据
-- preserve_existing: 保留已有字段，本地有值就不动，只写本地没有的字段
-- fill_missing_only: 仅填补空字段（新数据为主，空字段从本地 NFO 补）
+2026-10-23 精简为 3 种策略（prefer_nfo / preserve_existing 与 fill_missing_only 语义
+重合，已删除）：
+
+- fill_missing_only: 仅填补空字段（**默认**）。本地已有值一律保留，只把本地空着的
+  字段用刮削值补上——补全模式的核心语义。
+- merge_arrays: 合并数组去重（数组按新数据在前去重合并），标量字段用新数据。
+- prefer_scraper: 全新数据优先（正常模式的覆盖行为）。
 """
 
 import copy
@@ -111,11 +112,8 @@ def _merge_scalar(
         case NfoMergeStrategy.PREFER_SCRAPER | NfoMergeStrategy.MERGE_ARRAYS:
             return scraped_val, "scraper"
         case NfoMergeStrategy.FILL_MISSING_ONLY:
-            # "仅填补空字段"（UI 名称/models 描述/docstring 三处一致）：新数据为主，
-            # 只在刮削结果为空时从本地 NFO 补——与 preserve_existing（本地为主）语义相反。
-            # 原实现与 preserve_existing 同分支，导致两策略在 UI 上完全重复且新数据被丢弃。
-            return scraped_val, "scraper"
-        case NfoMergeStrategy.PREFER_NFO | NfoMergeStrategy.PRESERVE_EXISTING:
+            # "仅填补空字段"：本地已有值一律保留，刮削值只用来填本地空着的字段
+            # （2026-10-23 起与「本地信息优先」合并为同一语义，并成为默认策略）。
             return nfo_val, "nfo"
 
 
@@ -152,7 +150,7 @@ def _merge_array(
             return merged, "merged"
         case NfoMergeStrategy.PREFER_SCRAPER:
             return list(scraped_val), "scraper"
-        case NfoMergeStrategy.PREFER_NFO | NfoMergeStrategy.PRESERVE_EXISTING | NfoMergeStrategy.FILL_MISSING_ONLY:
+        case NfoMergeStrategy.FILL_MISSING_ONLY:
             return list(nfo_val), "nfo"
 
 

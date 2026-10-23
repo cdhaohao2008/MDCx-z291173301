@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from mdcx.config.enums import Language, NfoInclude, OutlineShow, ReadMode
+from mdcx.config.enums import Language, NfoInclude, OutlineShow
 from mdcx.core import nfo as nfo_module
 from mdcx.gen.field_enums import CrawlerResultFields
 from mdcx.models.model_types import CrawlersResult, FileInfo
@@ -103,7 +103,8 @@ async def test_get_nfo_data_strips_only_leading_number_prefix(monkeypatch: pytes
         nfo_module.manager.config.__class__,
         "get_field_config",
         lambda self, field: SimpleNamespace(
-            language=Language.JP if field != CrawlerResultFields.OUTLINE else Language.ZH_CN
+            # 标题/简介都按中文取（标题设为日文时会取原文标题，见专门用例）
+            language=Language.ZH_CN
         ),
     )
 
@@ -149,7 +150,9 @@ async def test_nfo_outline_roundtrip_keeps_outline_source_and_originalplot(monke
         nfo_module.manager.config.__class__,
         "get_field_config",
         lambda self, field: SimpleNamespace(
-            language=Language.ZH_CN if field == CrawlerResultFields.OUTLINE else Language.JP
+            language=Language.ZH_CN
+            if field in (CrawlerResultFields.OUTLINE, CrawlerResultFields.TITLE)
+            else Language.JP
         ),
     )
 
@@ -180,8 +183,9 @@ async def test_nfo_outline_roundtrip_keeps_outline_source_and_originalplot(monke
 
 
 @pytest.mark.asyncio
-async def test_get_nfo_data_read_update_preserves_actor_prefix_tag(monkeypatch: pytest.MonkeyPatch, tmp_path):
-    monkeypatch.setattr(nfo_module.manager.config, "read_mode", [ReadMode.READ_UPDATE_NFO])
+async def test_get_nfo_data_strips_generated_tags_for_write_paths(monkeypatch: pytest.MonkeyPatch, tmp_path):
+    # 2026-10-23 起不再依赖已删除的「允许更新NFO文件」开关：只要不是读取模式
+    # （即会把字段写回 nfo 的整理/补全/正常模式），就剥离后续会重建的自动标签。
     monkeypatch.setattr(
         nfo_module.manager.config.__class__,
         "get_field_config",
@@ -214,3 +218,35 @@ async def test_get_nfo_data_read_update_preserves_actor_prefix_tag(monkeypatch: 
     assert data is not None
     assert info is not None
     assert data.tag == "演员: 上原亚衣,系列: 测试系列,巨乳"
+
+
+@pytest.mark.asyncio
+async def test_get_nfo_data_uses_original_title_when_field_language_is_jp(monkeypatch: pytest.MonkeyPatch, tmp_path):
+    """标题字段语言设为日文时取 NFO 原文标题（2026-10-23 起不再依赖已删除的开关）。"""
+    monkeypatch.setattr(nfo_module.manager.config, "read_mode", [])
+    monkeypatch.setattr(
+        nfo_module.manager.config.__class__,
+        "get_field_config",
+        lambda self, field: SimpleNamespace(
+            language=Language.JP if field == CrawlerResultFields.TITLE else Language.ZH_CN
+        ),
+    )
+
+    video_path = tmp_path / "ABC-123.mp4"
+    video_path.write_bytes(b"")
+    (tmp_path / "ABC-123.nfo").write_text(
+        """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<movie>
+  <title>ABC-123 中文标题</title>
+  <originaltitle>ABC-123 日本語タイトル</originaltitle>
+  <num>ABC-123</num>
+</movie>
+""",
+        encoding="utf-8",
+    )
+
+    data, _info = await nfo_module.get_nfo_data(video_path, "ABC-123")
+
+    assert data is not None
+    assert data.title == "日本語タイトル"
+    assert data.originaltitle == "日本語タイトル"

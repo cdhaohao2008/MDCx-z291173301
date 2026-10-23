@@ -500,23 +500,19 @@ def load_config(self: MyMAinWindow):
             default=self.Ui.radioButton_mode_common,
         )
 
-        # 有nfo，是否执行更新模式
+        # 补全模式下方的独立选项（2026-10-23 精简为两项）
         # region read_mode
         set_checkboxes(
             manager.config.read_mode,
             (self.Ui.checkBox_read_has_nfo_update, ReadMode.HAS_NFO_UPDATE),
             (self.Ui.checkBox_read_download_file_again, ReadMode.READ_DOWNLOAD_AGAIN),
-            (self.Ui.checkBox_read_update_nfo, ReadMode.READ_UPDATE_NFO),
-            (self.Ui.checkBox_read_no_nfo_scrape, ReadMode.NO_NFO_SCRAPE),
         )
         # endregion
 
-        # NFO 合并策略下拉框
+        # NFO 合并策略下拉框（3 档，顺序与 NfoMergeStrategy.names() 一致）
         _strategy_items = [
             NfoMergeStrategy.PREFER_SCRAPER,
-            NfoMergeStrategy.PREFER_NFO,
             NfoMergeStrategy.MERGE_ARRAYS,
-            NfoMergeStrategy.PRESERVE_EXISTING,
             NfoMergeStrategy.FILL_MISSING_ONLY,
         ]
         self.Ui.comboBox_nfo_merge_strategy.setCurrentIndex(

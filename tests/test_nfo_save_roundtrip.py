@@ -15,6 +15,7 @@ from lxml import etree
 from mdcx.config.enums import Language, NfoInclude
 from mdcx.core import nfo as nfo_module
 from mdcx.core import tag_priority
+from mdcx.gen.field_enums import CrawlerResultFields
 from mdcx.models.model_types import CrawlersResult, FileInfo
 
 
@@ -47,10 +48,16 @@ def _configure_nfo_writer(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(nfo_module.manager.config, "nfo_tag_series", "系列: series")
     monkeypatch.setattr(nfo_module.manager.config, "actor_no_name", "佚名")
     monkeypatch.setattr(nfo_module.manager.config, "read_mode", [])
+    # 标题/简介按中文取：这两项设为日文时 get_nfo_data 会改取 NFO 里的原文
+    # （originaltitle / originalplot），本文件验证的是保存回环，不掺语言切换。
     monkeypatch.setattr(
         nfo_module.manager.config.__class__,
         "get_field_config",
-        lambda self, field: SimpleNamespace(language=Language.JP),
+        lambda self, field: SimpleNamespace(
+            language=Language.ZH_CN
+            if field in (CrawlerResultFields.TITLE, CrawlerResultFields.OUTLINE)
+            else Language.JP
+        ),
     )
     monkeypatch.setattr(nfo_module, "render_name", lambda *args, **kwargs: _RenderedTitle("ABC-123 标题"))
 

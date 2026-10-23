@@ -330,16 +330,15 @@ def test_read_mode_options_not_squeezed(win, app):
     ui = win.Ui
     win.show()
     _goto_guaxiaomoshi(win, app)
+    # 2026-10-23 精简：删掉「允许更新NFO文件」「无 NFO 按正常模式重新刮削」两项，
+    # 补全模式下方只剩两枚复选框 + 合并策略勾选框与下拉框。
     widgets = (
         "checkBox_read_has_nfo_update",
         "checkBox_read_download_file_again",
-        "checkBox_read_update_nfo",
-        "checkBox_read_no_nfo_scrape",
         "checkBox_nfo_merge_strategy",
         "comboBox_nfo_merge_strategy",
         "label_345",
         "label_347",
-        "label_37",
     )
     for width, height in ((1030, 753), (860, 600)):
         _resize(win, app, width, height)
@@ -352,12 +351,13 @@ def test_read_mode_options_not_squeezed(win, app):
         assert box.geometry().height() >= box.minimumSize().height(), (
             f"{width}x{height} 下读取模式区高度 {box.geometry().height()} < 最小 {box.minimumSize().height()}"
         )
-        first = ui.checkBox_read_download_file_again
-        second = ui.checkBox_read_update_nfo
-        assert (
-            first.mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0)).y() + first.height()
-            <= second.mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0)).y()
-        ), "读取模式区两行选项重叠"
+        # 三行（两枚复选框 + 合并策略行）依次排开，不许重叠
+        rows = (ui.checkBox_read_has_nfo_update, ui.checkBox_read_download_file_again, ui.checkBox_nfo_merge_strategy)
+        tops = [row.mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0)).y() for row in rows]
+        for upper, lower, top in zip(rows, rows[1:], tops[1:], strict=False):
+            assert top >= upper.mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0)).y() + upper.height(), (
+                f"补全模式区选项行重叠：{upper.objectName()} 与 {lower.objectName()}"
+            )
 
 
 def test_reuse_overwrite_meta_mutually_exclusive(win, app):
@@ -451,19 +451,20 @@ def test_javdb_tip_moved_up_one_line_static():
     assert _ui_geometry("label_26") == (146, 160, 513, 28), "label_26 设计几何被改动"
     assert _ui_geometry("gridLayoutWidget_15")[3] == 129, "grid 容器高不是 129"
     # 刮削模式组与其后各组：读取模式区被裁切修复后整体下移 41px（详见 test_read_mode_options_not_squeezed）；
-    # 补全模式新增一行（2026-10-23）后再整体下移 37px，组框高度 532 → 569。
+    # 补全模式新增一行（2026-10-23）后再整体下移 37px；同日删掉两项后组框高 569 → 523，
+    # 其下各组与滚动内容同步上收 46px。
     for name, y in (
         ("groupBox", 218),
-        ("groupBox_5", 806),
-        ("groupBox_2", 1286),
-        ("groupBox_18", 1516),
-        ("groupBox_27", 1646),
-        ("groupBox_15", 1776),
-        ("groupBox_30", 1906),
+        ("groupBox_5", 760),
+        ("groupBox_2", 1240),
+        ("groupBox_18", 1470),
+        ("groupBox_27", 1600),
+        ("groupBox_15", 1730),
+        ("groupBox_30", 1860),
     ):
         assert _ui_geometry(name)[1] == y, f"{name} 的 y 不是 {y}"
-    assert _ui_geometry("groupBox")[3] == 569, "刮削模式组框高不是 569"
-    assert _ui_geometry("scrollAreaWidgetContents_guaxiaomoshi")[3] == 2106, "滚动内容高不是 2106"
+    assert _ui_geometry("groupBox")[3] == 523, "刮削模式组框高不是 523"
+    assert _ui_geometry("scrollAreaWidgetContents_guaxiaomoshi")[3] == 2060, "滚动内容高不是 2060"
 
 
 def _content_pos(ui, widget):

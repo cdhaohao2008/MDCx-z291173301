@@ -276,7 +276,7 @@ async def test_organize_inplace_file_never_moved_when_read_mode_updates_enabled(
     monkeypatch.setattr(
         manager.config,
         "read_mode",
-        [ReadMode.HAS_NFO_UPDATE, ReadMode.READ_UPDATE_NFO, ReadMode.READ_DOWNLOAD_AGAIN],
+        [ReadMode.HAS_NFO_UPDATE, ReadMode.READ_DOWNLOAD_AGAIN],
     )
 
     spy = _FsSpy()

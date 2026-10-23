@@ -1491,12 +1491,11 @@ class Scraper:
         # 整理模式只读 nfo，绝不生成/更新 nfo
         if organize_mode:
             update_nfo = False
-        # 补全模式：只有「本次真的补到了空字段」才写回 nfo（本地已有的值一律保留），
-        # 勾选「允许更新NFO文件」时即使没有补到新字段也重新生成一次
-        # （用于应用翻译 / 标题模板等更新）。
+        # 补全模式：是否写回 nfo 要等「联网刮削 + 合并」完成后才知道（只有真的补到了
+        # 空字段才写，本地已有的值一律保留），这里先占位，稍后在合并结果处定稿。
         # 没有 nfo 而按正常模式全量刮削的文件走下面的正常分支（按下载/保留设置写 nfo）。
         elif complete_mode and not complete_fallback_normal:
-            update_nfo = bool(complete_filled_fields) or ReadMode.READ_UPDATE_NFO in read_mode
+            update_nfo = False
         # 不写nfo的情况：
         elif runtime_mode == VIDEO_MAIN_MODE and Switch.SORT_DEL in manager.config.switch_on:
             # 3模式勾选“删除本地已下载的nfo文件”（暂无效，会直接return）
@@ -1510,7 +1509,13 @@ class Scraper:
                 update_nfo = False
 
         # 读取模式下，补充缺失的演员 tmdbid（NFO已有→跳过，xlsx缓存→命中，API查询→补充）
-        if update_nfo and is_nfo_existed and NfoInclude.ACTOR_TMDBID in manager.config.nfo_include_new:
+        # 补全模式即使最终判定「没补到字段、不写 nfo」也先补 tmdbid：它本身就是一次
+        # 字段补全，补到了就会写回（见下方合并结果处的 update_nfo 定稿）。
+        if (
+            (update_nfo or complete_mode)
+            and is_nfo_existed
+            and NfoInclude.ACTOR_TMDBID in manager.config.nfo_include_new
+        ):
             tmdb_api_base = manager.config.tmdb_api_base
             tmdb_api_key = manager.config.tmdb_api_key
             if tmdb_api_base and tmdb_api_key:
@@ -1755,6 +1760,10 @@ class Scraper:
                     )
                 else:
                     LogBuffer.log().write("\n 📖 补全模式：本地 nfo 字段已齐全，无需补全字段")
+            # 定稿：只有真的补到空字段（或补到新的演员 tmdbid）才写回 nfo。
+            # 这一步必须排在「字段处理/翻译」之前——翻译与标题模板渲染都依赖它。
+            new_tmdb_ids = set(res.actor_tmdb_ids or {}) - set(complete_local.actor_tmdb_ids or {})
+            update_nfo = bool(complete_filled_fields) or bool(new_tmdb_ids)
 
         # 显示json_data结果或日志
         show_result(res, start_time)
@@ -2160,6 +2169,10 @@ class Scraper:
         if pic_final_catched and file_can_download and not reuse_images:
             # 补全模式：本地已有的主图视为「已处理」——只补缺，不重复打水印
             # （否则第二次运行会在已有水印的图上再盖一层）。
+            # 勾选「重新下载封面图片等文件」时不必在此特殊处理：下载函数每成功写出一张
+            # 新图都会把对应的 *_marked 复位为 False（见 web.py 的 thumb/poster/fanart
+            # download），所以重下的新图仍会正常走水印流程；而被「保留目标文件」策略
+            # 挡住、根本没重下的旧图，标记保持 True，正好避免二次水印。
             if complete_mode:
                 for mark_attr, image_path in (
                     ("poster_marked", poster_final_path),

@@ -14,7 +14,6 @@ from ..config.enums import (
     Language,
     NfoInclude,
     OutlineShow,
-    ReadMode,
     Website,
 )
 from ..config.extend import READ_MAIN_MODE, get_runtime_main_mode
@@ -176,7 +175,7 @@ async def write_nfo(
         return True
 
     # 本地NFO合并策略：勾选框开启且策略非 prefer_scraper 时读取现有 NFO 并按策略合并。
-    # skip_merge=True（NFO 库表单编辑保存）时跳过合并，避免 PREFER_NFO 等策略用磁盘旧值覆盖用户表单修改。
+    # skip_merge=True（NFO 库表单编辑保存）时跳过合并，避免合并策略用磁盘旧值覆盖用户表单修改。
     merge_strategy = manager.config.nfo_merge_strategy
     if should_merge_nfo(
         enabled=manager.config.nfo_merge_enabled,
@@ -674,11 +673,9 @@ async def get_nfo_data(file_path: Path, movie_number: str) -> tuple[CrawlersResu
 
     # 返回数据
     json_data.title = title
-    if (
-        manager.config.get_field_config(CrawlerResultFields.TITLE).language == Language.JP
-        and ReadMode.READ_UPDATE_NFO in manager.config.read_mode
-        and originaltitle
-    ):
+    # 标题字段语言设为日文时用 NFO 里的原文标题（与「允许更新NFO文件」开关无关：
+    # 该开关 2026-10-23 已删除，行为改由「设置→翻译」的字段语言决定）。
+    if manager.config.get_field_config(CrawlerResultFields.TITLE).language == Language.JP and originaltitle:
         json_data.title = originaltitle
     json_data.originaltitle = originaltitle
     if is_japanese(originaltitle):
@@ -692,15 +689,13 @@ async def get_nfo_data(file_path: Path, movie_number: str) -> tuple[CrawlersResu
     json_data.actor_tmdb_ids = actor_tmdb_ids
     json_data.original_actors = actor_list.copy()  # 保存 NFO 中的原始演员名（可能是映射名）
     json_data.outline = outline
-    if (
-        manager.config.get_field_config(CrawlerResultFields.OUTLINE).language == Language.JP
-        and ReadMode.READ_UPDATE_NFO in manager.config.read_mode
-        and originalplot
-    ):
+    if manager.config.get_field_config(CrawlerResultFields.OUTLINE).language == Language.JP and originalplot:
         json_data.outline = originalplot
     json_data.originalplot = originalplot
     json_data.tag = tag
-    if ReadMode.READ_UPDATE_NFO in manager.config.read_mode:
+    # 会写回 NFO 的模式（整理 / 补全）剥离「后续由 translate_info() 重建」的标签，
+    # 避免重写时标签重复；读取模式只展示、不重建标签，保留原样。
+    if get_runtime_main_mode() != READ_MAIN_MODE:
         json_data.tag = tag_only
     json_data.release = release
     json_data.year = year

@@ -175,28 +175,37 @@ class Translator(Enum):
 
 
 class ReadMode(Enum):
+    """补全模式下方的独立选项（2026-10-23 精简：只保留这两项）。
+
+    已删除：``no_nfo_scrape``（补全模式对无 nfo 的文件本来就无条件回退正常模式，
+    该开关全仓无消费点）、``read_update_nfo``（补全模式补到空字段即写回 nfo，
+    不需要再单独允许一次；读取模式只读展示也不写 nfo）。
+    """
+
     HAS_NFO_UPDATE = "has_nfo_update"
-    NO_NFO_SCRAPE = "no_nfo_scrape"
     READ_DOWNLOAD_AGAIN = "read_download_again"
-    READ_UPDATE_NFO = "read_update_nfo"
 
     @classmethod
     def names(cls):
-        return ["有NFO时更新", "无NFO时刮削", "重新下载", "更新NFO"]
+        return ["有NFO时更新", "重新下载"]
 
 
 class NfoMergeStrategy(Enum):
-    """NFO 合并策略：控制重新刮削时新数据与本地已有 NFO 的合并方式。"""
+    """NFO 合并策略：控制重新刮削时新数据与本地已有 NFO 的合并方式。
+
+    2026-10-23 精简为三档：``prefer_nfo``（本地信息优先）与 ``preserve_existing``
+    （保留已有字段）的语义与「仅填补空字段」重合，已删除并把 ``fill_missing_only``
+    定为默认——它现在的含义是「本地已有值一律保留，只把本地空着的字段用刮削值补上」，
+    即补全模式的核心语义。
+    """
 
     PREFER_SCRAPER = "prefer_scraper"
-    PREFER_NFO = "prefer_nfo"
     MERGE_ARRAYS = "merge_arrays"
-    PRESERVE_EXISTING = "preserve_existing"
     FILL_MISSING_ONLY = "fill_missing_only"
 
     @classmethod
     def names(cls):
-        return ["全新数据优先", "本地信息优先", "合并数组去重", "保留已有字段", "仅填补空字段"]
+        return ["全新数据优先", "合并数组去重", "仅填补空字段"]
 
 
 class DownloadableFile(Enum):

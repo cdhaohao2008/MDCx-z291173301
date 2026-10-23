@@ -371,16 +371,12 @@ def save_config(self: MyMAinWindow):
 
     manager.config.read_mode = get_checkboxes(
         (self.Ui.checkBox_read_has_nfo_update, ReadMode.HAS_NFO_UPDATE),
-        (self.Ui.checkBox_read_no_nfo_scrape, ReadMode.NO_NFO_SCRAPE),
         (self.Ui.checkBox_read_download_file_again, ReadMode.READ_DOWNLOAD_AGAIN),
-        (self.Ui.checkBox_read_update_nfo, ReadMode.READ_UPDATE_NFO),
     )
-    # NFO 合并策略
+    # NFO 合并策略（3 档，顺序与 NfoMergeStrategy.names() 一致）
     _strategy_items = [
         NfoMergeStrategy.PREFER_SCRAPER,
-        NfoMergeStrategy.PREFER_NFO,
         NfoMergeStrategy.MERGE_ARRAYS,
-        NfoMergeStrategy.PRESERVE_EXISTING,
         NfoMergeStrategy.FILL_MISSING_ONLY,
     ]
     _idx = self.Ui.comboBox_nfo_merge_strategy.currentIndex()

@@ -101,7 +101,7 @@ def _configure_complete_mode(monkeypatch: pytest.MonkeyPatch, media_dir: Path) -
     monkeypatch.setattr(manager.config, "emby_on", [])
     monkeypatch.setattr(manager.config, "actor_photo_kodi_auto", False)
     monkeypatch.setattr(manager.config, "actor_realname", False)
-    monkeypatch.setattr(manager.config, "read_mode", [ReadMode.READ_UPDATE_NFO])
+    monkeypatch.setattr(manager.config, "read_mode", [])
     monkeypatch.setattr(manager.config, "nfo_include_new", [NfoInclude.PLOT_, NfoInclude.OUTLINE])
     monkeypatch.setattr(manager.config, "subtitle_add", False)
     monkeypatch.setattr(manager.config, "download_files", [DownloadableFile.NFO])
@@ -201,7 +201,7 @@ def test_scan_ignore_dirs_drops_success_folder_in_complete_mode(monkeypatch: pyt
 def test_complete_merge_strategy_defaults_to_prefer_nfo(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(manager.config, "nfo_merge_enabled", False)
     monkeypatch.setattr(manager.config, "nfo_merge_strategy", NfoMergeStrategy.MERGE_ARRAYS)
-    assert complete_merge_strategy() == NfoMergeStrategy.PREFER_NFO
+    assert complete_merge_strategy() == NfoMergeStrategy.FILL_MISSING_ONLY
 
     monkeypatch.setattr(manager.config, "nfo_merge_enabled", True)
     assert complete_merge_strategy() == NfoMergeStrategy.MERGE_ARRAYS
@@ -218,7 +218,7 @@ def test_filled_missing_fields_only_counts_empty_local():
     scraped.outline = "刮削简介"
     scraped.tags = ["标签"]
 
-    merged = merge_nfo_fields(scraped, local, NfoMergeStrategy.PREFER_NFO)
+    merged = merge_nfo_fields(scraped, local, NfoMergeStrategy.FILL_MISSING_ONLY)
 
     assert merged.title == "本地标题", "本地已有值必须保留"
     assert merged.outline == "刮削简介", "本地空字段必须用刮削值补上"
@@ -407,12 +407,7 @@ async def test_read_mode_only_displays_without_scrape_or_move(monkeypatch: pytes
     monkeypatch.setattr(
         manager.config,
         "read_mode",
-        [
-            ReadMode.HAS_NFO_UPDATE,
-            ReadMode.READ_UPDATE_NFO,
-            ReadMode.READ_DOWNLOAD_AGAIN,
-            ReadMode.NO_NFO_SCRAPE,
-        ],
+        [ReadMode.HAS_NFO_UPDATE, ReadMode.READ_DOWNLOAD_AGAIN],
     )
 
     def _boom(*_args, **_kwargs):
@@ -442,3 +437,121 @@ def test_update_rules_only_active_when_option_checked(monkeypatch: pytest.Monkey
     monkeypatch.setattr(manager.config, "main_mode", 4)
     monkeypatch.setattr(manager.config, "read_mode", [])
     assert is_update_rules_active() is True
+
+
+# ---------------------------------------------------------------------------
+# 6. 选项精简与旧配置升级（2026-10-23）
+# ---------------------------------------------------------------------------
+
+
+def test_removed_read_mode_values_are_cleaned(monkeypatch: pytest.MonkeyPatch):
+    """旧配置里残留的两个已删除选项在加载时被清掉，且不影响保留项。"""
+    from mdcx.config.migrations import migrate_config_data
+    from mdcx.config.models import Config
+
+    data = {"read_mode": ["no_nfo_scrape", "has_nfo_update", "read_update_nfo", "read_download_again"]}
+    migrate_config_data(data)
+
+    assert data["read_mode"] == ["has_nfo_update", "read_download_again"]
+    config = Config.model_validate(data)
+    assert config.read_mode == [ReadMode.HAS_NFO_UPDATE, ReadMode.READ_DOWNLOAD_AGAIN]
+
+
+def test_read_mode_string_form_is_migrated():
+    """极早期配置把选项存成逗号分隔字符串时也要能升级。"""
+    from mdcx.config.migrations import migrate_config_data
+
+    data = {"read_mode": "read_update_nfo, has_nfo_update"}
+    migrate_config_data(data)
+
+    assert data["read_mode"] == ["has_nfo_update"]
+
+
+def test_removed_options_no_longer_exist_in_enum():
+    """两个选项的枚举值已删除（UI 与配置同步收敛）。"""
+    assert {item.value for item in ReadMode} == {"has_nfo_update", "read_download_again"}
+
+
+# ---------------------------------------------------------------------------
+# 7. 「重新下载封面图片等文件」的水印口径
+# ---------------------------------------------------------------------------
+
+
+def test_redownload_disables_local_image_keep(monkeypatch: pytest.MonkeyPatch):
+    """不勾选时保留本地图；勾选后回到正常下载语义（不再保留）。"""
+    from mdcx.core.web import keep_local_image
+
+    monkeypatch.setattr(manager.config, "main_mode", COMPLETE_MAIN_MODE)
+    monkeypatch.setattr(manager.config, "read_mode", [])
+    assert keep_local_image(Path("poster.jpg")) is True
+
+    monkeypatch.setattr(manager.config, "read_mode", [ReadMode.READ_DOWNLOAD_AGAIN])
+    assert keep_local_image(Path("poster.jpg")) is False
+
+
+@pytest.mark.asyncio
+async def test_add_mark_skips_premarked_but_marks_redownloaded(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """预标记为已处理的图不重复打水印；下载函数复位标记后（重下）会重新打水印。"""
+    from types import SimpleNamespace
+
+    from mdcx.config.enums import DownloadableFile, MarkType
+    from mdcx.core import image as image_module
+    from mdcx.models.model_types import OtherInfo
+
+    monkeypatch.setattr(manager.config, "thumb_mark", 1)
+    monkeypatch.setattr(manager.config, "poster_mark", 0)
+    monkeypatch.setattr(manager.config, "fanart_mark", 0)
+    monkeypatch.setattr(manager.config, "mark_type", [MarkType.YOUMA])
+    monkeypatch.setattr(manager.config, "download_files", [DownloadableFile.THUMB])
+
+    calls: list[Path] = []
+
+    async def _fake_mark(path, _marks):
+        calls.append(Path(path))
+
+    monkeypatch.setattr(image_module, "add_mark_thread", _fake_mark)
+
+    thumb = tmp_path / "thumb.jpg"
+    thumb.write_bytes(b"img")
+    other = OtherInfo.empty()
+    other.thumb_path = thumb
+    file_info = SimpleNamespace(has_sub=False, definition="")
+
+    # 本地已有图（上一轮已打过水印）：预标记 True → 跳过
+    other.thumb_marked = True
+    await image_module.add_mark(other, file_info, "有码")
+    assert calls == [], "已标记的本地图不应重复打水印"
+
+    # 重新下载：下载函数会把标记复位为 False → 正常打水印
+    other.thumb_marked = False
+    await image_module.add_mark(other, file_info, "有码")
+    assert calls == [thumb], "重下的新图必须打水印"
+
+
+def test_download_functions_reset_marked_flags():
+    """源码哨兵：三个下载函数成功写图后必须复位对应 *_marked，否则重下不打水印。"""
+    import ast
+
+    source = Path("mdcx/core/web.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    targets = {"thumb_download": "thumb_marked", "poster_download": "poster_marked", "fanart_download": "fanart_marked"}
+    found: dict[str, bool] = dict.fromkeys(targets, False)
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.AsyncFunctionDef) or node.name not in targets:
+            continue
+        attr = targets[node.name]
+        for child in ast.walk(node):
+            if isinstance(child, ast.Assign):
+                for target in child.targets:
+                    if (
+                        isinstance(target, ast.Attribute)
+                        and target.attr == attr
+                        and isinstance(target.value, ast.Name)
+                        and target.value.id == "other"
+                    ):
+                        found[node.name] = True
+
+    missing = [name for name, ok in found.items() if not ok]
+    assert not missing, f"以下下载函数没有复位 *_marked，重下的新图不会打水印：{missing}"

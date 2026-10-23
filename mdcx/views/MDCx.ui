@@ -5192,7 +5192,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       <x>0</x>
                       <y>0</y>
                       <width>860</width>
-                      <height>2106</height>
+                      <height>2060</height>
                     </rect>
                   </property>
                   <widget class="QGroupBox" name="groupBox">
@@ -5201,7 +5201,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         <x>30</x>
                         <y>218</y>
                         <width>701</width>
-                        <height>569</height>
+                        <height>523</height>
                       </rect>
                     </property>
                     <property name="minimumSize">
@@ -5219,7 +5219,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           <x>50</x>
                           <y>30</y>
                           <width>631</width>
-                          <height>525</height>
+                          <height>479</height>
                         </rect>
                       </property>
                       <layout class="QGridLayout" name="gridLayout_2">
@@ -5965,45 +5965,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   <layout class="QHBoxLayout" name="horizontalLayout_50">
                                     <item>
                                       <layout class="QGridLayout" name="gridLayout_11">
-                                        <item row="1" column="0">
-                                          <layout class="QHBoxLayout" name="horizontalLayout_128">
-                                            <item>
-                                              <widget class="QCheckBox" name="checkBox_read_update_nfo">
-                                                <property name="sizePolicy">
-                                                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                                                    <horstretch>0</horstretch>
-                                                    <verstretch>0</verstretch>
-                                                  </sizepolicy>
-                                                </property>
-                                                <property name="minimumSize">
-                                                  <size>
-                                                    <width>0</width>
-                                                    <height>0</height>
-                                                  </size>
-                                                </property>
-                                                <property name="text">
-                                                  <string>允许更新NFO文件</string>
-                                                </property>
-                                              </widget>
-                                            </item>
-                                            <item>
-                                              <widget class="QLabel" name="label_37">
-                                                <property name="sizePolicy">
-                                                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                                                    <horstretch>0</horstretch>
-                                                    <verstretch>0</verstretch>
-                                                  </sizepolicy>
-                                                </property>
-                                                <property name="styleSheet">
-                                                  <string notr="true">color: rgb(8, 128, 128);</string>
-                                                </property>
-                                                <property name="text">
-                                                  <string>&lt;p&gt; 按Emby标题、设置-翻译、NFO设置利用本地信息更新&lt;/p&gt;</string>
-                                                </property>
-                                              </widget>
-                                            </item>
-                                          </layout>
-                                        </item>
                                         <item row="0" column="0">
                                           <layout class="QHBoxLayout" name="horizontalLayout_132">
                                             <item>
@@ -6044,29 +6005,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               </layout>
                             </item>
                             <item>
-                              <layout class="QHBoxLayout" name="horizontalLayout_86">
-                                <item>
-                                  <widget class="QCheckBox" name="checkBox_read_no_nfo_scrape">
-                                    <property name="sizePolicy">
-                                      <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                                        <horstretch>0</horstretch>
-                                        <verstretch>0</verstretch>
-                                      </sizepolicy>
-                                    </property>
-                                    <property name="minimumSize">
-                                      <size>
-                                        <width>0</width>
-                                        <height>0</height>
-                                      </size>
-                                    </property>
-                                    <property name="text">
-                                      <string>本地没有NFO的文件，按正常模式规则重新刮削</string>
-                                    </property>
-                                  </widget>
-                                </item>
-                              </layout>
-                            </item>
-                            <item>
                               <layout class="QHBoxLayout" name="horizontalLayout_nfo_merge">
                                 <item>
                                   <widget class="QCheckBox" name="checkBox_nfo_merge_strategy">
@@ -6093,17 +6031,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                     </item>
                                     <item>
                                       <property name="text">
-                                        <string>本地信息优先</string>
-                                      </property>
-                                    </item>
-                                    <item>
-                                      <property name="text">
                                         <string>合并数组去重</string>
-                                      </property>
-                                    </item>
-                                    <item>
-                                      <property name="text">
-                                        <string>保留已有字段</string>
                                       </property>
                                     </item>
                                     <item>
@@ -6531,7 +6459,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1646</y>
+                        <y>1600</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -6711,7 +6639,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1776</y>
+                        <y>1730</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -6885,7 +6813,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1906</y>
+                        <y>1860</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -7059,7 +6987,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>806</y>
+                        <y>760</y>
                         <width>701</width>
                         <height>441</height>
                       </rect>
@@ -7642,7 +7570,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1516</y>
+                        <y>1470</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -8190,7 +8118,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1286</y>
+                        <y>1240</y>
                         <width>701</width>
                         <height>211</height>
                       </rect>
@@ -25910,7 +25838,7 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;更新模式&lt;/b&gt;：对已有NFO的影片在不改动文件位置结构的前提下重新整理文件结构，按更新规则重新命名目录和文件，适合已刮过但想调整目录结构的情况&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;读取模式&lt;/b&gt;：只读取本地NFO文件中的字段与目录里的封面图、缩略图、背景图并展示，不联网、不下载、不写NFO、不移动文件，适合检查媒体库；读取模式不受断点续刮缓存干扰，始终处理全部选中文件&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;补全模式&lt;/b&gt;：优先使用本地已有的NFO字段、NFO文件、封面图、缩略图、背景图、字幕与mediainfo，本地确实没有的才联网刮削补齐；没有NFO的文件自动按正常模式全量刮削；已在成功输出目录内的文件只补内容不移动，其余按正常模式的移动/重命名开关处理，搬运与整理模式共用同一套事务与回滚&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;合并策略&lt;/b&gt;：补全模式区域勾选框+下拉框，勾选后写入NFO前按策略决定如何处理已存在的NFO文件，全新数据优先/本地信息优先/合并数组去重/保留已有字段/仅填补空字段；不勾选时补全模式固定以本地信息优先（只填本地空着的字段）&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;合并策略&lt;/b&gt;：补全模式区域勾选框+下拉框，勾选后写入NFO前按策略决定如何处理已存在的NFO文件，三档：全新数据优先（等于正常模式的覆盖行为）/合并数组去重/仅填补空字段（默认，本地已有值保留、只补本地空着的字段）；不勾选时补全模式固定以「仅填补空字段」处理&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;软链接项&lt;/b&gt;：设置项，非独立模式，在任意模式下勾选「创建软链接」即可刮削后不移动原视频，而是在目标目录创建软链接，类快捷方式，便于PT下载既刮削又保种；需以管理员/有权限身份运行，注意：软链接通常只能在媒体库展示，不能直接播放&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;调试模式&lt;/b&gt;：在「设置→高级」的「调试模式日志页面」分组中勾选「显示字段内容信息」，完整排查建议同时同时勾选「显示刮削过程信息」「显示字段来源信息」等，日志页面会输出番号对应的完整元数据如封面、导演、演员、简介等供排查&lt;/li&gt;
 &lt;/ul&gt;
