@@ -1094,8 +1094,8 @@ def test_separate_mode_radios_red_holder_absolutely_positioned_and_grid_not_over
 
 # ---------- STRM 行位置锁定：主复选框与删除行严格上下对齐，禁止后移 ----------
 
-_STRM_MAIN_TEXT = "为本地视频文件生成STRM链接文本"
-_STRM_OVERWRITE_TEXT = "覆盖本地已存在的STRM链接文本"
+_STRM_MAIN_TEXT = "生成STRM链接"
+_STRM_OVERWRITE_TEXT = "覆盖STRM链接"
 
 
 def _find_layout_by_name(root, name):
@@ -1116,7 +1116,14 @@ def _grid_item_pos(grid, child_name):
 
 
 def test_strm_checkboxes_text_order_and_alignment_locked():
-    """STRM 行锁定：主复选框居左与删除行对齐、覆盖框居右，挪动即失败。"""
+    """STRM 行锁定：四枚复选框同排、顺序固定、间距项位置固定，挪动即失败。
+
+    2026-10-23 用户截图批注：复用元数据 / 覆盖元数据两枚复选框从独立一行上移进
+    STRM 行，行内顺序 = 生成STRM链接 / 覆盖STRM链接 / 复用元数据 / 覆盖元数据，
+    「覆盖STRM链接」与「复用元数据」之间夹一枚 Fixed 的 gap spacer（行内间距由
+    主窗口 _sync_strm_row_meta_align 按实测差值调宽，使复用框右缘对齐上一行描述
+    文字右缘）。原 horizontalLayout_reuse_meta 已整行删除，不得复活。
+    """
     root = _parse_ui()
     problems = []
 
@@ -1136,34 +1143,27 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
         problems.append("horizontalLayout_strm 不存在")
     else:
         kids = [item[0].get("name") for item in hbox.findall("item") if len(item)]
-        # 前两项必须是两复选框且顺序不变；允许末尾跟随纯 spacer（horizontalSpacer_strm）——
-        # STRM 行两个复选框都是 Fixed，HBox 最大宽被钉死在 285 会卡住 gridLayout_2 第 1 列，
-        # 容器拉宽后多余空间被三等分摊、描述列整体右移；末尾弹性 spacer 解开上限且不改变行外观。
-        if kids[:2] != ["checkBox_separate_generate_strm", "checkBox_separate_overwrite_strm"]:
-            problems.append(f"STRM 行内顺序被改（主框必须居左首位）: {kids!r}")
-        for extra in kids[2:]:
-            if not extra.startswith("horizontalSpacer_"):
-                problems.append(f"STRM 行内不允许出现非 spacer 部件: {extra!r}")
-
-    reuse_hbox = _find_layout_by_name(root, "horizontalLayout_reuse_meta")
-    if reuse_hbox is None:
-        problems.append("horizontalLayout_reuse_meta 不存在")
-    else:
-        kids = [item[0].get("name") for item in reuse_hbox.findall("item") if len(item)]
-        # 复用行：复用框居左 + gap spacer + 覆盖框居右（覆盖框与 STRM 覆盖框上下对齐），末尾弹性 spacer。
-        if kids[:3] != [
+        # 四枚复选框 + 行内 gap spacer + 末尾弹性 spacer，顺序与位置都不许动：
+        # 行尾弹性 spacer 必须留着 —— 四枚复选框都是 Fixed，HBox 最大宽被钉死会卡住
+        # gridLayout_2 第 1 列，容器拉宽后多余空间被均摊、描述列整体右移。
+        expect = [
+            "checkBox_separate_generate_strm",
+            "checkBox_separate_overwrite_strm",
+            "horizontalSpacer_strm_gap",
             "checkBox_separate_reuse_meta",
-            "horizontalSpacer_reuse_meta_gap",
             "checkBox_separate_overwrite_meta",
-        ]:
-            problems.append(f"复用行内顺序被改: {kids!r}")
-        for extra in kids[3:]:
-            if not extra.startswith("horizontalSpacer_"):
-                problems.append(f"复用行内不允许出现非 spacer 部件: {extra!r}")
+            "horizontalSpacer_strm",
+        ]
+        if kids != expect:
+            problems.append(f"STRM 行内顺序/成员被改: {kids!r} 期望 {expect!r}")
+
+    if _find_layout_by_name(root, "horizontalLayout_reuse_meta") is not None:
+        problems.append("horizontalLayout_reuse_meta 已删除（复用行并入 STRM 行），不得复活")
+
     overwrite_meta = _find_widget_by_name(root, "checkBox_separate_overwrite_meta")
     if overwrite_meta is None:
         problems.append("checkBox_separate_overwrite_meta 不存在")
-    elif _widget_string_prop(overwrite_meta, "text") != "覆盖本地保存的视频元数据文件":
+    elif _widget_string_prop(overwrite_meta, "text") != "覆盖元数据":
         problems.append(f"覆盖元数据复选框文案被改: {_widget_string_prop(overwrite_meta, 'text')!r}")
 
     # 新任务模式行（高级页 → 高级功能）：本地 / 网盘互斥复选框

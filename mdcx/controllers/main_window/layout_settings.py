@@ -5,10 +5,10 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtWidgets import (
     QWIDGETSIZE_MAX,
-    QLayout,
     QSizePolicy,
     QSpacerItem,
-    QWidget,
+    QStyle,
+    QStyleOptionButton,
 )
 
 
@@ -298,64 +298,105 @@ class LayoutSettingsMixin:
             if nx != clean.x() and 0 <= nx and nx + clean.width() <= limit:
                 clean.move(nx, clean.y())
 
-    def _sync_reuse_meta_gap_align(self) -> None:
-        """刮削模式页：四行的右侧复选框严格同 x 上下对齐。
+    # STRM 行四枚复选框在 horizontalLayout_strm 里的下标（生成 / 覆盖STRM / 复用 / 覆盖元数据）
+    _STRM_ROW_BOXES = (0, 1, 3, 4)
+    # 行内用来调间距的 gap spacer 下标（夹在「覆盖STRM链接」与「复用元数据」之间）
+    _STRM_ROW_GAP_INDEX = 2
+    # 行内设计间距（.ui 里 horizontalLayout_strm 的 spacing）
+    _STRM_ROW_SPACING = 14
 
-        锚点是 STRM 行（其左右两个复选框之间只有布局间距，没有间隔占位），
-        复用行、整理模式间隔行、视频模式行的右侧复选框则各自带一个 gap spacer
-        （第 1 项），差值只来自“首框宽度差 + 行内间距差”，由 gap spacer 补齐。
+    def _sync_strm_row_meta_align(self) -> None:
+        """刮削模式页：覆盖元数据右缘钉到分离模式描述文本右缘（四枚复选框同排）。
 
-        四行同处 gridLayout_2 第 1 列（左缘天然一致）。sizeHint 在 show 前后会变
-        （初始化公式一次算不准，窄态实测差 6px），故按实测差值闭环收敛：量各框经
-        content 中转的 x 差，残差就加多少，相等即 no-op。gap 钉 Fixed、行尾 spacer
-        保持 Expanding，宽态富余只进尾部；gap 变宽不改变行总宽（尾部吸收），不触发
+        用户需求（2026-10-23 两轮截图批注）：复用元数据 / 覆盖元数据两枚复选框从原来
+        独立的一行上移进 STRM 行、紧跟「覆盖STRM链接」之后（行内顺序 = 生成STRM链接 /
+        覆盖STRM链接 / 复用元数据 / 覆盖元数据）；随后又要求这两枚继续**左移**，改成
+        让**最后一枚「覆盖元数据」**的文字右缘与上一行描述文字「…视频与元数据分开存放」
+        右缘严格上下对齐。描述行一个像素都不动。
+
+        锚点 = 描述 label 的**文字**右缘 = label.x + fontMetrics.horizontalAdvance(文本)。
+        label 是 Minimum 策略、宽态会被拉宽到整格宽度，width() 比文字宽出几十像素
+        （实测窄态多 43、宽态多 897），拿 width() 当锚点整行会右飘。复选框同理：
+        widget 右缘比文字右缘多出 5px 左右（指示器左内缩 + 文字后留白，样式给的
+        SE_CheckBoxContents 才是文字起点），所以目标右缘按「widget.x + 内容区起点 +
+        文字宽」算，否则文字会比描述文字左缩 5px，肉眼能看出来。
+
+        调节手段两级，按「先动谁最不碍眼」排序：
+          ① 先动 gap spacer（覆盖STRM链接 与 复用元数据 之间那枚 Fixed 间隔）——
+             它就是原来那个大空档，收窄到 0 外观最自然；
+          ② gap 已经到 0 还偏右（字体更宽时四枚复选框连设计间距都放不下），才把
+             行内 spacing 从设计值 14 逐像素压小（最低 0），让整组往左收。
+        每遍都先把 spacing 复位成设计值再收敛，故幂等、往返自愈；收敛残差夹到
+        [0, slack]：slack = 行宽 − 四枚复选框 sizeHint 之和 − 行内间距总和，超过就是
+        窗口太窄、再撑会把行撑破网格列宽（连描述列一起推走），此时宁可不对齐也不裁字。
+        行尾 spacer 保持 Expanding：gap 变宽不改变行最小宽（富余由尾部吸收），不触发
         新的 resize，不会自激。休眠页跳过（切页同拍收敛，无漂移可见）。
         """
         ui = self.Ui
         content = getattr(ui, "scrollAreaWidgetContents_guaxiaomoshi", None)
-        if content is None or not content.isVisibleTo(self):
+        row = getattr(ui, "horizontalLayout_strm", None)
+        anchor = getattr(ui, "label_separate_mode", None)
+        target = getattr(ui, "checkBox_separate_overwrite_meta", None)
+        if content is None or row is None or anchor is None or target is None or not content.isVisibleTo(self):
             return
-        strm_box = getattr(ui, "checkBox_separate_overwrite_strm", None)
-        if strm_box is None:
+        gap_item = row.itemAt(self._STRM_ROW_GAP_INDEX)
+        gap = gap_item.spacerItem() if gap_item is not None else None
+        if gap is None:
             return
-        # 待收敛的行：右侧复选框 + 行内用于调节间距的 gap spacer（第 1 项）
-        rows: list[tuple[QWidget, QLayout, QSpacerItem]] = []
-        for box_name, row_name in (("checkBox_separate_overwrite_meta", "horizontalLayout_reuse_meta"),):
-            box = getattr(ui, box_name, None)
-            row = getattr(ui, row_name, None)
-            if box is None or row is None:
-                continue
-            gap_item = row.itemAt(1)
-            gap = gap_item.spacerItem() if gap_item is not None else None
-            if gap is None:
-                continue
-            # 行尾 spacer 保持 Expanding：gap 变宽不改变行总宽（富余由尾部吸收），
-            # 因此不会触发新的 resize，不会自激
-            tail_item = row.itemAt(3)
-            tail = tail_item.spacerItem() if tail_item is not None else None
-            if tail is not None and tail.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Expanding:
-                tail.changeSize(
-                    max(tail.sizeHint().width(), 0), 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
-                )
-            rows.append((box, row, gap))
-        if not rows:
-            return
-        for _box, _row, gap in rows:
-            if gap.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Fixed:
-                gap.changeSize(max(gap.sizeHint().width(), 0), 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
-        for _ in range(4):
-            xs = strm_box.mapTo(content, QPoint(0, 0)).x()
-            if all(box.mapTo(content, QPoint(0, 0)).x() == xs for box, _row, _gap in rows):
+        boxes = []
+        for index in self._STRM_ROW_BOXES:
+            item = row.itemAt(index)
+            box = item.widget() if item is not None else None
+            if box is None:
+                return
+            boxes.append(box)
+        # 行尾 spacer 保持 Expanding：gap 变宽不改变行最小宽（富余由尾部吸收），不会自激
+        tail_item = row.itemAt(row.count() - 1)
+        tail = tail_item.spacerItem() if tail_item is not None else None
+        if tail is not None and tail.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Expanding:
+            tail.changeSize(
+                max(tail.sizeHint().width(), 0), 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
+            )
+        if gap.sizePolicy().horizontalPolicy() != QSizePolicy.Policy.Fixed:
+            gap.changeSize(max(gap.sizeHint().width(), 0), 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        # 每遍先把行内 spacing 复位成设计值（上一遍可能压小过），再按残差收敛
+        if row.spacing() != self._STRM_ROW_SPACING:
+            row.setSpacing(self._STRM_ROW_SPACING)
+            row.invalidate()
+            row.activate()
+        # 可用余量按 sizeHint 算（行被压扁时 width() 是挤压值，会算出自洽的假 slack）。
+        # 行内 spacing 只出现在「控件与控件」之间：与 spacer 相邻的一侧实测不占 spacing，
+        # 故只按四枚复选框之间的 3 段计，多算会把行撑破、复选框被挤扁。
+        fixed_w = sum(box.sizeHint().width() for box in boxes)
+        anchor_right = anchor.mapTo(content, QPoint(0, 0)).x() + anchor.fontMetrics().horizontalAdvance(anchor.text())
+        # 复选框文字右缘相对 widget 左缘的偏移（内容区起点 + 文字宽；尾部留白不算）
+        style_option = QStyleOptionButton()
+        target.initStyleOption(style_option)
+        text_rect = target.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, style_option, target)
+        text_offset = text_rect.x() + target.fontMetrics().horizontalAdvance(target.text())
+        gap_w = gap.sizeHint().width()
+        for _ in range(20):
+            cur_right = target.mapTo(content, QPoint(0, 0)).x() + text_offset
+            delta = anchor_right - cur_right
+            if delta == 0:
                 break
-            for box, row, gap in rows:
-                xm = box.mapTo(content, QPoint(0, 0)).x()
-                if xm == xs:
-                    continue
-                gap.changeSize(
-                    max(gap.sizeHint().width() + (xs - xm), 0), 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum
-                )
-                row.invalidate()
-                row.activate()
+            if delta > 0:
+                # 往右：只放宽 gap，夹到「行内还剩多少余量」
+                slack = max(row.geometry().width() - fixed_w - row.spacing() * (len(boxes) - 1), 0)
+                new_gap = min(gap_w + delta, slack)
+                if new_gap == gap_w:
+                    break
+                gap_w = new_gap
+            elif gap_w > 0:
+                # 往左：先收 gap，收没了再压行内 spacing（最低 0）
+                gap_w = max(gap_w + delta, 0)
+            elif row.spacing() > 0:
+                row.setSpacing(row.spacing() - 1)
+            else:
+                break
+            gap.changeSize(gap_w, 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+            row.invalidate()
+            row.activate()
 
     def _sync_javdb_tip_pos(self) -> None:
         """刮削模式页：Javdb 延时提示（label_26）上移一行并钉死。
@@ -384,7 +425,7 @@ class LayoutSettingsMixin:
             or not content.isVisibleTo(self)
         ):
             return
-        # x：与分离模式描述文本左缘精确相等（经 content 中转，同 _sync_reuse_meta_gap_align）。
+        # x：与分离模式描述文本左缘精确相等（经 content 中转，同 _sync_strm_row_meta_align）。
         anchor_x = sep.mapTo(content, QPoint(0, 0)).x()
         if abs(anchor_x - tip.mapTo(content, QPoint(0, 0)).x()) > 1:
             tip.move(tip.x() + (anchor_x - tip.mapTo(content, QPoint(0, 0)).x()), tip.y())

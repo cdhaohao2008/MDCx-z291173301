@@ -25,8 +25,10 @@
      tooltip 非空。
   5. 窄↔宽两态 + 重复同步，6 个 label 与 label_26 的左缘逐像素不变
      （以后不允许再变动位置）。
-  6. 同列 3 个复选框（STRM 生成 / STRM 覆盖 / 元数据复用）左缘严格一致，
-     窄↔宽往返不变（视频模式「删除/移动」两枚复选框已随功能删除）。
+  6. STRM 行四枚复选框（生成 / 覆盖STRM / 复用 / 覆盖元数据）同排、顺序固定、
+     首枚贴齐列左缘，且复用行删除后不留空行（行距与其它行一致）。
+  7. 复用框右缘与分离模式描述**文字**右缘严格上下对齐（宽态精确相等；窄态夹到
+     可用余量上限，但不许挤扁/裁字、不许撑破行），窄↔宽往返冻结。
   9. Javdb 提示上移一行（静态）：label_26 移出 gridLayout_15、独立为
      groupBox_53 子件，下方 7 组框与滚动内容同步上收（值见测试断言）。
   10. Javdb 提示上移一行（运行时）：0-2 行高一致且等距（未被搬动），提示 x 与
@@ -45,20 +47,21 @@ from pathlib import Path
 
 import pytest
 from PyQt6.QtCore import QPoint
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QStyle, QStyleOptionButton
 
 REPO = Path(__file__).resolve().parent.parent
 UI_PATH = REPO / "mdcx" / "views" / "MDCx.ui"
 PY_PATH = REPO / "mdcx" / "views" / "MDCx.py"
 
-# gridLayout_2 第 1 列同列复选框：STRM 生成 / STRM 覆盖 / 元数据复用。
-# 全部同处第 1 列，左缘必须严格一致。
+# gridLayout_2 第 1 列同排的四枚复选框（2026-10-23 起同处 STRM 行）：
+# 生成STRM链接 / 覆盖STRM链接 / 复用元数据 / 覆盖元数据，左缘必须严格一致。
 # （原「整理模式间隔行」的两枚复选框已随任务模式迁移到「设置-高级」；
 #  视频模式「删除/移动」两枚复选框已随功能删除，此处都不再登记。）
 _MODE_CHECKBOXES = (
     "checkBox_separate_generate_strm",
     "checkBox_separate_overwrite_strm",
     "checkBox_separate_reuse_meta",
+    "checkBox_separate_overwrite_meta",
 )
 
 # gridLayout_2 第 1 列 6 个描述 label：正常 / 整理 / 分离 / 视频 / 更新 / 读取。
@@ -232,59 +235,123 @@ def test_desc_column_never_moves_again(win, app):
     assert snapshot() == narrow, "窄→宽→窄往返未复原"
 
 
-def test_mode_checkboxes_left_aligned(win, app):
-    """同列 3 复选框（生成/复用/删除）左缘严格一致，覆盖框同行居右，窄↔宽往返不变。"""
+def test_strm_row_holds_four_checkboxes(win, app):
+    """STRM 行四枚复选框同排：生成 / 覆盖STRM / 复用 / 覆盖元数据，顺序与行内位置固定。
+
+    用户需求（2026-10-23，截图批注）：复用元数据 / 覆盖元数据两枚复选框从独立的一行
+    上移进 STRM 行、紧跟覆盖STRM链接之后；原复用行整行删除（下方各行上移一行，行距不变）。
+    """
     ui = win.Ui
     win.show()
     _goto_guaxiaomoshi(win, app)
 
-    def snapshot():
-        return {name: _abs(ui, getattr(ui, name)) for name in _MODE_CHECKBOXES}
-
-    _resize(win, app, 1030, 753)
-    narrow = snapshot()
-    aligned = {
-        k: narrow[k]
-        for k in (
-            "checkBox_separate_generate_strm",
-            "checkBox_separate_reuse_meta",
-        )
-    }
-    assert len(set(aligned.values())) == 1, f"同列复选框左缘不一致: {narrow}"
-    assert narrow["checkBox_separate_overwrite_strm"] > narrow["checkBox_separate_generate_strm"], (
-        f"覆盖框应同行居右: {narrow}"
-    )
-    _resize(win, app, 1920, 1170)
-    wide = snapshot()
-    assert wide == narrow, f"宽态复选框位置变动: {narrow} -> {wide}"
-    _resize(win, app, 1030, 753)
-    assert snapshot() == narrow, "窄→宽→窄往返未复原"
-
-
-def test_overwrite_meta_aligns_under_overwrite_strm(win, app):
-    """覆盖元数据框与覆盖 STRM 框上下严格对齐、与复用框同行，窄↔宽往返不变。"""
-    ui = win.Ui
-    win.show()
-    _goto_guaxiaomoshi(win, app)
+    row = ui.horizontalLayout_strm
+    names = []
+    for i in range(row.count()):
+        widget = row.itemAt(i).widget()
+        names.append(widget.objectName() if widget is not None else "")
+    assert names == [
+        "checkBox_separate_generate_strm",
+        "checkBox_separate_overwrite_strm",
+        "",
+        "checkBox_separate_reuse_meta",
+        "checkBox_separate_overwrite_meta",
+        "",
+    ], f"STRM 行成员/顺序被改: {names}"
 
     def pos(name):
         p = getattr(ui, name).mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0))
         return (p.x(), p.y())
 
     _resize(win, app, 1030, 753)
-    narrow_meta = pos("checkBox_separate_overwrite_meta")
-    narrow_strm = pos("checkBox_separate_overwrite_strm")
-    narrow_reuse = pos("checkBox_separate_reuse_meta")
-    assert narrow_meta[0] == narrow_strm[0], f"覆盖元数据框未与覆盖 STRM 框对齐: {narrow_meta} vs {narrow_strm}"
-    assert narrow_meta[1] == narrow_reuse[1], f"覆盖元数据框未与复用框同行: {narrow_meta} vs {narrow_reuse}"
-    assert narrow_meta[1] > narrow_strm[1], "覆盖元数据框应在覆盖 STRM 框下方"
+    boxes = [pos(n) for n in _MODE_CHECKBOXES]
+    assert len({y for _x, y in boxes}) == 1, f"四枚复选框不在同一行: {boxes}"
+    assert [x for x, _y in boxes] == sorted(x for x, _y in boxes), f"行内顺序错: {boxes}"
+    # 首枚贴齐 gridLayout_2 第 1 列左缘（与描述列同一条竖线）
+    col_left = ui.gridLayoutWidget_2.mapTo(
+        ui.scrollAreaWidgetContents_guaxiaomoshi, ui.gridLayout_2.cellRect(3, 1).topLeft()
+    ).x()
+    assert boxes[0][0] == col_left, f"首枚复选框未贴齐列左缘: {boxes[0]} 期望 x={col_left}"
+
+    # 复用行删掉后不许留下空行：STRM 行→视频模式行的行距必须与其它相邻行一致。
+    def pitch(r1, r2):
+        return ui.gridLayout_2.cellRect(r2, 1).y() - ui.gridLayout_2.cellRect(r1, 1).y()
+
+    assert pitch(3, 5) == pitch(1, 2) == pitch(2, 3), f"STRM 行与视频模式行之间残留空行: {pitch(3, 5)} vs {pitch(2, 3)}"
+
+    # 窄↔宽往返：行内位置只随间距项变化，成员与顺序不变
     _resize(win, app, 1920, 1170)
-    wide_meta = pos("checkBox_separate_overwrite_meta")
-    wide_strm = pos("checkBox_separate_overwrite_strm")
-    assert wide_meta == narrow_meta, f"宽态覆盖元数据框位置变动: {narrow_meta} -> {wide_meta}"
-    assert wide_meta[0] == wide_strm[0], "宽态两覆盖框不对齐"
+    wide = [pos(n) for n in _MODE_CHECKBOXES]
+    assert len({y for _x, y in wide}) == 1, f"宽态四枚复选框不在同一行: {wide}"
     _resize(win, app, 1030, 753)
-    assert pos("checkBox_separate_overwrite_meta") == narrow_meta, "窄→宽→窄往返未复原"
+    assert [pos(n) for n in _MODE_CHECKBOXES] == boxes, "窄→宽→窄往返未复原"
+
+
+def test_overwrite_meta_right_edge_aligns_with_separate_desc(win, app):
+    """覆盖元数据右缘与分离模式描述文字右缘严格上下对齐，复用元数据紧随其左。
+
+    用户需求（2026-10-23 第二轮截图批注）：四枚复选框整体左移，改成让**最后一枚
+    「覆盖元数据」**的文字右缘落在上一行描述文字「…视频与元数据分开存放」右缘那条
+    竖线上；描述行本身一个像素都不动。
+
+    锚点是描述 label 的**文字**右缘（label 被拉宽到整格，width() 比文字宽出几十像素，
+    见 DADA/MEMORY.md「锚点必须用 sizeHint 而不是 width」）；复选框同理要用
+    SE_CheckBoxContents 起点 + 文字宽，widget 右缘多出几像素尾部留白。
+    调节顺序：先收 gap spacer，收没了再压行内 spacing —— 两态都必须严格对齐，
+    且不许把复选框挤扁/裁字、不许把行撑破。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_guaxiaomoshi(win, app)
+    content = ui.scrollAreaWidgetContents_guaxiaomoshi
+
+    def snapshot():
+        label = ui.label_separate_mode
+        reuse = ui.checkBox_separate_reuse_meta
+        over = ui.checkBox_separate_overwrite_meta
+        row = ui.horizontalLayout_strm
+        lp = label.mapTo(content, QPoint(0, 0))
+        rp = reuse.mapTo(content, QPoint(0, 0))
+        op = over.mapTo(content, QPoint(0, 0))
+        cell = ui.gridLayout_2.cellRect(3, 1)
+        row_right = ui.gridLayoutWidget_2.mapTo(content, cell.topLeft()).x() + cell.width()
+        # 复选框的文字右缘：内容区起点（样式给的 SE_CheckBoxContents）+ 文字宽，
+        # widget 右缘比它多出几像素尾部留白，不能直接拿 width() 当文字右缘。
+        option = QStyleOptionButton()
+        over.initStyleOption(option)
+        text_rect = over.style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, option, over)
+        return {
+            "text_right": lp.x() + label.fontMetrics().horizontalAdvance(label.text()),
+            "over_text_right": op.x() + text_rect.x() + over.fontMetrics().horizontalAdvance(over.text()),
+            "reuse_right": rp.x() + reuse.width(),
+            "over_left": op.x(),
+            "over_right": op.x() + over.width(),
+            "row_right": row_right,
+            "gap": row.itemAt(2).geometry().width(),
+            "spacing": row.spacing(),
+            "widths": [getattr(ui, n).width() for n in _MODE_CHECKBOXES],
+            "size_hints": [getattr(ui, n).sizeHint().width() for n in _MODE_CHECKBOXES],
+        }
+
+    for width, height in ((1030, 753), (1920, 1170)):
+        _resize(win, app, width, height)
+        snap = snapshot()
+        assert snap["over_text_right"] == snap["text_right"], (
+            f"{width} 宽下覆盖元数据文字右缘未与描述文字右缘对齐: {snap['over_text_right']} vs {snap['text_right']}"
+        )
+        assert snap["over_left"] > snap["reuse_right"], f"{width} 宽下复用框未排在覆盖元数据左侧: {snap}"
+        assert snap["over_right"] <= snap["row_right"], f"{width} 宽下覆盖元数据超出 STRM 行: {snap}"
+        assert snap["widths"] == snap["size_hints"], f"{width} 宽下复选框被挤扁: {snap}"
+        assert snap["gap"] >= 0 and snap["spacing"] >= 0, f"{width} 宽下出现负间距: {snap}"
+
+    # 往返冻结：宽→窄→宽 回到同一组数值（spacing 每遍先复位成设计值，幂等）
+    _resize(win, app, 1030, 753)
+    narrow = snapshot()
+    _resize(win, app, 1920, 1170)
+    wide = snapshot()
+    assert wide["over_text_right"] == wide["text_right"] == narrow["over_text_right"], "往返后对齐漂移"
+    _resize(win, app, 1030, 753)
+    assert snapshot() == narrow, "宽→窄往返后窄态数值漂移"
 
 
 def test_again_download_checkbox_at_column_left(win, app):
@@ -463,19 +530,21 @@ def test_javdb_tip_moved_up_one_line_static():
     assert _ui_geometry("gridLayoutWidget_15")[3] == 129, "grid 容器高不是 129"
     # 刮削模式组与其后各组：读取模式区被裁切修复后整体下移 41px（详见 test_read_mode_options_not_squeezed）；
     # 补全模式新增一行（2026-10-23）后再整体下移 37px；同日删掉两项后组框高 569 → 523，
-    # 其下各组与滚动内容同步上收 46px。
+    # 其下各组与滚动内容同步上收 46px。同日「复用元数据 / 覆盖元数据」并入 STRM 行、
+    # 原复用行删除：模式组再上收 52px（gridLayoutWidget_2 479 → 427，行距保持 43）。
     for name, y in (
         ("groupBox", 218),
-        ("groupBox_5", 760),
-        ("groupBox_2", 1240),
-        ("groupBox_18", 1470),
-        ("groupBox_27", 1600),
-        ("groupBox_15", 1730),
-        ("groupBox_30", 1860),
+        ("groupBox_5", 708),
+        ("groupBox_2", 1188),
+        ("groupBox_18", 1418),
+        ("groupBox_27", 1548),
+        ("groupBox_15", 1678),
+        ("groupBox_30", 1808),
     ):
         assert _ui_geometry(name)[1] == y, f"{name} 的 y 不是 {y}"
-    assert _ui_geometry("groupBox")[3] == 523, "刮削模式组框高不是 523"
-    assert _ui_geometry("scrollAreaWidgetContents_guaxiaomoshi")[3] == 2060, "滚动内容高不是 2060"
+    assert _ui_geometry("groupBox")[3] == 471, "刮削模式组框高不是 471"
+    assert _ui_geometry("gridLayoutWidget_2")[3] == 427, "刮削模式网格容器高不是 427"
+    assert _ui_geometry("scrollAreaWidgetContents_guaxiaomoshi")[3] == 2008, "滚动内容高不是 2008"
 
 
 def _content_pos(ui, widget):

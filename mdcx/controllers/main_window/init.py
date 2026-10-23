@@ -1140,9 +1140,9 @@ def Init_Singal(self: MyMAinWindow):
     if _col0_w > 0:
         self.Ui.gridLayout_2.setColumnMinimumWidth(0, _col0_w)
         self.Ui.gridLayout_15.setColumnMinimumWidth(0, _col0_w)
-    # 复用行、整理间隔行、视频模式行的第二复选框与 STRM 行第二复选框同 x 上下
-    # 严格对齐：由主窗口 _sync_reuse_meta_gap_align 按实测差值闭环收敛（sizeHint
-    # 在 show 前后会变，初始化公式一次算不准），此处不预设 gap 宽度。
+    # STRM 行四枚复选框（生成 / 覆盖STRM / 复用 / 覆盖元数据）同排：行内间距由主窗口
+    # _sync_strm_row_meta_align 按实测差值闭环收敛（sizeHint 在 show 前后会变，初始化
+    # 公式一次算不准），此处不预设 gap 宽度。
     # 复用/覆盖元数据互斥：只允许同时选中一个（界面层），运行时覆盖优先兜底。
     self.Ui.checkBox_separate_reuse_meta.toggled.connect(self.checkBox_separate_reuse_meta_changed)
     self.Ui.checkBox_separate_overwrite_meta.toggled.connect(self.checkBox_separate_overwrite_meta_changed)

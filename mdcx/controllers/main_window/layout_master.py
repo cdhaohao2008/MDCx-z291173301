@@ -502,11 +502,12 @@ class LayoutMasterMixin:
         # 上面那次宽态重跑之后，否则「刮削时自动清理」会被 _DOCK_RIGHT 钉回右缘。
         self._sync_guaxiaomulu_checkbox_align(guaxiaomulu_scroll)
 
-        # ============ page_setting / 刮削模式页: 复用行第二复选框对齐 STRM 行 ====
-        # 覆盖元数据框须与覆盖 STRM 框同 x（上下严格对齐）且永不再动：按实测差值闭环
-        # 收敛（sizeHint 在 show 前后会变，初始化公式一次算不准），相等即 no-op；
-        # 休眠页内部直接 return，切页同拍收敛。
-        self._sync_reuse_meta_gap_align()
+        # ============ page_setting / 刮削模式页: STRM 行四框同排 + 复用框右缘对齐 ====
+        # 复用/覆盖元数据已并入 STRM 行（生成 / 覆盖STRM / 复用 / 覆盖元数据），复用框
+        # 右缘须与上一行描述文字「…视频与元数据分开存放」右缘严格上下对齐、永不再动：
+        # 按实测差值闭环收敛（sizeHint 在 show 前后会变，初始化公式一次算不准），
+        # 相等即 no-op；休眠页内部直接 return，切页同拍收敛。
+        self._sync_strm_row_meta_align()
 
         # ============ page_setting / 刮削模式页: Javdb 延时提示上移一行并钉死 =
         # label_26 已移出 grid 独立为 groupBox_53 子件：x 与分离模式描述文本
