@@ -305,7 +305,7 @@ class MyMAinWindow(
         # 历史陷阱记录: setWindowFlags 触发 changeEvent, 若在 window_radius 等属性
         # 初始化前调用会在事件处理器内抛 AttributeError(PyQt6 qFatal abort 的形态之一)。
         # 当前无 setWindowFlags 调用, 此陷阱仅作为后续改动的注意事项保留。
-        self.dark_mode = False  # 暗黑模式标识
+        self.dark_mode = False  # 使用暗黑模式标识
         self.check_mac = True  # 检测配置目录
         self._actor_db_running: set[str] = set()  # 正在运行的 actor_db 异步任务的 btn_attr 集合
         self._nfo_lib_current_path: Path | None = None  # NFO 库管理：当前选中的 NFO 路径
@@ -377,7 +377,7 @@ class MyMAinWindow(
                 _sa._post_wide_sync_hook = self._sync_nfo_page_align
                 self._nfo_scroll = _sa
             elif _content is not None and _content.objectName() == "scrollAreaWidgetContents_gaoji":
-                # 高级页同病：网格里两项均分的行（界面外观行的「暗黑模式」、隐藏入口
+                # 高级页同病：网格里两项均分的行（界面外观行的「使用暗黑模式」、隐藏入口
                 # 行的「隐藏NFO库管理」）会被通用拉伸推到右缘，本控制器下一拍才拉回
                 # 基准线 → 用户看到「先在右侧、再向左漂移」（最大化与还原两个方向
                 # 各出现一次）。挂在拉伸之后的钩子上即可同拍完成。
@@ -396,9 +396,9 @@ class MyMAinWindow(
                 _sa._post_wide_sync_hook = self._sync_zimu_page_align
                 self._zimu_scroll = _sa
             elif _content is not None and _content.objectName() == "scrollAreaWidgetContents_xiazai":
-                # 下载页：两行复选框（groupBox_24「下载」/ groupBox_33「保留旧文件」）
+                # 下载页：两行复选框（groupBox_24「下载」/ groupBox_33「保留目标文件」）
                 # 都是「一项均分」但项数不同（7 vs 8），单元格边界必然错开 →
-                # 通用拉伸落定后同拍把下载行钉到保留旧文件行的同一条竖线，
+                # 通用拉伸落定后同拍把下载行钉到保留目标文件行的同一条竖线，
                 # 否则会看到「先在右边、再向左跳」（同 _sync_advanced_page_wide_hook）。
                 _sa._post_wide_sync_hook = self._sync_xiazai_row_align
                 self._xiazai_scroll = _sa

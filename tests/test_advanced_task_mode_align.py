@@ -1,15 +1,15 @@
-"""设置-高级页「任务模式」行：「存储在网盘」与「暗黑模式」严格上下对齐 + 隐藏窗口行不再压字。
+"""设置-高级页「任务模式」行：「网盘存储文件」与「使用暗黑模式」严格上下对齐 + 隐藏窗口行不再压字。
 
 需求（2026-10-23，最小化 / 最大化两张用户截图）：
-  ① 还原态「存储在网盘」**向左**、最大化态**向右**，都落在「暗黑模式」那条竖线上；
-     「暗黑模式」自身位置保持不变。
-  ② 「隐藏窗口」行的三枚单选（点关闭按钮 / 点最小化按钮 / 无）原先与「隐藏Dock图标
+  ① 还原态「网盘存储文件」**向左**、最大化态**向右**，都落在「使用暗黑模式」那条竖线上；
+     「使用暗黑模式」自身位置保持不变。
+  ② 「隐藏窗口」行的三枚单选（点击关闭按钮 / 点最小化按钮 / 无）原先与「隐藏Dock图标
      （Mac）/ 隐藏菜单栏图标（Mac）/ 保存后重启生效」挤在同一个网格格里互相压字，
      现在单选独占一行、复选框行下移一行，两行不得有任何垂直重叠。
 
 实现：
   - `_sync_advanced_page_task_mode_align()`：任务模式行容器取「界面外观」行同宽，
-    前导项「存储在本地」钉成「隐藏边框（美观样式）」等宽，末位即落「暗黑模式」竖线。
+    前导项「本地存储文件」钉成「隐藏边框（美观样式）」等宽，末位即落「使用暗黑模式」竖线。
   - .ui：gridLayout_20 里 horizontalLayout_dock 从 row9 挪到 row10（独占一行），
     其后各行 +1，组框与内嵌 grid 各加高 30px。
 """
@@ -102,7 +102,7 @@ _SIZES = ((1920, 1170), (1536, 864), (1366, 850), (1200, 800), (1085, 793), (103
 
 @pytest.mark.parametrize("width,height", _SIZES)
 def test_task_mode_netdisk_aligns_with_dark_mode(win, app, width, height):
-    """「存储在网盘」与「暗黑模式」严格上下对齐；「暗黑模式」自身不因本需求移动。"""
+    """「网盘存储文件」与「使用暗黑模式」严格上下对齐；「使用暗黑模式」自身不因本需求移动。"""
     ui = win.Ui
     win.show()
     _goto_advanced(win, app)
@@ -110,10 +110,10 @@ def test_task_mode_netdisk_aligns_with_dark_mode(win, app, width, height):
 
     netdisk = _pos(ui, ui.checkBox_task_store_netdisk)
     dark = _pos(ui, ui.checkBox_dark_mode)
-    assert netdisk[0] == dark[0], f"{width}x{height} 下「存储在网盘」x={netdisk[0]} 与「暗黑模式」x={dark[0]} 未对齐"
+    assert netdisk[0] == dark[0], f"{width}x{height} 下「网盘存储文件」x={netdisk[0]} 与「使用暗黑模式」x={dark[0]} 未对齐"
     # 末位项必须完整显示：容器被压窄到裁字时本需求就不成立
     assert ui.checkBox_task_store_netdisk.width() >= ui.checkBox_task_store_netdisk.sizeHint().width(), (
-        f"{width}x{height} 下「存储在网盘」被压窄到裁字"
+        f"{width}x{height} 下「网盘存储文件」被压窄到裁字"
     )
 
 
@@ -162,7 +162,7 @@ def test_hide_window_rows_do_not_overlap(win, app, width, height):
     for w in (ui.checkBox_hide_dock_icon, ui.checkBox_hide_menu_icon, ui.label_42):
         center = _pos(ui, w)[1] + w.height() / 2
         assert abs(center - label_314_center) <= 1, f"{w.objectName()} 未与「隐藏图标：」垂直居中"
-    # 「界面外观：」与「隐藏边框（美观样式）」「暗黑模式」同行居中
+    # 「界面外观：」与「隐藏边框（美观样式）」「使用暗黑模式」同行居中
     label_246 = ui.label_246
     label_246_center = _pos(ui, label_246)[1] + label_246.height() / 2
     for w in (ui.checkBox_hide_window_title, ui.checkBox_dark_mode):

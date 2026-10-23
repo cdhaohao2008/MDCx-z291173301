@@ -1147,14 +1147,14 @@ def Init_Singal(self: MyMAinWindow):
     # STRM：覆盖是生成的后置动作，勾选覆盖时同步勾选生成（取消生成则覆盖一并取消）
     self.Ui.checkBox_separate_generate_strm.toggled.connect(self.checkBox_separate_generate_strm_changed)
     self.Ui.checkBox_separate_overwrite_strm.toggled.connect(self.checkBox_separate_overwrite_strm_changed)
-    # 高级页-任务模式：存储在本地 / 存储在网盘互斥
+    # 高级页-任务模式：本地存储文件 / 网盘存储文件互斥
     self.Ui.checkBox_task_store_local.toggled.connect(self.checkBox_task_store_local_changed)
     self.Ui.checkBox_task_store_netdisk.toggled.connect(self.checkBox_task_store_netdisk_changed)
     # 视频模式：删除本地已下载的图片和信息文件 / 移动已下载图片和文件到新目录，
     # 两枚复选框互斥（同一时刻只能选中一个；都不勾选=图片/nfo/字幕留在原目录）
     self.Ui.checkBox_sortmode_delpic.toggled.connect(self.checkBox_sortmode_delpic_changed)
     self.Ui.checkBox_sortmode_movefile.toggled.connect(self.checkBox_sortmode_movefile_changed)
-    # 高级页「移动文件」：覆盖旧文件 / 保留旧文件互斥（同一时刻只能选中一个；
+    # 高级页「移动文件」：覆盖目标文件 / 保留目标文件互斥（同一时刻只能选中一个；
     # 都不勾选=保持原有移动行为）
     self.Ui.checkBox_move_overwrite.toggled.connect(self.checkBox_move_overwrite_changed)
     self.Ui.checkBox_move_keep.toggled.connect(self.checkBox_move_keep_changed)

@@ -959,7 +959,7 @@ async def thumb_download(
         keep_files=manager.config.keep_files,
     )
 
-    # 本地存在 thumb.jpg，且勾选保留旧文件时，不下载
+    # 本地存在 thumb.jpg，且勾选保留目标文件时，不下载
     if thumb_path and thumb_policy.should_keep:
         return True
 
@@ -1368,7 +1368,7 @@ async def poster_download(
             await delete_file_async(poster_path)
         return True
 
-    # 本地有poster时，且勾选保留旧文件时，不下载
+    # 本地有poster时，且勾选保留目标文件时，不下载
     if poster_path and poster_policy.should_keep:
         return True
 
@@ -1692,7 +1692,7 @@ async def extrafanart_download(
             await to_thread(shutil.rmtree, extrafanart_folder_path, ignore_errors=True)
         return None
 
-    # 本地存在 extrafanart_folder，且勾选保留旧文件时，不下载
+    # 本地存在 extrafanart_folder，且勾选保留目标文件时，不下载
     if extrafanart_policy.should_keep and await aiofiles.os.path.exists(extrafanart_folder_path):
         return True
 

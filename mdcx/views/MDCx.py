@@ -13590,7 +13590,7 @@ class Ui_MDCx(object):
         self.label_21.setText(
             _translate(
                 "MDCx",
-                "<p style='line-height:20px'>⚠️ 保留文件：请到设置>下载>保留旧文件或下载，设置要保留或更新的文件内容<br>\n"
+                "<p style='line-height:20px'>⚠️ 保留文件：请到设置>下载>保留目标文件或下载，设置要保留或更新的文件内容<br>\n"
                 "                          ⚠️ 跳过文件：在视频目录新建一个名为skip的空文件，即可自动跳过该目录及子目录，所有模式均有效<br>\n"
                 "                          ⚠️ 移动文件：失败时不移动文件，文件刮削成功后按更新模式规则移动视频文件<br>\n"
                 "                          ⚠️ 重命名文件：在「成功后重命名文件」中设置是否重命名，命名规则同「命名」-「视频文件名」相同</p>",
@@ -13787,7 +13787,7 @@ class Ui_MDCx(object):
         self.label_310.setText(
             _translate("MDCx", "⚠️ 下载剧照、预告片，请选择「字段优先」或「指定网站」！「速度优先」模式信息不完整")
         )
-        self.groupBox_33.setTitle(_translate("MDCx", "保留旧文件"))
+        self.groupBox_33.setTitle(_translate("MDCx", "保留目标文件"))
         self.checkBox_old_poster.setText(_translate("MDCx", "封面图"))
         self.checkBox_old_thumb.setText(_translate("MDCx", "缩略图"))
         self.checkBox_old_fanart.setText(_translate("MDCx", "背景图"))
@@ -14659,39 +14659,39 @@ class Ui_MDCx(object):
         self.radioButton_update_off.setText(_translate("MDCx", "关"))
         self.groupBox_12.setTitle(_translate("MDCx", "高级功能"))
         self.checkBox_hide_window_title.setText(_translate("MDCx", "隐藏边框（美观样式）"))
-        self.checkBox_dark_mode.setText(_translate("MDCx", "暗黑模式"))
+        self.checkBox_dark_mode.setText(_translate("MDCx", "使用暗黑模式"))
         self.checkBox_hide_dock_icon.setText(_translate("MDCx", "隐藏Dock图标（Mac）"))
         self.checkBox_hide_menu_icon.setText(_translate("MDCx", "隐藏菜单栏图标（Mac）"))
         self.label_42.setText(_translate("MDCx", "保存后重启生效 "))
         self.label_321.setText(_translate("MDCx", "间歇刮削："))
         self.checkBox_auto_start.setText(_translate("MDCx", "启动软件后自动开始刮削"))
         self.checkBox_auto_exit.setText(_translate("MDCx", "刮削结束后自动退出软件"))
-        self.checkBox_show_dialog_exit.setText(_translate("MDCx", "退出软件时"))
-        self.checkBox_show_dialog_stop_scrape.setText(_translate("MDCx", "停止刮削时"))
+        self.checkBox_show_dialog_exit.setText(_translate("MDCx", "当退出软件时"))
+        self.checkBox_show_dialog_stop_scrape.setText(_translate("MDCx", "当停止刮削时"))
         self.checkBox_timed_scrape.setText(_translate("MDCx", "每次间隔"))
         self.label_84.setText(_translate("MDCx", "（时:分:秒）自动开始刮削视频文件，读取配置时开始计时"))
         self.label_308.setText(_translate("MDCx", "自动任务："))
         self.label_309.setText(_translate("MDCx", "自动刮削："))
         self.label_277.setText(_translate("MDCx", "弹窗确认："))
         self.pushButton_select_config_folder.setText(_translate("MDCx", "选择目录"))
-        self.checkBox_remain_task.setText(_translate("MDCx", "记住任务，重启续刮"))
-        self.checkBox_infinite_scrape.setText(_translate("MDCx", "无限次刮削"))
+        self.checkBox_remain_task.setText(_translate("MDCx", "重启续刮任务"))
+        self.checkBox_infinite_scrape.setText(_translate("MDCx", "不限次数刮削"))
         self.label_279.setText(_translate("MDCx", "保留任务："))
         self.label_task_mode.setText(_translate("MDCx", "任务模式："))
-        self.checkBox_task_store_local.setText(_translate("MDCx", "存储在本地"))
+        self.checkBox_task_store_local.setText(_translate("MDCx", "本地存储文件"))
         self.checkBox_task_store_local.setToolTip(
-            _translate("MDCx", "任务文件存储在本地：整理模式不设置时间间隔整理文件，随时可以开始整理")
+            _translate("MDCx", "任务文件本地存储文件：整理模式不设置时间间隔整理文件，随时可以开始整理")
         )
-        self.checkBox_task_store_netdisk.setText(_translate("MDCx", "存储在网盘"))
+        self.checkBox_task_store_netdisk.setText(_translate("MDCx", "网盘存储文件"))
         self.checkBox_task_store_netdisk.setToolTip(
             _translate(
                 "MDCx",
-                "任务文件存储在网盘：整理模式按「高级→间歇刮削→自动休息」设定的间隔整理文件，上一次整理完成到下一次整理开始之间至少间隔自动休息时间",
+                "任务文件网盘存储文件：整理模式按「高级→间歇刮削→自动休息」设定的间隔整理文件，上一次整理完成到下一次整理开始之间至少间隔自动休息时间",
             )
         )
         self.label_move_file.setText(_translate("MDCx", "移动文件："))
-        self.checkBox_move_overwrite.setText(_translate("MDCx", "覆盖旧文件"))
-        self.checkBox_move_keep.setText(_translate("MDCx", "保留旧文件"))
+        self.checkBox_move_overwrite.setText(_translate("MDCx", "覆盖目标文件"))
+        self.checkBox_move_keep.setText(_translate("MDCx", "保留目标文件"))
         self.label_40.setText(
             _translate("MDCx", "将读取该目录中的配置文件、映射表、水印图片、演员头像等数据，修改后重启程序方可生效")
         )
@@ -14699,7 +14699,7 @@ class Ui_MDCx(object):
         self.label_421.setText(_translate("MDCx", "目录中的文件较多时，可以勾选此项提高文件打开速度"))
         self.label_314.setText(_translate("MDCx", "隐藏图标："))
         self.label_243.setText(_translate("MDCx", "配置目录："))
-        self.radioButton_hide_close.setText(_translate("MDCx", "点关闭按钮"))
+        self.radioButton_hide_close.setText(_translate("MDCx", "点击关闭按钮"))
         self.radioButton_hide_mini.setText(_translate("MDCx", "点最小化按钮"))
         self.radioButton_hide_none.setText(_translate("MDCx", "无"))
         self.checkBox_rest_scrape.setText(_translate("MDCx", "连续刮削"))

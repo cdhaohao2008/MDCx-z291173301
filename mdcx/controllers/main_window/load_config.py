@@ -1142,9 +1142,9 @@ def load_config(self: MyMAinWindow):
             self.Ui.checkBox_sortmode_delpic.setChecked(True)
             self.Ui.checkBox_sortmode_movefile.setChecked(False)
 
-        # 高级页「移动文件」：覆盖旧文件与保留旧文件必须勾选其中一个（默认档＝
-        # 保留旧文件）。老配置两者都没有 → 按默认档补上「保留旧文件」；手改配置
-        # 若两个都勾上 → 保留更安全的「保留旧文件」、去掉「覆盖旧文件」。
+        # 高级页「移动文件」：覆盖目标文件与保留目标文件必须勾选其中一个（默认档＝
+        # 保留目标文件）。老配置两者都没有 → 按默认档补上「保留目标文件」；手改配置
+        # 若两个都勾上 → 保留更安全的「保留目标文件」、去掉「覆盖目标文件」。
         move_overwrite, move_keep = normalize_move_file_policy(
             Switch.MOVE_OVERWRITE in switch_on, Switch.MOVE_KEEP in switch_on
         )
@@ -1161,9 +1161,9 @@ def load_config(self: MyMAinWindow):
         self.Ui.checkBox_move_overwrite.setChecked(move_overwrite)
         self.Ui.checkBox_move_keep.setChecked(move_keep)
 
-        # 高级页「任务模式」：存储在本地与存储在网盘必须勾选其中一个（默认档＝
-        # 存储在本地）。老配置两者都没有 → 按默认档补上「存储在本地」；手改配置
-        # 若两个都勾上 → 保留更安全的「存储在网盘」（网盘目录缓存没刷新会整理失败）。
+        # 高级页「任务模式」：本地存储文件与网盘存储文件必须勾选其中一个（默认档＝
+        # 本地存储文件）。老配置两者都没有 → 按默认档补上「本地存储文件」；手改配置
+        # 若两个都勾上 → 保留更安全的「网盘存储文件」（网盘目录缓存没刷新会整理失败）。
         switch_on = normalize_task_mode_switches(switch_on)
         manager.config.switch_on = switch_on
         self.Ui.checkBox_task_store_local.setChecked(Switch.TASK_STORE_LOCAL in switch_on)

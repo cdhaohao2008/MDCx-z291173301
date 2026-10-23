@@ -7483,7 +7483,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         <string notr="true">color: rgb(8, 128, 128);</string>
                       </property>
                       <property name="text">
-                        <string>&lt;p style='line-height:20px'&gt;⚠️ 保留文件：请到设置&gt;下载&gt;保留旧文件或下载，设置要保留或更新的文件内容&lt;br&gt;
+                        <string>&lt;p style='line-height:20px'&gt;⚠️ 保留文件：请到设置&gt;下载&gt;保留目标文件或下载，设置要保留或更新的文件内容&lt;br&gt;
                           ⚠️ 跳过文件：在视频目录新建一个名为skip的空文件，即可自动跳过该目录及子目录，所有模式均有效&lt;br&gt;
                           ⚠️ 移动文件：失败时不移动文件，文件刮削成功后按更新模式规则移动视频文件&lt;br&gt;
                           ⚠️ 重命名文件：在「成功后重命名文件」中设置是否重命名，命名规则同「命名」-「视频文件名」相同&lt;/p&gt;</string>
@@ -11530,7 +11530,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       </size>
                     </property>
                     <property name="title">
-                      <string>保留旧文件</string>
+                      <string>保留目标文件</string>
                     </property>
                     <widget class="QWidget" name="horizontalLayoutWidget_18">
                       <property name="geometry">
@@ -24268,7 +24268,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                       </size>
                                     </property>
                                     <property name="text">
-                                      <string>暗黑模式</string>
+                                      <string>使用暗黑模式</string>
                                     </property>
                                   </widget>
                                 </item>
@@ -24427,7 +24427,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>退出软件时</string>
+                                  <string>当退出软件时</string>
                                 </property>
                               </widget>
                             </item>
@@ -24446,7 +24446,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>停止刮削时</string>
+                                  <string>当停止刮削时</string>
                                 </property>
                               </widget>
                             </item>
@@ -24662,7 +24662,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>记住任务，重启续刮</string>
+                                  <string>重启续刮任务</string>
                                 </property>
                               </widget>
                             </item>
@@ -24681,7 +24681,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>无限次刮削</string>
+                                  <string>不限次数刮削</string>
                                 </property>
                               </widget>
                             </item>
@@ -24764,13 +24764,13 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                         </size>
                                       </property>
                                       <property name="text">
-                                        <string>存储在本地</string>
+                                        <string>本地存储文件</string>
                                       </property>
                                       <property name="checked">
                                         <bool>true</bool>
                                       </property>
                                       <property name="toolTip">
-                                        <string>任务文件存储在本地：整理模式不设置时间间隔整理文件，随时可以开始整理</string>
+                                        <string>任务文件本地存储文件：整理模式不设置时间间隔整理文件，随时可以开始整理</string>
                                       </property>
                                     </widget>
                                   </item>
@@ -24783,10 +24783,10 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                         </size>
                                       </property>
                                       <property name="text">
-                                        <string>存储在网盘</string>
+                                        <string>网盘存储文件</string>
                                       </property>
                                       <property name="toolTip">
-                                        <string>任务文件存储在网盘：整理模式按「高级→间歇刮削→自动休息」设定的间隔整理文件，上一次整理完成到下一次整理开始之间至少间隔自动休息时间</string>
+                                        <string>任务文件网盘存储文件：整理模式按「高级→间歇刮削→自动休息」设定的间隔整理文件，上一次整理完成到下一次整理开始之间至少间隔自动休息时间</string>
                                       </property>
                                     </widget>
                                   </item>
@@ -24846,7 +24846,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                       </size>
                                     </property>
                                     <property name="text">
-                                      <string>覆盖旧文件</string>
+                                      <string>覆盖目标文件</string>
                                     </property>
                                   </widget>
                                 </item>
@@ -24859,7 +24859,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                       </size>
                                     </property>
                                     <property name="text">
-                                      <string>保留旧文件</string>
+                                      <string>保留目标文件</string>
                                     </property>
                                     <property name="checked">
                                       <bool>true</bool>
@@ -25008,7 +25008,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                       </size>
                                     </property>
                                     <property name="text">
-                                      <string>点关闭按钮</string>
+                                      <string>点击关闭按钮</string>
                                     </property>
                                   </widget>
                                 </item>

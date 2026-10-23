@@ -1292,7 +1292,7 @@ class Config(BaseModel):
         ):
             if _separate not in d:
                 d[_separate] = d.get(_left, True)
-        # 任务模式「存储在本地 / 存储在网盘」互斥开关：清理旧版整理模式间隔键、
+        # 任务模式「本地存储文件 / 网盘存储文件」互斥开关：清理旧版整理模式间隔键、
         # 继承旧选择，并把「两开/全关」的手改配置归一
         _migrate_task_mode_keys(d)
         # 处理旧版字段设置

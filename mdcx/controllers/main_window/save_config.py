@@ -809,9 +809,9 @@ def save_config(self: MyMAinWindow):
     if Switch.SORT_DEL in manager.config.switch_on and Switch.SORT_MOVE in manager.config.switch_on:
         manager.config.switch_on = [item for item in manager.config.switch_on if item != Switch.SORT_MOVE]
 
-    # 高级页「移动文件」：覆盖旧文件与保留旧文件必须勾选其中一个（默认档＝
-    # 保留旧文件）。保存时校验：两个都没勾（手改配置或异常状态）就按默认档
-    # 「保留旧文件」校正，两个都勾上则去掉更激进的「覆盖旧文件」，校正结果
+    # 高级页「移动文件」：覆盖目标文件与保留目标文件必须勾选其中一个（默认档＝
+    # 保留目标文件）。保存时校验：两个都没勾（手改配置或异常状态）就按默认档
+    # 「保留目标文件」校正，两个都勾上则去掉更激进的「覆盖目标文件」，校正结果
     # 随本方法后面的 manager.save() 一并写盘。
     manager.config.switch_on = normalize_move_file_switches(
         manager.config.switch_on,
@@ -821,9 +821,9 @@ def save_config(self: MyMAinWindow):
     self.Ui.checkBox_move_overwrite.setChecked(Switch.MOVE_OVERWRITE in manager.config.switch_on)
     self.Ui.checkBox_move_keep.setChecked(Switch.MOVE_KEEP in manager.config.switch_on)
 
-    # 高级页「任务模式」：存储在本地与存储在网盘必须勾选其中一个（默认档＝
-    # 存储在本地）。保存时校验：两个都没勾就按默认档「存储在本地」校正；
-    # 两个都勾上则保留更安全的「存储在网盘」。
+    # 高级页「任务模式」：本地存储文件与网盘存储文件必须勾选其中一个（默认档＝
+    # 本地存储文件）。保存时校验：两个都没勾就按默认档「本地存储文件」校正；
+    # 两个都勾上则保留更安全的「网盘存储文件」。
     manager.config.switch_on = normalize_task_mode_switches(manager.config.switch_on)
     self.Ui.checkBox_task_store_local.setChecked(Switch.TASK_STORE_LOCAL in manager.config.switch_on)
     self.Ui.checkBox_task_store_netdisk.setChecked(Switch.TASK_STORE_NETDISK in manager.config.switch_on)

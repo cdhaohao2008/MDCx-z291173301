@@ -24,20 +24,20 @@ _LEGACY_MINNANO_CLEAN_RULES = {
 
 
 _TASK_MODE_SWITCHES = ("task_store_local", "task_store_netdisk")
-"""任务模式「存储在本地 / 存储在网盘」两个互斥开关的配置键。"""
+"""任务模式「本地存储文件 / 网盘存储文件」两个互斥开关的配置键。"""
 
 
 def _migrate_task_mode_keys(data: dict[str, Any]) -> None:
-    """任务模式「存储在本地 / 存储在网盘」互斥开关升级与归一。
+    """任务模式「本地存储文件 / 网盘存储文件」互斥开关升级与归一。
 
     旧版本把这两档选择放在刮削模式 → 整理模式下的独立 bool 键里
     （organize_local_no_interval / organize_netdisk_rest_interval），现已迁移到
     高级 → 高级功能 → 任务模式的 switch_on 互斥开关组。升级时：
 
     - 清掉旧键；旧配置勾了「网盘按自动休息间隔」→ 把 task_store_netdisk 继承进
-      switch_on（否则按默认档「存储在本地」，行为与旧默认一致）。
-    - 手改配置若任务模式两开/全关：两开保留「存储在网盘」（等待是安全下限，
-      网盘目录缓存没刷新就会整理失败），全关回到默认档「存储在本地」。
+      switch_on（否则按默认档「本地存储文件」，行为与旧默认一致）。
+    - 手改配置若任务模式两开/全关：两开保留「网盘存储文件」（等待是安全下限，
+      网盘目录缓存没刷新就会整理失败），全关回到默认档「本地存储文件」。
       界面层两枚复选框互斥（勾其一自动取消另一），这里只是手改配置的兜底。
     """
     data.pop("organize_local_no_interval", None)
@@ -634,10 +634,10 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     if note := _migrate_main_mode(data):
         warnings.append(note)
 
-    # 任务模式「存储在本地 / 存储在网盘」两个互斥开关：
-    # 必须勾选其中一个（默认档＝存储在本地）。老配置没有任务模式开关时补上
+    # 任务模式「本地存储文件 / 网盘存储文件」两个互斥开关：
+    # 必须勾选其中一个（默认档＝本地存储文件）。老配置没有任务模式开关时补上
     # 默认档并把旧整理间隔键清理迁移；手改成「两开」或「全关」时归一为
-    # 更安全的「存储在网盘」（网盘目录缓存刷新有延迟，不留间隔直接整理会失败）。
+    # 更安全的「网盘存储文件」（网盘目录缓存刷新有延迟，不留间隔直接整理会失败）。
     _migrate_task_mode_keys(data)
 
     # 分离模式 STRM 两开关：「覆盖本地已存在的STRM链接文本」以「为本地视频文件
@@ -645,7 +645,7 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     # 永远不生效）；两个都没勾则保持原样。
     _migrate_strm_overwrite_linkage(data)
 
-    # 无限次刮削开关（高级 → 保留任务右侧）：默认勾选，老配置缺键时自动补上
+    # 不限次数刮削开关（高级 → 保留任务右侧）：默认勾选，老配置缺键时自动补上
     # 不带 [迁移] 前缀即会被视为致命错误触发 _failed.json 保护分支，故此处静默补齐不告警
     _ensure_switch(data, "infinite_scrape")
 
@@ -654,10 +654,10 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     # 保留原有的 sort_del（不改变旧行为），去掉新开关 sort_move。
     _ensure_switch_exclusive(data, "sort_del", "sort_move")
 
-    # 文件移动策略（高级 → 移动文件）：「覆盖旧文件」与「保留旧文件」互斥且必须
-    # 勾选其中一个（默认档＝保留旧文件）。老配置两者都没有 → 补上 move_keep；
+    # 文件移动策略（高级 → 移动文件）：「覆盖目标文件」与「保留目标文件」互斥且必须
+    # 勾选其中一个（默认档＝保留目标文件）。老配置两者都没有 → 补上 move_keep；
     # 手改配置若两个都勾上，保留更安全的 move_keep（不覆盖已有文件），去掉
-    # move_overwrite；只勾了覆盖旧文件则原样保留（尊重用户的显式选择）。
+    # move_overwrite；只勾了覆盖目标文件则原样保留（尊重用户的显式选择）。
     _ensure_switch_one_of(data, ("move_keep", "move_overwrite"), "move_keep")
 
     data["config_version"] = CURRENT_CONFIG_VERSION

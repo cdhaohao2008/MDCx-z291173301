@@ -142,7 +142,7 @@ async def test_c2_overwrite_true_replaces_temp_without_conflict(tmp_path: Path):
 
 
 async def test_c2_overwrite_false_keeps_conflict_backup(tmp_path: Path):
-    """overwrite=False（默认）的「素材移动」语义：冲突必须保留旧文件。"""
+    """overwrite=False（默认）的「素材移动」语义：冲突必须保留目标文件。"""
     from mdcx.utils.file import move_file_async
 
     src = tmp_path / "src.mp4"

@@ -159,8 +159,8 @@ class SettingsActionsMixin:
             # 覆盖以生成为前提，勾选覆盖时同步勾选生成
             self.Ui.checkBox_separate_generate_strm.setChecked(True)
 
-    # 高级页-任务模式互斥：存储在本地 / 存储在网盘必须勾选其中一个
-    # （默认档＝「存储在本地」）。勾选其一自动去勾另一。
+    # 高级页-任务模式互斥：本地存储文件 / 网盘存储文件必须勾选其中一个
+    # （默认档＝「本地存储文件」）。勾选其一自动去勾另一。
     def checkBox_task_store_local_changed(self, checked):
         if checked:
             self.Ui.checkBox_task_store_netdisk.setChecked(False)
@@ -184,22 +184,22 @@ class SettingsActionsMixin:
         if checked:
             self.Ui.checkBox_sortmode_delpic.setChecked(False)
 
-    # 高级页-文件移动策略互斥：覆盖旧文件 / 保留旧文件必须勾选其中一个
-    # （默认档＝「保留旧文件」）。勾选其一自动去勾另一；把唯一勾选的那枚取消时
+    # 高级页-文件移动策略互斥：覆盖目标文件 / 保留目标文件必须勾选其中一个
+    # （默认档＝「保留目标文件」）。勾选其一自动去勾另一；把唯一勾选的那枚取消时
     # 立即回落到默认档，保证界面上永远有且只有一枚被勾选（保存时还有配置层
     # 兜底校验：未勾选按默认档校正后写盘）
     def checkBox_move_overwrite_changed(self, checked):
         if checked:
             self.Ui.checkBox_move_keep.setChecked(False)
         elif not self.Ui.checkBox_move_keep.isChecked():
-            # 两枚都没勾 → 回落到默认档「保留旧文件」
+            # 两枚都没勾 → 回落到默认档「保留目标文件」
             self.Ui.checkBox_move_keep.setChecked(True)
 
     def checkBox_move_keep_changed(self, checked):
         if checked:
             self.Ui.checkBox_move_overwrite.setChecked(False)
         elif not self.Ui.checkBox_move_overwrite.isChecked():
-            # 「保留旧文件」是默认档，取消勾选后立即回落（另一枚也没勾时）
+            # 「保留目标文件」是默认档，取消勾选后立即回落（另一枚也没勾时）
             self.Ui.checkBox_move_keep.setChecked(True)
 
     # 设置-刮削目录-同意清理(我已知晓/我已同意)

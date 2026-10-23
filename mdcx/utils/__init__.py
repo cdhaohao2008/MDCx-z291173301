@@ -55,7 +55,7 @@ class AsyncBackgroundExecutor:
         """提交不可被 cancel/cancel_async 取消的关键协程。
 
         用于资源释放这类必须执行到底的收尾动作：若被取消，引用计数或连接池
-        将永久泄漏（议题 #55：停止刮削时 `Computed.release()` 被一并取消，
+        将永久泄漏（议题 #55：当停止刮削时 `Computed.release()` 被一并取消，
         租约永不归零，旧网络栈的 `close_when_idle()` 陷入无限轮询）。
         """
         try:

@@ -1,38 +1,38 @@
-"""设置-高级页保留任务行：「无限次刮削」与「停止刮削时」严格上下对齐（宽窄两态）。
+"""设置-高级页保留任务行：「不限次数刮削」与「当停止刮削时」严格上下对齐（宽窄两态）。
 
 需求（用户截图红框）：
-  最小化时「无限次刮削」向右移到与「停止刮削时」上下对齐；
-  最大化时「无限次刮削」向左移到与「停止刮削时」上下对齐；
-  「停止刮削时」自身位置保持不变。
+  最小化时「不限次数刮削」向右移到与「当停止刮削时」上下对齐；
+  最大化时「不限次数刮削」向左移到与「当停止刮削时」上下对齐；
+  「当停止刮削时」自身位置保持不变。
 
 实现：_sync_advanced_page_align 内在弹窗确认行落定后，钉死前导项
-「记住任务，重启续刮」，使末位「无限次刮削」落到「停止刮削时」实测 x。
+「重启续刮任务」，使末位「不限次数刮削」落到「当停止刮削时」实测 x。
 只断言「精确落在锚点左缘」，不断言移动方向（离屏无 CJK 字体，方向不可比）。
 
-v2.7.6 需求③：最小化时「无限次刮削」改为与「无按钮」（radioButton_hide_none）
-严格上下对齐，且「无按钮」位置保持不变——真机上「停止刮削时」因前导项
-「退出软件时」的 sizeHint 过大而钉不上（停在竖线左侧），「无按钮」却钉得上，
+v2.7.6 需求③：最小化时「不限次数刮削」改为与「无按钮」（radioButton_hide_none）
+严格上下对齐，且「无按钮」位置保持不变——真机上「当停止刮削时」因前导项
+「当退出软件时」的 sizeHint 过大而钉不上（停在竖线左侧），「无按钮」却钉得上，
 故窄态的目标竖线换成「无按钮」的实测 x。实现上这一段整段挪到
 _sync_advanced_page_tail_align() 之后（「无按钮」的终态 x 是那里钉出来的）；
-宽态仍取「停止刮削时」，逐位不变。
+宽态仍取「当停止刮削时」，逐位不变。
 
-v2.7.6 需求④：最小化时「无限次刮削」改为与「显示字段内容信息」
+v2.7.6 需求④：最小化时「不限次数刮削」改为与「显示字段内容信息」
 （checkBox_show_data_log）严格上下对齐，且「显示字段内容信息」位置保持不变。
 **根因在判态**：这一批需求原先用几何拉伸量（`_scroll_stretch_extra() > 0`）区分
 最大化/还原态，但真机（dpr=1.25、屏幕 1536×864）**还原态**窗口 1085×793 的拉伸
 量已经是 +33 > 0 → 还原态被误判成最大化，「最小化时」那一支根本不执行（用户
 截图：目标纹丝不动）。故判态改成窗口管理器给的「真·最大化」状态
 （`_advanced_page_window_maximized()`：isMaximized()/isFullScreen()）：
-  最大化：目标竖线仍是「停止刮削时」，页面布局、控件、组件、提示词全部不变；
+  最大化：目标竖线仍是「当停止刮削时」，页面布局、控件、组件、提示词全部不变；
   还原态：目标竖线是「显示字段内容信息」col_x(src_data)。
 离屏环境里窗口从未 maximized，故默认走还原态那一支；最大化那一支用
 monkeypatch 替换 isMaximized 来覆盖（几何仍是还原态的，但断的是「选哪条竖线」）。
 
 v3.0 需求①（最新一条）：还原态的目标竖线再改一次——由「显示字段内容信息」
-改为「显示字段来源信息」（checkBox_show_from_log）：用户要的是「无限次刮削
+改为「显示字段来源信息」（checkBox_show_from_log）：用户要的是「不限次数刮削
 **向左**移动到与『显示字段来源信息』严格上下对齐的位置」，而「显示字段内容信息」
 那条竖线太靠右（真机 787），不是用户要的那条。「显示字段来源信息」自己不许动，
-实现同样只钉前导项「记住任务，重启续刮」。最大化态仍取「停止刮削时」，逐位不变。
+实现同样只钉前导项「重启续刮任务」。最大化态仍取「当停止刮削时」，逐位不变。
 
 可行性门控（与「隐藏菜单栏图标」行同款手法）：落点落在前导项文本自然宽
 之内时硬钉会裁字，此时整行放弃、保持设计态原样。
@@ -125,7 +125,7 @@ def _remain_row(ui, maximized):
 
     目标竖线按「窗口是否真·最大化」取（不能用几何拉伸量——真机还原态窗口的
     拉伸量已经 > 0，会把还原态误判成最大化）：
-      最大化：「停止刮削时」col_x(stop_scrape)（逐位不变）；
+      最大化：「当停止刮削时」col_x(stop_scrape)（逐位不变）；
       还原态：「显示字段来源信息」col_x(src_from)（v3.0 需求①点名的那条竖线）。
     """
     host = ui.gridLayoutWidget_20
@@ -153,7 +153,7 @@ _NARROW_SIZES = ((1030, 753), (1000, 700))
 def test_infinite_aligns_to_stop_or_defers(win, app, width, height):
     """放得下就必须精确对齐；放不下就整行放弃（不钉宽、不裁字）。
 
-    目标竖线按「窗口是否真·最大化」取：最大化取「停止刮削时」（逐位不变），
+    目标竖线按「窗口是否真·最大化」取：最大化取「当停止刮削时」（逐位不变），
     还原态取「显示字段来源信息」（v3.0 需求①；离屏窗口从未 maximized，故本用例
     走还原态那一支）。
     """
@@ -182,16 +182,16 @@ def test_infinite_aligns_to_stop_or_defers(win, app, width, height):
 
     # 两种情形下两项都不许被压到裁字；目标竖线上的控件自身一律不动。
     assert remain.width() >= remain.sizeHint().width(), (
-        f"{width} 宽下「记住任务，重启续刮」被压到 {remain.width()}px（sizeHint {remain.sizeHint().width()}），会裁字"
+        f"{width} 宽下「重启续刮任务」被压到 {remain.width()}px（sizeHint {remain.sizeHint().width()}），会裁字"
     )
     assert infinite.width() >= infinite.sizeHint().width(), (
-        f"{width} 宽下「无限次刮削」被压到 {infinite.width()}px（sizeHint {infinite.sizeHint().width()}），会裁字"
+        f"{width} 宽下「不限次数刮削」被压到 {infinite.width()}px（sizeHint {infinite.sizeHint().width()}），会裁字"
     )
 
 
 @pytest.mark.parametrize("width,height", _WIDE_SIZES + _NARROW_SIZES)
 def test_infinite_aligns_to_stop_when_window_maximized(win, app, monkeypatch, width, height):
-    """最大化那一支仍取「停止刮削时」——页面布局、控件、组件、提示词全部不变。
+    """最大化那一支仍取「当停止刮削时」——页面布局、控件、组件、提示词全部不变。
 
     离屏窗口不会真·最大化，故用 monkeypatch 替换 isMaximized 来覆盖这一支
     （断的是「选哪条竖线」，几何仍是当前尺寸的）。
@@ -209,14 +209,14 @@ def test_infinite_aligns_to_stop_when_window_maximized(win, app, monkeypatch, wi
     got = _abs(ui, ui.checkBox_infinite_scrape)
     want = _abs(ui, ui.checkBox_show_dialog_stop_scrape)
     if row["feasible"]:
-        assert got == want, f"{width} 宽下最大化态未对齐「停止刮削时」: x={got} 期望={want}"
+        assert got == want, f"{width} 宽下最大化态未对齐「当停止刮削时」: x={got} 期望={want}"
     else:
         assert got > want, f"{width} 宽下最大化态放不下（pin={row['pin']}）本应整行放弃，却对到了 x={got}"
 
 
 @pytest.mark.parametrize("width,height", _WIDE_SIZES + _NARROW_SIZES)
 def test_restored_infinite_lands_on_show_from_log(win, app, width, height):
-    """v3.0 需求①：还原态「无限次刮削」与「显示字段来源信息」严格上下对齐。
+    """v3.0 需求①：还原态「不限次数刮削」与「显示字段来源信息」严格上下对齐。
 
     并且「显示字段来源信息」位置保持不变——本用例连跑两遍同步，断言第二遍不再
     挪动它（同步是幂等的，且不许动的那一列确实没动）。
@@ -237,7 +237,7 @@ def test_restored_infinite_lands_on_show_from_log(win, app, width, height):
     row = _remain_row(ui, False)
     if row["feasible"]:
         assert _abs(ui, ui.checkBox_infinite_scrape) == from_x, (
-            f"{width} 宽下还原态「无限次刮削」未与「显示字段来源信息」严格上下对齐: "
+            f"{width} 宽下还原态「不限次数刮削」未与「显示字段来源信息」严格上下对齐: "
             f"x={_abs(ui, ui.checkBox_infinite_scrape)} 期望={from_x}"
         )
     # 「无按钮」在「显示字段内容信息」那条竖线上（离屏环境两者同列），与本需求
@@ -250,7 +250,7 @@ def test_restored_infinite_lands_on_show_from_log(win, app, width, height):
 
 @pytest.mark.parametrize("width,height", _WIDE_SIZES)
 def test_stop_stays_on_spec_line_in_wide(win, app, width, height):
-    """宽态「停止刮削时」仍精确落在既有竖线（显示字段来源信息）上，本需求未搬动它。"""
+    """宽态「当停止刮削时」仍精确落在既有竖线（显示字段来源信息）上，本需求未搬动它。"""
     ui = win.Ui
     win.show()
     _goto_advanced(win, app)
@@ -258,12 +258,12 @@ def test_stop_stays_on_spec_line_in_wide(win, app, width, height):
     assert win._scroll_stretch_extra(win._adv_scroll) > 0
     got = _abs(ui, ui.checkBox_show_dialog_stop_scrape)
     anchor = _abs(ui, ui.checkBox_show_from_log)
-    assert got == anchor, f"{width} 宽下「停止刮削时」被搬动: x={got} 既有竖线={anchor}"
+    assert got == anchor, f"{width} 宽下「当停止刮削时」被搬动: x={got} 既有竖线={anchor}"
 
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
 def test_stop_stays_on_spec_line_in_narrow(win, app, width, height):
-    """窄态「停止刮削时」仍精确落在既有竖线（显示字段内容信息）上，本需求未搬动它。"""
+    """窄态「当停止刮削时」仍精确落在既有竖线（显示字段内容信息）上，本需求未搬动它。"""
     ui = win.Ui
     win.show()
     _goto_advanced(win, app)
@@ -271,4 +271,4 @@ def test_stop_stays_on_spec_line_in_narrow(win, app, width, height):
     assert win._scroll_stretch_extra(win._adv_scroll) <= 0
     got = _abs(ui, ui.checkBox_show_dialog_stop_scrape)
     anchor = _abs(ui, ui.checkBox_show_data_log)
-    assert got == anchor, f"{width} 宽下「停止刮削时」被搬动: x={got} 既有竖线={anchor}"
+    assert got == anchor, f"{width} 宽下「当停止刮削时」被搬动: x={got} 既有竖线={anchor}"

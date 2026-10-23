@@ -150,7 +150,7 @@ def test_lease_release_uses_critical_channel():
         for node in ast.walk(exit_method)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
     }
-    assert "submit_critical" in calls, "release 必须走关键通道，否则停止刮削时会被取消导致租约泄漏"
+    assert "submit_critical" in calls, "release 必须走关键通道，否则当停止刮削时会被取消导致租约泄漏"
     assert "submit" not in calls, "release 不得使用可被取消的普通 submit 通道"
 
 

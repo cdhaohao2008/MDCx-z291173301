@@ -3,8 +3,8 @@
 三批需求（锚点自身均保持不动，提示词与控件提示一律不许变）：
   第一组（最大化「右移」）：「保存日志」「检查更新」两行的「关」→「隐藏NFO 文件管理」；
     「隐藏窗口」行的「点最小化按钮」→「显示字段来源信息」；同行的「无」→「显示字段内容信息」。
-  第二组（最大化「左移」）：刮削结束后自动退出软件 / 停止刮削时 / 隐藏菜单栏图标（Mac）/
-    暗黑模式 / 隐藏NFO 文件管理 / 两枚「关」→「显示字段来源信息」。
+  第二组（最大化「左移」）：刮削结束后自动退出软件 / 当停止刮削时 / 隐藏菜单栏图标（Mac）/
+    使用暗黑模式 / 隐藏NFO 文件管理 / 两枚「关」→「显示字段来源信息」。
   第三组（最小化「左移」，并要求「最大化时页面、布局、控件、提示词等均保持不变」）：
     「点最小化按钮」与两枚「关」→「隐藏NFO 文件管理」；同行的「无」→「显示字段内容信息」。
     注意最小化态里「点最小化按钮」的锚点是 nfo 而非 from_log（两态不同），
@@ -139,13 +139,13 @@ def _extra(win) -> int:
 # 本文件覆盖高级页七组竖线需求：
 #   第一组（最大化「右移」）：两个「关」→「隐藏NFO 文件管理」、「点最小化按钮」→
 #     「显示字段来源信息」、「无」→「显示字段内容信息」
-#   第二组（最大化「左移」）：刮削结束后自动退出软件 / 停止刮削时 /
-#     隐藏菜单栏图标（Mac）/ 暗黑模式 / 隐藏NFO 文件管理 / 两枚「关」
+#   第二组（最大化「左移」）：刮削结束后自动退出软件 / 当停止刮削时 /
+#     隐藏菜单栏图标（Mac）/ 使用暗黑模式 / 隐藏NFO 文件管理 / 两枚「关」
 #     → 「显示字段来源信息」
 #   第三组（最小化「左移」）：「点最小化按钮」+ 两枚「关」→「隐藏NFO 文件管理」，
 #     「无」→「显示字段内容信息」
 #   第四组（最小化「右移」）：「显示字段来源信息」→「隐藏NFO 文件管理」（需求①）；
-#     「停止刮削时」/「隐藏菜单栏图标（Mac）」/「暗黑模式」/ 两枚「关」
+#     「当停止刮削时」/「隐藏菜单栏图标（Mac）」/「使用暗黑模式」/ 两枚「关」
 #     → 「显示字段内容信息」（需求②）
 #   第七组（最小化「左移」）：「隐藏NFO 文件管理」+ 两枚「关」→「显示字段来源信息」，
 #     且「显示字段来源信息」位置保持不变（第四组需求①已撤销，见 _NARROW_FIT）
@@ -405,8 +405,8 @@ def _dock_row(ui, anchor_name):
     （不裁字下限）。能插入的间隔 gap = 目标竖线 - 行左缘 - 前缀；放得下的条件是
     0 <= gap <= 列宽 - 前缀 - 末尾（间隔项是 Fixed 策略的 QSpacerItem，它的
     sizeHint 会算进行内最小宽度，间隔过大会把整页网格列宽撑开、把不许动的
-    「暗黑模式」一起推走，故实现里把它夹取到这个区间内）。
-    竖线按态传入：宽态是「显示字段来源信息」，窄态是「暗黑模式」（需求②）。
+    「使用暗黑模式」一起推走，故实现里把它夹取到这个区间内）。
+    竖线按态传入：宽态是「显示字段来源信息」，窄态是「使用暗黑模式」（需求②）。
     """
     lay = ui.horizontalLayout_dock
     host = ui.gridLayoutWidget_20
@@ -434,12 +434,12 @@ def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
 
     v2.7.6 三处变化：
       ① 「保存后重启生效」挪到它**右侧**（行内顺序变了，前缀/末尾宽度随之重算）；
-      ② 窄态的目标竖线从「显示字段内容信息」换成「暗黑模式」——且「暗黑模式」
-         自己不许动，故窄态那条竖线取「暗黑模式」的实测终态 x；
+      ② 窄态的目标竖线从「显示字段内容信息」换成「使用暗黑模式」——且「使用暗黑模式」
+         自己不许动，故窄态那条竖线取「使用暗黑模式」的实测终态 x；
       ③ 放弃态不再「整行放弃、间隔归 0」，而是把间隔**夹取**到
          [0, 列宽-前缀-末尾]：间隔项是 Fixed 策略的 QSpacerItem，它的 sizeHint
          会算进行内最小宽度，间隔过大反而会把整页网格列宽撑开、把不许动的
-         「暗黑模式」一起推走——那等于把需求②自己毁掉。
+         「使用暗黑模式」一起推走——那等于把需求②自己毁掉。
     两种情形下 Fixed 前缀「隐藏Dock图标」都不许动、菜单栏图标都不许被压到裁字。
     """
     ui = win.Ui
@@ -487,16 +487,16 @@ def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
 def test_narrow_menu_icon_lands_on_dark_mode_when_it_fits(win, app, width, height):
-    """需求②（**判别力所在**）：窄态「隐藏菜单栏图标（Mac）」与「暗黑模式」严格上下对齐。
+    """需求②（**判别力所在**）：窄态「隐藏菜单栏图标（Mac）」与「使用暗黑模式」严格上下对齐。
 
     离屏环境里这一档天然「放不下」：需求①把提示词挪到菜单栏图标**右侧**后，
-    该行最小宽度变大（「隐藏菜单栏图标」到「暗黑模式」那条竖线的间隔超出可放区间），
+    该行最小宽度变大（「隐藏菜单栏图标」到「使用暗黑模式」那条竖线的间隔超出可放区间），
     实现只能把间隔夹取（宁可离目标近一点也不撑破网格列宽——撑破列宽会把不许动的
-    「暗黑模式」一起推走，等于把需求②自己毁掉）。真实字体下这几个控件更窄，走的
+    「使用暗黑模式」一起推走，等于把需求②自己毁掉）。真实字体下这几个控件更窄，走的
     是对齐分支——本用例把菜单栏图标的提示词临时改短来复现那条分支，断言后原样
     恢复（手法与本文件既有的 test_narrow_nav_row_lands_on_from_log_when_it_fits 一致）。
 
-    同时钉住需求②的另一半：「暗黑模式」位置保持不变（改短提示词不许带偏它）。
+    同时钉住需求②的另一半：「使用暗黑模式」位置保持不变（改短提示词不许带偏它）。
     """
     ui = win.Ui
     win.show()
@@ -516,10 +516,10 @@ def test_narrow_menu_icon_lands_on_dark_mode_when_it_fits(win, app, width, heigh
             f"{width} 宽下临时提示词仍不够短，没能制造出可行场景: gap={row['gap']} avail={row['avail']}"
         )
         assert _abs(ui, dark) == dark_before, (
-            f"窄态 {width} 宽下「暗黑模式」位置变了: {dark_before} -> {_abs(ui, dark)}"
+            f"窄态 {width} 宽下「使用暗黑模式」位置变了: {dark_before} -> {_abs(ui, dark)}"
         )
         assert _abs(ui, menu) == _abs(ui, dark), (
-            f"窄态 {width} 宽下「隐藏菜单栏图标」未与「暗黑模式」严格上下对齐: x={_abs(ui, menu)} 期望={_abs(ui, dark)}"
+            f"窄态 {width} 宽下「隐藏菜单栏图标」未与「使用暗黑模式」严格上下对齐: x={_abs(ui, menu)} 期望={_abs(ui, dark)}"
         )
     finally:
         menu.setText(original)
@@ -528,10 +528,10 @@ def test_narrow_menu_icon_lands_on_dark_mode_when_it_fits(win, app, width, heigh
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
 def test_restored_infinite_scrape_lands_on_show_from_log(win, app, width, height):
-    """v3.0 需求①：还原态「无限次刮削」与「显示字段来源信息」严格对齐。
+    """v3.0 需求①：还原态「不限次数刮削」与「显示字段来源信息」严格对齐。
 
     「显示字段来源信息」位置保持不变——它就是目标竖线本身，实现只钉前导项
-    「记住任务，重启续刮」，不碰它；本用例断言它在同步前后不动。
+    「重启续刮任务」，不碰它；本用例断言它在同步前后不动。
     「无按钮」的落点由 _sync_advanced_page_tail_align 钉出（「显示字段内容信息」
     那条竖线），与本需求的目标竖线不是同一条，故只断言它没被带偏。
     """
@@ -550,7 +550,7 @@ def test_restored_infinite_scrape_lands_on_show_from_log(win, app, width, height
 
     infinite_x = _abs(ui, ui.checkBox_infinite_scrape)
     assert infinite_x == from_x, (
-        f"还原态 {width} 宽下「无限次刮削」未与「显示字段来源信息」严格上下对齐: x={infinite_x} 期望={from_x}"
+        f"还原态 {width} 宽下「不限次数刮削」未与「显示字段来源信息」严格上下对齐: x={infinite_x} 期望={from_x}"
     )
     # 「无按钮」自己不许动：它仍落在「显示字段内容信息」那条竖线上
     assert _abs(ui, ui.radioButton_hide_none) == _abs(ui, ui.checkBox_show_data_log), (
@@ -566,7 +566,7 @@ def test_new_line_is_left_of_the_old_one_in_wide(win, app, monkeypatch, width, h
     旧竖线 = 只有通用宽幅逻辑时「刮削结束后自动退出软件」的自然位（`_without_feature`
     另起窗口量得），旧代码正是拿它当基准。断言「新竖线 < 旧竖线」而不是逐项与通用
     逻辑比大小——后者依赖字体度量：本文件所用离屏环境里「显示字段来源信息」与旧基准
-    的左右关系并不总与生产一致（例如 1920 宽下暗黑模式由 428 被移到 589，看着是右移，
+    的左右关系并不总与生产一致（例如 1920 宽下使用暗黑模式由 428 被移到 589，看着是右移，
     但那是因为通用逻辑把「界面外观行」摊到了另一处，真实生产度量下是左移）。
     真正与环境无关的是「新竖线在旧竖线左边」，它对每一档都成立。
     """
@@ -630,7 +630,7 @@ def test_wide_never_moves_anchors_and_never_clips(win, app, monkeypatch, width, 
 def test_narrow_hide_row_aligns_to_anchors(win, app, width, height):
     """最小化态：第三、四、七组里**无条件**的落点全部精确对齐。
 
-    第四组需求②「停止刮削时」/「暗黑模式」→「显示字段内容信息」与第七组两枚「关」
+    第四组需求②「当停止刮削时」/「使用暗黑模式」→「显示字段内容信息」与第七组两枚「关」
     →「隐藏NFO 文件管理」、第三组「点最小化按钮」/「无」的落点合并在
     _NARROW_TARGETS 里一起断言。第七组里「隐藏NFO 文件管理」→「显示字段来源信息」
     那一条带可行性门槛，单列在 _NARROW_FIT / test_narrow_nav_row_aligns_or_defers。
@@ -967,7 +967,7 @@ def test_narrow_never_moves_anchors(win, app, monkeypatch, width, height):
 def test_narrow_keeps_wide_only_feature_at_baseline(win, app, monkeypatch, width, height):
     """第二组需求在窄态仍须完全退让——它换过基准线，最容易漏掉窄态分支。
 
-    第四组把第二组六项里的「停止刮削时」「暗黑模式」「隐藏菜单栏图标」「关」×2
+    第四组把第二组六项里的「当停止刮削时」「使用暗黑模式」「隐藏菜单栏图标」「关」×2
     也纳入了窄态（落点换成更靠右的「显示字段内容信息」），第七组又把「隐藏NFO
     文件管理」与两枚「关」改成锚「显示字段来源信息」，于是第二组六项全部被窄态接管，
     只剩「刮削结束后自动退出软件」（第二组的基准本身，还原态必须留在自然位）与

@@ -302,11 +302,11 @@ class LayoutDownloadMixin:
         ui.gridLayout_27.invalidate()
         ui.gridLayout_27.activate()
 
-    # ============ page_setting / 下载页: 「下载」行钉到「保留旧文件」行同一竖线 ============
+    # ============ page_setting / 下载页: 「下载」行钉到「保留目标文件」行同一竖线 ============
     # 逐项对应关系（左=下载行 groupBox_24/horizontalLayoutWidget_14/horizontalLayout_16，
-    # 右=保留旧文件行 groupBox_33/horizontalLayoutWidget_18/horizontalLayout_23）。
+    # 右=保留目标文件行 groupBox_33/horizontalLayoutWidget_18/horizontalLayout_23）。
     # 「压缩」对应「剧照副本」是用户截图红框指定的位置；末项「主题视频」只存在于
-    # 保留旧文件行，无对应项。封面图虽是两行共同的首项（x 天然同位），仍列入：
+    # 保留目标文件行，无对应项。封面图虽是两行共同的首项（x 天然同位），仍列入：
     # 见 _sync_xiazai_row_align 里关于「宽度也要跟」的那段说明。
     _XIAZAI_ROW_ALIGN_PAIRS = (
         ("checkBox_download_poster", "checkBox_old_poster"),
@@ -319,16 +319,16 @@ class LayoutDownloadMixin:
     )
 
     def _sync_xiazai_row_align(self, xiazai_scroll=None) -> None:
-        """设置-下载：把「下载」行的 7 个复选框逐项钉到「保留旧文件」行的同一竖线。
+        """设置-下载：把「下载」行的 7 个复选框逐项钉到「保留目标文件」行的同一竖线。
 
-        用户需求（截图，最小化态）：「下载」行的复选框要向下与「保留旧文件」行
-        严格上下对齐；「保留旧文件」行的位置保持不变。最大化态同样要求对齐。
+        用户需求（截图，最小化态）：「下载」行的复选框要向下与「保留目标文件」行
+        严格上下对齐；「保留目标文件」行的位置保持不变。最大化态同样要求对齐。
         纵向（y/高）本就一致（实测两行容器在 content 里同 x=90、同高 31、两行
         复选框同高 17），故只重钉 x 与宽。
 
         根因：两行的容器与内部布局在 .ui 里长得几乎一样（都是
         horizontalLayoutWidget_* + QHBoxLayout），但项数不同——下载行 7 项、
-        保留旧文件行 8 项，且第 7 项文案不同（「压缩」对「剧照副本」，其后还有
+        保留目标文件行 8 项，且第 7 项文案不同（「压缩」对「剧照副本」，其后还有
         「主题视频」）。QBoxLayout 在无 stretch、无 expanding 项时把余量**均分**
         给各项，于是第 k 项左缘 = 行首 + Σ(前 k 项自然宽 + spacing) + k·余量/项数，
         项数少的那一行每一项都落在 8 项那行的右侧。实测逐项偏差（content 坐标，
@@ -339,8 +339,8 @@ class LayoutDownloadMixin:
         为什么宽度也要跟：只 move x 的话，左邻仍停在自己的布局位置上，而它被拉宽
         后的控件里画的是**左对齐**文字——实测窗口 1200 宽时「压缩」被移到 671，
         而它左邻「nfo」的控件在 644、文字画到 687，两者字形直接压在一起（实测
-        1200/1500/1920 各压 16~28px）。把宽度也重钉成保留旧文件行的同项宽度后，
-        每个控件右缘正好止于下一项左缘（那正是保留旧文件行自身的排布），
+        1200/1500/1920 各压 16~28px）。把宽度也重钉成保留目标文件行的同项宽度后，
+        每个控件右缘正好止于下一项左缘（那正是保留目标文件行自身的排布），
         极窄窗口下文字被裁的宽度也与参照行一致，实测各宽度字形重叠恒为 0。
 
         挂在下载滚动区拉伸之后的钩子上（CustomScrollArea._post_wide_sync_hook）：

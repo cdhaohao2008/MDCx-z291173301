@@ -498,7 +498,7 @@ class OtherInfo:
     poster_big: bool
     poster_size: tuple[int, int]
     thumb_size: tuple[int, int]
-    # 「保留旧文件」策略（设置 → 高级 → 移动文件）：目标目录已存在同名文件，
+    # 「保留目标文件」策略（设置 → 高级 → 移动文件）：目标目录已存在同名文件，
     # 本次整单不搬动，视频与伴生文件全部保持在原目录（避免被拆散）。
     # 必须放在所有无默认值的字段之后（dataclass 要求带默认值的字段在后）。
     keep_existing_target: bool = False

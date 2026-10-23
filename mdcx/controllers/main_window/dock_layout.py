@@ -196,7 +196,7 @@ class DockLayoutMixin:
     # 把支付宝码也塞进来**。_DONATE_ALIPAY_MIN 仅作控件占位初值。
     _DONATE_ALIPAY_MIN = 90  # 支付宝码占位初值（满尺寸时边长恒为 _DONATE_QR_SIZE）
     _DONATE_LINK_COLOR = "#0078D7"  # 与「赞助作者」页 [赞助作者] 链接同色
-    _DONATE_LINK_COLOR_DARK = "#4DA6FF"  # 暗黑模式提亮，保证可读
+    _DONATE_LINK_COLOR_DARK = "#4DA6FF"  # 使用暗黑模式提亮，保证可读
 
     def _init_donate_widgets(self) -> None:
         """在侧栏挂「微信收款码 + [赞助作者]」两个控件（运行时注入，不改 .ui）。

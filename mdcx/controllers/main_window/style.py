@@ -623,7 +623,7 @@ def set_dark_style(self: MyMAinWindow):
     _apply_log_document_style(self, True)
     self.Ui.treeWidget_number.setStyleSheet(build_tree_widget_style(True))
 
-    # 控件美化 左侧栏样式 暗黑模式
+    # 控件美化 左侧栏样式 使用暗黑模式
     self.Ui.widget_setting.setStyleSheet(f"""
         QWidget#widget_setting{{
             background: #1F272F;

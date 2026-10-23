@@ -190,7 +190,7 @@ async def test_organize_outside_file_still_moves(monkeypatch: pytest.MonkeyPatch
 
 
 def test_migrate_task_mode_keys_fills_missing_keys():
-    """旧配置没有任务模式开关 → 自动补齐为「存储在本地」。"""
+    """旧配置没有任务模式开关 → 自动补齐为「本地存储文件」。"""
     data: dict = {}
     _migrate_task_mode_keys(data)
 
@@ -199,7 +199,7 @@ def test_migrate_task_mode_keys_fills_missing_keys():
 
 
 def test_migrate_task_mode_keys_netdisk_wins_when_both_on():
-    """旧配置网盘为真 → 任务模式继承「存储在网盘」。"""
+    """旧配置网盘为真 → 任务模式继承「网盘存储文件」。"""
     data = {"organize_netdisk_rest_interval": True}
     _migrate_task_mode_keys(data)
     switch_items = data.get("switch_on")
@@ -208,7 +208,7 @@ def test_migrate_task_mode_keys_netdisk_wins_when_both_on():
 
 
 def test_migrate_task_mode_keys_local_when_both_off():
-    """旧配置全为假 → 任务模式回到默认档「存储在本地」。"""
+    """旧配置全为假 → 任务模式回到默认档「本地存储文件」。"""
     data = {"organize_local_no_interval": False, "organize_netdisk_rest_interval": False}
     _migrate_task_mode_keys(data)
     switch_items = data.get("switch_on")
@@ -217,7 +217,7 @@ def test_migrate_task_mode_keys_local_when_both_off():
 
 
 def test_config_update_migrates_old_config(monkeypatch: pytest.MonkeyPatch):
-    """旧版本配置文件载入时自动清理旧键、补齐任务模式（默认＝存储在本地）。"""
+    """旧版本配置文件载入时自动清理旧键、补齐任务模式（默认＝本地存储文件）。"""
     data: dict = {"main_mode": 6}
     Config.update(data)
     assert "organize_local_no_interval" not in data

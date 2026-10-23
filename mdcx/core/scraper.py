@@ -703,7 +703,7 @@ class Scraper:
                 if full_library_scan:
                     cache.cleanup_missing(existing)
                 force = file_mode != FileMode.Default  # Again/单文件等模式视为强制重新刮削
-                # 高级 → 保留任务 → 无限次刮削（默认勾选）：勾选后失败文件无限重试，
+                # 高级 → 保留任务 → 不限次数刮削（默认勾选）：勾选后失败文件无限重试，
                 # 不再按 MAX_RETRY_COUNT 跳过超限文件；未勾选时保持原断点续刮逻辑
                 infinite = Switch.INFINITE_SCRAPE in manager.config.switch_on
                 if force:
@@ -718,7 +718,7 @@ class Scraper:
                             # failed 且重试次数耗尽的文件跳过（MAX_RETRY_COUNT 语义
                             # 对主扫描路径生效——原实现只判 done，注定失败的文件
                             # 每次全量刮削都无限重试，全库审查 B5）
-                            # 无限次刮削勾选时跳过此分支：失败文件全部重新入队
+                            # 不限次数刮削勾选时跳过此分支：失败文件全部重新入队
                             if not infinite:
                                 state = cache.get_state(p)
                                 if (
@@ -1849,11 +1849,11 @@ class Scraper:
             ):
                 return None, None
 
-        # 「保留旧文件」策略（设置 → 高级 → 移动文件）：目标目录已有同名文件 →
+        # 「保留目标文件」策略（设置 → 高级 → 移动文件）：目标目录已有同名文件 →
         # 本次整单不搬动，视频与伴生文件全部保持在原目录，避免视频与图片/nfo 被拆散。
         if other.keep_existing_target:
             LogBuffer.log().write(
-                f"\n 📖 目标目录已存在同名文件，按「保留旧文件」策略不移动（文件保持在原目录）：{file_new_path}"
+                f"\n 📖 目标目录已存在同名文件，按「保留目标文件」策略不移动（文件保持在原目录）：{file_new_path}"
             )
             await save_success_list(file_path, file_path)
             return res, other

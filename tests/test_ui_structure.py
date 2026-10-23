@@ -1177,13 +1177,13 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
     else:
         kids = [item[0].get("name") for item in task_hbox.findall("item") if len(item)]
         # 行内只能是这两枚复选框、且中间不允许再插 spacer：两枚都按默认（可伸展）策略均分
-        # 整行宽度，「存储在网盘」才会严格落在行中点，与下一行「暗黑模式」（同结构 HBox 的
+        # 整行宽度，「网盘存储文件」才会严格落在行中点，与下一行「使用暗黑模式」（同结构 HBox 的
         # 第 2 项）上下对齐；一旦塞回 spacer 或把复选框改回 Fixed，网盘框就会右移错位。
         if kids != ["checkBox_task_store_local", "checkBox_task_store_netdisk"]:
             problems.append(f"任务模式行内顺序被改（只允许两枚复选框、不得插 spacer）: {kids!r}")
     for nm, text in (
-        ("checkBox_task_store_local", "存储在本地"),
-        ("checkBox_task_store_netdisk", "存储在网盘"),
+        ("checkBox_task_store_local", "本地存储文件"),
+        ("checkBox_task_store_netdisk", "网盘存储文件"),
     ):
         box = _find_widget_by_name(root, nm)
         if box is None:

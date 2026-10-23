@@ -167,7 +167,7 @@ class DonateDialog(CenterOnFirstShowMixin, QDialog):
     # ------------------------------------------------------------------ 配色
 
     def _palette(self) -> dict[str, str]:
-        """亮色严格用参考图取色；暗黑模式跟随应用主题 token。"""
+        """亮色严格用参考图取色；使用暗黑模式跟随应用主题 token。"""
         if self._dark:
             t = get_theme_tokens(True)
             return {
