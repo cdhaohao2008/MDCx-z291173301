@@ -30,8 +30,8 @@ from mdcx.config.extend import (
     get_movie_path_setting,
     normalize_move_file_policy,
     normalize_move_file_switches,
-    normalize_organize_interval_policy,
     normalize_strm_policy,
+    normalize_task_mode_switches,
 )
 from mdcx.config.manager import manager
 from mdcx.config.models import MIN_REST_TIME_SECONDS
@@ -497,16 +497,6 @@ def load_config(self: MyMAinWindow):
             (self.Ui.radioButton_mode_read, "read"),
             default=self.Ui.radioButton_mode_common,
         )
-
-        # 整理模式：两次整理之间的时间间隔策略（两枚复选框互斥，必须勾选其中一个，
-        # 默认档＝「本地存储不设置时间间隔整理文件」）
-        organize_local, organize_netdisk = normalize_organize_interval_policy(
-            manager.config.organize_local_no_interval, manager.config.organize_netdisk_rest_interval
-        )
-        manager.config.organize_local_no_interval = organize_local
-        manager.config.organize_netdisk_rest_interval = organize_netdisk
-        self.Ui.checkBox_organize_local_no_interval.setChecked(organize_local)
-        self.Ui.checkBox_organize_netdisk_rest_interval.setChecked(organize_netdisk)
 
         # 有nfo，是否执行更新模式
         # region read_mode
@@ -1138,6 +1128,8 @@ def load_config(self: MyMAinWindow):
             (self.Ui.checkBox_sortmode_movefile, Switch.SORT_MOVE),
             (self.Ui.checkBox_move_overwrite, Switch.MOVE_OVERWRITE),
             (self.Ui.checkBox_move_keep, Switch.MOVE_KEEP),
+            (self.Ui.checkBox_task_store_local, Switch.TASK_STORE_LOCAL),
+            (self.Ui.checkBox_task_store_netdisk, Switch.TASK_STORE_NETDISK),
         )
 
         # 视频模式：「删除本地已下载的图片和信息文件」与「移动已下载图片和文件到新目录」
@@ -1168,6 +1160,14 @@ def load_config(self: MyMAinWindow):
             manager.config.switch_on = switch_on
         self.Ui.checkBox_move_overwrite.setChecked(move_overwrite)
         self.Ui.checkBox_move_keep.setChecked(move_keep)
+
+        # 高级页「任务模式」：存储在本地与存储在网盘必须勾选其中一个（默认档＝
+        # 存储在本地）。老配置两者都没有 → 按默认档补上「存储在本地」；手改配置
+        # 若两个都勾上 → 保留更安全的「存储在网盘」（网盘目录缓存没刷新会整理失败）。
+        switch_on = normalize_task_mode_switches(switch_on)
+        manager.config.switch_on = switch_on
+        self.Ui.checkBox_task_store_local.setChecked(Switch.TASK_STORE_LOCAL in switch_on)
+        self.Ui.checkBox_task_store_netdisk.setChecked(Switch.TASK_STORE_NETDISK in switch_on)
 
         # 定时刮削设置
         if Switch.TIMED_SCRAPE in switch_on:

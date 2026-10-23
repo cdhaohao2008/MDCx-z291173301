@@ -5,7 +5,7 @@
 1. 高级页 → 移动文件：「覆盖旧文件」/「保留旧文件」
    - 默认档＝保留旧文件（出厂配置、pydantic 默认、迁移升级、界面初始态都勾它）；
    - 两者必须勾选其中一个：都没勾时按默认档校正，保存配置时校验后写盘。
-2. 刮削模式 → 整理模式：「本地存储不设置时间间隔整理文件」/「网盘按照自动休息间隔整理文件」
+2. 高级功能 → 任务模式：「存储在本地」/「存储在网盘」
    - 默认档＝本地存储不设置时间间隔整理文件；
    - 两者必须勾选其中一个：都没勾时按默认档校正，保存配置时校验后写盘。
 """
@@ -21,7 +21,7 @@ from mdcx.config.enums import Switch
 from mdcx.config.extend import (
     normalize_move_file_policy,
     normalize_move_file_switches,
-    normalize_organize_interval_policy,
+    normalize_task_mode_switches,
 )
 from mdcx.config.migrations import migrate_config_data
 from mdcx.config.models import Config
@@ -56,12 +56,14 @@ def test_normalize_move_file_switches_keeps_explicit_choice():
     assert normalize_move_file_switches([Switch.SORT_DEL], False, False) == [Switch.SORT_DEL, Switch.MOVE_KEEP]
 
 
-def test_normalize_organize_interval_policy_falls_back_to_local():
-    """都没勾 → 默认档「本地存储不设置时间间隔」；都勾 → 只留网盘按休息间隔。"""
-    assert normalize_organize_interval_policy(False, False) == (True, False)
-    assert normalize_organize_interval_policy(True, True) == (False, True)
-    assert normalize_organize_interval_policy(True, False) == (True, False)
-    assert normalize_organize_interval_policy(False, True) == (False, True)
+def test_normalize_task_mode_switches_falls_back_to_local():
+    """都没勾 → 默认档「存储在本地」；都勾 → 只留「存储在网盘」。"""
+    assert normalize_task_mode_switches([]) == [Switch.TASK_STORE_LOCAL]
+    assert normalize_task_mode_switches([Switch.TASK_STORE_LOCAL, Switch.TASK_STORE_NETDISK]) == [
+        Switch.TASK_STORE_NETDISK
+    ]
+    assert normalize_task_mode_switches([Switch.TASK_STORE_LOCAL]) == [Switch.TASK_STORE_LOCAL]
+    assert normalize_task_mode_switches([Switch.TASK_STORE_NETDISK]) == [Switch.TASK_STORE_NETDISK]
 
 
 # --------------------------------------------------------------------------
@@ -95,12 +97,12 @@ def test_migration_adds_move_keep_when_neither_present():
     assert "move_keep" not in data["switch_on"]
 
 
-def test_migration_keeps_organize_interval_default():
-    """老配置没有整理模式间隔开关 → 自动升级为默认档「本地存储不设置时间间隔」。"""
+def test_migration_keeps_task_mode_default():
+    """老配置没有任务模式开关 → 自动升级为默认档「存储在本地」。"""
     data: dict = {}
     migrate_config_data(data)
-    assert data["organize_local_no_interval"] is True
-    assert data["organize_netdisk_rest_interval"] is False
+    assert Switch.TASK_STORE_LOCAL in data.get("switch_on", [])
+    assert Switch.TASK_STORE_NETDISK not in data.get("switch_on", [])
 
 
 # --------------------------------------------------------------------------
@@ -113,8 +115,8 @@ def test_default_config_template_defaults_to_move_keep():
     template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
     assert "move_keep" in template["switch_on"]
     assert "move_overwrite" not in template["switch_on"]
-    assert template["organize_local_no_interval"] is True
-    assert template["organize_netdisk_rest_interval"] is False
+    assert "task_store_local" in template.get("switch_on", [])
+    assert "task_store_netdisk" not in template.get("switch_on", [])
 
 
 def test_config_model_defaults_to_move_keep():
@@ -122,8 +124,8 @@ def test_config_model_defaults_to_move_keep():
     config = Config()
     assert Switch.MOVE_KEEP in config.switch_on
     assert Switch.MOVE_OVERWRITE not in config.switch_on
-    assert config.organize_local_no_interval is True
-    assert config.organize_netdisk_rest_interval is False
+    assert Switch.TASK_STORE_LOCAL in config.switch_on
+    assert Switch.TASK_STORE_NETDISK not in config.switch_on
 
 
 # --------------------------------------------------------------------------
@@ -149,13 +151,13 @@ def test_ui_checkboxes_are_checked_by_default():
     assert overwrite is not None, "缺少「覆盖旧文件」复选框"
     assert _checked_property(overwrite) is False, "「覆盖旧文件」不应默认勾选"
 
-    local = widgets.get("checkBox_organize_local_no_interval")
-    assert local is not None, "缺少「本地存储不设置时间间隔整理文件」复选框"
-    assert _checked_property(local) is True, "「本地存储不设置时间间隔整理文件」应当默认勾选"
+    local = widgets.get("checkBox_task_store_local")
+    assert local is not None, "缺少「存储在本地」复选框"
+    assert _checked_property(local) is True, "「存储在本地」应当默认勾选"
 
-    netdisk = widgets.get("checkBox_organize_netdisk_rest_interval")
-    assert netdisk is not None, "缺少「网盘按照自动休息间隔整理文件」复选框"
-    assert _checked_property(netdisk) is False, "「网盘按照自动休息间隔整理文件」不应默认勾选"
+    netdisk = widgets.get("checkBox_task_store_netdisk")
+    assert netdisk is not None, "缺少「存储在网盘」复选框"
+    assert _checked_property(netdisk) is False, "「存储在网盘」不应默认勾选"
 
 
 class _FakeCheckBox:
@@ -171,40 +173,39 @@ class _FakeCheckBox:
         return self.checked
 
 
-class _FakeOrganizeUi:
+class _FakeTaskModeUi:
     def __init__(self) -> None:
-        self.checkBox_organize_local_no_interval = _FakeCheckBox()
-        self.checkBox_organize_netdisk_rest_interval = _FakeCheckBox()
+        self.checkBox_task_store_local = _FakeCheckBox()
+        self.checkBox_task_store_netdisk = _FakeCheckBox()
 
 
-class _FakeOrganizeHost:
+class _FakeTaskModeHost:
     def __init__(self) -> None:
-        self.Ui = _FakeOrganizeUi()
+        self.Ui = _FakeTaskModeUi()
 
 
-def test_ui_handlers_fall_back_to_local_interval():
-    """整理模式间隔：取消唯一勾选的那枚时回落到默认档「本地存储不设置时间间隔」。"""
+def test_ui_handlers_fall_back_to_local_task():
+    """任务模式：取消唯一勾选的那枚时回落到默认档「存储在本地」。"""
     from mdcx.controllers.main_window.settings_actions import SettingsActionsMixin
 
-    host = _FakeOrganizeHost()
-    local = host.Ui.checkBox_organize_local_no_interval
-    netdisk = host.Ui.checkBox_organize_netdisk_rest_interval
+    host = _FakeTaskModeHost()
+    local = host.Ui.checkBox_task_store_local
+    netdisk = host.Ui.checkBox_task_store_netdisk
 
-    # 勾「网盘按自动休息间隔」→「本地不限间隔」自动取消
+    # 勾「存储在网盘」→「存储在本地」自动取消
     netdisk.checked = True
-    SettingsActionsMixin.checkBox_organize_netdisk_rest_interval_changed(host, True)
-    assert netdisk.checked is True
+    SettingsActionsMixin.checkBox_task_store_netdisk_changed(host, True)
     assert local.checked is False
 
-    # 勾「本地不限间隔」→「网盘按自动休息间隔」自动取消
+    # 勾「存储在本地」→「存储在网盘」自动取消
     local.checked = True
-    SettingsActionsMixin.checkBox_organize_local_no_interval_changed(host, True)
+    SettingsActionsMixin.checkBox_task_store_local_changed(host, True)
     assert local.checked is True
     assert netdisk.checked is False
 
-    # 取消「本地不限间隔」且网盘也没勾 → 回落到默认档「本地存储不设置时间间隔」
+    # 取消「存储在本地」且网盘也没勾 → 回落到默认档「存储在本地」
     local.checked = False
     netdisk.checked = False
-    SettingsActionsMixin.checkBox_organize_local_no_interval_changed(host, False)
+    SettingsActionsMixin.checkBox_task_store_local_changed(host, False)
     assert local.checked is True
     assert netdisk.checked is False

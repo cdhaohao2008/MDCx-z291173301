@@ -322,7 +322,6 @@ class LayoutSettingsMixin:
         rows: list[tuple[QWidget, QLayout, QSpacerItem]] = []
         for box_name, row_name in (
             ("checkBox_separate_overwrite_meta", "horizontalLayout_reuse_meta"),
-            ("checkBox_organize_netdisk_rest_interval", "horizontalLayout_organize_interval"),
             ("checkBox_sortmode_movefile", "horizontalLayout_125"),
         ):
             box = getattr(ui, box_name, None)

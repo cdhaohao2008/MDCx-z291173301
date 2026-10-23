@@ -213,23 +213,25 @@ def normalize_move_file_switches(switch_on: list[Switch], overwrite: bool, keep:
     return normalized
 
 
-def normalize_organize_interval_policy(local: bool, netdisk: bool) -> tuple[bool, bool]:
-    """校正整理模式「本地/网盘间隔」两个互斥复选框的勾选状态。
+def normalize_task_mode_switches(switch_on: list[Switch]) -> list[Switch]:
+    """校正高级页「任务模式」两个互斥开关，返回校正后的开关列表。
 
-    返回 ``(本地存储不设置时间间隔整理文件, 网盘按照自动休息间隔整理文件)``：
+    「存储在本地」与「存储在网盘」必须勾选其中一个（默认档＝存储在本地）：
 
-    - 两个都没勾 → 按默认档校正为「本地存储不设置时间间隔整理文件」。
-    - 两个都勾 → 只保留「网盘按照自动休息间隔整理文件」（等待是安全下限：网盘目录
-      缓存没刷新就会整理失败）。
-    - 只勾一个 → 原样返回（尊重用户的显式选择）。
+    - 两个都没勾 → 补上「存储在本地」；
+    - 两个都勾 → 去掉「存储在本地」，只留「存储在网盘」（等待是安全下限：
+      网盘目录缓存没刷新就会整理失败）；
+    - 只勾一个 → 原样保留（尊重用户的显式选择）。
 
-    与迁移层 ``_migrate_organize_interval_keys`` 的口径保持一致。
+    与迁移层 ``_migrate_task_mode_keys`` 的口径保持一致。
     """
-    if local and netdisk:
-        return False, True
-    if not local and not netdisk:
-        return True, False
-    return local, netdisk
+    local = Switch.TASK_STORE_LOCAL in switch_on
+    netdisk = Switch.TASK_STORE_NETDISK in switch_on
+    if local == netdisk:
+        if local:
+            return [item for item in switch_on if item != Switch.TASK_STORE_LOCAL]
+        return [*switch_on, Switch.TASK_STORE_LOCAL]
+    return switch_on
 
 
 def normalize_strm_policy(generate: bool, overwrite: bool) -> tuple[bool, bool]:
@@ -615,16 +617,15 @@ def is_in_success_folder(file_path: Path | str, success_folder: Path | str | Non
 
 
 def organize_netdisk_rest_enabled() -> bool:
-    """整理模式是否启用「网盘按照自动休息间隔整理文件」。
+    """整理模式是否按「高级 → 间歇刮削 → 自动休息」的间隔整理文件。
 
-    只有整理模式 + 勾选「网盘按照自动休息间隔」+ 未勾「本地存储不设置时间间隔」
-    时才生效（两枚复选框互斥，配置层已归一，这里再兜一层防手改配置）。
+    任务模式（高级 → 高级功能 → 任务模式）勾选「存储在网盘」时生效：
+    网盘挂成本地盘时目录缓存刷新有延迟，不留间隔直接整理会因目录缓存
+    未刷新而报错，故网盘侧强制按休息间隔等待。
     """
     if not is_organize_mode():
         return False
-    if manager.config.organize_local_no_interval:
-        return False
-    return bool(manager.config.organize_netdisk_rest_interval)
+    return Switch.TASK_STORE_NETDISK in manager.config.switch_on
 
 
 def organize_rest_seconds() -> int:

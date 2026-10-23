@@ -32,8 +32,8 @@ from mdcx.config.enums import (
 from mdcx.config.extend import (
     get_movie_path_setting,
     normalize_move_file_switches,
-    normalize_organize_interval_policy,
     normalize_strm_policy,
+    normalize_task_mode_switches,
 )
 from mdcx.config.manager import manager
 from mdcx.config.models import MIN_REST_TIME_SECONDS, SiteConfig, normalize_site_list, str_to_list
@@ -431,17 +431,6 @@ def save_config(self: MyMAinWindow):
     manager.config.separate_overwrite_strm = overwrite_strm
     manager.config.separate_reuse_metadata = self.Ui.checkBox_separate_reuse_meta.isChecked()
     manager.config.separate_overwrite_meta = self.Ui.checkBox_separate_overwrite_meta.isChecked()
-    # 整理模式：两次整理之间的时间间隔策略（两枚复选框互斥，必须勾选其中一个，
-    # 默认档＝「本地存储不设置时间间隔整理文件」；未勾选时按默认档校正后写盘，
-    # 与配置迁移逻辑保持一致）
-    organize_local, organize_netdisk = normalize_organize_interval_policy(
-        self.Ui.checkBox_organize_local_no_interval.isChecked(),
-        self.Ui.checkBox_organize_netdisk_rest_interval.isChecked(),
-    )
-    self.Ui.checkBox_organize_local_no_interval.setChecked(organize_local)
-    self.Ui.checkBox_organize_netdisk_rest_interval.setChecked(organize_netdisk)
-    manager.config.organize_local_no_interval = organize_local
-    manager.config.organize_netdisk_rest_interval = organize_netdisk
     manager.config.show_poster = self.Ui.checkBox_cover.isChecked()
     # endregion
 
@@ -788,6 +777,8 @@ def save_config(self: MyMAinWindow):
         (self.Ui.checkBox_sortmode_movefile, Switch.SORT_MOVE),
         (self.Ui.checkBox_move_overwrite, Switch.MOVE_OVERWRITE),
         (self.Ui.checkBox_move_keep, Switch.MOVE_KEEP),
+        (self.Ui.checkBox_task_store_local, Switch.TASK_STORE_LOCAL),
+        (self.Ui.checkBox_task_store_netdisk, Switch.TASK_STORE_NETDISK),
         (self.Ui.checkBox_dialog_qt, Switch.QT_DIALOG),
         (self.Ui.checkBox_theporndb_hash, Switch.THEPORNDB_NO_HASH),
         (self.Ui.checkBox_hide_dock_icon, Switch.HIDE_DOCK),
@@ -829,6 +820,13 @@ def save_config(self: MyMAinWindow):
     )
     self.Ui.checkBox_move_overwrite.setChecked(Switch.MOVE_OVERWRITE in manager.config.switch_on)
     self.Ui.checkBox_move_keep.setChecked(Switch.MOVE_KEEP in manager.config.switch_on)
+
+    # 高级页「任务模式」：存储在本地与存储在网盘必须勾选其中一个（默认档＝
+    # 存储在本地）。保存时校验：两个都没勾就按默认档「存储在本地」校正；
+    # 两个都勾上则保留更安全的「存储在网盘」。
+    manager.config.switch_on = normalize_task_mode_switches(manager.config.switch_on)
+    self.Ui.checkBox_task_store_local.setChecked(Switch.TASK_STORE_LOCAL in manager.config.switch_on)
+    self.Ui.checkBox_task_store_netdisk.setChecked(Switch.TASK_STORE_NETDISK in manager.config.switch_on)
 
     # 日志设置
     manager.config.show_web_log = get_checkbox(self.Ui.checkBox_show_web_log)

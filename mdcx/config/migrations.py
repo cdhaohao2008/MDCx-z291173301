@@ -23,32 +23,29 @@ _LEGACY_MINNANO_CLEAN_RULES = {
 }
 
 
-_ORGANIZE_INTERVAL_KEYS = ("organize_local_no_interval", "organize_netdisk_rest_interval")
-"""整理模式「本地不限间隔 / 网盘按休息间隔」两个互斥开关的配置键。"""
+_TASK_MODE_SWITCHES = ("task_store_local", "task_store_netdisk")
+"""任务模式「存储在本地 / 存储在网盘」两个互斥开关的配置键。"""
 
 
-def _migrate_organize_interval_keys(data: dict[str, Any]) -> None:
-    """整理模式「本地存储不限间隔 / 网盘存储按自动休息间隔」互斥开关归一。
+def _migrate_task_mode_keys(data: dict[str, Any]) -> None:
+    """任务模式「存储在本地 / 存储在网盘」互斥开关升级与归一。
 
-    旧配置文件里没有这两个键 → 补出厂默认（本地不限间隔 = True，网盘按休息间隔
-    = False），保证老用户升级后行为与默认值一致。
+    旧版本把这两档选择放在刮削模式 → 整理模式下的独立 bool 键里
+    （organize_local_no_interval / organize_netdisk_rest_interval），现已迁移到
+    高级 → 高级功能 → 任务模式的 switch_on 互斥开关组。升级时：
 
-    手改成「两开」或「全关」时归一：两开以「网盘按自动休息间隔」为准（等待是安全
-    下限，网盘目录缓存没刷新就会整理失败）；全关则回到「本地不限间隔」（默认档）。
-    界面层两枚复选框互斥（勾其一自动取消另一），这里只是手改配置的兜底。
+    - 清掉旧键；旧配置勾了「网盘按自动休息间隔」→ 把 task_store_netdisk 继承进
+      switch_on（否则按默认档「存储在本地」，行为与旧默认一致）。
+    - 手改配置若任务模式两开/全关：两开保留「存储在网盘」（等待是安全下限，
+      网盘目录缓存没刷新就会整理失败），全关回到默认档「存储在本地」。
+      界面层两枚复选框互斥（勾其一自动取消另一），这里只是手改配置的兜底。
     """
-    if not any(key in data for key in _ORGANIZE_INTERVAL_KEYS):
-        data["organize_local_no_interval"] = True
-        data["organize_netdisk_rest_interval"] = False
-        return
-    local = bool(data.get("organize_local_no_interval", True))
-    netdisk = bool(data.get("organize_netdisk_rest_interval", False))
-    if local and netdisk:
-        data["organize_local_no_interval"] = False
-        data["organize_netdisk_rest_interval"] = True
-    elif not local and not netdisk:
-        data["organize_local_no_interval"] = True
-        data["organize_netdisk_rest_interval"] = False
+    data.pop("organize_local_no_interval", None)
+    netdisk = data.pop("organize_netdisk_rest_interval", None)
+    if netdisk is not None and bool(netdisk):
+        # 旧配置（归一后）选择的是「网盘按自动休息间隔」→ 继承进任务模式开关组
+        _ensure_switch(data, "task_store_netdisk")
+    _ensure_switch_one_of(data, _TASK_MODE_SWITCHES, "task_store_local")
 
 
 def _migrate_strm_overwrite_linkage(data: dict[str, Any]) -> None:
@@ -471,6 +468,8 @@ def _ensure_switch(data: dict[str, Any], value: str) -> None:
         values = [str(_enum_value(item)) for item in current]
         if value not in values:
             data["switch_on"] = [*current, value]
+    elif current is None:
+        data["switch_on"] = [value]
     # switch_on 缺失（全新默认配置）时不动：走 pydantic default_factory，本身已默认勾选
 
 
@@ -500,6 +499,9 @@ def _ensure_switch_one_of(data: dict[str, Any], options: tuple[str, ...], defaul
     switch_on 在 v2 json 里是 list，兼容 str（逗号分隔）形态。
     """
     current = data.get("switch_on")
+    if current is None or (isinstance(current, (list, set, tuple)) and not current):
+        data["switch_on"] = [default]
+        return
     if isinstance(current, str):
         items = _str_to_list(current, ",")
         present = [option for option in options if option in items]
@@ -632,10 +634,11 @@ def migrate_config_data(data: dict[str, Any]) -> list[str]:
     if note := _migrate_main_mode(data):
         warnings.append(note)
 
-    # 整理模式「本地存储不限间隔 / 网盘存储按自动休息间隔」两个互斥开关：
-    # 必须勾选其中一个（默认档＝本地不限间隔）。老配置没有这两个键时补出厂
-    # 默认；手改成「两开」或「全关」时归一。
-    _migrate_organize_interval_keys(data)
+    # 任务模式「存储在本地 / 存储在网盘」两个互斥开关：
+    # 必须勾选其中一个（默认档＝存储在本地）。老配置没有任务模式开关时补上
+    # 默认档并把旧整理间隔键清理迁移；手改成「两开」或「全关」时归一为
+    # 更安全的「存储在网盘」（网盘目录缓存刷新有延迟，不留间隔直接整理会失败）。
+    _migrate_task_mode_keys(data)
 
     # 分离模式 STRM 两开关：「覆盖本地已存在的STRM链接文本」以「为本地视频文件
     # 生成STRM链接文本」为前提，勾了覆盖却没勾生成的配置补上生成（否则覆盖

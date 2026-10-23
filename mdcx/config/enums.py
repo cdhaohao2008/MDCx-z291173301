@@ -394,6 +394,10 @@ class Switch(Enum):
     """移动文件时目标目录已有同名文件：用被移动文件直接覆盖目标目录的同名文件。"""
     MOVE_KEEP = "move_keep"
     """移动文件时目标目录已有同名文件：保留目标目录的同名文件，被移动文件留在原目录不移动。"""
+    TASK_STORE_LOCAL = "task_store_local"
+    """任务模式：任务文件存储在本地，整理模式不设置时间间隔直接整理文件。"""
+    TASK_STORE_NETDISK = "task_store_netdisk"
+    """任务模式：任务文件存储在网盘，整理模式按「高级→间歇刮削→自动休息」的间隔整理文件。"""
 
     QT_DIALOG = "qt_dialog"
     THEPORNDB_NO_HASH = "theporndb_no_hash"
@@ -427,6 +431,8 @@ class Switch(Enum):
             "Sort Move",
             "Move Overwrite",
             "Move Keep",
+            "Local",
+            "Cloud",
             "Qt Dialog",
             "Theporndb No Hash",
             "Hide Dock",

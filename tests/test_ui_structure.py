@@ -1170,66 +1170,41 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
     elif _widget_string_prop(overwrite_meta, "text") != "覆盖本地保存的视频元数据文件":
         problems.append(f"覆盖元数据复选框文案被改: {_widget_string_prop(overwrite_meta, 'text')!r}")
 
-    # 整理模式间隔行：本地框居左 + gap spacer + 网盘框居右，末尾弹性 spacer
-    organize_hbox = _find_layout_by_name(root, "horizontalLayout_organize_interval")
-    if organize_hbox is None:
-        problems.append("horizontalLayout_organize_interval 不存在")
+    # 新任务模式行（高级页 → 高级功能）：本地 / 网盘互斥复选框
+    task_hbox = _find_layout_by_name(root, "horizontalLayout_task_mode")
+    if task_hbox is None:
+        problems.append("horizontalLayout_task_mode 不存在")
     else:
-        kids = [item[0].get("name") for item in organize_hbox.findall("item") if len(item)]
-        if kids[:3] != [
-            "checkBox_organize_local_no_interval",
-            "horizontalSpacer_organize_interval_gap",
-            "checkBox_organize_netdisk_rest_interval",
+        kids = [item[0].get("name") for item in task_hbox.findall("item") if len(item)]
+        if kids[:4] != [
+            "checkBox_task_store_local",
+            "horizontalSpacer_task_mode_gap",
+            "checkBox_task_store_netdisk",
+            "horizontalSpacer_task_mode",
         ]:
-            problems.append(f"整理间隔行内顺序被改: {kids!r}")
-        for extra in kids[3:]:
-            if not extra.startswith("horizontalSpacer_"):
-                problems.append(f"整理间隔行内不允许出现非 spacer 部件: {extra!r}")
+            problems.append(f"任务模式行内顺序被改: {kids!r}")
     for nm, text in (
-        ("checkBox_organize_local_no_interval", "本地存储不设置时间间隔整理文件"),
-        ("checkBox_organize_netdisk_rest_interval", "网盘按照自动休息间隔整理文件"),
+        ("checkBox_task_store_local", "存储在本地"),
+        ("checkBox_task_store_netdisk", "存储在网盘"),
     ):
         box = _find_widget_by_name(root, nm)
         if box is None:
             problems.append(f"{nm} 不存在")
         elif _widget_string_prop(box, "text") != text:
-            problems.append(f"{nm} 文案被改: {_widget_string_prop(box, 'text')!r}")
+            problems.append(f"任务模式文案被改: {_widget_string_prop(box, 'text')!r}")
 
-    grid = _find_layout_by_name(root, "gridLayout_2")
-    if grid is None:
-        problems.append("gridLayout_2 不存在")
-    else:
-        if _grid_item_pos(grid, "horizontalLayout_organize_interval") != ("2", "1"):
+    # 高级功能页 gridLayout_20：任务模式行应在 row=6，移动文件行在 row=7
+    grid_advanced = _find_layout_by_name(root, "gridLayout_20")
+    if grid_advanced is not None:
+        if _grid_item_pos(grid_advanced, "label_task_mode")[0] != "6":
             problems.append(
-                f"整理间隔行被移动（应在 row=2 col=1）: {_grid_item_pos(grid, 'horizontalLayout_organize_interval')!r}"
+                f"任务模式标签行被移动（应在 row=6 col=0）: {_grid_item_pos(grid_advanced, 'label_task_mode')!r}"
             )
-        if _grid_item_pos(grid, "horizontalLayout_strm") != ("4", "1"):
-            problems.append(f"STRM 行被移动（应在 row=4 col=1）: {_grid_item_pos(grid, 'horizontalLayout_strm')!r}")
-        if _grid_item_pos(grid, "horizontalLayout_reuse_meta") != ("5", "1"):
+        if _grid_item_pos(grid_advanced, "label_move_file")[0] != "7":
             problems.append(
-                f"复用行被移动（应在 row=5 col=1）: {_grid_item_pos(grid, 'horizontalLayout_reuse_meta')!r}"
+                f"移动文件行被移动（应在 row=7 col=0）: {_grid_item_pos(grid_advanced, 'label_move_file')!r}"
             )
-        if _grid_item_pos(grid, "horizontalLayout_125") != ("7", "1"):
-            problems.append(f"删除行被移动（应在 row=7 col=1）: {_grid_item_pos(grid, 'horizontalLayout_125')!r}")
-        strm_spacer = _find_widget_by_name(root, "label_strm_spacer")
-        del_spacer = _find_widget_by_name(root, "label_344")
-        organize_spacer = _find_widget_by_name(root, "label_organize_interval_spacer")
-        if strm_spacer is None or del_spacer is None or organize_spacer is None:
-            problems.append("label_strm_spacer / label_344 / label_organize_interval_spacer 缺失")
-        else:
-            widths = set()
-            for nm, w in (
-                ("label_strm_spacer", strm_spacer),
-                ("label_344", del_spacer),
-                ("label_organize_interval_spacer", organize_spacer),
-            ):
-                minimum = w.find("property[@name='minimumSize']/size/width")
-                widths.add(int(minimum.text) if minimum is not None else None)
-                if _grid_item_pos(grid, nm)[1] != "0":
-                    problems.append(f"{nm} 不在 col=0: {_grid_item_pos(grid, nm)!r}")
-            if widths != {80}:
-                problems.append(f"各行 col=0 空位宽度应同为 80: {sorted(widths, key=str)!r}")
-    assert not problems, "STRM 行位置/顺序问题:\n" + "\n".join(problems)
+    assert not problems, "任务模式结构问题:\n" + "\n".join(problems)
 
 
 # ---------- 使用说明「Official 有码片商官网30家」清单 —— 文案/同步回归锁 ----------

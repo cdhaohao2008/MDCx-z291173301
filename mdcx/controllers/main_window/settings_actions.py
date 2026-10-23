@@ -159,19 +159,19 @@ class SettingsActionsMixin:
             # 覆盖以生成为前提，勾选覆盖时同步勾选生成
             self.Ui.checkBox_separate_generate_strm.setChecked(True)
 
-    # 整理模式-本地/网盘间隔互斥：两者必须勾选其中一个（默认档＝「本地存储不设置
-    # 时间间隔整理文件」）。勾选其一自动去勾另一；把唯一勾选的那枚取消时立即
-    # 回落到默认档，保证界面上永远有且只有一枚被勾选（保存时还有配置层兜底校验）
-    def checkBox_organize_local_no_interval_changed(self, checked):
+    # 高级页-任务模式互斥：存储在本地 / 存储在网盘必须勾选其中一个
+    # （默认档＝「存储在本地」）。勾选其一自动去勾另一。
+    def checkBox_task_store_local_changed(self, checked):
         if checked:
-            self.Ui.checkBox_organize_netdisk_rest_interval.setChecked(False)
-        elif not self.Ui.checkBox_organize_netdisk_rest_interval.isChecked():
-            # 两枚都没勾 → 回落到默认档「本地存储不设置时间间隔整理文件」
-            self.Ui.checkBox_organize_local_no_interval.setChecked(True)
+            self.Ui.checkBox_task_store_netdisk.setChecked(False)
+        elif not self.Ui.checkBox_task_store_netdisk.isChecked():
+            self.Ui.checkBox_task_store_local.setChecked(True)
 
-    def checkBox_organize_netdisk_rest_interval_changed(self, checked):
+    def checkBox_task_store_netdisk_changed(self, checked):
         if checked:
-            self.Ui.checkBox_organize_local_no_interval.setChecked(False)
+            self.Ui.checkBox_task_store_local.setChecked(False)
+        elif not self.Ui.checkBox_task_store_local.isChecked():
+            self.Ui.checkBox_task_store_netdisk.setChecked(True)
 
     # 视频模式-删除/移动互斥：两枚复选框只能同时选中一个。
     # 勾选其一自动去勾另一（toggled(False) 不动作，故无信号回环）；

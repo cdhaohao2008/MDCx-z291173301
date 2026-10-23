@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from mdcx.config.enums import Switch
 from mdcx.config.extend import (
     ORGANIZE_MAIN_MODE,
     is_in_success_folder,
@@ -23,7 +24,7 @@ from mdcx.config.extend import (
     organize_rest_seconds,
 )
 from mdcx.config.manager import manager
-from mdcx.config.migrations import _migrate_organize_interval_keys
+from mdcx.config.migrations import _migrate_task_mode_keys
 from mdcx.config.models import MIN_REST_TIME_SECONDS, Config
 from mdcx.core import scraper as scraper_module
 from mdcx.core.scraper import Scraper
@@ -188,46 +189,46 @@ async def test_organize_outside_file_still_moves(monkeypatch: pytest.MonkeyPatch
 # ---------------------------------------------------------------------------
 
 
-def test_migrate_organize_interval_keys_fills_missing_keys():
-    """旧配置没有这两个键 → 自动补齐为「本地不限制间隔」。"""
+def test_migrate_task_mode_keys_fills_missing_keys():
+    """旧配置没有任务模式开关 → 自动补齐为「存储在本地」。"""
     data: dict = {}
-    _migrate_organize_interval_keys(data)
+    _migrate_task_mode_keys(data)
 
-    assert data["organize_local_no_interval"] is True
-    assert data["organize_netdisk_rest_interval"] is False
-
-
-def test_migrate_organize_interval_keys_netdisk_wins_when_both_on():
-    """两个键同时为真（手改配置）→ 以网盘为准。"""
-    data = {"organize_local_no_interval": True, "organize_netdisk_rest_interval": True}
-    _migrate_organize_interval_keys(data)
-
-    assert data["organize_local_no_interval"] is False
-    assert data["organize_netdisk_rest_interval"] is True
+    assert "task_store_local" in (str(i) for i in (data.get("switch_on") or []))
+    assert all(k not in data for k in ("organize_local_no_interval", "organize_netdisk_rest_interval"))
 
 
-def test_migrate_organize_interval_keys_local_when_both_off():
-    """两个键同时为假（手改配置）→ 以本地不限制为准。"""
+def test_migrate_task_mode_keys_netdisk_wins_when_both_on():
+    """旧配置网盘为真 → 任务模式继承「存储在网盘」。"""
+    data = {"organize_netdisk_rest_interval": True}
+    _migrate_task_mode_keys(data)
+    switch_items = data.get("switch_on")
+    assert isinstance(switch_items, (list, str))
+    assert "task_store_netdisk" in (str(i) for i in (switch_items or []))
+
+
+def test_migrate_task_mode_keys_local_when_both_off():
+    """旧配置全为假 → 任务模式回到默认档「存储在本地」。"""
     data = {"organize_local_no_interval": False, "organize_netdisk_rest_interval": False}
-    _migrate_organize_interval_keys(data)
-
-    assert data["organize_local_no_interval"] is True
-    assert data["organize_netdisk_rest_interval"] is False
+    _migrate_task_mode_keys(data)
+    switch_items = data.get("switch_on")
+    assert isinstance(switch_items, (list, str))
+    assert "task_store_local" in (str(i) for i in (switch_items or []))
 
 
 def test_config_update_migrates_old_config(monkeypatch: pytest.MonkeyPatch):
-    """旧版本配置文件载入时自动补齐新字段（配置升级迁移）。"""
+    """旧版本配置文件载入时自动清理旧键、补齐任务模式（默认＝存储在本地）。"""
     data: dict = {"main_mode": 6}
     Config.update(data)
+    assert "organize_local_no_interval" not in data
+    assert "organize_netdisk_rest_interval" not in data
+    assert "task_store_local" in [str(i) for i in (data.get("switch_on") or [])]
 
-    assert data["organize_local_no_interval"] is True
-    assert data["organize_netdisk_rest_interval"] is False
 
-
-def test_config_defaults_are_local_no_interval():
+def test_config_defaults_are_local_task():
     cfg = Config.model_validate({"main_mode": 6})
-    assert cfg.organize_local_no_interval is True
-    assert cfg.organize_netdisk_rest_interval is False
+    assert Switch.TASK_STORE_LOCAL in cfg.switch_on
+    assert Switch.TASK_STORE_NETDISK not in cfg.switch_on
 
 
 # ---------------------------------------------------------------------------
@@ -237,12 +238,12 @@ def test_config_defaults_are_local_no_interval():
 
 def test_organize_netdisk_rest_enabled_requires_netdisk_flag(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(manager.config, "main_mode", ORGANIZE_MAIN_MODE)
-    monkeypatch.setattr(manager.config, "organize_local_no_interval", True)
-    monkeypatch.setattr(manager.config, "organize_netdisk_rest_interval", False)
+    from mdcx.config.enums import Switch
+
+    monkeypatch.setattr(manager.config, "switch_on", [Switch.TASK_STORE_LOCAL])
     assert organize_netdisk_rest_enabled() is False
 
-    monkeypatch.setattr(manager.config, "organize_local_no_interval", False)
-    monkeypatch.setattr(manager.config, "organize_netdisk_rest_interval", True)
+    monkeypatch.setattr(manager.config, "switch_on", [Switch.TASK_STORE_NETDISK])
     assert organize_netdisk_rest_enabled() is True
 
     # 非整理模式下不生效
@@ -291,8 +292,7 @@ async def test_wait_organize_interval_waits_until_deadline(monkeypatch: pytest.M
     monkeypatch.setattr(scraper_module.asyncio, "sleep", _fake_sleep)
     monkeypatch.setattr(scraper_module, "load_organize_state", lambda: {"last_run_end": 990.0})
     monkeypatch.setattr(manager.config, "main_mode", ORGANIZE_MAIN_MODE)
-    monkeypatch.setattr(manager.config, "organize_local_no_interval", False)
-    monkeypatch.setattr(manager.config, "organize_netdisk_rest_interval", True)
+    monkeypatch.setattr(manager.config, "switch_on", [Switch.TASK_STORE_NETDISK])
     monkeypatch.setattr(manager.config, "rest_time", timedelta(seconds=40))
 
     await Scraper(_DummyCrawlerProvider())._wait_organize_interval()
@@ -331,8 +331,7 @@ async def test_wait_organize_interval_skips_when_enough_time_passed(monkeypatch:
     monkeypatch.setattr(scraper_module.asyncio, "sleep", _fake_sleep)
     monkeypatch.setattr(scraper_module, "load_organize_state", lambda: {"last_run_end": 900.0})
     monkeypatch.setattr(manager.config, "main_mode", ORGANIZE_MAIN_MODE)
-    monkeypatch.setattr(manager.config, "organize_local_no_interval", False)
-    monkeypatch.setattr(manager.config, "organize_netdisk_rest_interval", True)
+    monkeypatch.setattr(manager.config, "switch_on", [Switch.TASK_STORE_NETDISK])
     monkeypatch.setattr(manager.config, "rest_time", timedelta(seconds=40))
 
     await Scraper(_DummyCrawlerProvider())._wait_organize_interval()
@@ -355,8 +354,7 @@ async def test_wait_organize_interval_skips_for_local_storage(monkeypatch: pytes
     monkeypatch.setattr(scraper_module.asyncio, "sleep", _fake_sleep)
     monkeypatch.setattr(scraper_module, "load_organize_state", lambda: {"last_run_end": 999.0})
     monkeypatch.setattr(manager.config, "main_mode", ORGANIZE_MAIN_MODE)
-    monkeypatch.setattr(manager.config, "organize_local_no_interval", True)
-    monkeypatch.setattr(manager.config, "organize_netdisk_rest_interval", False)
+    monkeypatch.setattr(manager.config, "switch_on", [Switch.TASK_STORE_LOCAL])
 
     await Scraper(_DummyCrawlerProvider())._wait_organize_interval()
 
