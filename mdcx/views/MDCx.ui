@@ -5654,9 +5654,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 <height>30</height>
                               </size>
                             </property>
-                            <property name="styleSheet">
-                              <string notr="true">color: rgb(255, 0, 0);</string>
-                            </property>
                             <property name="text">
                               <string>补全模式</string>
                             </property>
@@ -5673,7 +5670,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </sizepolicy>
                                 </property>
                                 <property name="styleSheet">
-                                  <string notr="true">color: rgb(255, 0, 0);</string>
+                                  <string notr="true">color: rgb(8, 128, 128);</string>
                                 </property>
                                 <property name="text">
                                   <string>执行：刮削-&gt;下载封面-&gt;重命名-&gt;打水印等全部操作，适合需要海报墙的情况</string>
