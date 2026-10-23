@@ -5192,7 +5192,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       <x>0</x>
                       <y>0</y>
                       <width>860</width>
-                      <height>2069</height>
+                      <height>2106</height>
                     </rect>
                   </property>
                   <widget class="QGroupBox" name="groupBox">
@@ -5201,7 +5201,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         <x>30</x>
                         <y>218</y>
                         <width>701</width>
-                        <height>532</height>
+                        <height>569</height>
                       </rect>
                     </property>
                     <property name="minimumSize">
@@ -5219,7 +5219,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           <x>50</x>
                           <y>30</y>
                           <width>631</width>
-                          <height>488</height>
+                          <height>525</height>
                         </rect>
                       </property>
                       <layout class="QGridLayout" name="gridLayout_2">
@@ -5641,6 +5641,117 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           </widget>
                         </item>
                         <item row="9" column="0">
+                          <widget class="QRadioButton" name="radioButton_mode_complete">
+                            <property name="sizePolicy">
+                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                <horstretch>0</horstretch>
+                                <verstretch>0</verstretch>
+                              </sizepolicy>
+                            </property>
+                            <property name="minimumSize">
+                              <size>
+                                <width>0</width>
+                                <height>30</height>
+                              </size>
+                            </property>
+                            <property name="styleSheet">
+                              <string notr="true">color: rgb(255, 0, 0);</string>
+                            </property>
+                            <property name="text">
+                              <string>补全模式</string>
+                            </property>
+                          </widget>
+                        </item>
+                        <item row="9" column="1">
+                          <layout class="QHBoxLayout" name="horizontalLayout_complete_mode">
+                            <item>
+                              <widget class="QLabel" name="label_complete_mode">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="styleSheet">
+                                  <string notr="true">color: rgb(255, 0, 0);</string>
+                                </property>
+                                <property name="text">
+                                  <string>执行：刮削-&gt;下载封面-&gt;重命名-&gt;打水印等全部操作，适合需要海报墙的情况</string>
+                                </property>
+                                <property name="wordWrap">
+                                  <bool>false</bool>
+                                </property>
+                              </widget>
+                            </item>
+                            <item>
+                              <widget class="QPushButton" name="pushButton_tips_complete_mode">
+                                <property name="sizePolicy">
+                                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                  </sizepolicy>
+                                </property>
+                                <property name="minimumSize">
+                                  <size>
+                                    <width>30</width>
+                                    <height>30</height>
+                                  </size>
+                                </property>
+                                <property name="maximumSize">
+                                  <size>
+                                    <width>30</width>
+                                    <height>30</height>
+                                  </size>
+                                </property>
+                                <property name="cursor">
+                                  <cursorShape>WhatsThisCursor</cursorShape>
+                                </property>
+                                <property name="mouseTracking">
+                                  <bool>true</bool>
+                                </property>
+                                <property name="toolTipDuration">
+                                  <number>500000</number>
+                                </property>
+                                <property name="layoutDirection">
+                                  <enum>Qt::LeftToRight</enum>
+                                </property>
+                                <property name="styleSheet">
+                                  <string notr="true">QPushButton{border-color: rgba(255, 255, 255,
+                                    0);
+                                    background-color: rgba(255, 255, 255, 0);border-radius:10px;}
+                                    QPushButton:hover{background-color: rgba(255, 255, 255, 20);}
+                                    QPushButton:pressed{ background-color: rgba(255, 255, 255, 10);}</string>
+                                </property>
+                                <property name="text">
+                                  <string />
+                                </property>
+                                <property name="icon">
+                                  <iconset theme="system-help">
+                                    <normaloff>.</normaloff>.</iconset>
+                                </property>
+                                <property name="iconSize">
+                                  <size>
+                                    <width>20</width>
+                                    <height>20</height>
+                                  </size>
+                                </property>
+                                <property name="shortcut">
+                                  <string />
+                                </property>
+                                <property name="checkable">
+                                  <bool>false</bool>
+                                </property>
+                                <property name="autoDefault">
+                                  <bool>false</bool>
+                                </property>
+                                <property name="default">
+                                  <bool>false</bool>
+                                </property>
+                              </widget>
+                            </item>
+                          </layout>
+                        </item>
+                        <item row="10" column="0">
                           <widget class="QLabel" name="label_231">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -5682,7 +5793,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   <string notr="true">color: rgb(8, 128, 128);</string>
                                 </property>
                                 <property name="text">
-                                  <string>不刮削，读取本地信息并显示，适合检查媒体库或媒体库文件重新整理和分类</string>
+                                  <string>不刮削，读取本地 nfo、封面图、缩略图并显示，适合检查媒体库或媒体库文件重新整理和分类</string>
                                 </property>
                                 <property name="wordWrap">
                                   <bool>false</bool>
@@ -5782,7 +5893,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="9" column="1">
+                        <item row="10" column="1">
                           <layout class="QVBoxLayout" name="verticalLayout_5">
                             <item>
                               <layout class="QHBoxLayout" name="horizontalLayout_127">
@@ -6423,7 +6534,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1609</y>
+                        <y>1646</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -6603,7 +6714,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1739</y>
+                        <y>1776</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -6777,7 +6888,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1869</y>
+                        <y>1906</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -6951,7 +7062,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>769</y>
+                        <y>806</y>
                         <width>701</width>
                         <height>441</height>
                       </rect>
@@ -7534,7 +7645,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1479</y>
+                        <y>1516</y>
                         <width>701</width>
                         <height>111</height>
                       </rect>
@@ -8082,7 +8193,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <property name="geometry">
                       <rect>
                         <x>30</x>
-                        <y>1249</y>
+                        <y>1286</y>
                         <width>701</width>
                         <height>211</height>
                       </rect>
@@ -25800,8 +25911,9 @@ p,li{white-space:pre-wrap;}
 &lt;li&gt;&lt;b&gt;正常模式&lt;/b&gt;：通过番号联网抓取元数据、封面、缩略图、背景图，并整理文件适合新下载的视频建立完整海报墙&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;视频模式：&lt;/b&gt;整理模式，仅联网刮削番号用于命名，然后重命名和移动视频文件，不下载图片、不生成NFO文件，适合不需要海报墙、只想归类文件的用户&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;更新模式&lt;/b&gt;：对已有NFO的影片在不改动文件位置结构的前提下重新整理文件结构，按更新规则重新命名目录和文件，适合已刮过但想调整目录结构的情况&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;读取模式&lt;/b&gt;：通过读取本地NFO文件实现无需联网的查看或更新，有4个独立选项可自由组合，有NFO时更新并按更新规则整理、无NFO刮削时对缺少NFO的文件联网刮、重新下载图片、更新NFO内容、补演员TMDB ID，读取模式不受断点续刮缓存干扰，始终处理全部选中文件&lt;/li&gt;
-&lt;li&gt;&lt;b&gt;合并策略&lt;/b&gt;：读取模式区域勾选框+下拉框，勾选后写入NFO前按策略决定如何处理已存在的NFO文件，全新数据优先/本地信息优先/合并数组去重/保留已有字段/仅填补空字段；不勾选则直接用新数据覆盖、不合并本地NFO文件，防止重刮覆盖手动整理的内容&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;读取模式&lt;/b&gt;：只读取本地NFO文件中的字段与目录里的封面图、缩略图、背景图并展示，不联网、不下载、不写NFO、不移动文件，适合检查媒体库；读取模式不受断点续刮缓存干扰，始终处理全部选中文件&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;补全模式&lt;/b&gt;：优先使用本地已有的NFO字段、NFO文件、封面图、缩略图、背景图、字幕与mediainfo，本地确实没有的才联网刮削补齐；没有NFO的文件自动按正常模式全量刮削；已在成功输出目录内的文件只补内容不移动，其余按正常模式的移动/重命名开关处理，搬运与整理模式共用同一套事务与回滚&lt;/li&gt;
+&lt;li&gt;&lt;b&gt;合并策略&lt;/b&gt;：补全模式区域勾选框+下拉框，勾选后写入NFO前按策略决定如何处理已存在的NFO文件，全新数据优先/本地信息优先/合并数组去重/保留已有字段/仅填补空字段；不勾选时补全模式固定以本地信息优先（只填本地空着的字段）&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;软链接项&lt;/b&gt;：设置项，非独立模式，在任意模式下勾选「创建软链接」即可刮削后不移动原视频，而是在目标目录创建软链接，类快捷方式，便于PT下载既刮削又保种；需以管理员/有权限身份运行，注意：软链接通常只能在媒体库展示，不能直接播放&lt;/li&gt;
 &lt;li&gt;&lt;b&gt;调试模式&lt;/b&gt;：在「设置→高级」的「调试模式日志页面」分组中勾选「显示字段内容信息」，完整排查建议同时同时勾选「显示刮削过程信息」「显示字段来源信息」等，日志页面会输出番号对应的完整元数据如封面、导演、演员、简介等供排查&lt;/li&gt;
 &lt;/ul&gt;

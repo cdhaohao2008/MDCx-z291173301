@@ -219,6 +219,9 @@
 - 写死数字前 grep 代码核实。高频漂移锚点：默认网站源顺序、代理域名列表、命名变量表、设置 Tab 名、字段优先级数、演员库列、指纹池、主窗口行数。README 爬虫数四处同步，Features.md 标题是独立第五处。
 - 长时间任务标准做法：后台终端 + checkpoint 断点续传（state 落盘，后台终端 1 小时上限连 wrapper 一起回收）+ 分批处理批间落盘 + wrapper 45-50 分钟自重启。进度看落盘文件，不看终端日志（stdout 全缓冲可能 0 字节假象）。
 - 功能移除类需求先调研证据再答：查活跃度、底层共享依赖、移除成本。用户转述与代码证据矛盾时以代码为准。
+- **刮削模式值全表**（2026-10-23 起）：1 正常 / 2 分离 / 3 视频 / 4 更新 / 5 读取（只读展示）/ 6 整理 / 7 补全（本地优先、只补缺失）。新增或改动模式必须同步这些点：`config/extend.py` 常量与 `is_xxx_mode()/is_xxx_selected()`、`load_config.py` / `save_config.py` 的 `mode_mapping` 与 radio 映射、`MDCx.ui` 单选项与说明、`core/file.py` 的 `creat_folder` / `_get_folder_path` / `move_movie` 模式元组、`base/file.py::get_movie_list` 的 `include_success` 与 `.strm`、`core/scraper.py` 的断点续刮排除列表与扫描排除目录、`init.py` 提示词、软件内使用说明。
+- **番号 ↔ 伴生文件关联只在 `core/file_association.py`**（`OrganizeIndex` / `build_organize_index` / `collect_media_assets`），整理、视频、补全三种模式共用；`core/organize.py` 只保留「移动计划 + 事务 + 回滚」。改归属规则只改前者，别再往 organize.py 里加。
+- **补全模式的「先搬后补」顺序不能反**：先补字段/图片再搬，会把刚写好的 nfo 当成旧 nfo 再搬一次，补全结果被覆盖。已在成功输出目录内的文件走 `complete_inplace_locked`，只补内容不移动。
 
 ## 日亚 ASIN 数据库与校验方法论
 

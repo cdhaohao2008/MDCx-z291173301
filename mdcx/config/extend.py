@@ -4,7 +4,7 @@ from pathlib import Path
 
 from ..manual import ManualConfig
 from ..utils.path import is_descendant
-from .enums import Switch, Website
+from .enums import NfoMergeStrategy, ReadMode, Switch, Website
 from .manager import manager
 from .models import CleanAction
 
@@ -48,11 +48,22 @@ SEPARATE_MAIN_MODE = 2
 VIDEO_MAIN_MODE = 3
 """视频模式的 main_mode 值：只刮削并重命名视频本体，不下载图片、不生成 nfo。"""
 
+UPDATE_MAIN_MODE = 4
+"""更新模式的 main_mode 值：按「更新模式规则」（A/B/C/D 目录）重新组织文件。"""
+
 ORGANIZE_MAIN_MODE = 6
 """整理模式的 main_mode 值：不联网刮削，读取同目录 nfo 字段后按命名规则重新整理文件。"""
 
 READ_MAIN_MODE = 5
 """读取模式的 main_mode 值：只读取同目录 nfo 字段，不联网刮削、不移动文件。"""
+
+COMPLETE_MAIN_MODE = 7
+"""补全模式的 main_mode 值：本地已有优先，只补缺失的字段、封面、缩略图与字幕。
+
+补全模式与正常模式的区别只有一点：正常模式是全量重新刮削（本地 NFO 内容会被
+新数据覆盖），补全模式优先使用本地已有的 nfo 字段、nfo 文件、图片、字幕、
+``-mediainfo.json``，本地确实没有的才联网刮削补齐。
+"""
 
 SEPARATE_META_EXTS = frozenset({".nfo", ".jpg", ".jpeg", ".png", ".webp", ".strm"})
 """分离模式下归入数据存放目录的元数据文件扩展名（小写）。
@@ -130,6 +141,61 @@ def is_organize_mode() -> bool:
     运行时被临时切成读取模式后，本函数返回 False（本次运行不再整理文件）。
     """
     return get_runtime_main_mode() == ORGANIZE_MAIN_MODE
+
+
+def is_complete_selected() -> bool:
+    """用户在「软件设置」里选择的刮削模式是否为补全模式（不受运行时覆盖影响）。
+
+    与 :func:`is_organize_selected` 同理：扫描是否包含「成功输出目录」、文件是否
+    允许移动这类判断要依据用户的选择，而不是运行时的临时切换。
+    """
+    return manager.config.main_mode == COMPLETE_MAIN_MODE
+
+
+def is_complete_mode() -> bool:
+    """当前是否为补全模式（刮削模式 == 7）。
+
+    补全模式优先使用本地已有的 nfo 字段、nfo 文件、图片、字幕与 mediainfo，
+    本地缺失的部分才联网刮削补齐；已经躺在「成功输出目录」内的文件只补内容、
+    不移动，其余文件按正常模式的移动/重命名开关处理。
+
+    运行时被临时切成读取模式后，本函数返回 False。
+    """
+    return get_runtime_main_mode() == COMPLETE_MAIN_MODE
+
+
+def is_read_only_mode() -> bool:
+    """当前是否为「只读取展示」的读取模式（刮削模式 == 5）。
+
+    读取模式只读取同目录 nfo 的字段与本地封面/缩略图并展示，不联网、不下载、
+    不写 nfo、不移动文件。原先挂在读取模式下的更新/重下/无 nfo 刮削等选项
+    已整体迁到补全模式。
+    """
+    return get_runtime_main_mode() == READ_MAIN_MODE
+
+
+def is_update_rules_active() -> bool:
+    """输出路径是否按「更新模式规则」（A/B/C/D 目录）计算。
+
+    更新模式、读取模式沿用原行为；补全模式只在勾选「本地刮削成功的文件，
+    按更新模式重新整理分类」时启用——该选项已从读取模式迁到补全模式。
+    """
+    mode = get_runtime_main_mode()
+    if mode in (UPDATE_MAIN_MODE, READ_MAIN_MODE):
+        return True
+    return mode == COMPLETE_MAIN_MODE and ReadMode.HAS_NFO_UPDATE in manager.config.read_mode
+
+
+def complete_merge_strategy() -> NfoMergeStrategy:
+    """补全模式写入 NFO 时使用的合并策略。
+
+    补全模式的核心语义是「本地已有优先，只补缺失」，因此未勾选
+    「本地NFO合并及策略」时固定用 :attr:`NfoMergeStrategy.PREFER_NFO`；
+    勾选后按用户在补全模式下方选择的策略执行。
+    """
+    if manager.config.nfo_merge_enabled:
+        return manager.config.nfo_merge_strategy
+    return NfoMergeStrategy.PREFER_NFO
 
 
 def is_video_move_companions_enabled() -> bool:

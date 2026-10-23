@@ -365,6 +365,7 @@ def save_config(self: MyMAinWindow):
         (self.Ui.radioButton_mode_sort, 3),
         (self.Ui.radioButton_mode_update, 4),
         (self.Ui.radioButton_mode_read, 5),
+        (self.Ui.radioButton_mode_complete, 7),
         default=1,
     )
 
@@ -879,6 +880,7 @@ def save_config(self: MyMAinWindow):
         4: ("update", "更新模式"),
         5: ("read", "读取模式"),
         6: ("organize", "整理模式"),
+        7: ("complete", "补全模式"),
     }
 
     mode_key, mode_text = mode_mapping.get(main_mode, ("common", "正常模式"))

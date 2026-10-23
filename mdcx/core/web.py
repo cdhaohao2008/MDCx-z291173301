@@ -28,7 +28,8 @@ from ..base.web import (
     jdbstatic_to_spfcas,
     spfcas_to_jdbstatic,
 )
-from ..config.enums import DownloadableFile, FixedScrapingType, HDPicSource, KeepableFile, Website
+from ..config.enums import DownloadableFile, FixedScrapingType, HDPicSource, KeepableFile, ReadMode, Website
+from ..config.extend import is_complete_mode
 from ..config.manager import manager
 from ..config.resource_policy import resource_policy
 from ..log_console import log_console
@@ -55,6 +56,18 @@ from .title_match import contains_compilation_keyword, title_series_match
 
 AMAZON_SEARCH_SCRAPING_TYPES = {FixedScrapingType.YOUMA}
 AMAZON_SEARCH_SPECIAL_MOSAICS = {"里番", "裏番", "动漫", "動漫"}
+
+
+def keep_local_image(path: Path | None) -> bool:
+    """补全模式：本地已有这张图且未勾选「重新下载」时，保留本地文件、不重下。
+
+    补全模式的核心是「本地已有优先，只补缺失」。未勾选「本地NFO内有链接，
+    重新下载封面图片等文件」时，只要目标图片还在，就跳过下载与覆盖；勾选后
+    回到正常模式的下载语义（按「下载 / 保留」策略决定是否重下）。
+    """
+    return bool(path) and is_complete_mode() and ReadMode.READ_DOWNLOAD_AGAIN not in manager.config.read_mode
+
+
 POSTER_COPY_POLICY_MAP = {
     FixedScrapingType.YOUMA: DownloadableFile.IGNORE_YOUMA,
     FixedScrapingType.WUMA: DownloadableFile.IGNORE_WUMA,
@@ -952,6 +965,9 @@ async def thumb_download(
     poster_path = other.poster_path
     thumb_path = other.thumb_path
     fanart_path = other.fanart_path
+    # 补全模式：本地已有缩略图 → 保留本地文件，不重新下载
+    if keep_local_image(thumb_path):
+        return True
     thumb_policy = resource_policy(
         DownloadableFile.THUMB,
         KeepableFile.THUMB,
@@ -1362,6 +1378,9 @@ async def poster_download(
     poster_path = other.poster_path
     thumb_path = other.thumb_path
     fanart_path = other.fanart_path
+    # 补全模式：本地已有封面 → 保留本地文件，不重新下载
+    if keep_local_image(poster_path):
+        return True
     # 不下载poster、不保留poster时，返回
     if poster_policy.should_remove_existing:
         if poster_path:
@@ -1571,6 +1590,9 @@ async def fanart_download(
     start_time = time.time()
     thumb_path = other.thumb_path
     fanart_path = other.fanart_path
+    # 补全模式：本地已有背景图 → 保留本地文件，不重新生成
+    if keep_local_image(fanart_path):
+        return True
     download_files = manager.config.download_files
     keep_files = manager.config.keep_files
     fanart_policy = resource_policy(

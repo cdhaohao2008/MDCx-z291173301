@@ -36,11 +36,13 @@ from ..config.enums import (
     TagInclude,
 )
 from ..config.extend import (
+    COMPLETE_MAIN_MODE,
     ORGANIZE_MAIN_MODE,
     READ_MAIN_MODE,
     SEPARATE_MAIN_MODE,
     VIDEO_MAIN_MODE,
     MoviePathSetting,
+    complete_merge_strategy,
     drop_ignore_dir,
     eff_del_empty_folder,
     eff_success_file_move,
@@ -48,6 +50,7 @@ from ..config.extend import (
     get_movie_path_setting,
     get_runtime_main_mode,
     get_separate_meta_root,
+    is_complete_selected,
     is_in_success_folder,
     is_organize_selected,
     is_success_output_tree,
@@ -94,6 +97,7 @@ from .file_crawler import FileScraper, classify_existing_scrape_result, classify
 from .image import add_mark, replace_thumb_fanart_with_poster
 from .media_resource import MediaResourceContext
 from .nfo import get_nfo_data, write_nfo
+from .nfo_merger import filled_missing_fields, merge_nfo_fields
 from .organize import OrganizeIndex, build_organize_index, organize_companion_files, organize_files
 from .super_resolution import maybe_upscale_poster
 from .translate import translate_actor, translate_info, translate_title_outline
@@ -155,13 +159,14 @@ class UnexpectedScrapeCancellation(Exception): ...
 def get_scan_ignore_dirs(path_setting: MoviePathSetting) -> list[Path]:
     """计算本次扫描要排除的目录列表。
 
-    整理模式（main_mode == 6）把整理结果写进「成功输出目录」（默认 JAV_output），
-    而该目录默认也在「排除目录」列表里 → 扫描时整棵被跳过，整理模式永远看不到
-    自己上一次的产物，于是再次点「开始」只会得到「共 0 个文件」（用户实测）。
-    因此整理模式下把成功输出目录从排除列表中摘掉：整理是幂等的（已经在目标位置
-    的文件无需移动），这样再次点「开始」就能把上次的整理结果重新整理一遍。
+    整理模式（main_mode == 6）与补全模式（main_mode == 7）都把结果写进
+    「成功输出目录」（默认 JAV_output），而该目录默认也在「排除目录」列表里 →
+    扫描时整棵被跳过，永远看不到自己上一次的产物：整理模式再次点「开始」只会
+    得到「共 0 个文件」，补全模式则无法补全已经归档的文件。
+    因此这两个模式下把成功输出目录从排除列表中摘掉：整理是幂等的（已经在目标
+    位置的文件无需移动），补全模式对目录内的文件只补字段/图片、不移动。
     """
-    if is_organize_selected():
+    if is_organize_selected() or is_complete_selected():
         # getattr 兜底：部分调用方（含测试桩）构造的是精简的路径设置对象，
         # 没有 success_folder 时按「无可摘除项」处理，不能让扫描整段抛异常。
         return drop_ignore_dir(path_setting.ignore_dirs, getattr(path_setting, "success_folder", None))
@@ -645,7 +650,7 @@ class Scraper:
                         current_paths.softlink_path,
                     )
                     scan_path = current_paths.softlink_path
-                if is_organize_selected() or is_video_move_companions_enabled():
+                if is_organize_selected() or is_complete_selected() or is_video_move_companions_enabled():
                     companion_scan_roots.append(scan_path)
                     companion_ignore_dirs.extend(scan_ignore_dirs)
                 if is_organize_selected() and is_success_output_tree(current_paths.movie_path):
@@ -693,9 +698,14 @@ class Scraper:
             signal.show_scrape_info("🔎 正在刮削中...")
 
         # 断点续刮：过滤掉已完成且 mtime 未变的文件；恢复上次失败的未超限文件（跨会话重试）
-        # 读取模式（5）/整理模式（6）本质是读已有结果，不参与断点续刮的跳过/恢复逻辑，
-        # 否则会导致只能看到「mtime 变化」的文件，且读完即被标记 done 导致下次读不到。
-        if cache.is_usable() and get_runtime_main_mode() not in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE):
+        # 读取模式（5）/整理模式（6）/补全模式（7）本质是读已有结果并补齐缺失项，
+        # 不参与断点续刮的跳过/恢复逻辑：否则补全过的文件会被标记 done，下次再想
+        # 补新缺的图/字幕就读不到它了。
+        if cache.is_usable() and get_runtime_main_mode() not in (
+            READ_MAIN_MODE,
+            ORGANIZE_MAIN_MODE,
+            COMPLETE_MAIN_MODE,
+        ):
             try:
                 existing = set(movie_list)
                 # 只有全量扫描拿到的才是完整媒体库集合，才有资格做全库清理；
@@ -763,8 +773,14 @@ class Scraper:
         # 整理模式：先完成整目录预扫描并固定归属关系，再允许任何文件开始移动。
         # 视频模式勾选「移动已下载图片和文件到新目录」时同样先建索引——
         # 伴生文件与视频的归属关系必须在任何文件被搬走之前确定。
+        # 补全模式也需要索引：先算出每个媒体已有哪些 nfo/图片/字幕，才能决定
+        # 哪些要补、哪些要随视频一起搬。
         if task_count and get_runtime_main_mode() == ORGANIZE_MAIN_MODE:
             await self._prepare_organize_index(movie_list, companion_scan_roots, companion_ignore_dirs)
+        elif task_count and get_runtime_main_mode() == COMPLETE_MAIN_MODE:
+            await self._prepare_organize_index(
+                movie_list, companion_scan_roots, companion_ignore_dirs, mode_label="补全模式"
+            )
         elif task_count and is_video_move_companions_enabled():
             await self._prepare_organize_index(
                 movie_list, companion_scan_roots, companion_ignore_dirs, mode_label="视频模式"
@@ -787,6 +803,13 @@ class Scraper:
                     signal.show_log_text(
                         f" 🍯 分批整理已启用，每批 {self._organize_batch_size} 个文件，整理完一批后再继续下一批..."
                     )
+            elif get_runtime_main_mode() == COMPLETE_MAIN_MODE:
+                if task_count < thread_number:
+                    thread_number = task_count
+                signal.show_log_text(
+                    f" 🕷 当前为补全模式（本地已有优先，只补缺失的字段/封面/缩略图/字幕），"
+                    f"并发数（{thread_number}），线程延时（{thread_time}）秒..."
+                )
             else:
                 if task_count < thread_number:
                     thread_number = task_count
@@ -1388,14 +1411,27 @@ class Scraper:
         # 本次运行实际生效的刮削模式（整理模式自动切换成读取模式后为 5）
         runtime_mode = get_runtime_main_mode()
         organize_mode = runtime_mode == ORGANIZE_MAIN_MODE
+        complete_mode = runtime_mode == COMPLETE_MAIN_MODE
         # 用户在「软件设置」里选择的模式（不受运行时临时切换影响）：
         # 整理模式下已经躺在「成功输出目录」内的文件，任何情况下都不移动、
         # 不复制后删源（跨盘 shutil.move = 复制 + 删除源文件）、不重命名、不删除。
         organize_selected = is_organize_selected()
         organize_inplace_locked = organize_selected and is_in_success_folder(file_path, success_folder)
-        # 读取模式 / 整理模式：都从同目录 nfo 读取已有字段
+        # 补全模式：已经在「成功输出目录」内的文件只补字段与缺失的图片/字幕，
+        # 不移动、不重命名（需求：已在成功目录中的文件只做补全）。
+        complete_inplace_locked = complete_mode and is_in_success_folder(file_path, success_folder)
+        # 补全模式下没有 nfo 的文件 → 该文件自动切换到正常模式全量刮削
+        complete_fallback_normal = False
+        # 补全模式：本地 nfo 数据（合并时的「本地优先」来源）与本次联网刮削结果
+        complete_local: CrawlersResult | None = None
+        complete_scraped: CrawlersResult | None = None
+        # 补全模式：本地 nfo 已解析出的主图路径（原地补全时沿用，不重命名已有图片）
+        complete_local_info: OtherInfo | None = None
+        # 补全模式：本次实际补到的空字段名（决定是否需要写回 nfo）
+        complete_filled_fields: list[str] = []
+        # 读取模式 / 整理模式 / 补全模式：都从同目录 nfo 读取已有字段
         file_can_download = True
-        if runtime_mode in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE):
+        if runtime_mode in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE, COMPLETE_MAIN_MODE):
             nfo_data, info = await get_nfo_data(file_path, movie_number)
             if nfo_data:  # 有nfo
                 is_nfo_existed = True
@@ -1423,24 +1459,31 @@ class Scraper:
                 if organize_mode:
                     # 整理模式完全离线：只读 nfo 字段并移动/重命名已有文件
                     file_can_download = False
+                elif complete_mode:
+                    # 补全模式：本地 nfo 是「已有值优先」的来源，字段缺失的部分
+                    # 稍后联网刮削补齐（见下方 complete_scraped 分支）。
+                    complete_local = nfo_data
+                    complete_local_info = info
+                    file_can_download = True
                 else:
-                    has_nfo_update = ReadMode.HAS_NFO_UPDATE in read_mode
-                    should_update_nfo = ReadMode.READ_UPDATE_NFO in read_mode
-                    redownload = ReadMode.READ_DOWNLOAD_AGAIN in read_mode
-                    if not has_nfo_update and not should_update_nfo and not redownload:  # 都不勾才跳过
-                        show_result(res, start_time)
-                        show_movie_info(file_info, nfo_data)
-                        LogBuffer.log().write(f"\n 🙉 [Movie] {file_path}")
-                        await save_success_list(file_path, file_path)
-                        return nfo_data, info
-
-                    if not redownload:
-                        file_can_download = False
+                    # 读取模式：只读取 nfo 字段与本地封面/缩略图并展示，
+                    # 不联网、不下载、不写 nfo、不移动文件。
+                    file_can_download = False
+                    show_result(res, start_time)
+                    show_movie_info(file_info, nfo_data)
+                    LogBuffer.log().write(f"\n 🙉 [Movie] {file_path}\n 📖 读取模式：只读取本地信息并显示")
+                    await save_success_list(file_path, file_path)
+                    return nfo_data, info
             else:
                 if organize_mode:
                     LogBuffer.error().write("整理模式需要同目录同名 nfo 文件，未找到有效 nfo，已跳过该文件")
                     return None, None
-                if "no_nfo_scrape" not in read_mode:  # 无 nfo 且未勾选「本地没有nfo的文件重新刮削」
+                if complete_mode:
+                    # 补全模式：没有 nfo 就无从「补全」，该文件按正常模式全量刮削
+                    complete_fallback_normal = True
+                    LogBuffer.log().write("\n 📖 补全模式：未找到同目录 nfo，该文件自动切换到正常模式全量刮削")
+                else:
+                    LogBuffer.error().write("读取模式需要同目录同名 nfo 文件，未找到有效 nfo，已跳过该文件")
                     return None, None
 
         # 判断是否write_nfo
@@ -1448,24 +1491,23 @@ class Scraper:
         # 整理模式只读 nfo，绝不生成/更新 nfo
         if organize_mode:
             update_nfo = False
+        # 补全模式：只有「本次真的补到了空字段」才写回 nfo（本地已有的值一律保留），
+        # 勾选「允许更新NFO文件」时即使没有补到新字段也重新生成一次
+        # （用于应用翻译 / 标题模板等更新）。
+        # 没有 nfo 而按正常模式全量刮削的文件走下面的正常分支（按下载/保留设置写 nfo）。
+        elif complete_mode and not complete_fallback_normal:
+            update_nfo = bool(complete_filled_fields) or ReadMode.READ_UPDATE_NFO in read_mode
         # 不写nfo的情况：
         elif runtime_mode == VIDEO_MAIN_MODE and Switch.SORT_DEL in manager.config.switch_on:
             # 3模式勾选“删除本地已下载的nfo文件”（暂无效，会直接return）
             update_nfo = False
-        elif runtime_mode in [1, 2, 3, 4] or (
-            runtime_mode == READ_MAIN_MODE and not is_nfo_existed and ReadMode.NO_NFO_SCRAPE in read_mode
-        ):
-            # 1、2、3、4模式，或5模式启用了“本地没有nfo的文件重新刮削”（变量命名有点问题，存在"no_nfo_scrape"意思其实是要刮削）
-            # 且
+        elif runtime_mode in [1, 2, 3, 4, COMPLETE_MAIN_MODE]:
             if DownloadableFile.NFO not in manager.config.download_files:
                 # [下载]处不勾选下载nfo时
                 update_nfo = False
             if KeepableFile.NFO in manager.config.keep_files and is_nfo_existed:
                 # [下载]处勾选保留nfo且nfo存在时
                 update_nfo = False
-        elif runtime_mode == READ_MAIN_MODE:
-            # 读模式下，由"允许更新 nfo 文件"独立控制
-            update_nfo = ReadMode.READ_UPDATE_NFO in read_mode
 
         # 读取模式下，补充缺失的演员 tmdbid（NFO已有→跳过，xlsx缓存→命中，API查询→补充）
         if update_nfo and is_nfo_existed and NfoInclude.ACTOR_TMDBID in manager.config.nfo_include_new:
@@ -1590,6 +1632,7 @@ class Scraper:
         # NFO/重命名张冠李戴——全库审查 A4）
         enable_shared_json = (
             not organize_mode
+            and not complete_mode
             and bool(movie_number)
             and "." not in movie_number
             and file_classification.scraping_type != FixedScrapingType.GUOCHAN
@@ -1691,16 +1734,40 @@ class Scraper:
             # 3. res.mosaic 在 crawl 中被更新, 实际上完全是由 file_info 的某些字段决定的, 和初始化 file_info.mosaic 的逻辑存在重复
             file_info.mosaic = res.mosaic
 
+        # 补全模式：本地已有 nfo 时也要联网刮削一次，但只把「本地空着的字段」补上，
+        # 本地已有的值一律保留（合并策略默认「本地信息优先」，勾选合并策略后按所选策略）。
+        if complete_mode and complete_local is not None:
+            crawl_task = file_info.crawl_task()
+            crawl_task.media_context = media_context  # type: ignore[attr-defined]
+            complete_scraped = await FileScraper(manager.config, self.crawler_provider).run(crawl_task, file_mode)
+            if complete_scraped is None:
+                LogBuffer.log().write("\n 🟡 补全模式：联网刮削未取得数据，改用本地 nfo 字段继续补全封面/缩略图/字幕")
+            else:
+                strategy = complete_merge_strategy()
+                merged = merge_nfo_fields(complete_scraped, complete_local, strategy)
+                merged.number = movie_number
+                complete_filled_fields = filled_missing_fields(complete_local, merged)
+                res = merged
+                if complete_filled_fields:
+                    LogBuffer.log().write(
+                        f"\n 📖 补全模式：已补全 {len(complete_filled_fields)} 个空字段"
+                        f"（{', '.join(complete_filled_fields)}）"
+                    )
+                else:
+                    LogBuffer.log().write("\n 📖 补全模式：本地 nfo 字段已齐全，无需补全字段")
+
         # 显示json_data结果或日志
         show_result(res, start_time)
 
-        # 整理模式：nfo 中的马赛克字段决定 {mosaic} 命名变量
-        if organize_mode and res.mosaic:
+        # 整理模式 / 补全模式：nfo 中的马赛克字段决定 {mosaic} 命名变量
+        if (organize_mode or complete_mode) and res.mosaic:
             file_info.mosaic = res.mosaic
 
         # 映射或翻译
         # 无已刮削数据时执行；演员/标签等映射服务于命名变量（{actor}/{tag} 等），与是否写 NFO 解耦
-        if not pre_data:
+        # 补全模式的 res 是「本地 nfo + 本次刮削」刚合并出来的新对象，必须走一遍字段处理，
+        # 不能因为本次会话里别的文件刮过同番号（pre_data 命中）就跳过。
+        if not pre_data or complete_mode:
             deal_some_field(res)  # 处理字段
             replace_special_word(res)  # 替换特殊字符
             if update_nfo:
@@ -1718,8 +1785,8 @@ class Scraper:
             translate_info(res, file_info.has_sub)  # 映射输出标签等信息
             replace_word(res)
 
-        # 更新视频分辨率（整理模式需解析 STRM 指向的视频或 mediainfo.json）
-        if organize_mode:
+        # 更新视频分辨率（整理模式 / 补全模式需解析 STRM 指向的视频或 mediainfo.json）
+        if organize_mode or complete_mode:
             definition, codec = await get_video_size_for_file(file_path, movie_number)
         else:
             definition, codec = await get_video_size(file_path, file_info.number)
@@ -1732,7 +1799,34 @@ class Scraper:
         # 读模式不勾"重新整理分类"时跳过路径计算
         skip_reorganize = runtime_mode == READ_MAIN_MODE and is_nfo_existed and ReadMode.HAS_NFO_UPDATE not in read_mode
 
-        if skip_reorganize:
+        if complete_inplace_locked:
+            # 补全模式 + 文件已在成功输出目录内：一切路径都落在文件当前目录，
+            # 只补字段与缺失的图片/字幕，不移动、不重命名任何已有文件。
+            skip_reorganize = True
+            naming_rule = _generate_file_name(file_info.cd_part, file_info, res)
+            file_new_name = naming_rule + file_ex.lower()
+            file_new_path = file_path  # 原地：视频/STRM 不动
+            folder_new_path = folder_old_path
+            nfo_new_path = file_path.with_suffix(".nfo")
+            poster_new_path_with_filename = folder_old_path / (file_name + "-poster.jpg")
+            thumb_new_path_with_filename = folder_old_path / (file_name + "-thumb.jpg")
+            fanart_new_path_with_filename = folder_old_path / (file_name + "-fanart.jpg")
+            _, folder_name = _get_folder_path(folder_old_path, file_info, res)
+            if manager.config.pic_simple_name and folder_name:
+                poster_final_path = folder_old_path / "poster.jpg"
+                thumb_final_path = folder_old_path / "thumb.jpg"
+                fanart_final_path = folder_old_path / "fanart.jpg"
+            else:
+                poster_final_path = poster_new_path_with_filename
+                thumb_final_path = thumb_new_path_with_filename
+                fanart_final_path = fanart_new_path_with_filename
+            # 已有主图按实际文件名沿用（可能是 png/webp/gif，也可能叫 poster.jpg），
+            # 避免为了「统一命名」而重命名用户已有的图片。
+            if complete_local_info is not None:
+                poster_final_path = complete_local_info.poster_path or poster_final_path
+                thumb_final_path = complete_local_info.thumb_path or thumb_final_path
+                fanart_final_path = complete_local_info.fanart_path or fanart_final_path
+        elif skip_reorganize:
             naming_rule = _generate_file_name(file_info.cd_part, file_info, res)
             file_new_name = naming_rule + file_ex.lower()
             file_new_path = success_folder / file_new_name
@@ -1784,7 +1878,8 @@ class Scraper:
                         return None, None
 
         # 不移动文件时，NFO、图片等写入原目录（分离模式走右侧开关）
-        if not eff_success_file_move():
+        # 补全模式的「已在成功输出目录内」分支已按原目录算好路径，不再覆盖。
+        if not eff_success_file_move() and not complete_inplace_locked:
             nfo_new_path = file_path.with_suffix(".nfo")
             folder_new_path = folder_old_path
             poster_new_path_with_filename = folder_old_path / (file_name + "-poster.jpg")
@@ -2034,7 +2129,45 @@ class Scraper:
             and poster_final_path.is_file()
             and fanart_final_path.is_file()
         )
+
+        # 补全模式：先「搬」后「补」。
+        # 顺序不能反：先补字段/图片再搬，会把刚写好的 nfo 当成「旧 nfo」再搬一次，
+        # 补全结果被旧内容覆盖。搬运本身复用整理/视频模式的事务：伴生文件先落位、
+        # 视频/STRM 最后搬，任一文件失败整体回滚到原目录。
+        if complete_mode and not complete_inplace_locked and eff_success_file_move():
+            moved, error = await organize_companion_files(
+                file_path=file_path,
+                file_new_path=file_new_path,
+                folder_old_path=folder_old_path,
+                folder_new_path=folder_new_path,
+                nfo_new_path=nfo_new_path,
+                naming_rule=naming_rule,
+                number=movie_number or res.number,
+                sub_list=sub_list,
+                poster_final_path=poster_final_path,
+                thumb_final_path=thumb_final_path,
+                fanart_final_path=fanart_final_path,
+                move_media=lambda: move_movie(other, file_info, file_path, file_new_path),
+                index=self._organize_index,
+            )
+            if not moved:
+                LogBuffer.error().write(error)
+                return None, None
+            # 视频/STRM 已搬到目标位置：后续补字段、补图都按新位置处理
+            if await aiofiles.os.path.exists(file_new_path):
+                file_info.file_path = file_new_path
+
         if pic_final_catched and file_can_download and not reuse_images:
+            # 补全模式：本地已有的主图视为「已处理」——只补缺，不重复打水印
+            # （否则第二次运行会在已有水印的图上再盖一层）。
+            if complete_mode:
+                for mark_attr, image_path in (
+                    ("poster_marked", poster_final_path),
+                    ("thumb_marked", thumb_final_path),
+                    ("fanart_marked", fanart_final_path),
+                ):
+                    if image_path is not None and await resolve_main_image(image_path):
+                        setattr(other, mark_attr, True)
             if not await self._download_images(
                 res,
                 other,
@@ -2055,11 +2188,14 @@ class Scraper:
                 await copy_trailer_to_theme_videos(meta_folder, naming_rule)
 
         # 生成nfo文件（分离模式复用元数据：nfo 已存在时跳过，不重写）
+        # 补全模式已在内存里按策略合并过（本地优先），这里跳过二次合并，
+        # 避免 write_nfo 再读一遍磁盘旧 nfo 把合并结果又盖回去。
         if not (reuse_meta and not overwrite_meta and nfo_new_path.is_file()):
-            await write_nfo(file_info, res, nfo_new_path, meta_folder, update_nfo)
+            await write_nfo(file_info, res, nfo_new_path, meta_folder, update_nfo, skip_merge=complete_mode)
 
         # 移动字幕、种子、bif、trailer、其他文件（配置允许时才执行，分离模式走右侧开关）
-        if eff_success_file_move():
+        # 补全模式已在上面用事务搬完（含字幕/种子/bif/json/剧照），这里不再重复搬。
+        if eff_success_file_move() and not complete_mode:
             if file_info.has_sub:
                 await move_sub(folder_old_path, folder_new_path, file_name, sub_list, naming_rule)
             await move_torrent(folder_old_path, folder_new_path, file_name, movie_number, naming_rule)

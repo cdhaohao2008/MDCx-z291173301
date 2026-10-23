@@ -179,6 +179,25 @@ def _sync_original_actors(scraped: CrawlersResult, nfo: CrawlersResult, merged: 
         merged.original_actors = []
 
 
+def filled_missing_fields(local: CrawlersResult, merged: CrawlersResult) -> list[str]:
+    """返回「本地为空、合并后有值」的字段名列表（补全模式判断是否需要写回 NFO）。
+
+    ``local`` 是本地 NFO 读出来的数据，``merged`` 是按策略合并后的数据。
+    只统计标量/数组字段里本地原本为空、现在有值的项——这些才是补全模式真正
+    「补到」的内容；本地本来就有值的字段一律不算（它们保持本地值）。
+    """
+    if local is None or merged is None:
+        return []
+    filled: list[str] = []
+    for field_name in (*_SCALAR_FIELDS, *_ARRAY_FIELDS):
+        if not _is_empty(getattr(local, field_name, None)):
+            continue
+        if _is_empty(getattr(merged, field_name, None)):
+            continue
+        filled.append(field_name)
+    return filled
+
+
 def merge_nfo_fields(
     scraped: CrawlersResult,
     nfo: CrawlersResult,

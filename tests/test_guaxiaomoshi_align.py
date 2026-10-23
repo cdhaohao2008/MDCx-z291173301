@@ -450,18 +450,20 @@ def test_javdb_tip_moved_up_one_line_static():
         raise AssertionError("找不到 groupBox_53")
     assert _ui_geometry("label_26") == (146, 160, 513, 28), "label_26 设计几何被改动"
     assert _ui_geometry("gridLayoutWidget_15")[3] == 129, "grid 容器高不是 129"
-    # 刮削模式组与其后各组：读取模式区被裁切修复后整体下移 41px（详见 test_read_mode_options_not_squeezed）
+    # 刮削模式组与其后各组：读取模式区被裁切修复后整体下移 41px（详见 test_read_mode_options_not_squeezed）；
+    # 补全模式新增一行（2026-10-23）后再整体下移 37px，组框高度 532 → 569。
     for name, y in (
         ("groupBox", 218),
-        ("groupBox_5", 769),
-        ("groupBox_2", 1249),
-        ("groupBox_18", 1479),
-        ("groupBox_27", 1609),
-        ("groupBox_15", 1739),
-        ("groupBox_30", 1869),
+        ("groupBox_5", 806),
+        ("groupBox_2", 1286),
+        ("groupBox_18", 1516),
+        ("groupBox_27", 1646),
+        ("groupBox_15", 1776),
+        ("groupBox_30", 1906),
     ):
         assert _ui_geometry(name)[1] == y, f"{name} 的 y 不是 {y}"
-    assert _ui_geometry("scrollAreaWidgetContents_guaxiaomoshi")[3] == 2069, "滚动内容高不是 2069"
+    assert _ui_geometry("groupBox")[3] == 569, "刮削模式组框高不是 569"
+    assert _ui_geometry("scrollAreaWidgetContents_guaxiaomoshi")[3] == 2106, "滚动内容高不是 2106"
 
 
 def _content_pos(ui, widget):

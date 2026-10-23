@@ -26,6 +26,8 @@ from ..config.extend import (
     get_movie_path_setting,
     get_runtime_main_mode,
     get_separate_meta_root,
+    is_complete_mode,
+    is_complete_selected,
     is_organize_selected,
     need_clean,
 )
@@ -262,6 +264,10 @@ async def pic_some_deal(number: str, thumb_final_path: Path, fanart_final_path: 
     """
     thumb、poster、fanart 删除冗余的图片
     """
+    # 补全模式只补缺、不删已有资源：用户取消勾选「下载缩略图」时也不清本地文件，
+    # 否则「补全」会把本地已有的图删掉。
+    if is_complete_mode():
+        return
     # 不保存thumb时，清理 thumb
     thumb_policy = resource_policy(
         DownloadableFile.THUMB,
@@ -638,10 +644,11 @@ async def get_movie_list(file_mode: FileMode, movie_path: Path, ignore_dirs: lis
             if NoEscape.FOLDER in manager.config.no_escape or get_runtime_main_mode() in (4, READ_MAIN_MODE):
                 ignore_dirs = []
             media_type = list(manager.config.media_type)
-            # 整理模式需要扫描已刮削成功的文件，并处理 STRM 链接文件
+            # 整理模式 / 补全模式需要扫描已刮削成功的文件，并处理 STRM 链接文件
             # （扫描规则跟着用户在「软件设置」里选择的模式走：整理模式自动
-            #  切换成读取模式发生在扫描之后，扫描时仍需看到成功输出目录内的文件）
-            organize_mode = is_organize_selected()
+            #  切换成读取模式发生在扫描之后，扫描时仍需看到成功输出目录内的文件；
+            #  补全模式要补全的就是已归档的文件，同样必须扫到成功输出目录）
+            organize_mode = is_organize_selected() or is_complete_selected()
             # 整理模式需要扫描已刮削成功的文件，并处理 STRM 链接文件
             normalized_media_type = {str(ext).lower().lstrip(".") for ext in media_type}
             if organize_mode and "strm" not in normalized_media_type:

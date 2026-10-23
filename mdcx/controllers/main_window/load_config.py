@@ -484,6 +484,7 @@ def load_config(self: MyMAinWindow):
             4: ("update", "更新模式"),
             5: ("read", "读取模式"),
             6: ("organize", "整理模式"),
+            7: ("complete", "补全模式"),
         }
         mode_key, mode_text = mode_mapping.get(main_mode, ("common", "正常模式"))
         Flags.main_mode_text = mode_text
@@ -495,6 +496,7 @@ def load_config(self: MyMAinWindow):
             (self.Ui.radioButton_mode_sort, "sort"),
             (self.Ui.radioButton_mode_update, "update"),
             (self.Ui.radioButton_mode_read, "read"),
+            (self.Ui.radioButton_mode_complete, "complete"),
             default=self.Ui.radioButton_mode_common,
         )
 

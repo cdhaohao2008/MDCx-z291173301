@@ -13,15 +13,16 @@ import aiofiles.os
 from ..base.number import remove_escape_string
 from ..config.enums import CDChar, Switch
 from ..config.extend import (
+    COMPLETE_MAIN_MODE,
     FILE_MOVE_KEEP,
     FILE_MOVE_OVERWRITE,
     ORGANIZE_MAIN_MODE,
-    READ_MAIN_MODE,
     VIDEO_MAIN_MODE,
     eff_success_file_move,
     eff_success_file_rename,
     get_file_move_policy,
     get_runtime_main_mode,
+    is_update_rules_active,
 )
 from ..config.manager import manager
 from ..consts import IS_MAC, IS_WINDOWS
@@ -98,11 +99,16 @@ async def creat_folder(
     dont_creat_folder = False  # 不需要创建文件夹
 
     # 正常模式、视频模式时，软链接关，成功后不移动文件开时，这时不创建文件夹
-    if get_runtime_main_mode() in (1, 3, 6) and manager.config.soft_link == 0 and not eff_success_file_move():
+    if (
+        get_runtime_main_mode() in (1, 3, 6, COMPLETE_MAIN_MODE)
+        and manager.config.soft_link == 0
+        and not eff_success_file_move()
+    ):
         dont_creat_folder = True
 
-    # 更新模式、读取模式，选择更新c文件时，不创建文件夹
-    if get_runtime_main_mode() in (4, READ_MAIN_MODE) and manager.config.update_mode == "c":
+    # 更新模式、读取模式（以及补全模式勾选「按更新模式重新整理分类」时），
+    # 选择更新c文件时不创建文件夹
+    if is_update_rules_active() and manager.config.update_mode == "c":
         dont_creat_folder = True
 
     # 如果不需要创建文件夹，当不重命名时，直接返回
@@ -156,7 +162,7 @@ async def creat_folder(
     #   覆盖目标文件：目标目录已有同名文件 → 交给后面的移动阶段直接覆盖；
     #   保留目标文件：目标目录已有同名文件 → 保留目标文件，源文件留在原目录不移动。
     move_policy = ""
-    if get_runtime_main_mode() in (VIDEO_MAIN_MODE, ORGANIZE_MAIN_MODE):
+    if get_runtime_main_mode() in (VIDEO_MAIN_MODE, ORGANIZE_MAIN_MODE, COMPLETE_MAIN_MODE):
         move_policy = get_file_move_policy()
     if move_policy == FILE_MOVE_KEEP:
         other.keep_existing_target = True
@@ -190,7 +196,7 @@ async def move_movie(other: OtherInfo, file_info: FileInfo, file_path: Path, fil
     # 必须挡在软链接/硬链接分支之前：那两条分支会先删掉目标文件再建链接，
     # 保留目标文件时绝不能删既有文件。
     if (
-        get_runtime_main_mode() in (VIDEO_MAIN_MODE, ORGANIZE_MAIN_MODE)
+        get_runtime_main_mode() in (VIDEO_MAIN_MODE, ORGANIZE_MAIN_MODE, COMPLETE_MAIN_MODE)
         and get_file_move_policy() == FILE_MOVE_KEEP
         and await aiofiles.os.path.exists(file_new_path)
     ):
@@ -264,7 +270,7 @@ async def move_movie(other: OtherInfo, file_info: FileInfo, file_path: Path, fil
     # 「覆盖目标文件」策略：目标已存在同名文件时直接覆盖（move_file_async 默认会把
     # 旧目标改名成 _conflict_ 副本保留，那属于「保留目标文件」，不是覆盖）。
     move_overwrite = (
-        get_runtime_main_mode() in (VIDEO_MAIN_MODE, ORGANIZE_MAIN_MODE)
+        get_runtime_main_mode() in (VIDEO_MAIN_MODE, ORGANIZE_MAIN_MODE, COMPLETE_MAIN_MODE)
         and get_file_move_policy() == FILE_MOVE_OVERWRITE
     )
     result, error_info = await move_file_async(file_path, file_new_path, overwrite=move_overwrite)
@@ -340,8 +346,8 @@ def _get_folder_path(success_folder: Path, file_info: FileInfo, res: CrawlersRes
     folder_name: str = manager.config.folder_name.replace("\\", "/")  # 设置-命名-视频目录名
     folder_path = file_info.file_path.parent
 
-    # 更新模式 或 读取模式
-    if get_runtime_main_mode() in (4, READ_MAIN_MODE):
+    # 更新模式 / 读取模式 / 补全模式勾选「按更新模式重新整理分类」
+    if is_update_rules_active():
         if manager.config.update_mode == "c":
             folder_name = folder_path.name
             return folder_path, folder_name
@@ -423,8 +429,8 @@ def _generate_file_name(cd_part, file_info: FileInfo, res: CrawlersResult) -> st
     if not eff_success_file_rename():
         return file_name
 
-    # 更新模式 或 读取模式
-    if get_runtime_main_mode() in (4, READ_MAIN_MODE):
+    # 更新模式 / 读取模式 / 补全模式勾选「按更新模式重新整理分类」
+    if is_update_rules_active():
         file_name_template = manager.config.update_c_filetemplate
     # 正常模式 或 整理模式
     else:
