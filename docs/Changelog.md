@@ -42,6 +42,7 @@
 - 高级页「分屏缩放」下拉框右缘缩到「隐藏边框样式」右缘（后者位置保持不变）：基准取复选框 `sizeHint().width()`（用户红线画在文字末尾，不是被 layoutWidget5 均分后的控件宽），两行左缘天然相等，故等价于把下拉框钉成同一宽度；下限取其 `minimumSizeHint()`，基准更窄时放弃对齐，绝不裁掉「跟随系统 / 300%」。新增 `_sync_advanced_page_scale_combo_align`。
 - 高级页「分屏缩放」下拉框改锚「隐藏演员管理」右缘，并**撤掉**上一条那条 `minimumSizeHint()` 下限：真机 80% 界面缩放下它比锚点宽约 20px，`max()` 会把下拉框停在最小可用宽、比锚点右出 20px（用户截图红框「向左缩进到这里」）。位置类需求一律以锚点 `sizeHint()` 为准，宽度可能小于下拉框自身最小可用宽——这是用户明确要的取舍。
 - 高级页「分屏缩放」下拉框里的「跟随系统」不再截成「跟随系」（下拉框宽度一个像素没动）：宽度被「隐藏演员管理」的 `sizeHint()` 钉死后（真机 102px），通用 QSS 的 `padding-right: 30px` 在 QSS 样式下与 26px 箭头**重复占位**（Qt 已从内容区扣过箭头宽），文本区只剩 35px，而四个汉字要 52px。给这一枚下拉框加限定 objectName 的 `QComboBox#comboBox_ui_scale { padding: 3px 0px 3px 8px }`（亮 / 暗两套），文本区 35→65px，外框宽度、箭头位置、所在行提示词间隔都不变。
+- 设置页补全模式「本地NFO内有链接，重新下载封面图片等文件」左移到与视频模式「删除本地已下载的图片和信息文件」同一条竖线上（左缘逐像素对齐）：该行行首原有一枚 10px 空标签（`label_252`），连同行间距把整行右推 16px，删掉这枚空标签后整行左移，删除框与补全模式其余选项位置保持不变（窄↔宽往返冻结）。新增 `test_again_download_checkbox_aligns_with_delpic` 与静态哨兵 `test_no_indent_label_before_again_checkbox`。
 - 测试：清掉长期红线的 12 条用例——任务模式/移动文件相关用例按新结构更新行号与断言；整理间隔两枚复选框已迁到高级页，对应两条用例删除；`aventertainments` 真实联网用例（站点在本机网络不可达、CI 本就按 `network` marker 跳过）删除；批量保存 3:4:3 宽度用例随跨列修复恢复通过。新增 `tests/test_advanced_task_mode_align.py`，把「网盘存储文件」两态对齐「使用暗黑模式」与「隐藏窗口」三行互不重叠钉成回归锁。新增 `tests/test_advanced_page_hint_align.py`（提示词落点/锚点不动/往返幂等）与 `tests/test_advanced_scale_combo_width.py`（下拉框右缘对齐、基准不动、不裁字）。
 
 ## 2026-10-22

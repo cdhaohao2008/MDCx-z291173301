@@ -5934,34 +5934,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             <item>
                               <layout class="QHBoxLayout" name="horizontalLayout_85">
                                 <item>
-                                  <widget class="QLabel" name="label_252">
-                                    <property name="sizePolicy">
-                                      <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                                        <horstretch>0</horstretch>
-                                        <verstretch>0</verstretch>
-                                      </sizepolicy>
-                                    </property>
-                                    <property name="minimumSize">
-                                      <size>
-                                        <width>10</width>
-                                        <height>0</height>
-                                      </size>
-                                    </property>
-                                    <property name="layoutDirection">
-                                      <enum>Qt::RightToLeft</enum>
-                                    </property>
-                                    <property name="frameShape">
-                                      <enum>QFrame::NoFrame</enum>
-                                    </property>
-                                    <property name="text">
-                                      <string />
-                                    </property>
-                                    <property name="alignment">
-                                      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                                    </property>
-                                  </widget>
-                                </item>
-                                <item>
                                   <layout class="QHBoxLayout" name="horizontalLayout_50">
                                     <item>
                                       <layout class="QGridLayout" name="gridLayout_11">

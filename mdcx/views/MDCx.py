@@ -2591,23 +2591,6 @@ class Ui_MDCx(object):
         self.verticalLayout_5.addLayout(self.horizontalLayout_127)
         self.horizontalLayout_85 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_85.setObjectName("horizontalLayout_85")
-        self.label_252 = QtWidgets.QLabel(parent=self.gridLayoutWidget_2)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.label_252.sizePolicy().hasHeightForWidth())
-        self.label_252.setSizePolicy(sizePolicy)
-        self.label_252.setMinimumSize(QtCore.QSize(10, 0))
-        self.label_252.setLayoutDirection(QtCore.Qt.LayoutDirection.RightToLeft)
-        self.label_252.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        self.label_252.setText("")
-        self.label_252.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignRight
-            | QtCore.Qt.AlignmentFlag.AlignTrailing
-            | QtCore.Qt.AlignmentFlag.AlignVCenter
-        )
-        self.label_252.setObjectName("label_252")
-        self.horizontalLayout_85.addWidget(self.label_252)
         self.horizontalLayout_50 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_50.setObjectName("horizontalLayout_50")
         self.gridLayout_11 = QtWidgets.QGridLayout()
