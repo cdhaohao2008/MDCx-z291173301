@@ -27,10 +27,11 @@
      （以后不允许再变动位置）。
   6. 同列 4 个复选框（STRM 生成 / STRM 覆盖 / 元数据复用 / 视频模式删除）
      左缘严格一致，窄↔宽往返不变。
-  9. Javdb 提示上移一行（静态）：label_26 移出 gridLayout_15、独立为
-     groupBox_53 子件，下方 7 组框与滚动内容同步上收（值见测试断言）。
-  10. Javdb 提示上移一行（运行时）：0-2 行高一致且等距（未被搬动），提示 x 与
-     分离描述文本精确相等，y 符合 row2底+spacing+share−h 公式，窄↔宽冻结。
+  9. Javdb 提示落进网格第 2 行（静态）：label_26 进 gridLayout_15 的
+     (row2,col1)、javdb 延时行下移到 row3，容器高 129→155；组框高与其后
+     7 组框、滚动内容均不动（值见测试断言）。
+  10. Javdb 提示夹在两行之间（运行时）：提示在线程间隔下方、javdb 行上方且
+     不重叠，x 与描述列相等，组框底部空白不超过一行行距，窄↔宽冻结。
   11. 补全模式「重新下载封面图片等文件」左缘与视频模式「删除本地已下载的图片和
      信息文件」严格上下对齐（锚点删除框不动），窄↔宽往返冻结；.ui 里不许再出现
      那枚 10px 缩进空标签。
@@ -478,31 +479,37 @@ def _ui_geometry(name):
     raise AssertionError(f".ui 里找不到 widget：{name}")
 
 
-def test_javdb_tip_moved_up_one_line_static():
-    """事项9（静态）：label_26 移出 grid，7 组框与内容同步上收（值见下方断言）。"""
+def test_javdb_tip_between_rows_static():
+    """事项9（静态）：提示已是 gridLayout_15 第 2 行（线程间隔与 javdb 延时之间）。
+
+    用户需求（2026-10-23，截图批注）：提示原挂在 grid 外、落在 javdb 行下方，
+    组框底部因此留出一大片空白；改为放进网格第 2 行、javdb 行下移到第 3 行，
+    网格容器 129 → 155 吸收新增行，组框高与其后各组位置保持不变（空白由组框
+    内部消化，页面不增高）。
+    """
     tree = ET.parse(UI_PATH)
-    for layout in tree.iter("layout"):
-        if layout.get("name") == "gridLayout_15":
-            assert "3" not in [item.get("row") for item in layout.findall("item")], (
-                "gridLayout_15 里还有 row3，label_26 又被塞回 grid"
-            )
-            assert "label_26" not in ET.tostring(layout, encoding="unicode"), "label_26 还在 grid 内"
-            break
-    else:
-        raise AssertionError("找不到 gridLayout_15")
-    for widget in tree.iter("widget"):
-        if widget.get("name") == "groupBox_53":
-            assert "label_26" in [w.get("name") for w in widget.findall("widget")], (
-                "label_26 不是 groupBox_53 的直接子件"
-            )
-            break
-    else:
-        raise AssertionError("找不到 groupBox_53")
-    assert _ui_geometry("label_26") == (146, 160, 513, 28), "label_26 设计几何被改动"
-    assert _ui_geometry("gridLayoutWidget_15")[3] == 129, "grid 容器高不是 129"
+    grid = next((layout for layout in tree.iter("layout") if layout.get("name") == "gridLayout_15"), None)
+    assert grid is not None, "找不到 gridLayout_15"
+    cells: dict[tuple[str | None, str | None], tuple[str, str | None]] = {}
+    for item in grid.findall("item"):
+        child = list(item)[0]
+        cells[(item.get("row"), item.get("column"))] = (child.tag, child.get("name"))
+    assert cells.get(("1", "0")) == ("widget", "label_238"), f"线程间隔标签不在第 1 行: {cells}"
+    assert cells.get(("2", "1")) == ("widget", "label_26"), f"提示不在第 2 行第 1 列: {cells}"
+    assert cells.get(("3", "0")) == ("widget", "label_237"), f"javdb 延时标签不在第 3 行: {cells}"
+    assert cells.get(("3", "1")) == ("layout", "horizontalLayout_57"), f"javdb 延时控件不在第 3 行: {cells}"
+
+    # 提示不再自带 geometry（由网格排布），也不再是 groupBox_53 的直接子件。
+    tip = next(widget for widget in tree.iter("widget") if widget.get("name") == "label_26")
+    assert tip.find("property[@name='geometry']") is None, "label_26 还带 geometry，说明又脱离网格了"
+    gb53 = next(widget for widget in tree.iter("widget") if widget.get("name") == "groupBox_53")
+    assert "label_26" not in [w.get("name") for w in gb53.findall("widget")], "label_26 又挂回 groupBox_53"
+
+    assert _ui_geometry("gridLayoutWidget_15")[3] == 155, "grid 容器高不是 155"
+    assert _ui_geometry("groupBox_53")[3] == 193, "多线程刮削组框高变了（其下各组会跟着漂）"
     # 刮削模式组与其后各组：读取模式区被裁切修复后整体下移 41px（详见 test_read_mode_options_not_squeezed）；
     # 补全模式新增一行（2026-10-23）后再整体下移 37px；同日删掉两项后组框高 569 → 523，
-    # 其下各组与滚动内容同步上收 46px。
+    # 其下各组与滚动内容同步上收 46px。多线程刮削组框高未变，故本次全部不动。
     for name, y in (
         ("groupBox", 218),
         ("groupBox_5", 760),
@@ -522,55 +529,46 @@ def _content_pos(ui, widget):
     return (p.x(), p.y())
 
 
-def test_javdb_tip_up_one_line_and_frozen(win, app):
-    """事项10（运行时）：0-2 行 pitch 保持 45，提示 x 与分离文本精确相等，
-    y 符合公式，窄↔宽往返冻结。"""
+def test_javdb_tip_between_rows_and_frozen(win, app):
+    """事项10（运行时）：提示夹在线程间隔与 javdb 延时两行之间、与描述列同 x，
+    组框底部不再留大片空白，窄↔宽往返冻结。"""
     ui = win.Ui
     win.show()
     _goto_guaxiaomoshi(win, app)
 
-    def snapshot():
+    def snap():
         grid = ui.gridLayout_15
         grid.activate()  # 强制重布局，防读到未激活的陈旧几何（offscreen 下曾读到 pitch 42 的中间态）
         app.processEvents()
         win._sync_page_layouts()  # 用激活后的几何再收敛一次，方法与断言读同一份输入
         app.processEvents()
-        widget = ui.gridLayoutWidget_15
         content = ui.scrollAreaWidgetContents_guaxiaomoshi
-        tops, heights = [], []
-        for r in range(3):
-            g = grid.itemAtPosition(r, 1).geometry()
-            tops.append(widget.mapTo(content, g.topLeft()).y())
-            heights.append(g.height())
-        s = grid.verticalSpacing()
-        if s < 0:
-            s = grid.spacing()
-        share = (widget.height() - sum(heights) - 2 * s) / 3
-        h = ui.label_26.fontMetrics().height()
-        return (
-            tops,
-            heights,
-            s,
-            share,
-            h,
-            _content_pos(ui, ui.label_26),
-            _content_pos(ui, ui.label_separate_mode),
-            _content_pos(ui, widget),
-        )
+        gb = ui.groupBox_53
+        return {
+            "interval": _content_pos(ui, ui.label_238),
+            "tip": _content_pos(ui, ui.label_26),
+            "javdb": _content_pos(ui, ui.label_237),
+            "sep": _content_pos(ui, ui.label_separate_mode),
+            "gb_bottom": gb.mapTo(content, QPoint(0, 0)).y() + gb.height(),
+            "tip_h": ui.label_26.height(),
+            "javdb_h": ui.label_237.height(),
+            "pitch": grid.itemAtPosition(1, 1).geometry().y() - grid.itemAtPosition(0, 1).geometry().y(),
+        }
+
+    def check(a):
+        assert a["interval"][1] < a["tip"][1], f"提示未排到线程间隔行下方: {a}"
+        assert a["tip"][1] + a["tip_h"] <= a["javdb"][1], f"提示与 javdb 延时行重叠: {a}"
+        assert a["tip"][0] == a["sep"][0], f"提示未与描述列同 x: {a['tip']} vs {a['sep']}"
+        blank = a["gb_bottom"] - (a["javdb"][1] + a["javdb_h"])
+        assert blank <= a["pitch"], f"组框底部空白 {blank}px 超过一行行距 {a['pitch']}px（多余空白没删干净）"
 
     _resize(win, app, 1030, 753)
-    tops, heights, s, share, h, tip, sep, wpos = snapshot()
-    # 行高一致且等距（不同字体环境行高不同，不锁死 45，只锁结构不变）。
-    assert heights[0] == heights[1] == heights[2], f"0-2 行高不一致: {heights}"
-    pitch = tops[1] - tops[0]
-    assert tops[2] - tops[1] == pitch, f"0-2 行间距不均匀: {tops}"
-    assert tip[0] == sep[0], f"提示未与分离文本对齐: {tip} vs {sep}"
-    row2bottom = tops[2] - wpos[1] + heights[2]
-    assert tip[1] == wpos[1] + row2bottom + s + share - h, f"提示 y 不符合公式: {tip}"
+    narrow = snap()
+    check(narrow)
     _resize(win, app, 1920, 1170)
-    wide = snapshot()
-    assert wide[0] == tops, f"宽态 0-2 行位置变动: {tops} -> {wide[0]}"
-    assert wide[5] == tip and wide[6] == sep, f"宽态提示/锚点变动: {tip} -> {wide[5]}"
+    wide = snap()
+    # 宽态只锁结构与 x：提示是 wordWrap 标签，宽态折行减少会让行高变化（真机单行时两态一致）。
+    check(wide)
+    assert wide["tip"][0] == narrow["tip"][0], "宽态提示左缘被推走"
     _resize(win, app, 1030, 753)
-    back = snapshot()
-    assert back[0] == tops and back[5] == tip, "窄→宽→窄往返未复原"
+    assert snap() == narrow, "窄→宽→窄往返未复原"

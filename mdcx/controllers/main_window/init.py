@@ -1128,11 +1128,12 @@ def Init_Singal(self: MyMAinWindow):
         _grid.setColumnStretch(0, 0)
         _grid.setColumnStretch(1, 1)
     _col0_w = 0
-    for _grid, _rows in (
-        (self.Ui.gridLayout_2, range(11)),
-        (self.Ui.gridLayout_15, range(3)),
-    ):
-        for _r in _rows:
+    # 行数按 rowCount() 全量取：javdb 延时行从第 2 行下移到第 3 行（提示插进第 2 行）后，
+    # 写死的 range(3) 会漏掉它，漏掉的正是列 0 最宽的那个标签 —— 于是 gridLayout_15 的
+    # 第 0 列被标签 sizeHint 撑到 120、而 gridLayout_2 仍停在钉死的 90，两网格第 1 列
+    # 左缘错开 30px（离屏实测 206 vs 176）。
+    for _grid in (self.Ui.gridLayout_2, self.Ui.gridLayout_15):
+        for _r in range(_grid.rowCount()):
             _item = _grid.itemAtPosition(_r, 0)
             _w = _item.widget() if _item is not None else None
             if _w is not None:

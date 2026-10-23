@@ -508,11 +508,6 @@ class LayoutMasterMixin:
         # 休眠页内部直接 return，切页同拍收敛。
         self._sync_reuse_meta_gap_align()
 
-        # ============ page_setting / 刮削模式页: Javdb 延时提示上移一行并钉死 =
-        # label_26 已移出 grid 独立为 groupBox_53 子件：x 与分离模式描述文本
-        # 精确对齐、y 上移一行；grid 内 0-2 行保持不动。休眠页内部 return。
-        self._sync_javdb_tip_pos()
-
         # ============ page_setting / 字幕页: 底部填充收缩 + 两处左对齐 ============
         # 排在通用拉伸之后：必须走统一入口 _sync_zimu_page_align（先收缩后对齐）。
         # 若尾部只调 _sync_zimu_fill_blank，它内部的重跑宽幅同步会把钩子刚对好的

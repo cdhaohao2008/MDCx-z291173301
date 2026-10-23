@@ -7736,11 +7736,11 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           <x>50</x>
                           <y>30</y>
                           <width>631</width>
-                          <height>129</height>
+                          <height>155</height>
                         </rect>
                       </property>
                       <layout class="QGridLayout" name="gridLayout_15">
-                        <item row="2" column="0">
+                        <item row="3" column="0">
                           <widget class="QLabel" name="label_237">
                             <property name="sizePolicy">
                               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -7765,7 +7765,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
-                        <item row="2" column="1">
+                        <item row="3" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_57">
                             <item>
                               <widget class="CustomQSlider" name="horizontalSlider_javdb_time">
@@ -7977,6 +7977,28 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             </property>
                           </widget>
                         </item>
+                        <item row="2" column="1">
+                          <widget class="QLabel" name="label_26">
+                            <property name="sizePolicy">
+                              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                                <horstretch>0</horstretch>
+                                <verstretch>0</verstretch>
+                              </sizepolicy>
+                            </property>
+                            <property name="styleSheet">
+                              <string notr="true">color: rgb(8, 128, 128);</string>
+                            </property>
+                            <property name="text">
+                              <string>设置Javdb延时可以降低Javdb被风控概率，将在1/2延时-1延时之间随机选择</string>
+                            </property>
+                            <property name="wordWrap">
+                              <bool>true</bool>
+                            </property>
+                            <property name="alignment">
+                              <set>Qt::AlignLeft|Qt::AlignVCenter</set>
+                            </property>
+                          </widget>
+                        </item>
                         <item row="0" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_54">
                             <item>
@@ -8059,31 +8081,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                           </layout>
                         </item>
                       </layout>
-                    </widget>
-                    <widget class="QLabel" name="label_26">
-                      <property name="geometry">
-                        <rect>
-                          <x>146</x>
-                          <y>160</y>
-                          <width>513</width>
-                          <height>28</height>
-                        </rect>
-                      </property>
-                      <property name="sizePolicy">
-                        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-                          <horstretch>0</horstretch>
-                          <verstretch>0</verstretch>
-                        </sizepolicy>
-                      </property>
-                      <property name="styleSheet">
-                        <string notr="true">color: rgb(8, 128, 128);</string>
-                      </property>
-                      <property name="text">
-                        <string>设置Javdb延时可以降低Javdb被风控概率，将在1/2延时-1延时之间随机选择</string>
-                      </property>
-                      <property name="wordWrap">
-                        <bool>true</bool>
-                      </property>
                     </widget>
                   </widget>
                   <widget class="QGroupBox" name="groupBox_2">
