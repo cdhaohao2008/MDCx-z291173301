@@ -1176,13 +1176,11 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
         problems.append("horizontalLayout_task_mode 不存在")
     else:
         kids = [item[0].get("name") for item in task_hbox.findall("item") if len(item)]
-        if kids[:4] != [
-            "checkBox_task_store_local",
-            "horizontalSpacer_task_mode_gap",
-            "checkBox_task_store_netdisk",
-            "horizontalSpacer_task_mode",
-        ]:
-            problems.append(f"任务模式行内顺序被改: {kids!r}")
+        # 行内只能是这两枚复选框、且中间不允许再插 spacer：两枚都按默认（可伸展）策略均分
+        # 整行宽度，「存储在网盘」才会严格落在行中点，与下一行「暗黑模式」（同结构 HBox 的
+        # 第 2 项）上下对齐；一旦塞回 spacer 或把复选框改回 Fixed，网盘框就会右移错位。
+        if kids != ["checkBox_task_store_local", "checkBox_task_store_netdisk"]:
+            problems.append(f"任务模式行内顺序被改（只允许两枚复选框、不得插 spacer）: {kids!r}")
     for nm, text in (
         ("checkBox_task_store_local", "存储在本地"),
         ("checkBox_task_store_netdisk", "存储在网盘"),
@@ -1204,6 +1202,25 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
             problems.append(
                 f"移动文件行被移动（应在 row=7 col=0）: {_grid_item_pos(grid_advanced, 'label_move_file')!r}"
             )
+
+    # 对齐几何锁：任务模式行必须与「隐藏图标」行同构——
+    # 行高由标签最小高度 30 撑起（与 label_314 一致），HBox 挂在 y=-10、550×51 的固定几何内嵌
+    # widget 上（与「隐藏图标」行的 layoutWidget 一致），这样两行里的第 2 枚复选框落在同一条竖线。
+    label_task_mode = _find_widget_by_name(root, "label_task_mode")
+    if label_task_mode is not None:
+        min_h = label_task_mode.find("property[@name='minimumSize']/size/height")
+        if min_h is None or min_h.text != "30":
+            problems.append(
+                f"任务模式标签最小高度应为 30（撑起行高才能与复选框垂直居中）: {None if min_h is None else min_h.text!r}"
+            )
+    task_geometry = _find_widget_by_name(root, "layoutWidget_task_mode")
+    if task_geometry is None:
+        problems.append("layoutWidget_task_mode 不存在")
+    else:
+        rect = task_geometry.find("property[@name='geometry']/rect")
+        values = None if rect is None else tuple(rect.findtext(tag) for tag in ("x", "y", "width", "height"))
+        if values != ("0", "-10", "550", "51"):
+            problems.append(f"任务模式内嵌 widget 几何应为 (0,-10,550,51)（与隐藏图标行同构）: {values!r}")
     assert not problems, "任务模式结构问题:\n" + "\n".join(problems)
 
 

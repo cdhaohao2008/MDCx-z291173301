@@ -24723,7 +24723,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                             <property name="minimumSize">
                               <size>
                                 <width>0</width>
-                                <height>0</height>
+                                <height>30</height>
                               </size>
                             </property>
                             <property name="layoutDirection">
@@ -24749,7 +24749,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               <property name="geometry">
                                 <rect>
                                   <x>0</x>
-                                  <y>-5</y>
+                                  <y>-10</y>
                                   <width>550</width>
                                   <height>51</height>
                                 </rect>
@@ -24757,16 +24757,10 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 <layout class="QHBoxLayout" name="horizontalLayout_task_mode">
                                   <item>
                                     <widget class="QCheckBox" name="checkBox_task_store_local">
-                                      <property name="sizePolicy">
-                                        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                                          <horstretch>0</horstretch>
-                                          <verstretch>0</verstretch>
-                                        </sizepolicy>
-                                      </property>
                                       <property name="minimumSize">
                                         <size>
                                           <width>0</width>
-                                          <height>0</height>
+                                          <height>30</height>
                                         </size>
                                       </property>
                                       <property name="text">
@@ -24781,30 +24775,11 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                     </widget>
                                   </item>
                                   <item>
-                                    <spacer name="horizontalSpacer_task_mode_gap">
-                                      <property name="orientation">
-                                        <enum>Qt::Horizontal</enum>
-                                      </property>
-                                      <property name="sizeHint" stdset="0">
-                                        <size>
-                                          <width>10</width>
-                                          <height>20</height>
-                                        </size>
-                                      </property>
-                                    </spacer>
-                                  </item>
-                                  <item>
                                     <widget class="QCheckBox" name="checkBox_task_store_netdisk">
-                                      <property name="sizePolicy">
-                                        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                                          <horstretch>0</horstretch>
-                                          <verstretch>0</verstretch>
-                                        </sizepolicy>
-                                      </property>
                                       <property name="minimumSize">
                                         <size>
                                           <width>0</width>
-                                          <height>0</height>
+                                          <height>30</height>
                                         </size>
                                       </property>
                                       <property name="text">
@@ -24814,19 +24789,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                         <string>任务文件存储在网盘：整理模式按「高级→间歇刮削→自动休息」设定的间隔整理文件，上一次整理完成到下一次整理开始之间至少间隔自动休息时间</string>
                                       </property>
                                     </widget>
-                                  </item>
-                                  <item>
-                                    <spacer name="horizontalSpacer_task_mode">
-                                      <property name="orientation">
-                                        <enum>Qt::Horizontal</enum>
-                                      </property>
-                                      <property name="sizeHint" stdset="0">
-                                        <size>
-                                          <width>20</width>
-                                          <height>20</height>
-                                        </size>
-                                      </property>
-                                    </spacer>
                                   </item>
                                 </layout>
                             </widget>
