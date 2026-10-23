@@ -463,7 +463,8 @@ class LayoutMasterMixin:
         # 与「移动文件」行同款手法，必须排在上面几个方法之后：它同样要量锚点行
         # 两枚复选框的终态宽度。
         self._sync_advanced_page_task_mode_align()
-        # 高级页：「分屏缩放」行下拉框右缘缩到「隐藏边框样式」右缘（本批需求②）。
+        # 高级页：「分屏缩放」行下拉框右缘缩到「隐藏演员管理」右缘（第三批需求，
+        # 替换第二批的「隐藏边框样式」锚点；两枚都是 6 个汉字，落点相同）。
         # 必须排在 _sync_advanced_page_hint_align 之前：那一条提示词的前导控件正是
         # 这个下拉框，它的宽度一变，间隔就要按新宽度重算。
         self._sync_advanced_page_scale_combo_align()
@@ -659,8 +660,9 @@ class LayoutMasterMixin:
           「当停止刮削时」，页面布局、控件、组件、提示词全部保持不变。
           （v3.0 起目标由「显示字段内容信息」改成「显示字段来源信息」——用户要
           的是**向左**移到「显示字段来源信息」那条竖线上，不是向右。）
-        ⑤ 分屏缩放行的下拉框右缘缩到「隐藏边框样式」右缘（2026-10-23 第二批
-          需求②）由 `_sync_advanced_page_scale_combo_align` 单独处理，不在本方法内。
+        ⑤ 分屏缩放行的下拉框右缘缩到「隐藏演员管理」右缘（2026-10-23 第三批需求，
+          锚点由第二批的「隐藏边框样式」改成它，两者都是 6 个汉字、落点相同）
+          由 `_sync_advanced_page_scale_combo_align` 单独处理，不在本方法内。
         """
         ui = self.Ui
         host = ui.gridLayoutWidget_20
@@ -1334,21 +1336,26 @@ class LayoutMasterMixin:
             lay.activate()
 
     def _sync_advanced_page_scale_combo_align(self) -> None:
-        """「分屏缩放」下拉框右缘缩到「隐藏边框样式」右缘（后者位置保持不变）。
+        """「分屏缩放」下拉框右缘缩到「隐藏演员管理」右缘（后者位置保持不变）。
 
-        需求原话：「分屏缩放下拉框右侧边界缩进到与隐藏边框样式右侧边界严格对齐的
-        位置，隐藏边框样式位置保持不变」。
+        需求原话（2026-10-23 第三批，替换第二批的「隐藏边框样式」锚点）：
+        「分屏缩放下拉框右侧边界向左缩进到与隐藏演员管理右侧边界严格对齐的位置，
+        隐藏演员管理位置保持不变」。
 
-        基准取哪一条边界：用户红线画在「隐藏边框样式」**文字末尾**（截图实测 462，
-        而该行容器 layoutWidget5 的右缘在 537）——宽态下容器被加宽、两枚复选框均分，
-        控件宽远大于文字宽，右侧那截留白不是用户眼中的「边界」。故基准取复选框的
+        基准取哪一条边界：用户红线画在复选框**文字末尾**，不是它被 layoutWidget5
+        均分后的控件宽（宽态下容器被加宽、两枚复选框均分，控件宽远大于文字宽，
+        右侧那截留白不是用户眼中的「边界」）。故基准取复选框的
         `sizeHint().width()`（= 方框 + 文字，只随字体变、与窗口宽无关）。
+        注意必须用 `sizeHint()` 而不是 `width()`：隐藏入口行的两枚复选框都被
+        `_sync_advanced_page_align` 钉过宽（`pin_d` / sizeHint），`width()` 是钉宽。
 
         两行同处 gridLayout_20 的 col1、左缘天然相等，故「右缘对齐」等价于把下拉框
         钉成与基准相同的宽度。下拉框是 Fixed 策略，setFixedWidth 直接生效。
-        下限取它自己的 `minimumSizeHint()`：基准比它还窄时（字体极端或语言切换）
-        放弃对齐、退回最小可用宽，绝不让「跟随系统 / 300%」被裁掉——宁可差几像素，
-        也不做出一个显示不全的下拉框。
+
+        **不许再加「至少 minimumSizeHint」的下限**（第二批踩过）：真机 80% 界面
+        缩放下 `minimumSizeHint()` 比锚点宽约 20px，`max()` 会把下拉框停在最小可用
+        宽上、比锚点右出 20px（用户截图红框「向左缩进到这里」）。用户要的是严格
+        对齐，宽度一律以锚点为准；档位文字挤不挤是次要问题。
 
         幂等：只在 min/max 与目标不符时动手；`changed` 由调用点忽略，
         故本方法自己把所在行 invalidate+activate 一次，否则末位提示词要等下一拍
@@ -1356,10 +1363,10 @@ class LayoutMasterMixin:
         """
         ui = self.Ui
         combo = ui.comboBox_ui_scale
-        base_box = ui.checkBox_hide_window_title
+        base_box = ui.checkBox_hide_actor_nav
         if not (combo.isVisibleTo(self) and base_box.isVisibleTo(self)):
             return
-        want_w = max(base_box.sizeHint().width(), combo.minimumSizeHint().width())
+        want_w = max(1, base_box.sizeHint().width())
         if (combo.minimumWidth(), combo.maximumWidth()) == (want_w, want_w):
             return
         combo.setFixedWidth(want_w)
