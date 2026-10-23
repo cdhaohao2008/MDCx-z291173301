@@ -13549,7 +13549,7 @@ class Ui_MDCx(object):
             _translate("MDCx", "执行：刮削->下载封面->重命名->打水印等全部操作，适合需要海报墙的情况")
         )
         self.label_312.setText(
-            _translate("MDCx", "不刮削，读取本地 nfo、封面图、缩略图并显示，适合检查媒体库或媒体库文件重新整理和分类")
+            _translate("MDCx", "不刮削，读取本地信息并显示，适合检查媒体库或媒体库文件重新整理和分类")
         )
         self.radioButton_mode_common.setText(_translate("MDCx", "正常模式"))
         self.checkBox_read_has_nfo_update.setText(_translate("MDCx", "本地刮削成功的文件，按更新模式重新整理分类"))

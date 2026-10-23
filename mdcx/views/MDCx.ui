@@ -5793,7 +5793,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   <string notr="true">color: rgb(8, 128, 128);</string>
                                 </property>
                                 <property name="text">
-                                  <string>不刮削，读取本地 nfo、封面图、缩略图并显示，适合检查媒体库或媒体库文件重新整理和分类</string>
+                                  <string>不刮削，读取本地信息并显示，适合检查媒体库或媒体库文件重新整理和分类</string>
                                 </property>
                                 <property name="wordWrap">
                                   <bool>false</bool>
