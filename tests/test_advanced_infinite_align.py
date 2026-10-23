@@ -6,7 +6,7 @@
   「当停止刮削时」自身位置保持不变。
 
 实现：_sync_advanced_page_align 内在弹窗确认行落定后，钉死前导项
-「重启续刮任务」，使末位「不限次数刮削」落到「当停止刮削时」实测 x。
+「任务重启续刮」，使末位「不限次数刮削」落到「当停止刮削时」实测 x。
 只断言「精确落在锚点左缘」，不断言移动方向（离屏无 CJK 字体，方向不可比）。
 
 v2.7.6 需求③：最小化时「不限次数刮削」改为与「无按钮」（radioButton_hide_none）
@@ -32,7 +32,7 @@ v3.0 需求①（最新一条）：还原态的目标竖线再改一次——由
 改为「显示字段来源信息」（checkBox_show_from_log）：用户要的是「不限次数刮削
 **向左**移动到与『显示字段来源信息』严格上下对齐的位置」，而「显示字段内容信息」
 那条竖线太靠右（真机 787），不是用户要的那条。「显示字段来源信息」自己不许动，
-实现同样只钉前导项「重启续刮任务」。最大化态仍取「当停止刮削时」，逐位不变。
+实现同样只钉前导项「任务重启续刮」。最大化态仍取「当停止刮削时」，逐位不变。
 
 可行性门控（与「隐藏菜单栏图标」行同款手法）：落点落在前导项文本自然宽
 之内时硬钉会裁字，此时整行放弃、保持设计态原样。
@@ -182,7 +182,7 @@ def test_infinite_aligns_to_stop_or_defers(win, app, width, height):
 
     # 两种情形下两项都不许被压到裁字；目标竖线上的控件自身一律不动。
     assert remain.width() >= remain.sizeHint().width(), (
-        f"{width} 宽下「重启续刮任务」被压到 {remain.width()}px（sizeHint {remain.sizeHint().width()}），会裁字"
+        f"{width} 宽下「任务重启续刮」被压到 {remain.width()}px（sizeHint {remain.sizeHint().width()}），会裁字"
     )
     assert infinite.width() >= infinite.sizeHint().width(), (
         f"{width} 宽下「不限次数刮削」被压到 {infinite.width()}px（sizeHint {infinite.sizeHint().width()}），会裁字"

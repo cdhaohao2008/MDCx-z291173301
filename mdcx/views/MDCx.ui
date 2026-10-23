@@ -24556,7 +24556,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>重启续刮任务</string>
+                                  <string>任务重启续刮</string>
                                 </property>
                               </widget>
                             </item>

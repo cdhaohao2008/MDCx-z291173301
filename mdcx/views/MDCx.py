@@ -14597,7 +14597,7 @@ class Ui_MDCx(object):
         self.label_309.setText(_translate("MDCx", "自动刮削："))
         self.label_277.setText(_translate("MDCx", "弹窗确认："))
         self.pushButton_select_config_folder.setText(_translate("MDCx", "选择目录"))
-        self.checkBox_remain_task.setText(_translate("MDCx", "重启续刮任务"))
+        self.checkBox_remain_task.setText(_translate("MDCx", "任务重启续刮"))
         self.checkBox_infinite_scrape.setText(_translate("MDCx", "不限次数刮削"))
         self.label_279.setText(_translate("MDCx", "保留任务："))
         self.label_task_mode.setText(_translate("MDCx", "任务模式："))
