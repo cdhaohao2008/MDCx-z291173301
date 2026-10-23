@@ -155,8 +155,6 @@
 - **删 `.ui` 控件 = 删代码里的 `ui.<name>`**：动手前 grep 全仓（控制器、`_snapshot`/`_STATICS` 名单、`sizeHint` 参与的行内最小宽算式），删完必须重跑 pyuic 并跑 `test_ui_structure`。参与「行内最小宽」的项（如 `tail_b` / `need_d` / `room`）要同步去掉它的 sizeHint，否则会按一个不存在的宽度卡门、整段对齐永远放弃。
 - **位置类需求（「X 右缘与 Y 右缘严格对齐」）不要自作聪明加「不裁字」下限**：`max(锚点宽, 控件.minimumSizeHint())` 在小比例界面缩放（真机 80%）下会让控件停在最小可用宽、比锚点右出约 20px，用户直接返工。判据只有锚点坐标；宽度因此小于 minimumSizeHint、档位文字略挤，是用户自己选的取舍，最多在回帖里提一句。同理，锚点必须用 `sizeHint()` 而不是 `width()`——被 `pin_d` 钉过的复选框，`width()` 是钉宽不是文字宽。
 - **行首「空 QLabel 做缩进」是对齐需求的隐形敌人**：这类标签（如已删的 `label_252`，10px Fixed + 空文本）只贡献宽度，grep 文案永远搜不到；把它的最小宽改 0 也不行——QHBoxLayout 的 spacing 还会再留 6px。要左对齐就直接从 `.ui` 删掉那枚 item，删完 pyuic 重生成即可（`horizontalLayout_85` 只剩一个子布局也合法）。排查手法 = 打印 `mapTo(content, (0,0))` 的 x 与父 cell 的 `cellRect(row, col)` 左缘做差，差值就是行首占位项总宽。
-- **把「绝对定位的提示标签」塞回网格**（`label_26` 2026-10-23）：三步 = ①`.ui` 里删掉该 widget 的 `geometry` 与它在 groupBox 下的独立位置，改成 `<item row=… column=…>`（其余行号整体下移）；②容器（`gridLayoutWidget_15`）高度按「原高 + 新行高 + 行距」补（129→155），**组框高度保持不变**——新增行正好吃掉原本空在底部的那条，下方各组与滚动内容零位移；③绝对定位时代的运行时钉位函数（`_sync_javdb_tip_pos`）连同调用点一起删，网格自己排。
-- 两个必踩的坑：①**标签横向策略必须 `Expanding`**——`Minimum` 策略下标签只占 sizeHint 宽、被单元格居中，左缘偏出半格余量（离屏实测 176 → 206，且随字体度量漂移）；②**网格行数一变，按写死行数取列宽的钉宽循环会漏行**：`init.py` 里 `range(3)` 取 gridLayout_15 列 0 各标签 `sizeHint` 的最大值，javdb 延时行挪到第 3 行后被漏掉，于是该网格列 0 被撑到 120 而 gridLayout_2 仍是 90，两网格第 1 列左缘错开 30px。凡「按行遍历网格取宽度」一律 `range(grid.rowCount())`。
 
 ## 并发与网络库
 
