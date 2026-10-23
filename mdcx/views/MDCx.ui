@@ -24255,7 +24255,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 <item>
                                   <widget class="QCheckBox" name="checkBox_hide_window_title">
                                     <property name="text">
-                                      <string>隐藏边框（美观样式）</string>
+                                      <string>隐藏边框样式</string>
                                     </property>
                                   </widget>
                                 </item>
@@ -24293,7 +24293,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>隐藏Dock图标（Mac）</string>
+                                  <string>隐藏Dock图标</string>
                                 </property>
                               </widget>
                             </item>
@@ -24312,7 +24312,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>隐藏菜单栏图标（Mac）</string>
+                                  <string>隐藏菜单图标</string>
                                 </property>
                               </widget>
                             </item>
@@ -24900,7 +24900,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </sizepolicy>
                                 </property>
                                 <property name="text">
-                                  <string>使用 QT 选择对话框</string>
+                                  <string>使用QT对话框</string>
                                 </property>
                               </widget>
                             </item>

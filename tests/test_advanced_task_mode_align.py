@@ -4,12 +4,12 @@
   ① 还原态「网盘存储文件」**向左**、最大化态**向右**，都落在「使用暗黑模式」那条竖线上；
      「使用暗黑模式」自身位置保持不变。
   ② 「隐藏窗口」行的三枚单选（点击关闭按钮 / 点最小化按钮 / 无）原先与「隐藏Dock图标
-     （Mac）/ 隐藏菜单栏图标（Mac）/ 保存后重启生效」挤在同一个网格格里互相压字，
+     （Mac）/ 隐藏菜单图标/ 保存后重启生效」挤在同一个网格格里互相压字，
      现在单选独占一行、复选框行下移一行，两行不得有任何垂直重叠。
 
 实现：
   - `_sync_advanced_page_task_mode_align()`：任务模式行容器取「界面外观」行同宽，
-    前导项「本地存储文件」钉成「隐藏边框（美观样式）」等宽，末位即落「使用暗黑模式」竖线。
+    前导项「本地存储文件」钉成「隐藏边框样式」等宽，末位即落「使用暗黑模式」竖线。
   - .ui：gridLayout_20 里 horizontalLayout_dock 从 row9 挪到 row10（独占一行），
     其后各行 +1，组框与内嵌 grid 各加高 30px。
 """
@@ -110,7 +110,9 @@ def test_task_mode_netdisk_aligns_with_dark_mode(win, app, width, height):
 
     netdisk = _pos(ui, ui.checkBox_task_store_netdisk)
     dark = _pos(ui, ui.checkBox_dark_mode)
-    assert netdisk[0] == dark[0], f"{width}x{height} 下「网盘存储文件」x={netdisk[0]} 与「使用暗黑模式」x={dark[0]} 未对齐"
+    assert netdisk[0] == dark[0], (
+        f"{width}x{height} 下「网盘存储文件」x={netdisk[0]} 与「使用暗黑模式」x={dark[0]} 未对齐"
+    )
     # 末位项必须完整显示：容器被压窄到裁字时本需求就不成立
     assert ui.checkBox_task_store_netdisk.width() >= ui.checkBox_task_store_netdisk.sizeHint().width(), (
         f"{width}x{height} 下「网盘存储文件」被压窄到裁字"
@@ -156,13 +158,13 @@ def test_hide_window_rows_do_not_overlap(win, app, width, height):
         center = _pos(ui, w)[1] + w.height() / 2
         label_center = _pos(ui, label_313)[1] + label_313.height() / 2
         assert abs(center - label_center) <= 1, f"{w.objectName()} 未与「隐藏窗口：」垂直居中"
-    # 「隐藏图标：」与「隐藏Dock图标（Mac）」那一行同行居中
+    # 「隐藏图标：」与「隐藏Dock图标」那一行同行居中
     label_314 = ui.label_314
     label_314_center = _pos(ui, label_314)[1] + label_314.height() / 2
     for w in (ui.checkBox_hide_dock_icon, ui.checkBox_hide_menu_icon, ui.label_42):
         center = _pos(ui, w)[1] + w.height() / 2
         assert abs(center - label_314_center) <= 1, f"{w.objectName()} 未与「隐藏图标：」垂直居中"
-    # 「界面外观：」与「隐藏边框（美观样式）」「使用暗黑模式」同行居中
+    # 「界面外观：」与「隐藏边框样式」「使用暗黑模式」同行居中
     label_246 = ui.label_246
     label_246_center = _pos(ui, label_246)[1] + label_246.height() / 2
     for w in (ui.checkBox_hide_window_title, ui.checkBox_dark_mode):

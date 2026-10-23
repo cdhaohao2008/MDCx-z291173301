@@ -3,7 +3,7 @@
 三批需求（锚点自身均保持不动，提示词与控件提示一律不许变）：
   第一组（最大化「右移」）：「保存日志」「检查更新」两行的「关」→「隐藏NFO 文件管理」；
     「隐藏窗口」行的「点最小化按钮」→「显示字段来源信息」；同行的「无」→「显示字段内容信息」。
-  第二组（最大化「左移」）：刮削结束后自动退出软件 / 当停止刮削时 / 隐藏菜单栏图标（Mac）/
+  第二组（最大化「左移」）：刮削结束后自动退出软件 / 当停止刮削时 / 隐藏菜单图标/
     使用暗黑模式 / 隐藏NFO 文件管理 / 两枚「关」→「显示字段来源信息」。
   第三组（最小化「左移」，并要求「最大化时页面、布局、控件、提示词等均保持不变」）：
     「点最小化按钮」与两枚「关」→「隐藏NFO 文件管理」；同行的「无」→「显示字段内容信息」。
@@ -140,12 +140,12 @@ def _extra(win) -> int:
 #   第一组（最大化「右移」）：两个「关」→「隐藏NFO 文件管理」、「点最小化按钮」→
 #     「显示字段来源信息」、「无」→「显示字段内容信息」
 #   第二组（最大化「左移」）：刮削结束后自动退出软件 / 当停止刮削时 /
-#     隐藏菜单栏图标（Mac）/ 使用暗黑模式 / 隐藏NFO 文件管理 / 两枚「关」
+#     隐藏菜单图标/ 使用暗黑模式 / 隐藏NFO 文件管理 / 两枚「关」
 #     → 「显示字段来源信息」
 #   第三组（最小化「左移」）：「点最小化按钮」+ 两枚「关」→「隐藏NFO 文件管理」，
 #     「无」→「显示字段内容信息」
 #   第四组（最小化「右移」）：「显示字段来源信息」→「隐藏NFO 文件管理」（需求①）；
-#     「当停止刮削时」/「隐藏菜单栏图标（Mac）」/「使用暗黑模式」/ 两枚「关」
+#     「当停止刮削时」/「隐藏菜单图标」/「使用暗黑模式」/ 两枚「关」
 #     → 「显示字段内容信息」（需求②）
 #   第七组（最小化「左移」）：「隐藏NFO 文件管理」+ 两枚「关」→「显示字段来源信息」，
 #     且「显示字段来源信息」位置保持不变（第四组需求①已撤销，见 _NARROW_FIT）
@@ -163,7 +163,7 @@ _LEFT_TARGETS = (
     ("radioButton_update_off", "checkBox_show_from_log"),
 )
 
-# 第五组（最小化「右移」）：「刮削结束后自动退出软件」→「隐藏菜单栏图标（Mac）」。
+# 第五组（最小化「右移」）：「刮削结束后自动退出软件」→「隐藏菜单图标」。
 #   锚点不是固定像素，而是**第 8 行末位的实时左缘**——窄态下它的位置由 gap_b 决定，
 #   而 gap_b 由 _sync_advanced_page_align 的 anchor 算出，所以这一段必须排在该方法
 #   里第 8 行那批 activate **之后**才量得到终态值。
@@ -213,7 +213,7 @@ _NARROW_TARGETS = (
 # 「窗口一窄就必须对齐」写成死断言。
 _NARROW_FIT = (("checkBox_hide_nfo_nav", "checkBox_show_from_log"),)
 
-# 「隐藏菜单栏图标（Mac）」单列，不在 _LEFT_TARGETS 里做钉死像素的断言，原因见
+# 「隐藏菜单图标」单列，不在 _LEFT_TARGETS 里做钉死像素的断言，原因见
 # _dock_row 的说明：它所在行是「Fixed 前缀 + 间隔 + 末项」结构，前缀宽度等于两个
 # 控件的 sizeHint 之和，而 sizeHint 是**字体度量**的函数；离屏测试环境里的字体度量
 # 既不真实也不稳定（tests/conftest.py 把 get_fonts 桩掉 -> QFontDatabase.families()
@@ -276,11 +276,11 @@ _REFS_X_ONLY = (
     "layoutWidget_17",
     "checkBox_show_web_log",
     "checkBox_hide_window_title",
-    # 第五组：第 8 行那枚 Fixed 前缀「隐藏Dock图标（Mac）」，第五组只许动第 2 行，
+    # 第五组：第 8 行那枚 Fixed 前缀「隐藏Dock图标」，第五组只许动第 2 行，
     # 它必须逐位不动（_dock_row / test_narrow_auto_exit_lands_on_menu_icon 会比对它）
     "checkBox_hide_dock_icon",
 )
-# v2.7.6 需求①把「保存后重启生效」挪到「隐藏菜单栏图标（Mac）」右侧，故 label_42
+# v2.7.6 需求①把「保存后重启生效」挪到「隐藏菜单图标」右侧，故 label_42
 # 的左缘**按设计**要变（原贴在 Dock 图标后面，现改为贴在菜单栏图标后面），
 # 不能留在 _REFS_X_ONLY 里当「左缘不许动」的参照件——它的相对关系由
 # test_menu_icon_row_aligns_or_defers 单独断言（在菜单栏图标右侧）。
@@ -379,7 +379,7 @@ def test_tail_aligns_to_anchors_in_wide(win, app, width, height):
 def test_left_targets_land_on_from_log_in_wide(win, app, width, height):
     """第二组：宽态下六项一律精确落在「显示字段来源信息」的左缘上。
 
-    第七项「隐藏菜单栏图标（Mac）」不在此列，它由 test_menu_icon_row_aligns_or_defers
+    第七项「隐藏菜单图标」不在此列，它由 test_menu_icon_row_aligns_or_defers
     按实测可行性单独断言（理由见 _EXTRA_NAMES）。
     """
     ui = win.Ui
@@ -399,7 +399,7 @@ def _dock_row(ui, anchor_name):
     """隐藏图标行（horizontalLayout_dock）的实测可行性。
 
     与 _sync_advanced_page_align 里那一段同式。v2.7.6 需求①把「保存后重启生效」
-    挪到了「隐藏菜单栏图标（Mac）」**右侧**，行内顺序变成
+    挪到了「隐藏菜单图标」**右侧**，行内顺序变成
     「隐藏Dock图标 | 间隔 | 隐藏菜单栏图标 | 保存后重启生效」，故前缀只含
     「隐藏Dock图标」+ 一个间隔，末尾还要给提示词标签留出它自己的 sizeHint
     （不裁字下限）。能插入的间隔 gap = 目标竖线 - 行左缘 - 前缀；放得下的条件是
@@ -430,7 +430,7 @@ def _dock_row(ui, anchor_name):
 
 @pytest.mark.parametrize("width,height", _WIDE_SIZES + _NARROW_SIZES)
 def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
-    """「隐藏菜单栏图标（Mac）」：放得下就必须精确对齐，放不下就夹到可行区间内。
+    """「隐藏菜单图标」：放得下就必须精确对齐，放不下就夹到可行区间内。
 
     v2.7.6 三处变化：
       ① 「保存后重启生效」挪到它**右侧**（行内顺序变了，前缀/末尾宽度随之重算）；
@@ -468,7 +468,7 @@ def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
             f"{width} 宽下前缀放不下（gap={row['gap']} avail={row['avail']}）本应夹取到 x={want_x}，实际={menu_x}"
         )
 
-    # 需求①：「保存后重启生效」必须在「隐藏菜单栏图标（Mac）」右侧
+    # 需求①：「保存后重启生效」必须在「隐藏菜单图标」右侧
     assert _abs(ui, label) >= menu_x + menu.width(), (
         f"{width} 宽下「保存后重启生效」不在「隐藏菜单栏图标」右侧:"
         f" label_x={_abs(ui, label)} 菜单栏图标右缘={menu_x + menu.width()}"
@@ -487,7 +487,7 @@ def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
 def test_narrow_menu_icon_lands_on_dark_mode_when_it_fits(win, app, width, height):
-    """需求②（**判别力所在**）：窄态「隐藏菜单栏图标（Mac）」与「使用暗黑模式」严格上下对齐。
+    """需求②（**判别力所在**）：窄态「隐藏菜单图标」与「使用暗黑模式」严格上下对齐。
 
     离屏环境里这一档天然「放不下」：需求①把提示词挪到菜单栏图标**右侧**后，
     该行最小宽度变大（「隐藏菜单栏图标」到「使用暗黑模式」那条竖线的间隔超出可放区间），
@@ -971,7 +971,7 @@ def test_narrow_keeps_wide_only_feature_at_baseline(win, app, monkeypatch, width
     也纳入了窄态（落点换成更靠右的「显示字段内容信息」），第七组又把「隐藏NFO
     文件管理」与两枚「关」改成锚「显示字段来源信息」，于是第二组六项全部被窄态接管，
     只剩「刮削结束后自动退出软件」（第二组的基准本身，还原态必须留在自然位）与
-    「隐藏菜单栏图标（Mac）」由第五组单独接管（落点即它自己，须留在基线）。
+    「隐藏菜单图标」由第五组单独接管（落点即它自己，须留在基线）。
 
     仍须原地不动的只有第七组那条「隐藏NFO 文件管理」→「显示字段来源信息」——
     它带可行性门槛，放不下就整行放弃（由 test_narrow_nav_row_aligns_or_defers 断言）。
@@ -997,7 +997,7 @@ def test_narrow_keeps_wide_only_feature_at_baseline(win, app, monkeypatch, width
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
 def test_narrow_auto_exit_lands_on_menu_icon(win, app, monkeypatch, width, height):
-    """第五组：最小化态「刮削结束后自动退出软件」右移到「隐藏菜单栏图标（Mac）」。
+    """第五组：最小化态「刮削结束后自动退出软件」右移到「隐藏菜单图标」。
 
     锚点自身必须原地不动——它是第四组需求②的目标（窄态对齐「显示字段内容信息」），
     本段只钉第 2 行的前导项 checkBox_auto_start，不碰第 8 行的 gap_b，故这里对照
@@ -1022,7 +1022,7 @@ def test_narrow_auto_exit_lands_on_menu_icon(win, app, monkeypatch, width, heigh
     # 它在「只有通用宽幅逻辑」的基线**之上**仍停在该组已定的竖线上——已由上面
     # got == want 覆盖。本组只允许动第 2 行的两枚控件，故第 8 行的 Fixed 前缀
     # 「隐藏Dock图标」必须逐位不动（menu_icon 自身是第四组目标，不在此列）。
-    # label_42 不在此列：v2.7.6 需求①把它挪到「隐藏菜单栏图标（Mac）」右侧，
+    # label_42 不在此列：v2.7.6 需求①把它挪到「隐藏菜单图标」右侧，
     # 它的左缘按设计要变（由 test_menu_icon_row_aligns_or_defers 断言）。
     for name in ("checkBox_hide_dock_icon",):
         assert _abs(ui, getattr(ui, name)) == base[name][0], (
