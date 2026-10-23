@@ -14,7 +14,7 @@
 各模式的用法：
 
 - 整理模式：``build_organize_index()`` 建索引，按索引生成移动计划；
-- 视频模式：勾选「移动已下载图片和文件到新目录」时同样先建索引；
+- 视频模式：先建索引，再按索引删掉「属于这个视频/STRM」的伴生文件（只留视频本体）；
 - 补全模式：``collect_media_assets()`` 查询当前媒体已有哪些 nfo / 图片 / 字幕 /
   mediainfo / 种子，据此决定还需要刮削补哪些。
 """
@@ -38,6 +38,33 @@ ORGANIZE_BACKUP_MARK = ".mdcx_organize_backup_"
 _ASSET_FOLDER_NAMES = ("extrafanart", "backdrops", "behind the scenes", "trailers")
 # 剧照类目录名关键词：容忍 extarfanart、extrafanart_copy 等非标准写法
 _ASSET_NAME_HINTS = ("fanart", "backdrop", "scene", "trailer")
+
+_SYSTEM_DIR_NAMES = frozenset(
+    {
+        "system volume information",
+        "$recycle.bin",
+        "recycler",
+        "thumbs.db",
+        ".ds_store",
+        "desktop.ini",
+    }
+)
+"""系统/回收站目录与文件：既不属于番号，也绝不能参与搬移或删除。
+
+NAS 的缩略图缓存（Synology ``@eaDir``、QNAP ``.@__thumb``、群晖 ``#recycle``）、
+Windows 的 ``$RECYCLE.BIN`` / ``System Volume Information`` 都会被识别成
+「媒体目录下不含媒体的子目录」，若不排除会被当成剧照目录整体搬走或删掉。
+"""
+
+
+def _is_system_entry(name: str) -> bool:
+    """系统目录 / 回收站 / 隐藏目录：一律不索引、不搬移、不删除。"""
+    key = _name_key(name)
+    if not key:
+        return True
+    if key[0] in "@#.~$":
+        return True
+    return key in _SYSTEM_DIR_NAMES
 
 
 def _name_key(name: str) -> str:
@@ -140,7 +167,8 @@ def _canonical_asset_folder_name(name: str) -> str:
     for hint, canonical in _ASSET_CANONICAL_NAMES:
         if hint not in key:
             continue
-        if key.endswith("_copy"):
+        # 副本目录：容忍 -copy / 空格 copy 等非标准分隔符，统一归一为「标准名_copy」
+        if key.endswith(("_copy", "-copy", " copy", "copy")) and len(key) > len("copy"):
             return f"{canonical}_copy"
         return canonical
     return raw
@@ -285,7 +313,7 @@ class OrganizeIndex:
         asset_dirs: set[Path] = set()
         for folder in self._media_by_folder:
             for child in self._child_dirs.get(folder, set()):
-                if _is_backup_name(child.name):
+                if _is_backup_name(child.name) or _is_system_entry(child.name):
                     continue
                 if child in dirs_with_media and not self._is_asset_dir_name(child.name):
                     # 自身还含媒体的子目录是「另一部作品」的目录，不属于当前番号
@@ -495,7 +523,8 @@ def build_organize_index(
 ) -> OrganizeIndex:
     """在移动任何文件前遍历目录，建立媒体番号与全部伴生文件的归属快照。"""
     index = OrganizeIndex()
-    ignored = {Path(os.path.abspath(path)) for path in ignore_dirs}
+    # 排除目录按归一化路径比较：Windows 大小写不敏感，网络盘也可能返回不同大小写
+    ignored = {_name_key(str(Path(os.path.abspath(path)))) for path in ignore_dirs}
     deduped_roots = _dedupe_roots(roots)
     for root in deduped_roots:
         if _safe_is_file(root):
@@ -505,14 +534,19 @@ def build_organize_index(
             continue
         for current, dirs, files in os.walk(root, topdown=True, followlinks=False):
             current_path = Path(current)
-            dirs[:] = [name for name in dirs if Path(os.path.abspath(current_path / name)) not in ignored]
+            dirs[:] = [
+                name
+                for name in dirs
+                if _name_key(str(Path(os.path.abspath(current_path / name)))) not in ignored
+                and not _is_system_entry(name)
+            ]
             if any(_name_key(name) in {"skip", ".skip", ".ignore"} for name in files):
                 dirs.clear()
                 continue
             for name in dirs:
                 index._register_dir(current_path / name)
             for name in files:
-                if _is_backup_name(name):
+                if _is_backup_name(name) or _is_system_entry(name):
                     continue
                 index._register_file(current_path / name)
     index._finalize()

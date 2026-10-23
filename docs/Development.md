@@ -369,6 +369,11 @@ markupsafe>=3.0.4    pydantic-core>=2.50.1  PyQt6-sip>=13.13.0
 
 ## 13. 版本号管理
 
+> **铁律（2026-10-23 用户定规，取代 2026-10-19 的「LOCAL_VERSION 领先当天是既定口径、不许顺手改」）**：
+> 只要改了软件代码，`mdcx/consts.py::LOCAL_VERSION` 就必须同步成**当天日期** `YYYYMMDD`。
+> 例：代码里是 `20261022`、当天是 2026-10-23，就改成 `20261023`；跨天多次改动按最后一次的日期。
+> 改完再按 §13.2 复核四个同步点、§13.3 复核测试。**不需要用户每次提醒，改代码即自动同步。**
+
 ### 13.1 两处定义
 
 `mdcx/consts.py`：
@@ -389,6 +394,7 @@ markupsafe>=3.0.4    pydantic-core>=2.50.1  PyQt6-sip>=13.13.0
 
 ### 13.3 改版流程
 
+0. 改完代码先把 `LOCAL_VERSION` 同步成**当天日期**（见本章开头的铁律），再往下走。
 1. 在 Changelog 顶部按日期写条目（当天没段就新建，有段就并进）。
 2. `uv run bump --version <YYYYMMDD>`（`--dry-run` 预览、`--force` 免交互；只有真要改展示版本号才加 `--name X.Y[.Z]`）。
 3. 复核 `uv run pytest tests/test_version_consistency.py tests/test_version_metadata.py`。

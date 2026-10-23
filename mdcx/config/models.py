@@ -1064,7 +1064,6 @@ class Config(BaseModel):
             Switch.REMAIN_TASK,
             Switch.INFINITE_SCRAPE,
             Switch.SHOW_DIALOG_STOP_SCRAPE,
-            Switch.SORT_DEL,
             Switch.MOVE_KEEP,
             Switch.TASK_STORE_LOCAL,
             Switch.THEPORNDB_NO_HASH,

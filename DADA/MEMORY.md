@@ -200,7 +200,7 @@
 
 ## 版本号与配置迁移
 
-- **版本号纪律**：`LOCAL_VERSION` 领先当天是既定口径、不是缺陷（用户 2026-10-19 明示，不许提醒、不许顺手改）。`LOCAL_VERSION` 大于当天日期、多个展示版本号共用同一 `LOCAL_VERSION`、同 tag 复用 `overwrite: true` 重建 Release、`check_version()` 取数字 tag 最大值 —— 这四类日期/版本疑问一律先问用户，别写进文档、changelog 或 commit message。真正要守的只有版本号同步点一致（`scripts/bump.py --check` + `tests/test_version_consistency.py` + `tests/test_version_metadata.py`）。
+- **版本号纪律（2026-10-23 改口）**：**改了软件代码就把 `consts.py::LOCAL_VERSION` 改成当天日期 `YYYYMMDD`**（代码里 20261022、当天 10-23 → 改成 20261023），不用等用户提醒；这条取代 2026-10-19「领先当天是既定口径、不许顺手改」的旧口径。多个展示版本号共用同一 `LOCAL_VERSION`、同 tag 复用 `overwrite: true` 重建 Release、`check_version()` 取数字 tag 最大值 —— 这三类日期/版本疑问一律先问用户，别写进文档、changelog 或 commit message。真正要守的只有版本号同步点一致（`scripts/bump.py --check` + `tests/test_version_consistency.py` + `tests/test_version_metadata.py`）。
 - 提交前把变更写进当天日期段；用 `scripts/bump.py --version`。
 - bump 升展示版本号有坑：LOCAL_VERSION 未变会误报「版本号替换失败」，需手改三处。
 - Windows 跑 `bump.py` 需设 `PYTHONIOENCODING` 并 `stdout.reconfigure`。
@@ -215,6 +215,15 @@
 - 用户在安装目录自己维护多个并列配置 json（`actor.json` / `default.json` / `studios.json` / `theporndb.json` + 各 `*bak.txt`），是针对不同命名方式/刮削网站的独立配置，不是出厂数据文件。①在用户安装目录看到同名 json 不要凭仓库同名文件断定是数据文件，先看有没有 `config_version` / `main_mode` 这类配置字段。②`list_configs()` 无差别列出目录内所有 `.json` / `.ini` 供「切换配置」选用是既有设计不是缺陷，没有用户要求不要动。
 - 手工改用户真配置按**字节级单行替换**（`ReadAllText` / `WriteAllText` + `UTF8Encoding($false)`，无 BOM、纯 CRLF），改完逐项回验：JSON 可解析、`main_mode` 等行为字段未变、键集合一致、差异行只有目标行、CRLF 计数不变。
 
+## 视频模式与正常模式的伴生文件处理（2026-10-23 定稿）
+
+- **视频模式不再有选项，固定「搬视频 + 删伴生文件」**：`Switch.SORT_DEL` / `Switch.SORT_MOVE` 已删除（老配置由 `_migrate_sort_mode_switches`→`_drop_switches` 清理）。视频模式现在：`move_movie` → `organize.delete_companion_files`（按关联索引删该番号的图片/剧照/预告片/nfo/json/字幕/种子/bif）→ 收尾删空目录。索引不可用时回退 `deal_old_files` 的固定路径清理。**软链接/硬链接模式不删**（原目录视频还在，删伴生文件会掏空源目录）。
+- **正常 / 分离 / 更新模式的伴生文件搬移走 `deal_old_files(index=...)`**：有索引时逐文件做 `resolve_owner` 归属判定 + 全部移动走 `OrganizeTransaction`（失败整体回滚，返回 `(ok, pic_catched, single_catched)` 三元组）；无索引（分离模式/补全模式/索引失败）保持旧的整路径搬移。剧照类目录改成「按归属逐个搬 + 清空后删空目录」，不再整目录 `move`/`rmtree`。
+- **正常 / 分离 / 更新模式的后半段搬运复用 `organize_companion_files`**（字幕/种子/bif/json/其他伴生文件 + 视频本体最后搬），替换了 `move_sub`/`move_torrent`/`move_bif`/`move_other_file`（后四者现在只服务读取模式等残留分支，别再往搬文件分支里加）。分离模式靠 `asset_root=meta_folder` 让剧照目录落数据目录，其它模式 `asset_root` 与 `folder_new_path` 相同。
+- **索引必须在任何文件被搬走之前建好**：`_prepare_organize_index` 现在覆盖整理/补全/视频/正常/分离/更新（后三者仅在勾了「刮削成功后移动文件」时）。正常/分离/更新为此多付一次全库扫描——这是「不误搬」的代价，别改成按目录懒建（同目录并发处理时，先处理完的番号会把共用文件误判给后来的番号）。
+- **系统目录不进索引**：`@eaDir` / `#recycle` / `.@__thumb` / `$RECYCLE.BIN` / `System Volume Information` / `Thumbs.db` / `.DS_Store` 等以 `@ # . ~ $` 开头或名单内的条目由 `file_association._is_system_entry` 一律排除，否则会被当成「不含媒体的伴生子目录」整体搬走或删掉。
+- **`deal_old_files` 的返回值变了**（2 元组 → 3 元组），调用方必须解包 `ok`；`ok=False` 表示已回滚、本次应放弃处理。
+
 ## 通用纪律
 
 - 把常量/枚举值当判据时，改那个值必须连带 grep 所有读它的地方。没有幂等保护的迁移就是定时炸弹 —— 判据失效时不报错，几个月后以「我的设置怎么变了」出现。
@@ -222,7 +231,7 @@
 - 长时间任务标准做法：后台终端 + checkpoint 断点续传（state 落盘，后台终端 1 小时上限连 wrapper 一起回收）+ 分批处理批间落盘 + wrapper 45-50 分钟自重启。进度看落盘文件，不看终端日志（stdout 全缓冲可能 0 字节假象）。
 - 功能移除类需求先调研证据再答：查活跃度、底层共享依赖、移除成本。用户转述与代码证据矛盾时以代码为准。
 - **刮削模式值全表**（2026-10-23 起）：1 正常 / 2 分离 / 3 视频 / 4 更新 / 5 读取（只读展示）/ 6 整理 / 7 补全（本地优先、只补缺失）。新增或改动模式必须同步这些点：`config/extend.py` 常量与 `is_xxx_mode()/is_xxx_selected()`、`load_config.py` / `save_config.py` 的 `mode_mapping` 与 radio 映射、`MDCx.ui` 单选项与说明、`core/file.py` 的 `creat_folder` / `_get_folder_path` / `move_movie` 模式元组、`base/file.py::get_movie_list` 的 `include_success` 与 `.strm`、`core/scraper.py` 的断点续刮排除列表与扫描排除目录、`init.py` 提示词、软件内使用说明。
-- **番号 ↔ 伴生文件关联只在 `core/file_association.py`**（`OrganizeIndex` / `build_organize_index` / `collect_media_assets`），整理、视频、补全三种模式共用；`core/organize.py` 只保留「移动计划 + 事务 + 回滚」。改归属规则只改前者，别再往 organize.py 里加。
+- **番号 ↔ 伴生文件关联只在 `core/file_association.py`**（`OrganizeIndex` / `build_organize_index` / `collect_media_assets`），整理、补全、视频（只删）、正常/分离/更新（搬移，`scraper.COMPANION_INDEX_MODES`）全部共用；`core/organize.py` 只保留「移动计划 + 事务 + 回滚」。改归属规则只改前者，别再往 organize.py 里加。
 - **补全模式的「先搬后补」顺序不能反**：先补字段/图片再搬，会把刚写好的 nfo 当成旧 nfo 再搬一次，补全结果被覆盖。已在成功输出目录内的文件走 `complete_inplace_locked`，只补内容不移动。
 - **补全模式下方选项 2026-10-23 已收敛**（详见 `docs/Development.md` 3.7）：删掉「允许更新 NFO 文件」「无 NFO 按正常模式重新刮削」两项（连同 `ReadMode` 的两个枚举值，旧配置由 `_migrate_read_mode_options` 清理）；NFO 合并策略删掉 `prefer_nfo` / `preserve_existing`，只剩 3 档且默认 `fill_missing_only`——它的含义已改成「本地已有值一律保留、只补本地空字段」，旧配置由 `_migrate_nfo_merge_strategy` 映射。**仍保留的已知冲突只有「按更新模式重新整理分类」**（会把文件放到成功输出目录之外、对目录内文件无效），改它之前先确认归档口径。
 - **「重新下载封面图片等文件」不存在「重下不打水印」缺陷**：下载函数每成功写出一张新图都会把对应 `*_marked` 复位为 False，`add_mark` 照常执行；给已存在图预标记 True 只是防二次水印。别按「修 bug」的思路去给它加 `READ_DOWNLOAD_AGAIN` 条件——那会让被「保留目标文件」挡住、根本没重下的旧图被重复打水印。

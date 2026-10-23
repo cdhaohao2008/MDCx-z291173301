@@ -37,9 +37,11 @@ from ..config.enums import (
 )
 from ..config.extend import (
     COMPLETE_MAIN_MODE,
+    NORMAL_MAIN_MODE,
     ORGANIZE_MAIN_MODE,
     READ_MAIN_MODE,
     SEPARATE_MAIN_MODE,
+    UPDATE_MAIN_MODE,
     VIDEO_MAIN_MODE,
     MoviePathSetting,
     complete_merge_strategy,
@@ -54,7 +56,6 @@ from ..config.extend import (
     is_in_success_folder,
     is_organize_selected,
     is_success_output_tree,
-    is_video_move_companions_enabled,
     mirror_meta_folder,
     organize_netdisk_rest_enabled,
     organize_rest_seconds,
@@ -98,7 +99,13 @@ from .image import add_mark, replace_thumb_fanart_with_poster
 from .media_resource import MediaResourceContext
 from .nfo import get_nfo_data, write_nfo
 from .nfo_merger import filled_missing_fields, merge_nfo_fields
-from .organize import OrganizeIndex, build_organize_index, organize_companion_files, organize_files
+from .organize import (
+    OrganizeIndex,
+    build_organize_index,
+    delete_companion_files,
+    organize_companion_files,
+    organize_files,
+)
 from .super_resolution import maybe_upscale_poster
 from .translate import translate_actor, translate_info, translate_title_outline
 from .utils import (
@@ -121,6 +128,17 @@ from .web import (
 
 if TYPE_CHECKING:
     from ..crawler import CrawlerProviderProtocol
+
+
+COMPANION_INDEX_MODES = (NORMAL_MAIN_MODE, SEPARATE_MAIN_MODE, UPDATE_MAIN_MODE)
+"""搬伴生文件时按「番号 ↔ 伴生文件」归属索引走事务的刮削模式。
+
+正常 / 分离 / 更新三种模式都会把视频搬到新目录、把伴生文件一并搬走，因此都
+需要「只搬归属当前视频/STRM 的文件」+ 失败整体回滚；整理与补全模式走各自的
+独立分支，视频模式只删不搬。
+"""
+
+_COMPANION_MODE_LABELS = {NORMAL_MAIN_MODE: "正常模式", SEPARATE_MAIN_MODE: "分离模式", UPDATE_MAIN_MODE: "更新模式"}
 
 
 class _LazyQMessageBox:
@@ -420,10 +438,9 @@ class Scraper:
     async def _cleanup_video_empty_folders(self) -> None:
         """视频模式收尾：删除本次搬移后变空的源目录。
 
-        视频模式把视频搬到新目录后，原目录往往只剩空壳；勾选「移动已下载图片和
-        文件到新目录」时，图片/信息文件/json/字幕等伴生文件也一起搬走，原目录
-        必然变空。这里只删除「本次运行确实搬空」的目录：目录仍非空就跳过，扫描
-        根目录本身永不删除，roots 之外的目录也不动。
+        视频模式把视频搬到新目录、并把该番号关联的图片/信息文件/json/字幕等
+        伴生文件一并删除后，原目录往往只剩空壳。这里只删除「本次运行确实搬空」
+        的目录：目录仍非空就跳过，扫描根目录本身永不删除，roots 之外的目录也不动。
 
         与通用「删除空目录」开关无关——那是全量扫描式清理，这里是本次搬移的
         收尾（视频模式搬走文件必然留下空壳，属于搬移本身的一部分）。
@@ -623,9 +640,9 @@ class Scraper:
         # 拿去做全库 scrape_state 清理，否则不在子集里的合法记录会被误判
         # "源文件已不存在"而清光（议题 #98 2.4）。
         full_library_scan = not movie_list
-        # 「番号 ↔ 伴生文件」归属索引的扫描根：整理模式恒需要；视频模式勾选
-        # 「移动已下载图片和文件到新目录」时同样需要（伴生文件归属必须在任何
-        # 文件被搬走之前确定，否则媒体已搬走 → 归属丢失 → 伴生文件不被搬运）
+        # 「番号 ↔ 伴生文件」归属索引的扫描根：整理模式、补全模式、视频模式都需要。
+        # 视频模式要用它决定「哪些伴生文件属于这个视频、可以删除」——归属必须在
+        # 任何文件被搬走之前确定，否则媒体已搬走 → 归属丢失 → 伴生文件漏删。
         companion_scan_roots: list[Path] = []
         companion_ignore_dirs: list[Path] = []
         # 整理模式：统计「已经躺在成功输出目录内」的文件数量，
@@ -650,7 +667,11 @@ class Scraper:
                         current_paths.softlink_path,
                     )
                     scan_path = current_paths.softlink_path
-                if is_organize_selected() or is_complete_selected() or is_video_move_companions_enabled():
+                if (
+                    is_organize_selected()
+                    or is_complete_selected()
+                    or get_runtime_main_mode() in (VIDEO_MAIN_MODE, *COMPANION_INDEX_MODES)
+                ):
                     companion_scan_roots.append(scan_path)
                     companion_ignore_dirs.extend(scan_ignore_dirs)
                 if is_organize_selected() and is_success_output_tree(current_paths.movie_path):
@@ -771,8 +792,8 @@ class Scraper:
             self._organize_batch_size = max(1, int(manager.config.rest_count))
 
         # 整理模式：先完成整目录预扫描并固定归属关系，再允许任何文件开始移动。
-        # 视频模式勾选「移动已下载图片和文件到新目录」时同样先建索引——
-        # 伴生文件与视频的归属关系必须在任何文件被搬走之前确定。
+        # 视频模式同样先建索引：删伴生文件前必须先确定归属，否则视频搬走后
+        # 归属就丢了（目录里只剩别的番号，文件会被误判成它的）。
         # 补全模式也需要索引：先算出每个媒体已有哪些 nfo/图片/字幕，才能决定
         # 哪些要补、哪些要随视频一起搬。
         if task_count and get_runtime_main_mode() == ORGANIZE_MAIN_MODE:
@@ -781,9 +802,18 @@ class Scraper:
             await self._prepare_organize_index(
                 movie_list, companion_scan_roots, companion_ignore_dirs, mode_label="补全模式"
             )
-        elif task_count and is_video_move_companions_enabled():
+        elif task_count and get_runtime_main_mode() == VIDEO_MAIN_MODE:
             await self._prepare_organize_index(
                 movie_list, companion_scan_roots, companion_ignore_dirs, mode_label="视频模式"
+            )
+        elif task_count and get_runtime_main_mode() in COMPANION_INDEX_MODES and eff_success_file_move():
+            # 正常 / 分离 / 更新模式：勾了「刮削成功后移动文件」才会搬伴生文件，
+            # 此时需要索引判定归属（不搬文件就不必付全库扫描的代价）。
+            await self._prepare_organize_index(
+                movie_list,
+                companion_scan_roots,
+                companion_ignore_dirs,
+                mode_label=_COMPANION_MODE_LABELS[get_runtime_main_mode()],
             )
 
         # 进度速率估算（纯呈现层：滑动窗口速率 → 预计剩余时间）
@@ -852,8 +882,8 @@ class Scraper:
                 if meta_root is not None:
                     # 数据存放目录下的空目录：走右侧分离模式开关
                     await _clean_empty_folders(meta_root, file_mode, allow_empty=eff_del_empty_folder())
-        # 视频模式：所有任务完成后，删除被搬空后的源目录（勾选「移动已下载图片和
-        # 文件到新目录」时伴生文件也一起搬走，原目录必然变空）
+        # 视频模式：所有任务完成后，删除被搬空后的源目录（视频搬走 + 伴生文件
+        # 删除后，原目录必然变空）
         if get_runtime_main_mode() == VIDEO_MAIN_MODE:
             await self._cleanup_video_empty_folders()
         end_time = time.time()
@@ -1497,8 +1527,8 @@ class Scraper:
         elif complete_mode and not complete_fallback_normal:
             update_nfo = False
         # 不写nfo的情况：
-        elif runtime_mode == VIDEO_MAIN_MODE and Switch.SORT_DEL in manager.config.switch_on:
-            # 3模式勾选“删除本地已下载的nfo文件”（暂无效，会直接return）
+        elif runtime_mode == VIDEO_MAIN_MODE:
+            # 视频模式不写 nfo（搬完视频就删伴生文件，写了也会被删）
             update_nfo = False
         elif runtime_mode in [1, 2, 3, 4, COMPLETE_MAIN_MODE]:
             if DownloadableFile.NFO not in manager.config.download_files:
@@ -1987,13 +2017,13 @@ class Scraper:
         # 视频模式（原来叫整理模式）
         # 视频模式（仅根据刮削数据把电影命名为番号并分类到对应目录名称的文件夹下）
         if runtime_mode == VIDEO_MAIN_MODE:
-            # 「移动已下载图片和文件到新目录」：伴生文件（图片/信息文件/json/字幕等）
-            # 按番号关联事务式搬到新目录，视频本体最后搬（保留软/硬链接语义）。
-            # 与「删除本地已下载的图片和信息文件」互斥，界面层与配置层均已归一。
-            if Switch.SORT_MOVE in manager.config.switch_on:
-                moved, error = await organize_companion_files(
+            # 视频模式只保留视频本体：先把视频搬到新目录，再删掉原目录里属于这个
+            # 番号的伴生文件（图片/剧照/预告片/nfo/json/字幕/种子/bif 等）。
+            # 删除范围由关联索引决定，同目录里属于其它番号的文件、归属不明的共用
+            # 文件都不动；索引不可用时回退到按固定路径清理。
+            if await move_movie(other, file_info, file_path, file_new_path):
+                cleaned, error = await delete_companion_files(
                     file_path=file_path,
-                    file_new_path=file_new_path,
                     folder_old_path=folder_old_path,
                     folder_new_path=folder_new_path,
                     nfo_new_path=nfo_new_path,
@@ -2003,37 +2033,33 @@ class Scraper:
                     poster_final_path=poster_final_path,
                     thumb_final_path=thumb_final_path,
                     fanart_final_path=fanart_final_path,
-                    move_media=lambda: move_movie(other, file_info, file_path, file_new_path),
                     index=self._organize_index,
                 )
-                if not moved:
-                    LogBuffer.error().write(error)
-                    return None, None
-                # 伴生文件与视频都搬走后，原目录会变成空壳：登记源目录，
+                if not cleaned:
+                    if error == "no-index":
+                        # 索引建立失败：退回按固定路径清理（旧行为，范围较小）
+                        await deal_old_files(
+                            res.number,
+                            other,
+                            folder_old_path,
+                            folder_new_path,
+                            file_path,
+                            thumb_new_path_with_filename,
+                            poster_new_path_with_filename,
+                            fanart_new_path_with_filename,
+                            nfo_new_path,
+                            poster_final_path,
+                            thumb_final_path,
+                            fanart_final_path,
+                            naming_rule,
+                        )
+                    else:
+                        LogBuffer.error().write(f"视频模式清理伴生文件失败：{error}")
+                # 登记源目录与其伴生目录：文件删完后它们会变成空壳，
                 # 所有任务结束后统一删除（视频模式空目录收尾）
                 self._video_source_folders.add(folder_old_path)
-                await save_success_list(file_path, file_new_path)  # 保存成功列表
-                return res, other
-            # 移动文件
-            if await move_movie(other, file_info, file_path, file_new_path):
-                if Switch.SORT_DEL in manager.config.switch_on:
-                    await deal_old_files(
-                        res.number,
-                        other,
-                        folder_old_path,
-                        folder_new_path,
-                        file_path,
-                        thumb_new_path_with_filename,
-                        poster_new_path_with_filename,
-                        fanart_new_path_with_filename,
-                        nfo_new_path,
-                        poster_final_path,
-                        thumb_final_path,
-                        fanart_final_path,
-                        naming_rule,
-                    )  # 清理旧的thumb、poster、fanart、nfo
-                # 登记源目录：视频搬走（且旧图片/信息文件已删）后原目录可能变空
-                self._video_source_folders.add(folder_old_path)
+                if self._organize_index is not None:
+                    self._video_source_folders.update(self._organize_index.asset_dirs_in(folder_old_path))
                 await save_success_list(file_path, file_new_path)  # 保存成功列表
                 return res, other
             # 返回MDCx1_1main, 继续处理下一个文件
@@ -2110,7 +2136,10 @@ class Scraper:
         # 清理旧的thumb、poster、fanart、extrafanart、nfo
         pic_final_catched = False
         single_folder_catched = False
-        pic_final_catched, single_folder_catched = await deal_old_files(
+        # 正常 / 分离 / 更新模式：把「保留目标文件」勾选范围内的旧资源按番号关联
+        # 搬到新目录。传索引后只搬归属当前视频/STRM 的文件（同目录其它番号的图片、
+        # 剧照目录不会被整目录端走），且全部移动走一个事务，失败整体回滚。
+        migrated, pic_final_catched, single_folder_catched = await deal_old_files(
             res.number,
             other,
             folder_old_path,
@@ -2124,7 +2153,11 @@ class Scraper:
             thumb_final_path,
             fanart_final_path,
             naming_rule,
+            index=self._organize_index if runtime_mode in COMPANION_INDEX_MODES else None,
         )
+        if not migrated:
+            LogBuffer.error().write("伴生文件搬移失败，本次刮削已中止（文件保持原目录）")
+            return None, None
 
         # 如果 final_pic_path 没处理过，这时才需要下载和加水印
         # 分离模式复用元数据：三张 final 图片都已存在时跳过下载（保留已有文件）
@@ -2209,15 +2242,43 @@ class Scraper:
         # 移动字幕、种子、bif、trailer、其他文件（配置允许时才执行，分离模式走右侧开关）
         # 补全模式已在上面用事务搬完（含字幕/种子/bif/json/剧照），这里不再重复搬。
         if eff_success_file_move() and not complete_mode:
-            if file_info.has_sub:
-                await move_sub(folder_old_path, folder_new_path, file_name, sub_list, naming_rule)
-            await move_torrent(folder_old_path, folder_new_path, file_name, movie_number, naming_rule)
-            await move_bif(folder_old_path, folder_new_path, file_name, naming_rule)
-            await move_other_file(res.number, folder_old_path, folder_new_path, file_name, naming_rule, meta_folder)
+            if runtime_mode in COMPANION_INDEX_MODES and manager.config.soft_link == 0:
+                # 正常 / 分离 / 更新模式：与整理模式同一套「番号关联 + 事务 + 回滚」搬运。
+                # 只搬归属当前视频/STRM 的伴生文件，视频本体最后搬，任一失败整体回滚。
+                # 分离模式的 nfo/图片路径已 remap 到数据目录，这里传的是 meta 侧路径，
+                # 因此计划里剩下的（字幕/种子/bif/json/其他）落到视频所在目录，与旧行为一致。
+                # 软/硬链接模式不搬：原目录里的视频本体还在，搬走伴生文件会把源目录掏空。
+                moved, error = await organize_companion_files(
+                    file_path=file_path,
+                    file_new_path=file_new_path,
+                    folder_old_path=folder_old_path,
+                    folder_new_path=folder_new_path,
+                    nfo_new_path=nfo_new_path,
+                    naming_rule=naming_rule,
+                    number=movie_number or res.number,
+                    sub_list=sub_list,
+                    poster_final_path=poster_final_path,
+                    thumb_final_path=thumb_final_path,
+                    fanart_final_path=fanart_final_path,
+                    move_media=lambda: move_movie(other, file_info, file_path, file_new_path),
+                    index=self._organize_index,
+                    # 分离模式：剧照/预告片等伴生目录要落在数据目录（meta_folder），
+                    # 不能跟着视频跑到视频目录；其它模式两者相同。
+                    asset_root=meta_folder,
+                )
+                if not moved:
+                    LogBuffer.error().write(error)
+                    return None, None
+            else:
+                if file_info.has_sub:
+                    await move_sub(folder_old_path, folder_new_path, file_name, sub_list, naming_rule)
+                await move_torrent(folder_old_path, folder_new_path, file_name, movie_number, naming_rule)
+                await move_bif(folder_old_path, folder_new_path, file_name, naming_rule)
+                await move_other_file(res.number, folder_old_path, folder_new_path, file_name, naming_rule, meta_folder)
 
-            # 移动文件
-            if not await move_movie(other, file_info, file_path, file_new_path):
-                return None, None
+                # 移动文件
+                if not await move_movie(other, file_info, file_path, file_new_path):
+                    return None, None
         await save_success_list(file_path, file_new_path)
 
         # 分离模式：为本地视频生成STRM链接地址（与nfo/封面同目录，内容为视频最终绝对路径）

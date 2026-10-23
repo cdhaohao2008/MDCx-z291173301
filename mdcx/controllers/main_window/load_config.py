@@ -1122,23 +1122,11 @@ def load_config(self: MyMAinWindow):
             (self.Ui.checkBox_dark_mode, Switch.DARK_MODE),
             (self.Ui.checkBox_copy_netdisk_nfo, Switch.COPY_NETDISK_NFO),
             (self.Ui.checkBox_theporndb_hash, Switch.THEPORNDB_NO_HASH),
-            (self.Ui.checkBox_sortmode_delpic, Switch.SORT_DEL),
-            (self.Ui.checkBox_sortmode_movefile, Switch.SORT_MOVE),
             (self.Ui.checkBox_move_overwrite, Switch.MOVE_OVERWRITE),
             (self.Ui.checkBox_move_keep, Switch.MOVE_KEEP),
             (self.Ui.checkBox_task_store_local, Switch.TASK_STORE_LOCAL),
             (self.Ui.checkBox_task_store_netdisk, Switch.TASK_STORE_NETDISK),
         )
-
-        # 视频模式：「删除本地已下载的图片和信息文件」与「移动已下载图片和文件到新目录」
-        # 互斥。老配置只可能有 sort_del（自动升级为只勾删除、不勾移动）；
-        # 手改配置若两个都勾上，保留原有的 sort_del、不改变旧行为。
-        # 注：上面的 set_checkboxes 是逐个 setChecked 的，两个都勾时后一个会把前一个
-        # 顶掉（互斥信号联动），故这里按归一后的配置把两枚复选框重新钉死。
-        if Switch.SORT_DEL in switch_on and Switch.SORT_MOVE in switch_on:
-            manager.config.switch_on = [item for item in switch_on if item != Switch.SORT_MOVE]
-            self.Ui.checkBox_sortmode_delpic.setChecked(True)
-            self.Ui.checkBox_sortmode_movefile.setChecked(False)
 
         # 高级页「移动文件」：覆盖目标文件与保留目标文件必须勾选其中一个（默认档＝
         # 保留目标文件）。老配置两者都没有 → 按默认档补上「保留目标文件」；手改配置

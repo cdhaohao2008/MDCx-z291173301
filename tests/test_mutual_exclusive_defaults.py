@@ -53,7 +53,7 @@ def test_normalize_move_file_switches_keeps_explicit_choice():
     assert normalize_move_file_switches([Switch.MOVE_OVERWRITE], True, False) == [Switch.MOVE_OVERWRITE]
     assert normalize_move_file_switches([Switch.MOVE_KEEP], False, True) == [Switch.MOVE_KEEP]
     # 其它开关不受影响
-    assert normalize_move_file_switches([Switch.SORT_DEL], False, False) == [Switch.SORT_DEL, Switch.MOVE_KEEP]
+    assert normalize_move_file_switches([Switch.AUTO_EXIT], False, False) == [Switch.AUTO_EXIT, Switch.MOVE_KEEP]
 
 
 def test_normalize_task_mode_switches_falls_back_to_local():
@@ -73,14 +73,14 @@ def test_normalize_task_mode_switches_falls_back_to_local():
 
 def test_migration_adds_move_keep_when_neither_present():
     """老配置没有移动文件开关 → 自动升级为默认档「保留目标文件」。"""
-    data = {"switch_on": ["sort_del"]}
+    data = {"switch_on": ["auto_exit"]}
     migrate_config_data(data)
     assert "move_keep" in data["switch_on"]
     assert "move_overwrite" not in data["switch_on"]
-    assert "sort_del" in data["switch_on"]
+    assert "auto_exit" in data["switch_on"]
 
     # 逗号分隔的字符串形态同样补齐
-    data = {"switch_on": "sort_del"}
+    data = {"switch_on": "auto_exit"}
     migrate_config_data(data)
     assert "move_keep" in str(data["switch_on"])
 

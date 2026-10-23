@@ -454,10 +454,9 @@ _READ_MODE_UI_TEXTS = {
     "label_41": "刮削排除目录：",
     "label_48": "刮削排除目录：",
     "checkBox_read_has_nfo_update": "本地刮削成功的文件，按更新模式重新整理分类",
-    "checkBox_read_download_file_again": "本地信息文件有链接，重新下载封面图与缩略图",
+    "checkBox_read_download_file_again": "本地信息文件内有链接，重新下载封面图片",
     "label_347": "将按设置 -「下载」更新",
     "checkBox_nfo_merge_strategy": "本地信息合并及策略",
-    "checkBox_sortmode_delpic": "删除本地已下载的图片和信息文件",
 }
 
 # 马赛克命名规则四条说明（忽略 XML 缩进换行空白差异）。

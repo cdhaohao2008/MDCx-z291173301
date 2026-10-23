@@ -813,7 +813,7 @@ def Init_Ui(self: MyMAinWindow):
         4）字段翻译请在「设置→翻译」中设置<br/>5）图片、剧照、预告片请在「设置→下载」中设置<br/>6）视频文件命名请在「设置→命名」中设置<br/>7）如果刮削后不需要重命名，请在下面的「刮削成功后重命名文件」设置为「关」<br/>8）如果刮削后不需要移动文件，请在下面的「刮削成功后移动文件」设置为「关」<br/>9）如果想自动刮削，请在「设置→高级」中勾选「自动刮削」<br/>10）其他设置项和功能玩法可自行研究</p></body></html>""")
     self.Ui.pushButton_tips_sort_mode.setIcon(help_icon)
     self.Ui.pushButton_tips_sort_mode.setToolTip(
-        """<html><head/><body><p><b>视频模式：</b><br/>1，适合不需要图片墙的情况。视频模式将联网刮削视频相关字段信息，然后根据「设置→命名」中设置的命名规则重命名、移动视频文件<br/>2，仅整理视频，不会下载和重命名图片、nfo 文件<br/>3，如果是海报墙用户，请不要使用视频模式。</p></body></html>"""
+        """<html><head/><body><p><b>视频模式：</b><br/>1，适合不需要图片墙的情况。视频模式将联网刮削视频相关字段信息，然后根据「设置→命名」中设置的命名规则重命名、移动视频文件<br/>2，仅保留视频本体：视频搬到新目录后，原目录里的图片、剧照、预告片、nfo、字幕、种子等信息文件会一并删除（与视频/STRM 关联的才删，无关文件不动）<br/>3，如果是海报墙用户，请不要使用视频模式。</p></body></html>"""
     )
     self.Ui.pushButton_tips_update_mode.setIcon(help_icon)
     self.Ui.pushButton_tips_update_mode.setToolTip("""<html><head/><body><p><b>更新模式：</b><br/>1，适合视频已经归类好的情况。更新模式将在不改动文件位置结构的前提下重新刮削更新一些信息<br/>2，更新规则在下面的「更新模式规则中」定义：<br/>-1）如果只更新视频文件名，请选择「只更新C」，视频文件名命名规则请到「设置→命名」中设置<br/>-2）如果要更新视频所在的目录名，请选择「更新B和C」；如果要更新视频目录的上层目录，请勾选「同时更新A目录」<br/>-3），如果要在视频目录为视频再创建一级目录，请选择「创建D目录」<br/>\
@@ -1152,10 +1152,6 @@ def Init_Singal(self: MyMAinWindow):
     # 高级页-任务模式：本地存储文件 / 网盘存储文件互斥
     self.Ui.checkBox_task_store_local.toggled.connect(self.checkBox_task_store_local_changed)
     self.Ui.checkBox_task_store_netdisk.toggled.connect(self.checkBox_task_store_netdisk_changed)
-    # 视频模式：删除本地已下载的图片和信息文件 / 移动已下载图片和文件到新目录，
-    # 两枚复选框互斥（同一时刻只能选中一个；都不勾选=图片/nfo/字幕留在原目录）
-    self.Ui.checkBox_sortmode_delpic.toggled.connect(self.checkBox_sortmode_delpic_changed)
-    self.Ui.checkBox_sortmode_movefile.toggled.connect(self.checkBox_sortmode_movefile_changed)
     # 高级页「移动文件」：覆盖目标文件 / 保留目标文件互斥（同一时刻只能选中一个；
     # 都不勾选=保持原有移动行为）
     self.Ui.checkBox_move_overwrite.toggled.connect(self.checkBox_move_overwrite_changed)

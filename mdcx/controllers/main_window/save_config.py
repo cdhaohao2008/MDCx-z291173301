@@ -770,8 +770,6 @@ def save_config(self: MyMAinWindow):
         (self.Ui.checkBox_infinite_scrape, Switch.INFINITE_SCRAPE),
         (self.Ui.checkBox_show_dialog_exit, Switch.SHOW_DIALOG_EXIT),
         (self.Ui.checkBox_show_dialog_stop_scrape, Switch.SHOW_DIALOG_STOP_SCRAPE),
-        (self.Ui.checkBox_sortmode_delpic, Switch.SORT_DEL),
-        (self.Ui.checkBox_sortmode_movefile, Switch.SORT_MOVE),
         (self.Ui.checkBox_move_overwrite, Switch.MOVE_OVERWRITE),
         (self.Ui.checkBox_move_keep, Switch.MOVE_KEEP),
         (self.Ui.checkBox_task_store_local, Switch.TASK_STORE_LOCAL),
@@ -800,11 +798,6 @@ def save_config(self: MyMAinWindow):
     )
 
     manager.config.switch_on = switch_actions
-
-    # 视频模式：删除/移动两个开关互斥（界面层已保证只勾一个，这里再兜一层，
-    # 防止手改配置或异常状态把两个都写进配置文件）
-    if Switch.SORT_DEL in manager.config.switch_on and Switch.SORT_MOVE in manager.config.switch_on:
-        manager.config.switch_on = [item for item in manager.config.switch_on if item != Switch.SORT_MOVE]
 
     # 高级页「移动文件」：覆盖目标文件与保留目标文件必须勾选其中一个（默认档＝
     # 保留目标文件）。保存时校验：两个都没勾（手改配置或异常状态）就按默认档

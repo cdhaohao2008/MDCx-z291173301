@@ -4,6 +4,42 @@
 
 ## 2026-10-23
 
+### 分离模式 / 更新模式：伴生文件搬移也改为「番号关联 + 事务 + 回滚」
+
+- `deal_old_files(index=...)` 与 `organize_companion_files` 的适用范围从「正常模式」扩到「正常 / 分离 / 更新」三种模式（`scraper.COMPANION_INDEX_MODES`）：三种模式在勾选「刮削成功后移动文件」时都会先建一次归属索引，搬伴生文件时逐文件判定归属、只搬属于当前视频/STRM 的，任一失败整体回滚。
+- 字幕、种子、bif、json、`-mediainfo.json` 及其他同前缀伴生文件的搬移，在分离/更新模式下同样改由 `organize_companion_files` 统一处理，替换 `move_sub` / `move_torrent` / `move_bif` / `move_other_file` 四段按文件名子串匹配的搬移；`move_other_file` 的误搬风险在三种搬文件模式里全部消除。
+- 新增 `_build_plan(asset_root=...)` / `organize_companion_files(asset_root=...)`：分离模式下剧照、剧照副本、主题视频、附加视频等伴生目录落**数据目录**（`meta_folder`），主图与 nfo 落数据目录，字幕/种子/bif/json 仍跟视频目录，与旧行为一致；其它模式两者相同。
+- 软链接/硬链接模式仍不搬伴生文件（原目录视频还在，搬走会把源目录掏空）。
+
+### 版本号：改代码即把日期同步成当天
+
+- `docs/Development.md` 第 13 章新增铁律：**只要改了软件代码，`mdcx/consts.py::LOCAL_VERSION` 必须同步成当天日期 `YYYYMMDD`**（代码里 20261022、当天 2026-10-23 → 改成 20261023），改完再按 13.2 复核四个同步点。该规则取代 2026-10-19「`LOCAL_VERSION` 领先当天是既定口径、不许顺手改」的旧口径，并同步写进 `DADA/MEMORY.md`。
+- 本次代码日期已是 `20261023`（当天），无需再改值。
+
+### 视频模式：删除两个互斥选项，固定「只留视频本体」
+
+- 删除刮削模式页视频模式行的「删除本地已下载的图片和信息文件」「移动已下载图片和文件到新目录」两个复选框（连同 `Switch.SORT_DEL` / `Switch.SORT_MOVE` 两个枚举值、界面互斥处理器、加载/保存配置的读写与互斥归一、`is_video_move_companions_enabled()`），老配置里残留的 `sort_del` / `sort_move` 在加载时自动清掉（幂等）。
+- 视频模式现在固定：视频按番号重命名、搬到新目录 → 删除原目录里**属于这个视频/STRM** 的伴生文件（图片、剧照、剧照副本、预告片、主题视频、NFO、JSON 含 `-mediainfo.json`、字幕、种子、bif 等）→ 收尾删除被搬空的源目录。这才符合「视频模式只整理视频」的字面意思。
+- 删除范围改由「番号 ↔ 伴生文件」归属索引决定（`organize.delete_companion_files`）：只删归属当前媒体的文件，同目录其它番号的文件与归属不明的共用文件一律不动；索引不可用时退回按固定路径清理。
+- 软链接/硬链接模式不删伴生文件：原目录里的视频本体还在，删掉会把源目录掏空。
+- 视频模式运行前会建立一次归属索引（`_prepare_organize_index(mode_label="视频模式")`），归属必须在任何文件被搬走之前确定。
+
+### 正常模式：伴生文件搬移改为「番号关联 + 事务 + 回滚」
+
+- `deal_old_files()` 新增 `index` 参数：传索引后每个待搬文件先做归属判定（`OrganizeIndex.resolve_owner`），只搬属于当前视频/STRM 的文件；同目录混放多个番号时，不再把整份 `extrafanart` / `backdrops` / `trailers` / 剧照副本目录端给第一个处理的番号。索引没覆盖到的文件按旧行为放行，避免漏搬。
+- 正常模式（`main_mode == 1`）勾选「刮削成功后移动文件」时，在开始搬任何文件之前建立整库归属索引；不搬文件则不建，避免白付一次全库扫描。
+- 剧照/剧照副本/主题视频/附加视频目录改为「按归属逐个搬移 + 清空后删空目录」，不再整目录 `move`/`rmtree`；目标已存在同名目录时也只删属于当前视频的那份。
+- 上述搬移全部走 `OrganizeTransaction`：任一文件搬移失败 → 整体回滚到原目录，本次刮削中止并记录失败原因（不再留下搬一半的目录）。
+- 字幕、种子、bif、JSON（含 `-mediainfo.json`）及其他同前缀伴生文件改由 `organize_companion_files` 统一搬运（与整理模式同一套计划/事务/校验/回滚），替换原来的 `move_sub` / `move_torrent` / `move_bif` / `move_other_file` 四段按文件名子串匹配的搬移；`move_other_file` 原来「文件名里含番号就搬」的误搬风险随之消除。
+- 软链接/硬链接模式下不搬伴生文件（与 `deal_old_files` 原有的软链接早退口径一致）。
+
+### 关联索引（`core/file_association.py`）修复
+
+- 系统目录不再被当成剧照目录：`@eaDir`（群晖缩略图）、`#recycle`、`.@__thumb`（QNAP）、`$RECYCLE.BIN`、`System Volume Information`、`Thumbs.db`、`.DS_Store` 等以 `@ # . ~ $` 开头或名单内的条目一律不进索引，不参与搬移与删除。
+- 排除目录比较改为归一化路径（大小写不敏感），修正 Windows / 网络盘上大小写不一致导致排除目录没被排除的问题。
+- 剧照副本目录归一化容忍 `-copy` / 空格 `copy` 等非标准分隔符，避免 `extrafanart-copy` 被误归一成 `extrafanart` 而与剧照目录混在一起。
+- `delete_companion_files()` 清空剧照目录后自底向上删除空子目录。
+
 ### 新增 / 改变
 
 - 高级功能新增「任务模式」：两枚互斥选项「本地存储文件」（默认，整理模式不设置时间间隔整理文件）/「网盘存储文件」（整理模式按「自动休息」间隔整理文件，上一次整理完成到下一次整理开始之间至少间隔自动休息设定时间，防止网盘目录缓存未刷新导致整理失败）；配置保存在 `switch_on` 开关组（`task_store_local` / `task_store_netdisk`），旧整理模式的独立 bool 键（`organize_local_no_interval` / `organize_netdisk_rest_interval`）已废弃并自动升级迁移。

@@ -3,15 +3,15 @@ import os
 import re
 import shutil
 import traceback
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import aiofiles
 import aiofiles.os
 
 from ..base.number import remove_escape_string
-from ..config.enums import CDChar, Switch
+from ..config.enums import CDChar
 from ..config.extend import (
     COMPLETE_MAIN_MODE,
     FILE_MOVE_KEEP,
@@ -48,6 +48,9 @@ from ..utils.picture import (
     resolve_existing_image,
 )
 from .naming import FIELD_DESCRIPTIONS, NameRenderOptions, NamingTarget, render_name
+
+if TYPE_CHECKING:
+    from .organize import OrganizeIndex
 
 
 def _is_invalid_name_error(error: BaseException) -> bool:
@@ -888,6 +891,8 @@ async def _migrate_picture_resource(
     old_path_with_filename: Path,
     old_path_no_filename: Path,
     local_key: str,
+    owned: Callable[[Path], bool] | None = None,
+    move: Callable[[Path, Path], Awaitable[bool]] | None = None,
 ) -> tuple[bool, bool, Path | None]:
     """迁移单张封面图片到最终路径，返回 (exists, done_path_copy, 实际落位路径).
 
@@ -897,6 +902,10 @@ async def _migrate_picture_resource(
     3. 依次尝试移动: new_path_with_filename -> old_path_with_filename -> old_path_no_filename
        （每个位置都按受支持后缀依次查找，搬走时保留源文件真实扩展名，不做格式伪装）
     4. 全部不存在则 exists=False，尝试从 file_done_dic 的 local_* 复制
+
+    ``owned`` 为归属判定（见 ``deal_old_files``）：返回 False 的候选一律不动，
+    避免多番号混放时把别人的 poster.jpg 搬走；``move`` 是事务化的移动函数，
+    不传时退回直接移动。
     """
     done_path_copy = True
     exists = True
@@ -922,9 +931,15 @@ async def _migrate_picture_resource(
                         source = await resolve_existing_image(source_base)
                         if source is None:
                             continue
+                        if owned is not None and not owned(source):
+                            # 归属别的番号（或同目录共用、无法确定归属）：不动它
+                            continue
                         target = image_path_with_suffix(final_path, source.suffix)
                         if str(source).lower() != str(target).lower():
-                            moved, _ = await move_file_async(source, target, overwrite=True)
+                            if move is not None:
+                                moved = await move(source, target)
+                            else:
+                                moved, _ = await move_file_async(source, target, overwrite=True)
                             if not moved:
                                 exists = False
                                 continue
@@ -941,6 +956,8 @@ async def _migrate_picture_resource(
             for old_base in (old_path_with_filename, old_path_no_filename, new_path_with_filename):
                 for old_path in image_path_candidates(old_base):
                     if str(old_path).lower() == str(keep).lower():
+                        continue
+                    if owned is not None and not owned(old_path):
                         continue
                     if await aiofiles.os.path.exists(old_path):
                         await delete_file_async(old_path)
@@ -967,9 +984,18 @@ async def deal_old_files(
     thumb_final_path: Path,
     fanart_final_path: Path,
     naming_rule: str = "",
-) -> tuple[bool, bool]:
+    index: OrganizeIndex | None = None,
+) -> tuple[bool, bool, bool]:
     """
     处理本地已存在的thumb、poster、fanart、nfo
+
+    ``index`` 为运行前建立的「番号 ↔ 伴生文件」归属索引。传入时：
+
+    - 每个待搬文件先做归属判定，只搬属于当前视频/STRM 的文件——同目录里其它
+      番号的图片、nfo、剧照目录一律不动（不再整目录搬走）；
+    - 全部移动走一个事务，任一文件移动失败就整体回滚，不会留下搬一半的目录。
+
+    返回 ``(成功, 图片处理权, 单文件夹处理权)``；失败时调用方应放弃本次处理。
     """
     nfo_old_path = file_path.with_suffix(".nfo")
     file_name = file_path.stem
@@ -1000,6 +1026,76 @@ async def deal_old_files(
     poster_old_path_no_filename = folder_old_path / "poster.jpg"
     thumb_old_path_no_filename = folder_old_path / "thumb.jpg"
     fanart_old_path_no_filename = folder_old_path / "fanart.jpg"
+
+    # ============ 归属判定 + 事务 ============
+    # 有索引时：只搬「归属当前视频/STRM」的文件，并让全部移动走一个事务。
+    # 没有索引时（分离模式 / 补全模式 / 索引建立失败）：保持原有的整路径搬移行为。
+    transaction = None
+    filtering = False
+    aliases = tuple(alias for alias in (file_path.stem, number) if alias)
+    if index is not None and index.entry(file_path) is not None:
+        from .organize import OrganizeTransaction
+
+        transaction = OrganizeTransaction()
+        filtering = True
+
+    def owned(path: Path) -> bool:
+        """这个文件是否属于当前视频/STRM（索引没覆盖到时按旧行为放行）。"""
+        if index is None or not filtering:
+            return True
+        if index.entry(path) is None:
+            # 索引快照里没有它（索引没覆盖到 / 处理期间新生成）：保持旧行为，避免漏搬
+            return True
+        return index.resolve_owner(path, file_path, aliases) == file_path
+
+    async def move_file(src: Path, dst: Path) -> bool:
+        if transaction is not None:
+            moved, _error = await transaction.move_file(src, dst)
+            return moved
+        moved, _error = await move_file_async(src, dst)
+        return moved
+
+    async def prune_empty_dirs(root: Path) -> None:
+        """删掉搬空后的子目录（root 本身也一并删掉，但不碰它的父目录）。"""
+        try:
+            for current, _dirs, _files in await asyncio.to_thread(lambda: list(os.walk(root, topdown=False))):
+                path = Path(current)
+                try:
+                    if not any(path.iterdir()):
+                        path.rmdir()
+                except OSError:
+                    continue
+        except OSError:
+            return
+
+    async def move_owned_tree(old_root: Path, new_root: Path) -> bool:
+        """按归属搬移整个伴生目录（保持相对结构），别人的文件原地不动。"""
+        ok = True
+        try:
+            files = await asyncio.to_thread(lambda: [Path(c) / n for c, _d, fs in os.walk(old_root) for n in fs])
+        except OSError:
+            return True
+        for src in files:
+            if not owned(src):
+                continue
+            dst = new_root / src.relative_to(old_root)
+            if not await move_file(src, dst):
+                ok = False
+        await prune_empty_dirs(old_root)
+        return ok
+
+    async def delete_owned_tree(root: Path) -> None:
+        """目标目录已有同名资源时：只删属于当前视频的那份，别人的保留。"""
+        try:
+            files = await asyncio.to_thread(lambda: [Path(c) / n for c, _d, fs in os.walk(root) for n in fs])
+        except OSError:
+            return
+        for src in files:
+            if not owned(src):
+                continue
+            await delete_file_async(src)
+        await prune_empty_dirs(root)
+
     file_path_list = {
         nfo_old_path,
         nfo_new_path,
@@ -1035,9 +1131,12 @@ async def deal_old_files(
         extrafanart_extra_new_path,
     }
 
-    # 视频模式进行清理
+    # 视频模式进行清理：视频模式固定只保留视频本体，原目录里的图片、剧照、预告片、
+    # nfo 等信息文件一律删除（不再有「删除/移动」两个选项）。
+    # 软链接/硬链接模式例外：原目录里的视频本体还在，删掉伴生文件会把源目录掏空，
+    # 因此链接模式不清理。
     main_mode = get_runtime_main_mode()
-    if main_mode == 3 and Switch.SORT_DEL in manager.config.switch_on:
+    if main_mode == VIDEO_MAIN_MODE and manager.config.soft_link == 0:
         for each in file_path_list:
             if await aiofiles.os.path.exists(each):
                 await delete_file_async(each)
@@ -1045,10 +1144,11 @@ async def deal_old_files(
             if await aiofiles.os.path.isdir(each):
                 # 守护: 拒绝系统关键路径, 防止路径计算错误误删用户文件
                 await asyncio.to_thread(safe_rmtree, each)
-        return False, False
+        return True, False, False
 
     # 非视频模式，将本地已有的图片、剧照等文件按命名规则迁移到目标位置。
     # 这里不应用下载/保留策略，避免后续下载失败时提前丢失旧资源；是否保留、替换或删除由资源处理函数决定。
+    ok = True  # 本次搬移是否全部成功（有事务时失败会整体回滚）
     # 抢占图片的处理权
     single_folder_catched = False  # 剧照、剧照副本、主题视频 这些单文件夹的处理权，他们只需要处理一次
     pic_final_catched = False  # 最终图片（poster、thumb、fanart）的处理权
@@ -1085,7 +1185,7 @@ async def deal_old_files(
 
     # 软硬链接模式，不处理旧的图片
     if manager.config.soft_link != 0:
-        return pic_final_catched, single_folder_catched
+        return True, pic_final_catched, single_folder_catched
 
     """
     保留图片或删除图片说明：
@@ -1105,6 +1205,8 @@ async def deal_old_files(
         poster_old_path_with_filename,
         poster_old_path_no_filename,
         "local_poster",
+        owned=owned,
+        move=move_file,
     )
     thumb_exists, done_thumb_path_copy, thumb_actual_path = await _migrate_picture_resource(
         number,
@@ -1114,6 +1216,8 @@ async def deal_old_files(
         thumb_old_path_with_filename,
         thumb_old_path_no_filename,
         "local_thumb",
+        owned=owned,
+        move=move_file,
     )
     fanart_exists, done_fanart_path_copy, fanart_actual_path = await _migrate_picture_resource(
         number,
@@ -1123,6 +1227,8 @@ async def deal_old_files(
         fanart_old_path_with_filename,
         fanart_old_path_no_filename,
         "local_fanart",
+        owned=owned,
+        move=move_file,
     )
 
     # 更新图片地址（主图可能不是 .jpg，这里记录实际落位路径）
@@ -1130,17 +1236,25 @@ async def deal_old_files(
     info.thumb_path = (thumb_actual_path or thumb_final_path) if thumb_exists and done_thumb_path_copy else None
     info.fanart_path = (fanart_actual_path or fanart_final_path) if fanart_exists and done_fanart_path_copy else None
 
-    # nfo 处理
+    # nfo 处理（只动归属当前视频的那份，别人的 nfo 不碰）
+    nfo_owned = owned(nfo_old_path)
     try:
         if await aiofiles.os.path.exists(nfo_new_path):
-            if str(nfo_old_path).lower() != str(nfo_new_path).lower() and await aiofiles.os.path.exists(nfo_old_path):
+            if (
+                nfo_owned
+                and str(nfo_old_path).lower() != str(nfo_new_path).lower()
+                and await aiofiles.os.path.exists(nfo_old_path)
+            ):
                 await delete_file_async(nfo_old_path)
-        elif nfo_old_path != nfo_new_path and await aiofiles.os.path.exists(nfo_old_path):
-            await move_file_async(nfo_old_path, nfo_new_path)
+        elif nfo_owned and nfo_old_path != nfo_new_path and await aiofiles.os.path.exists(nfo_old_path):
+            ok = await move_file(nfo_old_path, nfo_new_path)
+            if not ok:
+                LogBuffer.error().write(f"移动 nfo 失败：{nfo_old_path}")
+                return False, False, False
     except Exception:
         log_console.log_text(traceback.format_exc())
 
-    # trailer
+    # trailer（只搬/删归属当前视频的那份）
     if trailer_name:  # 预告片名字不含视频文件名
         # trailer最终路径等于已下载路径时，trailer是已下载的，不需要处理
         if await aiofiles.os.path.exists(str(trailer_new_file_path)):
@@ -1148,25 +1262,34 @@ async def deal_old_files(
                 await delete_file_async(trailer_old_file_path_with_filename)
             elif await aiofiles.os.path.exists(str(trailer_new_file_path_with_filename)):
                 await delete_file_async(trailer_new_file_path_with_filename)
-        elif trailer_old_file_path != trailer_new_file_path and await aiofiles.os.path.exists(
-            str(trailer_old_file_path)
+        elif (
+            trailer_old_file_path != trailer_new_file_path
+            and owned(trailer_old_file_path)
+            and await aiofiles.os.path.exists(str(trailer_old_file_path))
         ):
             await aiofiles.os.makedirs(str(trailer_new_folder_path), exist_ok=True)
-            await move_file_async(trailer_old_file_path, trailer_new_file_path)
+            ok = await move_file(trailer_old_file_path, trailer_new_file_path) and ok
         elif await aiofiles.os.path.exists(str(trailer_new_file_path_with_filename)):
             await aiofiles.os.makedirs(str(trailer_new_folder_path), exist_ok=True)
-            await move_file_async(trailer_new_file_path_with_filename, trailer_new_file_path)
-        elif await aiofiles.os.path.exists(str(trailer_old_file_path_with_filename)):
+            ok = await move_file(trailer_new_file_path_with_filename, trailer_new_file_path) and ok
+        elif await aiofiles.os.path.exists(str(trailer_old_file_path_with_filename)) and owned(
+            trailer_old_file_path_with_filename
+        ):
             await aiofiles.os.makedirs(str(trailer_new_folder_path), exist_ok=True)
-            await move_file_async(trailer_old_file_path_with_filename, trailer_new_file_path)
+            ok = await move_file(trailer_old_file_path_with_filename, trailer_new_file_path) and ok
 
-        # 删除旧文件夹，用不到了
+        # 删除旧文件夹，用不到了（多番号混放时只删属于当前视频的那些）
         if trailer_old_folder_path != trailer_new_folder_path and await aiofiles.os.path.exists(
             trailer_old_folder_path
         ):
-            await asyncio.to_thread(shutil.rmtree, trailer_old_folder_path, ignore_errors=True)
+            if filtering:
+                await delete_owned_tree(trailer_old_folder_path)
+            else:
+                await asyncio.to_thread(shutil.rmtree, trailer_old_folder_path, ignore_errors=True)
         # 删除带文件名文件，用不到了
-        if await aiofiles.os.path.exists(trailer_old_file_path_with_filename):
+        if await aiofiles.os.path.exists(trailer_old_file_path_with_filename) and owned(
+            trailer_old_file_path_with_filename
+        ):
             await delete_file_async(trailer_old_file_path_with_filename)
         if trailer_new_file_path_with_filename != trailer_old_file_path_with_filename and await aiofiles.os.path.exists(
             trailer_new_file_path_with_filename
@@ -1182,13 +1305,14 @@ async def deal_old_files(
                 await delete_file_async(trailer_old_file_path_with_filename)
         elif (
             trailer_old_file_path_with_filename != trailer_new_file_path_with_filename
+            and owned(trailer_old_file_path_with_filename)
             and await aiofiles.os.path.exists(trailer_old_file_path_with_filename)
         ):
-            await move_file_async(trailer_old_file_path_with_filename, trailer_new_file_path_with_filename)
-        elif await aiofiles.os.path.exists(trailer_old_file_path):
-            await move_file_async(trailer_old_file_path, trailer_new_file_path_with_filename)
+            ok = await move_file(trailer_old_file_path_with_filename, trailer_new_file_path_with_filename) and ok
+        elif owned(trailer_old_file_path) and await aiofiles.os.path.exists(trailer_old_file_path):
+            ok = await move_file(trailer_old_file_path, trailer_new_file_path_with_filename) and ok
         elif trailer_new_file_path != trailer_old_file_path and await aiofiles.os.path.exists(trailer_new_file_path):
-            await move_file_async(trailer_new_file_path, trailer_new_file_path_with_filename)
+            ok = await move_file(trailer_new_file_path, trailer_new_file_path_with_filename) and ok
         else:
             trailer_exists = False
 
@@ -1198,15 +1322,22 @@ async def deal_old_files(
             )
             # 删除旧、新文件夹，用不到了(分集使用local trailer复制即可)
             if await aiofiles.os.path.exists(trailer_old_folder_path):
-                await asyncio.to_thread(shutil.rmtree, trailer_old_folder_path, ignore_errors=True)
+                if filtering:
+                    await delete_owned_tree(trailer_old_folder_path)
+                else:
+                    await asyncio.to_thread(shutil.rmtree, trailer_old_folder_path, ignore_errors=True)
             if trailer_new_folder_path != trailer_old_folder_path and await aiofiles.os.path.exists(
                 trailer_new_folder_path
             ):
-                await asyncio.to_thread(shutil.rmtree, trailer_new_folder_path, ignore_errors=True)
+                if filtering:
+                    await delete_owned_tree(trailer_new_folder_path)
+                else:
+                    await asyncio.to_thread(shutil.rmtree, trailer_new_folder_path, ignore_errors=True)
             # 删除带文件名旧文件，用不到了
             if (
                 trailer_old_file_path_with_filename != trailer_new_file_path_with_filename
                 and await aiofiles.os.path.exists(trailer_old_file_path_with_filename)
+                and owned(trailer_old_file_path_with_filename)
             ):
                 await delete_file_async(trailer_old_file_path_with_filename)
         else:
@@ -1216,46 +1347,40 @@ async def deal_old_files(
 
     # 处理 extrafanart、extrafanart副本、主题视频、附加视频
     if single_folder_catched:
-        # 处理 extrafanart
-        try:
-            if await aiofiles.os.path.exists(extrafanart_new_path):
-                if str(extrafanart_old_path).lower() != str(
-                    extrafanart_new_path
-                ).lower() and await aiofiles.os.path.exists(extrafanart_old_path):
-                    await asyncio.to_thread(shutil.rmtree, extrafanart_old_path, ignore_errors=True)
-            elif await aiofiles.os.path.exists(extrafanart_old_path):
-                await move_file_async(extrafanart_old_path, extrafanart_new_path)
-        except Exception:
-            log_console.log_text(traceback.format_exc())
+        asset_folders = (
+            (extrafanart_old_path, extrafanart_new_path),
+            (extrafanart_copy_old_path, extrafanart_copy_new_path),
+            (theme_videos_old_path, theme_videos_new_path),
+            (extrafanart_extra_old_path, extrafanart_extra_new_path),
+        )
+        for old_dir, new_dir in asset_folders:
+            try:
+                if str(old_dir).lower() == str(new_dir).lower():
+                    continue
+                if not await aiofiles.os.path.exists(old_dir):
+                    continue
+                if await aiofiles.os.path.exists(new_dir):
+                    # 目标已有同名资源：删掉旧的这份
+                    if filtering:
+                        # 只删属于当前视频的文件，别人的剧照原地不动
+                        await delete_owned_tree(old_dir)
+                    else:
+                        await asyncio.to_thread(shutil.rmtree, old_dir, ignore_errors=True)
+                elif filtering:
+                    # 按归属逐个搬：保持相对结构，同目录其它番号的剧照不搬
+                    ok = await move_owned_tree(old_dir, new_dir) and ok
+                else:
+                    moved, _error = await move_file_async(old_dir, new_dir)
+                    ok = moved and ok
+            except Exception:
+                log_console.log_text(traceback.format_exc())
 
-        # extrafanart副本
-        try:
-            if await aiofiles.os.path.exists(extrafanart_copy_new_path):
-                if str(extrafanart_copy_old_path).lower() != str(
-                    extrafanart_copy_new_path
-                ).lower() and await aiofiles.os.path.exists(extrafanart_copy_old_path):
-                    await asyncio.to_thread(shutil.rmtree, extrafanart_copy_old_path, ignore_errors=True)
-            elif await aiofiles.os.path.exists(extrafanart_copy_old_path):
-                await move_file_async(extrafanart_copy_old_path, extrafanart_copy_new_path)
-        except Exception:
-            log_console.log_text(traceback.format_exc())
+    if not ok:
+        if transaction is not None:
+            await transaction.rollback()
+        LogBuffer.error().write(f"伴生文件搬移失败，已回滚到原目录：{folder_old_path}")
+        return False, False, False
+    if transaction is not None:
+        await transaction.commit()
 
-        # 主题视频
-        if await aiofiles.os.path.exists(theme_videos_new_path):
-            if str(theme_videos_old_path).lower() != str(
-                theme_videos_new_path
-            ).lower() and await aiofiles.os.path.exists(theme_videos_old_path):
-                await asyncio.to_thread(shutil.rmtree, theme_videos_old_path, ignore_errors=True)
-        elif await aiofiles.os.path.exists(theme_videos_old_path):
-            await move_file_async(theme_videos_old_path, theme_videos_new_path)
-
-        # 附加视频
-        if await aiofiles.os.path.exists(extrafanart_extra_new_path):
-            if str(extrafanart_extra_old_path).lower() != str(
-                extrafanart_extra_new_path
-            ).lower() and await aiofiles.os.path.exists(extrafanart_extra_old_path):
-                await asyncio.to_thread(shutil.rmtree, extrafanart_extra_old_path, ignore_errors=True)
-        elif await aiofiles.os.path.exists(extrafanart_extra_old_path):
-            await move_file_async(extrafanart_extra_old_path, extrafanart_extra_new_path)
-
-    return pic_final_catched, single_folder_catched
+    return True, pic_final_catched, single_folder_catched

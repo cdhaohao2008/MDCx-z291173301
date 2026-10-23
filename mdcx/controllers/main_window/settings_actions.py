@@ -173,17 +173,6 @@ class SettingsActionsMixin:
         elif not self.Ui.checkBox_task_store_local.isChecked():
             self.Ui.checkBox_task_store_netdisk.setChecked(True)
 
-    # 视频模式-删除/移动互斥：两枚复选框只能同时选中一个。
-    # 勾选其一自动去勾另一（toggled(False) 不动作，故无信号回环）；
-    # 两枚都不勾选是合法中间态：图片/nfo/字幕等伴生文件全部留在原目录。
-    def checkBox_sortmode_delpic_changed(self, checked):
-        if checked:
-            self.Ui.checkBox_sortmode_movefile.setChecked(False)
-
-    def checkBox_sortmode_movefile_changed(self, checked):
-        if checked:
-            self.Ui.checkBox_sortmode_delpic.setChecked(False)
-
     # 高级页-文件移动策略互斥：覆盖目标文件 / 保留目标文件必须勾选其中一个
     # （默认档＝「保留目标文件」）。勾选其一自动去勾另一；把唯一勾选的那枚取消时
     # 立即回落到默认档，保证界面上永远有且只有一枚被勾选（保存时还有配置层

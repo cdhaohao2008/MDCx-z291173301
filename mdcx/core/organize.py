@@ -16,7 +16,7 @@ import aiofiles.os
 from ..config.extend import FILE_MOVE_KEEP, FILE_MOVE_OVERWRITE, get_file_move_policy, is_in_success_folder
 from ..config.manager import manager
 from ..models.log_buffer import LogBuffer
-from ..utils.file import elevated_move_file, move_file_async
+from ..utils.file import delete_file_async, elevated_move_file, move_file_async
 from ..utils.picture import IMAGE_SUFFIXES, image_path_with_suffix
 from .file_association import (
     OrganizeIndex,
@@ -36,6 +36,7 @@ __all__ = [
     "OrganizePlanError",
     "OrganizeTransaction",
     "build_organize_index",
+    "delete_companion_files",
     "organize_companion_files",
     "organize_files",
 ]
@@ -222,11 +223,14 @@ async def _build_plan(
     fanart_final_path: Path,
     index: OrganizeIndex | None = None,
     include_media: bool = True,
+    asset_root: Path | None = None,
 ) -> list[tuple[Path, Path]]:
     """生成整理计划：只包含当前番号真实存在的关联文件。
 
     ``include_media=False`` 时不把视频/STRM 主体放进计划（视频模式自行搬运
-    视频本体，伴生文件先落位、主体后搬）。
+    视频本体，伴生文件先落位、主体后搬）。``asset_root`` 指定剧照/预告片等
+    伴生目录的落点，默认与 ``folder_new_path`` 相同；分离模式的元数据目录与
+    视频目录不同，需要单独指定。
     """
     plan: list[tuple[Path, Path]] = []
     seen_sources: set[Path] = set()
@@ -390,6 +394,7 @@ async def _build_plan(
     # 目录来源是索引动态识别出的「媒体目录下的伴生子目录」，因此像 extarfanart
     # 这类非标准写法的剧照目录同样会被整体搬走；目录名按标准名归一
     # （extarfanart → extrafanart），文件本身保持原文件名与相对层级。
+    asset_target_root = asset_root if asset_root is not None else folder_new_path
     for source_folder in index.asset_dirs_in(folder_old_path):
         target_name = _canonical_asset_folder_name(source_folder.name)
         for source in index.files_under(source_folder):
@@ -397,7 +402,7 @@ async def _build_plan(
             if _is_backup_name(source.name) or not belongs(source):
                 continue
             relative = source.relative_to(source_folder)
-            add_variant(source, folder_new_path / target_name / relative)
+            add_variant(source, asset_target_root / target_name / relative)
 
     # 其余与文件同名的伴生文件（不含媒体、nfo、json，它们已单独处理）。
     handled_suffixes = media_types | {".nfo", ".json"} | set(sub_types) | IMAGE_SUFFIXES
@@ -537,22 +542,23 @@ async def organize_companion_files(
     move_media: Callable[[], Awaitable[bool]],
     index: OrganizeIndex | None = None,
     elevated: bool = False,
+    asset_root: Path | None = None,
 ) -> tuple[bool, str]:
-    """视频模式「移动已下载图片和文件到新目录」：按番号关联事务式搬运伴生文件。
+    """按番号关联事务式搬运伴生文件（补全模式使用；整理模式共用同一套机制）。
 
     与整理模式共用同一套「计划 → 事务 → 校验 → 回滚」机制，只有两点不同：
 
     1. 伴生文件先落位、视频本体最后搬（``move_media`` 由调用方提供，保留
-       视频模式原有的软链接/硬链接语义）；
+       调用方原有的软链接/硬链接语义）；
     2. 视频本体搬运失败时，已经搬走的伴生文件一并回滚，保证「全有或全无」。
 
     搬运范围与整理模式一致：NFO、图片（poster/thumb/fanart 及同番号全部图片）、
     JSON（含 ``-mediainfo.json``，按新命名规则改名）、字幕、种子、bif、
     单文件预告片、剧照目录（保持相对结构）、其余同名前缀伴生文件。
 
-    与整理模式不同：这里**不套用「成功输出目录」过滤**——视频模式的目标目录
-    就在成功输出目录里，用户要的正是「伴生文件跟着视频一起搬」；若沿用整理
-    模式的「源文件在成功输出目录内就不动」，扫描成功输出目录时会一个都不搬。
+    与整理模式不同：这里**不套用「成功输出目录」过滤**——目标目录就在成功
+    输出目录里，用户要的正是「伴生文件跟着视频一起搬」；若沿用整理模式的
+    「源文件在成功输出目录内就不动」，扫描成功输出目录时会一个都不搬。
 
     返回 ``(成功, 错误信息)``。失败时伴生文件已回滚到原目录。
     """
@@ -571,6 +577,7 @@ async def organize_companion_files(
             fanart_final_path=fanart_final_path,
             index=index,
             include_media=False,
+            asset_root=asset_root,
         )
     except OrganizePlanError as e:
         LogBuffer.error().write(f"移动失败：{e}")
@@ -624,4 +631,89 @@ async def organize_companion_files(
 
     await transaction.commit()
     LogBuffer.log().write(f"\n 🍀 Companion files done: {folder_old_path} -> {folder_new_path}")
+    return True, ""
+
+
+def _prune_empty_tree(root: Path) -> None:
+    """自底向上删掉被清空的目录（含 root 本身，不碰父目录）。"""
+    for current, _dirs, _files in os.walk(root, topdown=False):
+        path = Path(current)
+        try:
+            if not any(path.iterdir()):
+                path.rmdir()
+        except OSError:
+            continue
+
+
+async def delete_companion_files(
+    *,
+    file_path: Path,
+    folder_old_path: Path,
+    folder_new_path: Path,
+    nfo_new_path: Path,
+    naming_rule: str,
+    number: str,
+    sub_list: list[str],
+    poster_final_path: Path,
+    thumb_final_path: Path,
+    fanart_final_path: Path,
+    index: OrganizeIndex | None = None,
+) -> tuple[bool, str]:
+    """视频模式：删除与当前视频 / STRM 关联的伴生文件。
+
+    视频模式只保留视频本体：视频搬走之后，原目录里的图片、剧照、预告片、nfo、
+    json、字幕、种子、bif 等「属于这个番号」的文件一并删除。
+
+    删除范围完全由关联索引（:mod:`mdcx.core.file_association`）决定——
+    只删归属当前媒体的文件，同目录里属于其它番号的、以及归属不明的共用文件
+    一律不动（与整理模式的搬运口径完全一致）。
+
+    返回 ``(是否全部删除, 错误信息)``；索引不可用时返回 ``(False, "no-index")``，
+    由调用方回退到按固定路径清理。
+    """
+    if index is None or index.entry(file_path) is None:
+        return False, "no-index"
+    try:
+        plan = await _build_plan(
+            file_path=file_path,
+            file_new_path=folder_new_path / file_path.name,
+            folder_old_path=folder_old_path,
+            folder_new_path=folder_new_path,
+            nfo_new_path=nfo_new_path,
+            naming_rule=naming_rule,
+            number=number,
+            sub_list=sub_list,
+            poster_final_path=poster_final_path,
+            thumb_final_path=thumb_final_path,
+            fanart_final_path=fanart_final_path,
+            index=index,
+            include_media=False,
+        )
+    except OrganizePlanError as e:
+        return False, str(e)
+    except Exception as e:
+        return False, f"生成清理计划时出错：{e}"
+
+    failed: list[str] = []
+    deleted = 0
+    for src, _dst in plan:
+        try:
+            if await aiofiles.os.path.exists(src):
+                await delete_file_async(src)
+                deleted += 1
+        except Exception as e:
+            failed.append(f"{src} ({e!s})")
+
+    if deleted:
+        LogBuffer.log().write(f"\n 🍀 视频模式已清理 {deleted} 个伴生文件: {folder_old_path}")
+    # 清空后的剧照/预告片目录一并收掉（只删空目录，非空的一律保留）
+    for asset_dir in index.asset_dirs_in(folder_old_path):
+        try:
+            await asyncio.to_thread(_prune_empty_tree, asset_dir)
+        except OSError:
+            continue
+    if failed:
+        message = "；".join(failed[:3])
+        LogBuffer.error().write(f"视频模式清理伴生文件失败：{message}")
+        return False, message
     return True, ""

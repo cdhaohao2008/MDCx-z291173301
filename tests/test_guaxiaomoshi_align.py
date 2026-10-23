@@ -25,15 +25,14 @@
      tooltip 非空。
   5. 窄↔宽两态 + 重复同步，6 个 label 与 label_26 的左缘逐像素不变
      （以后不允许再变动位置）。
-  6. 同列 4 个复选框（STRM 生成 / STRM 覆盖 / 元数据复用 / 视频模式删除）
-     左缘严格一致，窄↔宽往返不变。
+  6. 同列 3 个复选框（STRM 生成 / STRM 覆盖 / 元数据复用）左缘严格一致，
+     窄↔宽往返不变（视频模式「删除/移动」两枚复选框已随功能删除）。
   9. Javdb 提示上移一行（静态）：label_26 移出 gridLayout_15、独立为
      groupBox_53 子件，下方 7 组框与滚动内容同步上收（值见测试断言）。
   10. Javdb 提示上移一行（运行时）：0-2 行高一致且等距（未被搬动），提示 x 与
      分离描述文本精确相等，y 符合 row2底+spacing+share−h 公式，窄↔宽冻结。
-  11. 补全模式「重新下载封面图片等文件」左缘与视频模式「删除本地已下载的图片和
-     信息文件」严格上下对齐（锚点删除框不动），窄↔宽往返冻结；.ui 里不许再出现
-     那枚 10px 缩进空标签。
+  11. 补全模式「重新下载封面图片等文件」左缘贴齐 gridLayout_2 第 1 列左缘，
+     窄↔宽往返冻结；.ui 里不许再出现那枚 10px 缩进空标签。
 """
 
 import os
@@ -52,14 +51,14 @@ REPO = Path(__file__).resolve().parent.parent
 UI_PATH = REPO / "mdcx" / "views" / "MDCx.ui"
 PY_PATH = REPO / "mdcx" / "views" / "MDCx.py"
 
-# gridLayout_2 第 1 列同列复选框：STRM 生成 / STRM 覆盖 / 元数据复用 / 视频模式删除。
+# gridLayout_2 第 1 列同列复选框：STRM 生成 / STRM 覆盖 / 元数据复用。
 # 全部同处第 1 列，左缘必须严格一致。
-# （原「整理模式间隔行」的两枚复选框已随任务模式迁移到「设置-高级」，此处不再登记。）
+# （原「整理模式间隔行」的两枚复选框已随任务模式迁移到「设置-高级」；
+#  视频模式「删除/移动」两枚复选框已随功能删除，此处都不再登记。）
 _MODE_CHECKBOXES = (
     "checkBox_separate_generate_strm",
     "checkBox_separate_overwrite_strm",
     "checkBox_separate_reuse_meta",
-    "checkBox_sortmode_delpic",
 )
 
 # gridLayout_2 第 1 列 6 个描述 label：正常 / 整理 / 分离 / 视频 / 更新 / 读取。
@@ -249,7 +248,6 @@ def test_mode_checkboxes_left_aligned(win, app):
         for k in (
             "checkBox_separate_generate_strm",
             "checkBox_separate_reuse_meta",
-            "checkBox_sortmode_delpic",
         )
     }
     assert len(set(aligned.values())) == 1, f"同列复选框左缘不一致: {narrow}"
@@ -289,45 +287,13 @@ def test_overwrite_meta_aligns_under_overwrite_strm(win, app):
     assert pos("checkBox_separate_overwrite_meta") == narrow_meta, "窄→宽→窄往返未复原"
 
 
-def test_video_move_checkbox_aligns_with_overwrite_strm(win, app):
-    """视频模式「移动已下载图片和文件到新目录」与「覆盖本地已存在的STRM链接文本」严格上下对齐。
-
-    锚点框（覆盖 STRM）位置保持不变，只把新复选框右移到与它同 x；
-    该 x 与复用行的右侧框一致（同一列的右对齐基准）。
-    """
-    ui = win.Ui
-    win.show()
-    _goto_guaxiaomoshi(win, app)
-
-    def pos(name):
-        p = getattr(ui, name).mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0))
-        return (p.x(), p.y())
-
-    _resize(win, app, 1030, 753)
-    narrow_move = pos("checkBox_sortmode_movefile")
-    narrow_strm = pos("checkBox_separate_overwrite_strm")
-    narrow_meta = pos("checkBox_separate_overwrite_meta")
-    narrow_delete = pos("checkBox_sortmode_delpic")
-    assert narrow_move[0] == narrow_strm[0], f"移动框未与覆盖 STRM 框对齐: {narrow_move} vs {narrow_strm}"
-    assert narrow_move[0] == narrow_meta[0], f"移动框未与其它行右侧框对齐: {narrow_move} vs {narrow_meta}"
-    # 锚点框位置保持不变：仍与同列其它右侧框同 x
-    assert narrow_strm[0] == narrow_meta[0], f"覆盖 STRM 框位置被改动: {narrow_strm}"
-    # 移动框在「删除…」框右侧（同行的第二枚复选框）
-    assert narrow_move[0] > narrow_delete[0], f"移动框应在删除框右侧: {narrow_move} vs {narrow_delete}"
-    _resize(win, app, 1920, 1170)
-    assert pos("checkBox_sortmode_movefile") == narrow_move, f"宽态移动框位置变动: {narrow_move}"
-    assert pos("checkBox_separate_overwrite_strm") == narrow_strm, f"宽态覆盖 STRM 框位置变动: {narrow_strm}"
-    _resize(win, app, 1030, 753)
-    assert pos("checkBox_sortmode_movefile") == narrow_move, "窄→宽→窄往返未复原"
-    assert pos("checkBox_separate_overwrite_strm") == narrow_strm, "窄→宽→窄往返未复原"
-
-
-def test_again_download_checkbox_aligns_with_delpic(win, app):
-    """补全模式「重新下载封面图片等文件」与视频模式「删除…」左缘严格上下对齐。
+def test_again_download_checkbox_at_column_left(win, app):
+    """补全模式「重新下载封面图片等文件」左缘贴齐 gridLayout_2 第 1 列左缘。
 
     用户需求（2026-10-23，截图批注）：重新下载框原先被行首一枚 10px 空标签
-    （label_252）+ 行间距右推 16px，看起来像缩进在上一行之下；要求左移到与
-    「删除本地已下载的图片和信息文件」同一条竖线上，且删除框位置保持不变。
+    （label_252）+ 行间距右推 16px，看起来像缩进在上一行之下；要求左移到与该列
+    其它复选框同一条竖线上。视频模式「删除/移动」两枚复选框已随功能删除，
+    这里改用列左缘（cellRect(10, 1)）作为锚点。
     """
     ui = win.Ui
     win.show()
@@ -339,15 +305,12 @@ def test_again_download_checkbox_aligns_with_delpic(win, app):
 
     _resize(win, app, 1030, 753)
     again = pos("checkBox_read_download_file_again")
-    delete = pos("checkBox_sortmode_delpic")
-    assert again[0] == delete[0], f"重新下载框未与删除框对齐: {again} vs {delete}"
-    assert again[1] > delete[1], "重新下载框应在删除框下方（两行不同，只对齐左缘）"
 
-    # 锚点（删除框）位置保持不变：仍落在 gridLayout_2 第 1 列的左缘。
+    # 锚点：gridLayout_2 第 1 列的左缘（同列复选框都在这一条竖线上）。
     col_left = ui.gridLayoutWidget_2.mapTo(
         ui.scrollAreaWidgetContents_guaxiaomoshi, ui.gridLayout_2.cellRect(10, 1).topLeft()
     ).x()
-    assert delete[0] == col_left, f"删除框被挪离列左缘: {delete} 期望 x={col_left}"
+    assert again[0] == col_left, f"重新下载框被挪离列左缘: {again} 期望 x={col_left}"
 
     # 补全模式三行选项（重新整理分类 / 重新下载 / 合并策略）左缘一致。
     for name in ("checkBox_read_has_nfo_update", "checkBox_nfo_merge_strategy"):
@@ -356,10 +319,8 @@ def test_again_download_checkbox_aligns_with_delpic(win, app):
     # 窄↔宽往返冻结。
     _resize(win, app, 1920, 1170)
     assert pos("checkBox_read_download_file_again") == again, "宽态重新下载框位置变动"
-    assert pos("checkBox_sortmode_delpic") == delete, "宽态删除框位置变动"
     _resize(win, app, 1030, 753)
     assert pos("checkBox_read_download_file_again") == again, "窄→宽→窄往返未复原"
-    assert pos("checkBox_sortmode_delpic") == delete, "窄→宽→窄往返未复原"
 
 
 def test_no_indent_label_before_again_checkbox():

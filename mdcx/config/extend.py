@@ -42,6 +42,9 @@ def parse_media_paths(media_path: str | Path | None = None) -> list[Path]:
     return paths or [manager.data_folder]
 
 
+NORMAL_MAIN_MODE = 1
+"""正常模式的 main_mode 值：全量联网刮削，按「下载/保留」设置写图片与 nfo。"""
+
 SEPARATE_MAIN_MODE = 2
 """分离模式的 main_mode 值：视频与元数据分开存放，其余逻辑同正常模式。"""
 
@@ -197,15 +200,6 @@ def complete_merge_strategy() -> NfoMergeStrategy:
     if manager.config.nfo_merge_enabled:
         return manager.config.nfo_merge_strategy
     return NfoMergeStrategy.FILL_MISSING_ONLY
-
-
-def is_video_move_companions_enabled() -> bool:
-    """视频模式是否启用了「移动已下载图片和文件到新目录」。
-
-    该开关与「删除本地已下载的图片和信息文件」互斥（同一时刻只能选中一个），
-    配置层已归一：两个都勾上时保留原有的 sort_del、去掉 sort_move。
-    """
-    return get_runtime_main_mode() == VIDEO_MAIN_MODE and Switch.SORT_MOVE in manager.config.switch_on
 
 
 def get_file_move_policy() -> str:

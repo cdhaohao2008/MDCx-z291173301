@@ -5948,7 +5948,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                                   </sizepolicy>
                                                 </property>
                                                 <property name="text">
-                                                  <string>本地信息文件有链接，重新下载封面图与缩略图</string>
+                                                  <string>本地信息文件内有链接，重新下载封面图片</string>
                                                 </property>
                                               </widget>
                                             </item>
@@ -6158,7 +6158,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   <string notr="true">color: rgb(8, 128, 128);</string>
                                 </property>
                                 <property name="text">
-                                  <string>执行：刮削-&gt;重命名，仅整理本地视频，不下载图片，适合不要海报墙的情况</string>
+                                  <string>执行：刮削-&gt;重命名-&gt;删除伴生文件，只留视频本体，适合不要海报墙的情况</string>
                                 </property>
                                 <property name="wordWrap">
                                   <bool>false</bool>
@@ -6232,108 +6232,6 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                               </widget>
                             </item>
                           </layout>
-                        </item>
-                        <item row="6" column="1">
-                          <layout class="QHBoxLayout" name="horizontalLayout_125">
-                            <property name="spacing">
-                              <number>2</number>
-                            </property>
-                            <item>
-                              <widget class="QCheckBox" name="checkBox_sortmode_delpic">
-                                <property name="sizePolicy">
-                                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                                    <horstretch>0</horstretch>
-                                    <verstretch>0</verstretch>
-                                  </sizepolicy>
-                                </property>
-                                <property name="minimumSize">
-                                  <size>
-                                    <width>0</width>
-                                    <height>0</height>
-                                  </size>
-                                </property>
-                                <property name="text">
-                                  <string>删除本地已下载的图片和信息文件</string>
-                                </property>
-                              </widget>
-                            </item>
-                            <item>
-                              <spacer name="horizontalSpacer_sortmode_movefile_gap">
-                                <property name="orientation">
-                                  <enum>Qt::Orientation::Horizontal</enum>
-                                </property>
-                                <property name="sizeHint" stdset="0">
-                                  <size>
-                                    <width>20</width>
-                                    <height>20</height>
-                                  </size>
-                                </property>
-                              </spacer>
-                            </item>
-                            <item>
-                              <widget class="QCheckBox" name="checkBox_sortmode_movefile">
-                                <property name="sizePolicy">
-                                  <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                                    <horstretch>0</horstretch>
-                                    <verstretch>0</verstretch>
-                                  </sizepolicy>
-                                </property>
-                                <property name="minimumSize">
-                                  <size>
-                                    <width>0</width>
-                                    <height>0</height>
-                                  </size>
-                                </property>
-                                <property name="toolTip">
-                                  <string>把本地已下载的图片、信息文件、json、字幕等按番号关联移动到新目录（与「删除…」互斥）</string>
-                                </property>
-                                <property name="text">
-                                  <string>移动已下载图片和文件到新目录</string>
-                                </property>
-                              </widget>
-                            </item>
-                            <item>
-                              <spacer name="horizontalSpacer_sortmode_movefile">
-                                <property name="orientation">
-                                  <enum>Qt::Orientation::Horizontal</enum>
-                                </property>
-                                <property name="sizeHint" stdset="0">
-                                  <size>
-                                    <width>20</width>
-                                    <height>20</height>
-                                  </size>
-                                </property>
-                              </spacer>
-                            </item>
-                          </layout>
-                        </item>
-                        <item row="6" column="0">
-                          <widget class="QLabel" name="label_344">
-                            <property name="sizePolicy">
-                              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                                <horstretch>0</horstretch>
-                                <verstretch>0</verstretch>
-                              </sizepolicy>
-                            </property>
-                            <property name="minimumSize">
-                              <size>
-                                <width>80</width>
-                                <height>30</height>
-                              </size>
-                            </property>
-                            <property name="layoutDirection">
-                              <enum>Qt::RightToLeft</enum>
-                            </property>
-                            <property name="frameShape">
-                              <enum>QFrame::NoFrame</enum>
-                            </property>
-                            <property name="text">
-                              <string />
-                            </property>
-                            <property name="alignment">
-                              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                            </property>
-                          </widget>
                         </item>
                         <item row="0" column="1">
                           <layout class="QHBoxLayout" name="horizontalLayout_126">
@@ -7491,7 +7389,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                         <string notr="true">color: rgb(8, 128, 128);</string>
                       </property>
                       <property name="text">
-                        <string>&lt;p style='line-height:20px'&gt;⚠️ 保留文件：请到设置&gt;下载&gt;使用本地文件或下载，设置要保留或更新的文件内容&lt;br&gt;
+                        <string>&lt;p style='line-height:20px'&gt;⚠️ 保留文件：请到设置&gt;下载&gt;保留目标文件或下载，设置要保留或更新的文件内容&lt;br&gt;
                           ⚠️ 跳过文件：在视频目录新建一个名为skip的空文件，即可自动跳过该目录及子目录，所有模式均有效&lt;br&gt;
                           ⚠️ 移动文件：失败时不移动文件，文件刮削成功后按更新模式规则移动视频文件&lt;br&gt;
                           ⚠️ 重命名文件：在「成功后重命名文件」中设置是否重命名，命名规则同「命名」-「视频文件名」相同&lt;/p&gt;</string>
@@ -11538,7 +11436,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                       </size>
                     </property>
                     <property name="title">
-                      <string>使用本地文件</string>
+                      <string>保留目标文件</string>
                     </property>
                     <widget class="QWidget" name="horizontalLayoutWidget_18">
                       <property name="geometry">

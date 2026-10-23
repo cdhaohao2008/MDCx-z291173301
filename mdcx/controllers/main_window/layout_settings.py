@@ -320,10 +320,7 @@ class LayoutSettingsMixin:
             return
         # 待收敛的行：右侧复选框 + 行内用于调节间距的 gap spacer（第 1 项）
         rows: list[tuple[QWidget, QLayout, QSpacerItem]] = []
-        for box_name, row_name in (
-            ("checkBox_separate_overwrite_meta", "horizontalLayout_reuse_meta"),
-            ("checkBox_sortmode_movefile", "horizontalLayout_125"),
-        ):
+        for box_name, row_name in (("checkBox_separate_overwrite_meta", "horizontalLayout_reuse_meta"),):
             box = getattr(ui, box_name, None)
             row = getattr(ui, row_name, None)
             if box is None or row is None:
