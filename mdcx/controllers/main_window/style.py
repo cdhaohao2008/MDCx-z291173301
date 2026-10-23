@@ -412,6 +412,15 @@ def set_style(self: MyMAinWindow):
             padding: 3px 30px 3px 8px;
             selection-background-color: #4C6EFF;
         }}
+        /* 「分屏缩放」下拉框：外框宽度被「隐藏演员管理」的 sizeHint 钉死（真机 102px），
+           加宽这条路已被用户否掉，只能从控件内部腾地方。通用 QComboBox 的
+           `padding-right: 30px` 在 QSS 样式下与 26px 箭头**重复占位**（Qt 已从内容区
+           扣过箭头宽），102px 的框里文本区只剩 35px，而「跟随系统」要 52px，于是被
+           截成「跟随系」。把冗余右内边距清零后文本区 35→65px，外框宽度、箭头位置
+           都不动（见 tests/test_advanced_scale_combo_width.py）。 */
+        QComboBox#comboBox_ui_scale{{
+            padding: 3px 0px 3px 8px;
+        }}
         QComboBox::drop-down{{
             subcontrol-origin: padding;
             subcontrol-position: top right;
@@ -1077,6 +1086,10 @@ def set_dark_style(self: MyMAinWindow):
             border: 1px solid #2F3A46;
             border-radius: 8px;
             padding: 3px 30px 3px 8px;
+        }}
+        /* 暗色同理：右内边距与 26px 箭头重复占位，会让「跟随系统」被截字。 */
+        QComboBox#comboBox_ui_scale{{
+            padding: 3px 0px 3px 8px;
         }}
         QComboBox::drop-down {{
             subcontrol-origin: padding;

@@ -21,6 +21,14 @@
     `width()`，否则上一遍留下的约束会让「已对齐」的判定永远成立（假绿）。
   - 它同时是分屏缩放行提示词的前导控件，宽度一变，那条提示词的间隔就要重算
     （见 tests/test_advanced_page_hint_align.py）；故本方法必须排在提示词对齐之前。
+
+第四批（2026-10-23）追加需求：「在不改变下拉框宽度的情况下让『跟随系统』四个字
+完全显示」。宽度既然不许动，能动的只有控件内部的空间分配 —— 通用 QSS 里
+`QComboBox{padding: 3px 30px 3px 8px}` 的 30px 右内边距在 QSS 样式下与 26px 箭头
+**重复占位**（Qt 已经从内容区扣过箭头宽），102px 的框里文本区只剩 35px，而
+「跟随系统」要 52px，于是被截成「跟随系」。修法是给这一枚下拉框加限定 objectName
+的 QSS，把右内边距清零（见 mdcx/controllers/main_window/style.py 亮/暗两处）。
+本文件末尾的 `test_combo_text_area_reaches_arrow` 锁住这条结构判据。
 """
 
 import os
@@ -31,7 +39,9 @@ import sys
 
 import pytest
 from PyQt6.QtCore import QPoint
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QStyle, QStyleOptionComboBox
+
+from mdcx.controllers.main_window import style as style_mod
 
 _app: QApplication | None = None
 
@@ -235,4 +245,48 @@ def test_round_trip_keeps_combo_width(win, app, width, height):
 
     assert (combo.width(), combo.minimumWidth(), combo.maximumWidth()) == first, (
         f"往返后下拉框宽度漂移: {first} -> {(combo.width(), combo.minimumWidth(), combo.maximumWidth())}"
+    )
+
+
+def _combo_text_area(combo) -> tuple[int, int]:
+    """返回（文本区宽, 文本区右缘到箭头左缘的间隙）。
+
+    间隙是**结构量**：QSS 样式下 `padding-right` 会和 `::drop-down` 的宽度重复占位，
+    间隙就等于那截被白扔的右内边距。判据不看字形宽（离屏平台的中文字形是退化
+    度量，4 个汉字只报 28px，真机 Microsoft YaHei UI 13px 报 52px），只看这截留白。
+    """
+    opt = QStyleOptionComboBox()
+    combo.initStyleOption(opt)
+    style = combo.style()
+    field = style.subControlRect(QStyle.ComplexControl.CC_ComboBox, opt, QStyle.SubControl.SC_ComboBoxEditField, combo)
+    arrow = style.subControlRect(QStyle.ComplexControl.CC_ComboBox, opt, QStyle.SubControl.SC_ComboBoxArrow, combo)
+    return field.width(), arrow.left() - (field.left() + field.width())
+
+
+@pytest.mark.parametrize("width,height", _WIDE_SIZES + _NARROW_SIZES)
+def test_combo_text_area_reaches_arrow(win, app, width, height):
+    """宽度不许动的前提下，「跟随系统」要完整显示 —— 文本区必须一直用到箭头左缘。
+
+    fixture 把 `set_style` 打了桩（测试要跑得快、且不依赖 QSS），但本需求的红线恰恰
+    在 QSS 里，故这里显式装一次真样式；不装的话原生样式本来就没有右内边距，
+    判据会恒真（假绿）。
+    """
+    ui = win.Ui
+    win.show()
+    _goto_advanced(win, app)
+    style_mod.set_style(win)
+    app.processEvents()
+    _resize(win, app, width, height)
+
+    combo = ui.comboBox_ui_scale
+    field_w, gap = _combo_text_area(combo)
+
+    # ① 外框宽度仍然是锚点宽（第四批明确「不改变下拉框宽度」）
+    want = ui.checkBox_hide_actor_nav.sizeHint().width()
+    assert combo.width() == want, f"{width} 宽下下拉框被改宽了: {combo.width()} != 锚点宽 {want}"
+
+    # ② 文本区贴到箭头左缘：通用 QSS 的 30px 冗余右内边距必须为这一枚下拉框清零
+    assert gap <= 2, (
+        f"{width} 宽下文本区右缘离箭头还有 {gap}px 留白（文本区仅 {field_w}px），"
+        "「跟随系统」会被截成「跟随系」：检查 QComboBox#comboBox_ui_scale 的 padding-right"
     )
