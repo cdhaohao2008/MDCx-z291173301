@@ -1094,8 +1094,8 @@ def test_separate_mode_radios_red_holder_absolutely_positioned_and_grid_not_over
 
 # ---------- STRM 行位置锁定：主复选框与删除行严格上下对齐，禁止后移 ----------
 
-_STRM_MAIN_TEXT = "生成STRM链接"
-_STRM_OVERWRITE_TEXT = "覆盖STRM链接"
+_STRM_MAIN_TEXT = "生成链接文本"
+_STRM_OVERWRITE_TEXT = "替换链接文本"
 
 
 def _find_layout_by_name(root, name):
@@ -1118,9 +1118,9 @@ def _grid_item_pos(grid, child_name):
 def test_strm_checkboxes_text_order_and_alignment_locked():
     """STRM 行锁定：四枚复选框同排、顺序固定、间距项位置固定，挪动即失败。
 
-    2026-10-23 用户截图批注：复用元数据 / 覆盖元数据两枚复选框从独立一行上移进
-    STRM 行，行内顺序 = 生成STRM链接 / 覆盖STRM链接 / 复用元数据 / 覆盖元数据，
-    「覆盖STRM链接」与「复用元数据」之间夹一枚 Fixed 的 gap spacer（行内间距由
+    2026-10-23 用户截图批注：复用本地数据 / 覆盖本地数据两枚复选框从独立一行上移进
+    STRM 行，行内顺序 = 生成链接文本 / 替换链接文本 / 复用本地数据 / 覆盖本地数据，
+    「替换链接文本」与「复用本地数据」之间夹一枚 Fixed 的 gap spacer（行内间距由
     主窗口 _sync_strm_row_meta_align 按实测差值调宽，使复用框右缘对齐上一行描述
     文字右缘）。原 horizontalLayout_reuse_meta 已整行删除，不得复活。
     """
@@ -1163,8 +1163,8 @@ def test_strm_checkboxes_text_order_and_alignment_locked():
     overwrite_meta = _find_widget_by_name(root, "checkBox_separate_overwrite_meta")
     if overwrite_meta is None:
         problems.append("checkBox_separate_overwrite_meta 不存在")
-    elif _widget_string_prop(overwrite_meta, "text") != "覆盖元数据":
-        problems.append(f"覆盖元数据复选框文案被改: {_widget_string_prop(overwrite_meta, 'text')!r}")
+    elif _widget_string_prop(overwrite_meta, "text") != "覆盖本地数据":
+        problems.append(f"覆盖本地数据复选框文案被改: {_widget_string_prop(overwrite_meta, 'text')!r}")
 
     # 新任务模式行（高级页 → 高级功能）：本地 / 网盘互斥复选框
     task_hbox = _find_layout_by_name(root, "horizontalLayout_task_mode")

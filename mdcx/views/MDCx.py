@@ -13409,16 +13409,16 @@ class Ui_MDCx(object):
         self.label_separate_mode.setText(
             _translate("MDCx", "执行：刮削->下载封面->重命名->打水印等全部操作，视频与元数据分开存放")
         )
-        self.checkBox_separate_generate_strm.setText(_translate("MDCx", "生成STRM链接"))
-        self.checkBox_separate_overwrite_strm.setText(_translate("MDCx", "覆盖STRM链接"))
+        self.checkBox_separate_generate_strm.setText(_translate("MDCx", "生成链接文本"))
+        self.checkBox_separate_overwrite_strm.setText(_translate("MDCx", "替换链接文本"))
         self.checkBox_separate_overwrite_strm.setToolTip(
             _translate(
                 "MDCx",
-                "勾选本项会自动勾选「生成STRM链接」（没有生成就没有可覆盖的）；已存在的STRM链接文本将被覆盖，不勾选则跳过已存在项",
+                "勾选本项会自动勾选「生成链接文本」（没有生成就没有可覆盖的）；已存在的STRM链接文本将被覆盖，不勾选则跳过已存在项",
             )
         )
-        self.checkBox_separate_reuse_meta.setText(_translate("MDCx", "复用元数据"))
-        self.checkBox_separate_overwrite_meta.setText(_translate("MDCx", "覆盖元数据"))
+        self.checkBox_separate_reuse_meta.setText(_translate("MDCx", "复用本地数据"))
+        self.checkBox_separate_overwrite_meta.setText(_translate("MDCx", "覆盖本地数据"))
         self.radioButton_mode_sort.setText(_translate("MDCx", "视频模式"))
         self.radioButton_mode_complete.setText(_translate("MDCx", "补全模式"))
         self.label_complete_mode.setText(

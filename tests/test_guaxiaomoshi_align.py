@@ -25,7 +25,7 @@
      tooltip 非空。
   5. 窄↔宽两态 + 重复同步，6 个 label 与 label_26 的左缘逐像素不变
      （以后不允许再变动位置）。
-  6. STRM 行四枚复选框（生成 / 覆盖STRM / 复用 / 覆盖元数据）同排、顺序固定、
+  6. STRM 行四枚复选框（生成 / 覆盖STRM / 复用 / 覆盖本地数据）同排、顺序固定、
      首枚贴齐列左缘，且复用行删除后不留空行（行距与其它行一致）。
   7. 复用框右缘与分离模式描述**文字**右缘严格上下对齐（宽态精确相等；窄态夹到
      可用余量上限，但不许挤扁/裁字、不许撑破行），窄↔宽往返冻结。
@@ -54,7 +54,7 @@ UI_PATH = REPO / "mdcx" / "views" / "MDCx.ui"
 PY_PATH = REPO / "mdcx" / "views" / "MDCx.py"
 
 # gridLayout_2 第 1 列同排的四枚复选框（2026-10-23 起同处 STRM 行）：
-# 生成STRM链接 / 覆盖STRM链接 / 复用元数据 / 覆盖元数据，左缘必须严格一致。
+# 生成链接文本 / 替换链接文本 / 复用本地数据 / 覆盖本地数据，左缘必须严格一致。
 # （原「整理模式间隔行」的两枚复选框已随任务模式迁移到「设置-高级」；
 #  视频模式「删除/移动」两枚复选框已随功能删除，此处都不再登记。）
 _MODE_CHECKBOXES = (
@@ -236,10 +236,10 @@ def test_desc_column_never_moves_again(win, app):
 
 
 def test_strm_row_holds_four_checkboxes(win, app):
-    """STRM 行四枚复选框同排：生成 / 覆盖STRM / 复用 / 覆盖元数据，顺序与行内位置固定。
+    """STRM 行四枚复选框同排：生成 / 覆盖STRM / 复用 / 覆盖本地数据，顺序与行内位置固定。
 
-    用户需求（2026-10-23，截图批注）：复用元数据 / 覆盖元数据两枚复选框从独立的一行
-    上移进 STRM 行、紧跟覆盖STRM链接之后；原复用行整行删除（下方各行上移一行，行距不变）。
+    用户需求（2026-10-23，截图批注）：复用本地数据 / 覆盖本地数据两枚复选框从独立的一行
+    上移进 STRM 行、紧跟替换链接文本之后；原复用行整行删除（下方各行上移一行，行距不变）。
     """
     ui = win.Ui
     win.show()
@@ -288,10 +288,10 @@ def test_strm_row_holds_four_checkboxes(win, app):
 
 
 def test_overwrite_meta_right_edge_aligns_with_separate_desc(win, app):
-    """覆盖元数据右缘与分离模式描述文字右缘严格上下对齐，复用元数据紧随其左。
+    """覆盖本地数据右缘与分离模式描述文字右缘严格上下对齐，复用本地数据紧随其左。
 
     用户需求（2026-10-23 第二轮截图批注）：四枚复选框整体左移，改成让**最后一枚
-    「覆盖元数据」**的文字右缘落在上一行描述文字「…视频与元数据分开存放」右缘那条
+    「覆盖本地数据」**的文字右缘落在上一行描述文字「…视频与元数据分开存放」右缘那条
     竖线上；描述行本身一个像素都不动。
 
     锚点是描述 label 的**文字**右缘（label 被拉宽到整格，width() 比文字宽出几十像素，
@@ -337,10 +337,10 @@ def test_overwrite_meta_right_edge_aligns_with_separate_desc(win, app):
         _resize(win, app, width, height)
         snap = snapshot()
         assert snap["over_text_right"] == snap["text_right"], (
-            f"{width} 宽下覆盖元数据文字右缘未与描述文字右缘对齐: {snap['over_text_right']} vs {snap['text_right']}"
+            f"{width} 宽下覆盖本地数据文字右缘未与描述文字右缘对齐: {snap['over_text_right']} vs {snap['text_right']}"
         )
-        assert snap["over_left"] > snap["reuse_right"], f"{width} 宽下复用框未排在覆盖元数据左侧: {snap}"
-        assert snap["over_right"] <= snap["row_right"], f"{width} 宽下覆盖元数据超出 STRM 行: {snap}"
+        assert snap["over_left"] > snap["reuse_right"], f"{width} 宽下复用框未排在覆盖本地数据左侧: {snap}"
+        assert snap["over_right"] <= snap["row_right"], f"{width} 宽下覆盖本地数据超出 STRM 行: {snap}"
         assert snap["widths"] == snap["size_hints"], f"{width} 宽下复选框被挤扁: {snap}"
         assert snap["gap"] >= 0 and snap["spacing"] >= 0, f"{width} 宽下出现负间距: {snap}"
 
@@ -439,7 +439,7 @@ def test_read_mode_options_not_squeezed(win, app):
 
 
 def test_reuse_overwrite_meta_mutually_exclusive(win, app):
-    """复用/覆盖元数据互斥：勾选其一自动去勾另一，去勾不动作。"""
+    """复用/覆盖本地数据互斥：勾选其一自动去勾另一，去勾不动作。"""
     ui = win.Ui
     win.show()
     _goto_guaxiaomoshi(win, app)
@@ -530,7 +530,7 @@ def test_javdb_tip_moved_up_one_line_static():
     assert _ui_geometry("gridLayoutWidget_15")[3] == 129, "grid 容器高不是 129"
     # 刮削模式组与其后各组：读取模式区被裁切修复后整体下移 41px（详见 test_read_mode_options_not_squeezed）；
     # 补全模式新增一行（2026-10-23）后再整体下移 37px；同日删掉两项后组框高 569 → 523，
-    # 其下各组与滚动内容同步上收 46px。同日「复用元数据 / 覆盖元数据」并入 STRM 行、
+    # 其下各组与滚动内容同步上收 46px。同日「复用本地数据 / 覆盖本地数据」并入 STRM 行、
     # 原复用行删除：模式组再上收 52px（gridLayoutWidget_2 479 → 427，行距保持 43）。
     for name, y in (
         ("groupBox", 218),

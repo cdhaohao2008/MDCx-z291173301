@@ -1,7 +1,7 @@
 """分离模式 STRM「生成 / 覆盖」联动回归测试。
 
-用户诉求：勾选「覆盖STRM链接」时同步勾选
-「生成STRM链接」——没有生成 STRM 文件就无从覆盖。
+用户诉求：勾选「替换链接文本」时同步勾选
+「生成链接文本」——没有生成 STRM 文件就无从覆盖。
 
 覆盖三层：
 
@@ -84,7 +84,7 @@ def test_ui_handlers_link_overwrite_and_generate():
     generate = host.Ui.checkBox_separate_generate_strm
     overwrite = host.Ui.checkBox_separate_overwrite_strm
 
-    # 勾「覆盖STRM链接」→ 同步勾「生成STRM链接」
+    # 勾「替换链接文本」→ 同步勾「生成链接文本」
     overwrite.checked = True
     SettingsActionsMixin.checkBox_separate_overwrite_strm_changed(host, True)
     assert overwrite.checked is True
@@ -169,7 +169,7 @@ def test_ui_tooltip_explains_overwrite_auto_links_generate():
     assert overwrite is not None, "缺少 checkBox_separate_overwrite_strm"
     tip = _string_prop(overwrite, "toolTip")
     assert "自动勾选" in tip, f"提示词未说明自动勾选生成：{tip}"
-    assert "生成STRM链接" in tip, f"提示词未点明联动项：{tip}"
+    assert "生成链接文本" in tip, f"提示词未点明联动项：{tip}"
 
 
 def test_ui_strm_checkbox_texts_unchanged():
@@ -178,5 +178,5 @@ def test_ui_strm_checkbox_texts_unchanged():
     generate = _widget(root, "checkBox_separate_generate_strm")
     overwrite = _widget(root, "checkBox_separate_overwrite_strm")
     assert generate is not None and overwrite is not None
-    assert _string_prop(generate, "text") == "生成STRM链接"
-    assert _string_prop(overwrite, "text") == "覆盖STRM链接"
+    assert _string_prop(generate, "text") == "生成链接文本"
+    assert _string_prop(overwrite, "text") == "替换链接文本"

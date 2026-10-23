@@ -5456,7 +5456,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>生成STRM链接</string>
+                                  <string>生成链接文本</string>
                                 </property>
                               </widget>
                             </item>
@@ -5475,10 +5475,10 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>覆盖STRM链接</string>
+                                  <string>替换链接文本</string>
                                 </property>
                                 <property name="toolTip">
-                                  <string>勾选本项会自动勾选「生成STRM链接」（没有生成就没有可覆盖的）；已存在的STRM链接文本将被覆盖，不勾选则跳过已存在项</string>
+                                  <string>勾选本项会自动勾选「生成链接文本」（没有生成就没有可覆盖的）；已存在的STRM链接文本将被覆盖，不勾选则跳过已存在项</string>
                                 </property>
                               </widget>
                             </item>
@@ -5513,7 +5513,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>复用元数据</string>
+                                  <string>复用本地数据</string>
                                 </property>
                               </widget>
                             </item>
@@ -5532,7 +5532,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   </size>
                                 </property>
                                 <property name="text">
-                                  <string>覆盖元数据</string>
+                                  <string>覆盖本地数据</string>
                                 </property>
                               </widget>
                             </item>
