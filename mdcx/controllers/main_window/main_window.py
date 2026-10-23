@@ -295,6 +295,9 @@ class MyMAinWindow(
         self._nfo_colon_cal: tuple | None = None  # NFO冒号对齐：(字体样式key, 组标题冒号x, 行标签右pad)，像素标定缓存
         self._adv_dock_spacer = None  # 高级页隐藏图标行插在「隐藏Dock图标」与「隐藏菜单栏图标」之间的固定间隔
         self._adv_dock_gap = -1  # 该间隔当前生效的宽度（-1 = 从未设置）
+        # 高级页四条 teal 提示词行：插在末位提示词之前的固定间隔（键 = dock / dialog / scale / nav）
+        self._adv_hint_spacers: dict[str, object] = {}
+        self._adv_hint_gaps: dict[str, int] = {}
 
         self.window_radius = 0  # 窗口四角弧度，为0时表示显示窗口标题栏
         self.window_border = 0  # 窗口描边，为0时表示显示窗口标题栏

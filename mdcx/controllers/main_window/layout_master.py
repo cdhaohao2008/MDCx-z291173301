@@ -463,6 +463,16 @@ class LayoutMasterMixin:
         # 与「移动文件」行同款手法，必须排在上面几个方法之后：它同样要量锚点行
         # 两枚复选框的终态宽度。
         self._sync_advanced_page_task_mode_align()
+        # 高级页：「分屏缩放」行下拉框右缘缩到「隐藏边框样式」右缘（本批需求②）。
+        # 必须排在 _sync_advanced_page_hint_align 之前：那一条提示词的前导控件正是
+        # 这个下拉框，它的宽度一变，间隔就要按新宽度重算。
+        self._sync_advanced_page_scale_combo_align()
+        # 高级页：改对话框行与分屏缩放行的两条 teal 提示词（「目录中的文件较多时…」
+        # 「保存后重启生效，可能会有点模糊」）右移到「显示字段来源信息」那条竖线
+        # （两枚锚点一个像素都不动）。隐藏图标行 / 隐藏入口行那两枚提示词已按本批
+        # 需求删除，不在此列。
+        # 必须排在这里：两行的前导控件/锚点坐标是上面几个方法才落定的终态值。
+        self._sync_advanced_page_hint_align()
 
         # ============ page_setting / 演员页: 两行控件对齐到各自基准线 ============
         # 同样排在通用拉伸之后：本方法先落设计几何再按最大化分支覆盖。
@@ -605,9 +615,9 @@ class LayoutMasterMixin:
         令 pin = anchor - row_x - spacing，钉死该行前导控件为 pin 宽后剩余空间
         全部归末位项，目标项的绝对 x 恒等于 anchor：
           弹窗确认行  钉「当退出软件时」            -> 「当停止刮削时」        落 anchor
-          隐藏图标行  在 label_42 之后插固定间隔  -> 「隐藏菜单图标」落 anchor，
-                      前两项保持贴 col1 左缘（改用整行左 margin 会把「隐藏Dock图标
-                      （Mac）」「保存后重启生效」一起推走，破坏本页左缘节奏）
+          隐藏图标行  在「隐藏Dock图标」之后插固定间隔 -> 「隐藏菜单图标」落 anchor，
+                      前一项保持贴 col1 左缘（改用整行左 margin 会把「隐藏Dock图标」
+                      一起推走，破坏本页左缘节奏）
           界面外观行  把 layoutWidget5 加宽到 2*(anchor-row_x)-spacing（两项均分）
                       -> 「使用暗黑模式」落 anchor；该容器是 frame 的普通子 QWidget
                       （frame 无 layout），故用 setGeometry 而非 layout 属性
@@ -627,12 +637,10 @@ class LayoutMasterMixin:
         与同列标签共用网格列右缘，不需运行时介入。休眠页跳过。
 
         v2.7.6 又加三条需求（只动窄态，宽态逐位不变）：
-        ① 「保存后重启生效」挪到「隐藏菜单图标」**右侧**：MDCx.ui 里
-          horizontalLayout_dock 的项序改成「隐藏Dock图标 | 隐藏菜单栏图标 |
-          保存后重启生效」，同时把「隐藏菜单图标」的 sizePolicy 由
-          Minimum 改成 Fixed——Minimum 会独吞整行余量，提示词会被顶到行末，
-          改 Fixed 后它才紧贴在复选框文字右侧；提示词自己改成 Minimum 顶住余量，
-          该行才仍是「可拉伸项」，否则 QGridLayout 的 col1 不再伸展、整页列宽错乱。
+        ① 「保存后重启生效」挪到「隐藏菜单图标」**右侧**（**该提示词已于
+          2026-10-23 第二批需求删除**，行内现在只剩「隐藏Dock图标 | 间隔 |
+          隐藏菜单图标」；「隐藏菜单图标」的 sizePolicy 仍是 Fixed，故它不会被
+          余量推走，行内余量留在右端空着）。
         ② 窄态「隐藏菜单图标」与「使用暗黑模式」严格上下对齐，且「使用暗黑模式」
           位置保持不变：隐藏图标行的目标竖线在窄态改取「使用暗黑模式」的**实测终态
           x**（不是共用 anchor——窄态 anchor 是「显示字段内容信息」那条线，真机上
@@ -651,6 +659,8 @@ class LayoutMasterMixin:
           「当停止刮削时」，页面布局、控件、组件、提示词全部保持不变。
           （v3.0 起目标由「显示字段内容信息」改成「显示字段来源信息」——用户要
           的是**向左**移到「显示字段来源信息」那条竖线上，不是向右。）
+        ⑤ 分屏缩放行的下拉框右缘缩到「隐藏边框样式」右缘（2026-10-23 第二批
+          需求②）由 `_sync_advanced_page_scale_combo_align` 单独处理，不在本方法内。
         """
         ui = self.Ui
         host = ui.gridLayoutWidget_20
@@ -792,10 +802,10 @@ class LayoutMasterMixin:
             changed = True
 
         # ---- 隐藏图标行：插固定间隔把「隐藏菜单图标」单独推到目标竖线 ----
-        # v2.7.6 行内顺序改为：隐藏Dock图标| 间隔 | 隐藏菜单图标|
-        # 保存后重启生效 —— 需求①要那条 teal 提示词挪到「隐藏菜单图标」
-        # 复选框的右侧（贴着它的文字），不再挤在「隐藏Dock图标」后面。间隔因此插在
-        # 第 1、2 项之间（index 1），末项是提示词标签。
+        # 行内顺序：隐藏Dock图标 | 间隔 | 隐藏菜单图标。间隔插在第 1、2 项之间
+        # （index 1）。本行原先末位还挂着一枚 teal 提示词「保存后重启生效」，
+        # 用户已明确要求删除（2026-10-23 第二批需求），故行内不再有可拉伸项：
+        # 余量留在行右端空着，不影响 col1 伸展（第 12/13 行的提示词仍是 Minimum）。
         # 目标竖线分两态：
         #   最大化：仍是 anchor（「显示字段来源信息」那条线），最大化结果与本批
         #     需求之前逐位不变；
@@ -807,18 +817,17 @@ class LayoutMasterMixin:
         # lw 的宽度也是刚 setGeometry 出来的，故窄态先 invalidate+activate 一次
         # lay_c（不 activate gridLayout_20，避免中间态把网格最小宽顶大）。
         dock_icon = ui.checkBox_hide_dock_icon
-        label_42 = ui.label_42
         menu_icon = ui.checkBox_hide_menu_icon
         if not wide:
             lay_c.invalidate()
             lay_c.activate()
         target_b = anchor if wide else col_x(dark_c)
-        # 行内顺序 [隐藏Dock图标 | 间隔 | 隐藏菜单栏图标 | 保存后重启生效]：
-        # 前缀只到「隐藏菜单栏图标」，末尾还要给提示词标签留出它自己的宽度
-        # （它是 Minimum 策略，sizeHint 即不裁字的下界）。
+        # 行内顺序 [隐藏Dock图标 | 间隔 | 隐藏菜单栏图标 | 末尾 Expanding 间隔]：
+        # 前缀只到「隐藏菜单栏图标」，末尾是它自己的 sizeHint（Fixed 策略，不裁字
+        # 的下界）；末尾那枚 0 宽的伸展间隔仍会占一个 spacing，故 avail 要扣掉它。
         prefix = dock_icon.sizeHint().width() + lay_b.spacing()
-        tail_b = menu_icon.sizeHint().width() + lay_b.spacing() + label_42.sizeHint().width()
-        avail_b = col_w - prefix - tail_b
+        tail_b = menu_icon.sizeHint().width()
+        avail_b = col_w - prefix - tail_b - lay_b.spacing()
         gap_b = target_b - row_x - prefix
         # 间隔项是 Fixed 策略的 QSpacerItem，它的 sizeHint 会算进行内最小宽度，
         # 故间隔一旦超过 avail_b，整行的最小宽度就会撑破网格列宽——那会把整页
@@ -848,13 +857,14 @@ class LayoutMasterMixin:
 
         # ---- 隐藏入口行：钉「隐藏 Emby 演员管理」，「隐藏NFO库管理」落锚点 ----
         # 钉住后还须把 nfo 本身也钉回 sizeHint 宽：QCheckBox 默认 sizePolicy 可拉伸，
-        # 最大化时它会独吞余量把说明标签顶到 1323（实测），而复选框是左对齐绘制、
-        # 文字只占 152，于是文字与说明标签之间出现 394px 空洞（用户截图红框）。
-        # 钉死后余量全归末位的说明标签，它紧贴 nfo 文字右侧 6px。
+        # 最大化时它会独吞余量、把文字与右邻之间撑出几百像素的空洞（用户截图红框）。
+        # 本行原先末位还挂着一枚 teal 提示词「仅隐藏入口，保存后立即生效」，
+        # 用户已明确要求删除（2026-10-23 第二批需求），故现在只有两枚复选框：
+        # 余量留在行右端空着，`room` 只需放得下 nfo 自己。
         # 锚点统一取「显示字段来源信息」col_x(src_from)，**两态相同**：
         #   最大化：阶段一已把「刮削结束后自动退出软件」钉到 src_from 那条竖线，故
         #     anchor 恒等于 col_x(src_from)（真机实测 1200/1366/1536 三档 anchor 与
-        #     nav_x 逐位相等 289/344/401），pin_d/room/need_d/ok_d 一个字节都没变，
+        #     nav_x 逐位相等 289/344/401），pin_d/room/ok_d 一个字节都没变，
         #     最大化结果与本批改动前逐位相同。
         #   最小化：需求是「隐藏NFO库管理向左移动到与它上下严格对齐，且它位置保持
         #     不变」，故该动的是 nfo 而不是 from（与本批撤销的
@@ -864,19 +874,18 @@ class LayoutMasterMixin:
         # 还原态窗口 1085×793 的 _scroll_stretch_extra 已经是 **+33 > 0**，程序
         # 把它判成「最大化」，最小化那段代码根本不会执行（用户截图：三个目标纹丝
         # 不动）。该尺寸下阶段一的门也会卡掉（anchor 停在自然位 401 ≠ 311），
-        # 于是宽态那一支算出 pin_d=298、room=291 < need_d=371（= nfo 111 + 说明
-        # 标签 260）而整行放弃。改用 col_x(src_from) 后 pin_d=148、room=441 ≥ 371
-        # 恰好放得下，而真最大化三档因 anchor≡nav_x 而逐位不变。
-        # 放不下时整行放弃（解除钉宽、保持自然位）。下限只卡 nfo 的 sizeHint：说明
-        # 标签「仅隐藏入口…」在窄态本就压得动（实测已被压到 240/211/151），拿它
-        # 一起卡门会让窄态这一段永远放不下（实测 col_w=557 时 room 只剩 332 < 360）。
+        # 于是宽态那一支算出 pin_d=298、room 不够而整行放弃。改用 col_x(src_from)
+        # 后 pin_d=148、room 恰好放得下，而真最大化三档因 anchor≡nav_x 而逐位不变。
+        # 放不下时整行放弃（解除钉宽、保持自然位）。下限只卡 nfo 的 sizeHint
+        # （提示词删掉后这一行没有别的下限了）。
         actor = ui.checkBox_hide_actor_nav
         nfo = ui.checkBox_hide_nfo_nav
-        hint = ui.label_nav_hide_hint
         nav_x = col_x(src_from)
         pin_d = nav_x - row_x - lay_d.spacing()
+        # 行内顺序 [隐藏Emby演员管理 | 隐藏NFO库管理 | 末尾 Expanding 间隔]：
+        # 末尾那枚 0 宽的伸展间隔仍占一个 spacing，故 room 要扣两个 spacing。
         room = col_w - pin_d - 2 * lay_d.spacing()
-        need_d = nfo.sizeHint().width() + (hint.sizeHint().width() if wide else 0)
+        need_d = nfo.sizeHint().width()
         ok_d = pin_d >= actor.sizeHint().width() and room >= need_d
         changed |= self._pin_row_lead_width(actor, pin_d if ok_d else None)
         changed |= self._pin_row_lead_width(nfo, nfo.sizeHint().width() if ok_d else None)
@@ -1323,6 +1332,161 @@ class LayoutMasterMixin:
         for lay in lays:
             lay.invalidate()
             lay.activate()
+
+    def _sync_advanced_page_scale_combo_align(self) -> None:
+        """「分屏缩放」下拉框右缘缩到「隐藏边框样式」右缘（后者位置保持不变）。
+
+        需求原话：「分屏缩放下拉框右侧边界缩进到与隐藏边框样式右侧边界严格对齐的
+        位置，隐藏边框样式位置保持不变」。
+
+        基准取哪一条边界：用户红线画在「隐藏边框样式」**文字末尾**（截图实测 462，
+        而该行容器 layoutWidget5 的右缘在 537）——宽态下容器被加宽、两枚复选框均分，
+        控件宽远大于文字宽，右侧那截留白不是用户眼中的「边界」。故基准取复选框的
+        `sizeHint().width()`（= 方框 + 文字，只随字体变、与窗口宽无关）。
+
+        两行同处 gridLayout_20 的 col1、左缘天然相等，故「右缘对齐」等价于把下拉框
+        钉成与基准相同的宽度。下拉框是 Fixed 策略，setFixedWidth 直接生效。
+        下限取它自己的 `minimumSizeHint()`：基准比它还窄时（字体极端或语言切换）
+        放弃对齐、退回最小可用宽，绝不让「跟随系统 / 300%」被裁掉——宁可差几像素，
+        也不做出一个显示不全的下拉框。
+
+        幂等：只在 min/max 与目标不符时动手；`changed` 由调用点忽略，
+        故本方法自己把所在行 invalidate+activate 一次，否则末位提示词要等下一拍
+        才跟着挪，中间那一帧会被绘制出来。
+        """
+        ui = self.Ui
+        combo = ui.comboBox_ui_scale
+        base_box = ui.checkBox_hide_window_title
+        if not (combo.isVisibleTo(self) and base_box.isVisibleTo(self)):
+            return
+        want_w = max(base_box.sizeHint().width(), combo.minimumSizeHint().width())
+        if (combo.minimumWidth(), combo.maximumWidth()) == (want_w, want_w):
+            return
+        combo.setFixedWidth(want_w)
+        lay = ui.horizontalLayout_dock_2
+        lay.invalidate()
+        lay.activate()
+
+    def _sync_advanced_page_hint_align(self) -> None:
+        """高级页两条 teal 提示词右移到锚点竖线（两枚锚点自身一个像素都不动）。
+
+        当前只剩两行（2026-10-23 第二批需求删掉了隐藏图标行与隐藏入口行的提示词，
+        那两枚标签已从 MDCx.ui 里删除，`ui.label_42` / `ui.label_nav_hide_hint`
+        不再存在——别再照着旧注释去找它们）：
+          改对话框行的「目录中的文件较多时，可以勾选此项提高文件打开速度」与
+          分屏缩放行的「保存后重启生效，可能会有点模糊」→「显示字段来源信息」
+          （两行相邻、左缘又都贴在各自前导控件右侧，用户当成一块描述，
+          实为两个独立标签，各自对到同一条竖线）。
+
+        根因：这两条提示词都是所在 QHBoxLayout 的**末位项**、horizontal
+        sizePolicy 为 Minimum —— 末位项吃掉行内全部余量，左缘于是恒等于
+        「前导控件右缘 + spacing」。行左缘一律贴 col1，前导控件宽度只取决于自己
+        的字形，于是提示词全挤在最左侧，与半页之外（groupBox_3 调试模式）
+        的锚点之间没有任何联动。
+
+        做法：在末位提示词**之前插一个 Fixed 间隔**，
+        宽度 = 锚点 x - 前导控件右缘 - spacing，末位项左缘即精确落锚点。
+        为什么不用 `_pin_row_lead_width` 把前导控件钉宽：
+          - 分屏缩放行的前导控件是 QComboBox，钉宽会把下拉框本身撑成几百像素；
+          - 改对话框行钉宽只是把复选框的可点击区撑大（视觉无害，但用户点空白处
+            就会误触开关），间隔项没有这个副作用。
+        间隔项是 Fixed 策略的 QSpacerItem，它的 sizeHint 会算进行内最小宽度，
+        故必须夹到 [0, 列宽 - 行内最小宽]：超了会把 gridLayout_20 的列撑宽，
+        整页（连同不许动的锚点）一起被推走 —— 与隐藏图标行 gap_b 同一个坑。
+        夹到 0 即拆除间隔、保持自然位。
+
+        本方法只处理这两行 —— 间隔都插在**前导控件之后**，前导控件的坐标不受
+        间隔影响，故 gap 用实测值算即自洽（往返幂等）。隐藏图标行那枚提示词已删除，
+        它原有的「第一段间隔推菜单图标」仍留在 `_sync_advanced_page_align` 里。
+
+        锚点只读不写：两枚锚点（`checkBox_show_from_log` / `checkBox_show_data_log`）
+        全程只被 mapTo 量坐标，不设任何约束 —— 「位置保持不变」由此保证。
+
+        实测（离屏 1920×1170 / 1030×753，列宽 1496 / 606）：
+          1920  from=590；label_421 180→590、label_427 197→590；
+          1030  from=294；label_421 180→294、label_427 197→294。
+        幂等：生效宽度记在 `_adv_hint_gaps`，只有变化才 invalidate+activate。
+        """
+        ui = self.Ui
+        host = ui.gridLayoutWidget_20
+        content = ui.scrollAreaWidgetContents_gaoji
+        src_from = ui.checkBox_show_from_log
+        src_data = ui.checkBox_show_data_log
+        lead = ui.checkBox_show_dialog_exit
+        if not (host.isVisibleTo(self) and content.isVisibleTo(self)):
+            return
+        if not (src_from.isVisibleTo(self) and src_data.isVisibleTo(self) and lead.isVisibleTo(self)):
+            return
+
+        host_x = host.mapTo(content, QPoint(0, 0)).x()
+
+        def col_x(widget) -> int:
+            """控件左缘换算到 gridLayoutWidget_20 的局部坐标（跨分支经 content 中转）。"""
+            return widget.mapTo(content, QPoint(0, 0)).x() - host_x
+
+        row_x = col_x(lead)
+        col_w = host.width() - row_x
+        if col_w <= 0:
+            return
+
+        # (键, 行内布局, 提示词前导控件, 提示词标签, 目标竖线)
+        # 隐藏图标行与隐藏入口行的提示词已按 2026-10-23 第二批需求从 .ui 删除，
+        # 不在此列（`ui.label_42` / `ui.label_nav_hide_hint` 已不存在）。
+        rows = (
+            ("dialog", ui.horizontalLayout_149, ui.checkBox_dialog_qt, ui.label_421, col_x(src_from)),
+            ("scale", ui.horizontalLayout_dock_2, ui.comboBox_ui_scale, ui.label_427, col_x(src_from)),
+        )
+        changed: list = []
+        for key, lay, lead_w, hint, target in rows:
+            if not (lead_w.isVisibleTo(self) and hint.isVisibleTo(self)):
+                continue
+            sp = lay.spacing()
+            # 前导控件右缘（相对行左缘）+ 提示词自身不裁字的下界 = 行内最小宽
+            prefix = col_x(lead_w) - row_x + lead_w.width()
+            gap = target - row_x - prefix - sp
+            slack = col_w - (prefix + 2 * sp + hint.sizeHint().width())
+            if self._set_adv_hint_gap(lay, key, max(0, min(gap, slack))):
+                changed.append(lay)
+
+        if not changed:
+            return
+        # 同 _sync_advanced_page_tail_align：改约束不重排，必须当场 activate，
+        # 否则要等下一拍，中间那一帧会被绘制出来。
+        for lay in changed:
+            lay.invalidate()
+            lay.activate()
+
+    def _set_adv_hint_gap(self, lay, key: str, gap: int) -> bool:
+        """在末位提示词之前插/改/拆一个 Fixed 间隔，返回是否改动了几何约束。
+
+        gap <= 0 表示拆除（放不下时回到自然位）。间隔项只由本方法插入、.ui 里没有，
+        故拆卸时直接从布局里摘掉，不留 0 宽的僵尸项（它的 sizeHint 仍会算进
+        行内最小宽，等于白占位）。末位项此刻的下标就是插入位置，插完它整体右移一位。
+        """
+        spacer = self._adv_hint_spacers.get(key)
+        if spacer is not None and lay.indexOf(spacer) < 0:
+            # 布局被重建过（.ui 重新 apply 或行内项序变动），缓存里的对象已失效
+            spacer = None
+            self._adv_hint_spacers.pop(key, None)
+        if gap <= 0:
+            if spacer is None:
+                self._adv_hint_gaps.pop(key, None)
+                return False
+            lay.removeItem(spacer)
+            self._adv_hint_spacers.pop(key, None)
+            self._adv_hint_gaps.pop(key, None)
+            return True
+        if spacer is None:
+            last = lay.count() - 1
+            lay.insertSpacing(last, gap)
+            self._adv_hint_spacers[key] = lay.itemAt(last)
+            self._adv_hint_gaps[key] = gap
+            return True
+        if self._adv_hint_gaps.get(key) != gap:
+            spacer.changeSize(gap, 0, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+            self._adv_hint_gaps[key] = gap
+            return True
+        return False
 
     @staticmethod
     def _pin_row_lead_width(box, width) -> bool:

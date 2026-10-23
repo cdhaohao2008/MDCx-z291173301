@@ -146,7 +146,7 @@ def test_hide_window_rows_do_not_overlap(win, app, width, height):
     _resize(win, app, width, height)
 
     radios = (ui.radioButton_hide_close, ui.radioButton_hide_mini, ui.radioButton_hide_none)
-    boxes = (ui.checkBox_hide_dock_icon, ui.checkBox_hide_menu_icon, ui.label_42)
+    boxes = (ui.checkBox_hide_dock_icon, ui.checkBox_hide_menu_icon)
 
     radio_bottom = max(_pos(ui, w)[1] + w.height() for w in radios)
     box_top = min(_pos(ui, w)[1] for w in boxes)
@@ -161,7 +161,7 @@ def test_hide_window_rows_do_not_overlap(win, app, width, height):
     # 「隐藏图标：」与「隐藏Dock图标」那一行同行居中
     label_314 = ui.label_314
     label_314_center = _pos(ui, label_314)[1] + label_314.height() / 2
-    for w in (ui.checkBox_hide_dock_icon, ui.checkBox_hide_menu_icon, ui.label_42):
+    for w in (ui.checkBox_hide_dock_icon, ui.checkBox_hide_menu_icon):
         center = _pos(ui, w)[1] + w.height() / 2
         assert abs(center - label_314_center) <= 1, f"{w.objectName()} 未与「隐藏图标：」垂直居中"
     # 「界面外观：」与「隐藏边框样式」「使用暗黑模式」同行居中

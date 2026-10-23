@@ -11677,21 +11677,10 @@ class Ui_MDCx(object):
         self.checkBox_hide_menu_icon.setMinimumSize(QtCore.QSize(0, 30))
         self.checkBox_hide_menu_icon.setObjectName("checkBox_hide_menu_icon")
         self.horizontalLayout_dock.addWidget(self.checkBox_hide_menu_icon)
-        self.label_42 = QtWidgets.QLabel(parent=self.gridLayoutWidget_20)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.label_42.sizePolicy().hasHeightForWidth())
-        self.label_42.setSizePolicy(sizePolicy)
-        self.label_42.setMinimumSize(QtCore.QSize(0, 30))
-        self.label_42.setStyleSheet("color: rgb(8, 128, 128);")
-        self.label_42.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignLeading
-            | QtCore.Qt.AlignmentFlag.AlignLeft
-            | QtCore.Qt.AlignmentFlag.AlignVCenter
+        spacerItem17 = QtWidgets.QSpacerItem(
+            0, 0, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
         )
-        self.label_42.setObjectName("label_42")
-        self.horizontalLayout_dock.addWidget(self.label_42)
+        self.horizontalLayout_dock.addItem(spacerItem17)
         self.gridLayout_20.addLayout(self.horizontalLayout_dock, 10, 1, 1, 1)
         self.label_321 = QtWidgets.QLabel(parent=self.gridLayoutWidget_20)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
@@ -12250,21 +12239,10 @@ class Ui_MDCx(object):
         self.checkBox_hide_nfo_nav.setMinimumSize(QtCore.QSize(0, 30))
         self.checkBox_hide_nfo_nav.setObjectName("checkBox_hide_nfo_nav")
         self.horizontalLayout_nav_hide.addWidget(self.checkBox_hide_nfo_nav)
-        self.label_nav_hide_hint = QtWidgets.QLabel(parent=self.gridLayoutWidget_20)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.label_nav_hide_hint.sizePolicy().hasHeightForWidth())
-        self.label_nav_hide_hint.setSizePolicy(sizePolicy)
-        self.label_nav_hide_hint.setMinimumSize(QtCore.QSize(0, 30))
-        self.label_nav_hide_hint.setStyleSheet("color: rgb(8, 128, 128);")
-        self.label_nav_hide_hint.setAlignment(
-            QtCore.Qt.AlignmentFlag.AlignLeading
-            | QtCore.Qt.AlignmentFlag.AlignLeft
-            | QtCore.Qt.AlignmentFlag.AlignVCenter
+        spacerItem18 = QtWidgets.QSpacerItem(
+            0, 0, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum
         )
-        self.label_nav_hide_hint.setObjectName("label_nav_hide_hint")
-        self.horizontalLayout_nav_hide.addWidget(self.label_nav_hide_hint)
+        self.horizontalLayout_nav_hide.addItem(spacerItem18)
         self.gridLayout_20.addLayout(self.horizontalLayout_nav_hide, 14, 1, 1, 1)
         self.scrollArea_5.setWidget(self.scrollAreaWidgetContents_gaoji)
         self.tabWidget.addTab(self.tab5, "")
@@ -12762,10 +12740,10 @@ class Ui_MDCx(object):
         self.pushButton_about.setMaximumSize(QtCore.QSize(16777215, 40))
         self.pushButton_about.setObjectName("pushButton_about")
         self.verticalLayout.addWidget(self.pushButton_about)
-        spacerItem17 = QtWidgets.QSpacerItem(
+        spacerItem19 = QtWidgets.QSpacerItem(
             20, 0, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding
         )
-        self.verticalLayout.addItem(spacerItem17)
+        self.verticalLayout.addItem(spacerItem19)
         self.left_backgroud_widget = QtWidgets.QWidget(parent=self.widget_setting)
         self.left_backgroud_widget.setGeometry(QtCore.QRect(0, 0, 210, 720))
         self.left_backgroud_widget.setObjectName("left_backgroud_widget")
@@ -14662,7 +14640,6 @@ class Ui_MDCx(object):
         self.checkBox_dark_mode.setText(_translate("MDCx", "使用暗黑模式"))
         self.checkBox_hide_dock_icon.setText(_translate("MDCx", "隐藏Dock图标"))
         self.checkBox_hide_menu_icon.setText(_translate("MDCx", "隐藏菜单图标"))
-        self.label_42.setText(_translate("MDCx", "保存后重启生效 "))
         self.label_321.setText(_translate("MDCx", "间歇刮削："))
         self.checkBox_auto_start.setText(_translate("MDCx", "启动软件后自动开始刮削"))
         self.checkBox_auto_exit.setText(_translate("MDCx", "刮削结束后自动退出软件"))
@@ -14729,7 +14706,6 @@ class Ui_MDCx(object):
         self.checkBox_hide_actor_nav.setText(_translate("MDCx", "隐藏Emby演员管理"))
         self.checkBox_hide_nfo_nav.setToolTip(_translate("MDCx", "隐藏左侧导航的「信息管理」入口，可随时在此重新开启"))
         self.checkBox_hide_nfo_nav.setText(_translate("MDCx", "隐藏NFO库管理"))
-        self.label_nav_hide_hint.setText(_translate("MDCx", "仅隐藏入口，功能本身保留，保存后立即生效"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab5), _translate("MDCx", " 高级 "))
         self.pushButton_init_config.setText(_translate("MDCx", "恢复默认"))
         self.pushButton_save_config.setText(_translate("MDCx", "保存"))

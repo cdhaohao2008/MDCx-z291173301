@@ -143,6 +143,12 @@
 - **PyQt6 测试纪律**：每个含 Qt 的测试文件顶部（PyQt6 导入前）自持 `os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")`；fixture 构造后立即停全部 QTimer；qFatal abort（栈无 Python 行号）查 QTimer 槽与 dummy 桩缺方法；Qt 同名 API 重载签名不同，改前确认目标类签名；测试桩显式枚举属性方法；隔离配置目录用 `monkeypatch.chdir(tmp_path)`，勿把 dummy 的 Path 属性改成 str。
 - **主窗最小尺寸是动态的**（`init.py::Init_Ui` 按 primaryScreen 可用区算 `_adaptive_window_sizes`，offscreen 虚拟屏 800x800 → min 480x600、启动 720x680）。写矮窗口几何回归测试前必须 `win.setMinimumSize(0, 0)` 解耦；断言 label 裁切用 `win.height()` 而非目标 resize 值。
 - 主窗口全局绝对定位：长文本 QLabel 用 wordWrap 查 sizeHint；新增顶层控件要纳入 resizeEvent 手动几何同步；QComboBox 装饰后缀用 `addItem(icon, 文本, UserRole 纯值)`，消费点统一 `currentData()`，信号 handler 收文本须剥后缀。
+- **把行内末位项（teal 提示词/说明标签）右移到某条竖线的通用手法**：在末位项之前插一个 `Fixed` 的 `QSpacerItem`（`insertSpacing` + `changeSize`），宽度 = 锚点 x − 前导项右缘 − spacing，并按「列宽 − 行内最小宽」夹到 `[0, slack]`（超了会撑破网格列宽、把不许动的锚点一起推走；夹到 0 即拆除间隔、保持自然位）。不要改用 `_pin_row_lead_width` 钉前导控件：QComboBox 会被撑成几百像素，复选框则把可点击区吞掉本该留白的区域（用户点空白处误触开关）。
+- **间隔插在「前导控件之前」时，禁止用实测坐标反推同一行后续间隔**：宽→窄过渡那一拍行里还挂着上一遍的宽间隔，QHBoxLayout 会把 Fixed 间隔与前缀一起压扁（实测菜单图标 417→304），据此算出的间隔会一路自我强化，并把同一方法后面「拿该坐标当基准」的钉宽一起带歪（表现为窄→宽→窄往返后 `checkBox_auto_start` 宽度漂移 9px）。必须用**本遍刚算出的 gap** 反推意图落点；这类「自己的产物又被自己下一段当基准」的段，写进产生 gap 的那个方法内部，别拆到独立方法里。
+- 造「本需求之前」的基线：把该需求的**唯一落点写入口**桩成 no-op（如 `_set_adv_hint_gap`）比另起窗口逐个摘方法更省；但入口被多处共用时，桩掉等于整体关掉功能，测试里要同时断言「目标确实被搬走了」，否则删掉整段实现也能通过。
+- 极窄窗宽下的对齐需求，判据写「不劣于关掉本功能的基线」，不要写绝对的 `width >= sizeHint`——有些行在 820 宽本来就装不下（`label_421` sizeHint 288 / 实测 257），那是既有挤压，与本需求无关，写绝对判据会得到一条永远红的假用例。
+- **删掉某行唯一的可拉伸项（末位提示词/说明标签）前，必须先确认那行还剩伸展能力**：QGridLayout 的列上限取「该列各行最大宽的最小值」，一行全 Fixed 就会把整列上限压到 sizeHint，超出的空间改为把整列居中 —— 表现为整页右移（实测 col1 左缘 101 → 805，`cellRect` 从 0 变成 352）。治法 = 该行末尾补一枚 `QSizePolicy::Expanding`、`sizeHint` 写 `0×0` 的间隔（与「BoxLayout 缺末尾 Expanding spacer」同源），补完列上限恢复成无界、间隔自己吃掉余量，视觉零变化。
+- **删 `.ui` 控件 = 删代码里的 `ui.<name>`**：动手前 grep 全仓（控制器、`_snapshot`/`_STATICS` 名单、`sizeHint` 参与的行内最小宽算式），删完必须重跑 pyuic 并跑 `test_ui_structure`。参与「行内最小宽」的项（如 `tail_b` / `need_d` / `room`）要同步去掉它的 sizeHint，否则会按一个不存在的宽度卡门、整段对齐永远放弃。
 
 ## 并发与网络库
 

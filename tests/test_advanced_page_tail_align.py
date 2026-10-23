@@ -16,6 +16,18 @@
     且「显示字段来源信息」**位置保持不变**（它重新变成窄态的锚点）。
     上一批（第四组需求①）曾把它窄态右移到 nfo 那一列，本批与那一批方向相反，
     故 `_sync_advanced_page_debug_row` 连同调用一并删除——该行两项回到自然位。
+  第八组（提示词右移）：「保存后重启生效」→「显示字段内容信息」、
+    「目录中的文件较多时…」与「保存后重启生效，可能会有点模糊」→「显示字段来源信息」、
+    「仅隐藏入口，保存后立即生效」→「显示字段内容信息」。这四条提示词原本是各自行
+    的末位从动项，右移后不再紧贴前导控件，落点由 `_set_adv_hint_gap` 插的 Fixed
+    间隔决定；本文件只保留「右缘不动、不许压到裁字」这两条，落点断言全部搬到
+    `tests/test_advanced_page_hint_align.py`。
+  第九组（删除提示词，2026-10-23 第二批）：隐藏图标行的「保存后重启生效」与
+    隐藏入口行的「仅隐藏入口，保存后立即生效」已从 MDCx.ui 删除，`ui.label_42` /
+    `ui.label_nav_hide_hint` 不再存在。故本文件不再有 `_FOLLOWERS`：隐藏入口行只剩
+    两枚复选框（`room` 只需放得下 nfo），隐藏图标行的「末尾宽度」只剩菜单图标自己。
+    改这里任何一处，`test_menu_icon_row_aligns_or_defers` 与
+    `test_narrow_never_moves_anchors` 都会跟着红。
 
 根因防线（任一回归都会让本文件失败）：
   - 三处手法不同，勿互相套用。①所在行容器是顶层组框的**直接子项**、被通用
@@ -55,8 +67,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import sys
 
 import pytest
-from PyQt6.QtCore import QPoint
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtWidgets import QApplication, QLabel
 
 _app: QApplication | None = None
 
@@ -280,13 +292,9 @@ _REFS_X_ONLY = (
     # 它必须逐位不动（_dock_row / test_narrow_auto_exit_lands_on_menu_icon 会比对它）
     "checkBox_hide_dock_icon",
 )
-# v2.7.6 需求①把「保存后重启生效」挪到「隐藏菜单图标」右侧，故 label_42
-# 的左缘**按设计**要变（原贴在 Dock 图标后面，现改为贴在菜单栏图标后面），
-# 不能留在 _REFS_X_ONLY 里当「左缘不许动」的参照件——它的相对关系由
-# test_menu_icon_row_aligns_or_defers 单独断言（在菜单栏图标右侧）。
-
-# 必然随需求一起动的从动项（末位吸收余量/紧贴右邻），只作窄态与往返比对。
-_FOLLOWERS = ("label_nav_hide_hint",)
+# 第九组把「保存后重启生效」「仅隐藏入口…」两枚提示词从 .ui 删除，
+# 故这里不再有「必然随需求一起动的从动项」（原 `_FOLLOWERS` 只有那两枚）。
+_FOLLOWERS: tuple[str, ...] = ()
 
 # 全部落在宽态（_scroll_stretch_extra() > 0）；1100 特意保留——它是最贴近
 # 刚过宽态线的那一档，正是 want_w < 551 曾被误判为「放不下」的那一档。
@@ -398,11 +406,10 @@ def test_left_targets_land_on_from_log_in_wide(win, app, width, height):
 def _dock_row(ui, anchor_name):
     """隐藏图标行（horizontalLayout_dock）的实测可行性。
 
-    与 _sync_advanced_page_align 里那一段同式。v2.7.6 需求①把「保存后重启生效」
-    挪到了「隐藏菜单图标」**右侧**，行内顺序变成
-    「隐藏Dock图标 | 间隔 | 隐藏菜单栏图标 | 保存后重启生效」，故前缀只含
-    「隐藏Dock图标」+ 一个间隔，末尾还要给提示词标签留出它自己的 sizeHint
-    （不裁字下限）。能插入的间隔 gap = 目标竖线 - 行左缘 - 前缀；放得下的条件是
+    与 _sync_advanced_page_align 里那一段同式。第九组删掉「保存后重启生效」后，
+    行内顺序是「隐藏Dock图标 | 间隔 | 隐藏菜单栏图标」，故前缀只含
+    「隐藏Dock图标」+ 一个间隔，末尾只剩菜单图标自己的 sizeHint。
+    能插入的间隔 gap = 目标竖线 - 行左缘 - 前缀；放得下的条件是
     0 <= gap <= 列宽 - 前缀 - 末尾（间隔项是 Fixed 策略的 QSpacerItem，它的
     sizeHint 会算进行内最小宽度，间隔过大会把整页网格列宽撑开、把不许动的
     「使用暗黑模式」一起推走，故实现里把它夹取到这个区间内）。
@@ -416,7 +423,7 @@ def _dock_row(ui, anchor_name):
     col_w = host.width() - row_x
     anchor = _abs(ui, getattr(ui, anchor_name)) - host_x
     prefix = ui.checkBox_hide_dock_icon.sizeHint().width() + lay.spacing()
-    tail = ui.checkBox_hide_menu_icon.sizeHint().width() + lay.spacing() + ui.label_42.sizeHint().width()
+    tail = ui.checkBox_hide_menu_icon.sizeHint().width()
     avail = col_w - prefix - tail
     gap = anchor - row_x - prefix
     return {
@@ -433,7 +440,8 @@ def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
     """「隐藏菜单图标」：放得下就必须精确对齐，放不下就夹到可行区间内。
 
     v2.7.6 三处变化：
-      ① 「保存后重启生效」挪到它**右侧**（行内顺序变了，前缀/末尾宽度随之重算）；
+      ① 「保存后重启生效」挪到它**右侧**（**第九组已删除该提示词**，行内末尾
+         只剩菜单图标自己，前缀/末尾宽度随之重算）；
       ② 窄态的目标竖线从「显示字段内容信息」换成「使用暗黑模式」——且「使用暗黑模式」
          自己不许动，故窄态那条竖线取「使用暗黑模式」的实测终态 x；
       ③ 放弃态不再「整行放弃、间隔归 0」，而是把间隔**夹取**到
@@ -453,7 +461,6 @@ def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
     row = _dock_row(ui, anchor_name)
     menu = ui.checkBox_hide_menu_icon
     dock = ui.checkBox_hide_dock_icon
-    label = ui.label_42
     anchor_x = _abs(ui, getattr(ui, anchor_name))
     menu_x = _abs(ui, menu)
     dock_before = _abs(ui, dock)
@@ -468,12 +475,6 @@ def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
             f"{width} 宽下前缀放不下（gap={row['gap']} avail={row['avail']}）本应夹取到 x={want_x}，实际={menu_x}"
         )
 
-    # 需求①：「保存后重启生效」必须在「隐藏菜单图标」右侧
-    assert _abs(ui, label) >= menu_x + menu.width(), (
-        f"{width} 宽下「保存后重启生效」不在「隐藏菜单栏图标」右侧:"
-        f" label_x={_abs(ui, label)} 菜单栏图标右缘={menu_x + menu.width()}"
-    )
-
     # 两种情形下 Fixed 前缀「隐藏Dock图标」都不许动、末项都不许被压到裁字
     win._sync_page_layouts()
     app.processEvents()
@@ -483,6 +484,19 @@ def test_menu_icon_row_aligns_or_defers(win, app, monkeypatch, width, height):
     assert menu.width() >= menu.sizeHint().width(), (
         f"{width} 宽下「隐藏菜单栏图标」被压到 {menu.width()}px（sizeHint {menu.sizeHint().width()}），会裁字"
     )
+    # 第九组：该行只剩「Dock图标 + 间隔 + 菜单图标 + 末尾 Expanding 间隔」，
+    # 不得再残留任何 QLabel。末尾那枚 Expanding 间隔是**必需的**：整行全 Fixed 时
+    # QGridLayout 用「各行最大宽的最小值」当列上限，col1 会被压回 sizeHint 并居中，
+    # 整页右移（离屏实测 101 → 805）。
+    lay = ui.horizontalLayout_dock
+    assert lay.count() == 4, f"{width} 宽下隐藏图标行项数={lay.count()}，应为「图标 + 间隔 + 菜单图标 + 末尾间隔」4 项"
+    assert lay.itemAt(3).widget() is None, f"{width} 宽下隐藏图标行末位不是间隔项"
+    assert lay.itemAt(3).expandingDirections() & Qt.Orientation.Horizontal, (
+        f"{width} 宽下隐藏图标行末尾间隔不是 Expanding，col1 会失去伸展能力"
+    )
+    for i in range(lay.count()):
+        wdg = lay.itemAt(i).widget()
+        assert not isinstance(wdg, QLabel), f"{width} 宽下隐藏图标行仍残留标签「{wdg.objectName()}」"
 
 
 @pytest.mark.parametrize("width,height", _NARROW_SIZES)
@@ -941,22 +955,12 @@ def test_narrow_never_moves_anchors(win, app, monkeypatch, width, height):
         assert _snapshot(ui)[name] == base[name], (
             f"窄态 {width} 宽下参照件「{name}」被带偏: 基线={base[name]} 实际={_snapshot(ui)[name]}"
         )
-    # 「仅隐藏入口…」是隐藏入口行的末位从动项，不是固定参照件：nfo 被钉回
-    # sizeHint 后，它必须左移并吸收释放出来的宽度。这里断言真正跨环境成立的性质——
-    # 右缘仍贴住行右缘、宽度不被压到 sizeHint 以下、左缘紧贴 nfo 右缘。
-    hint_name = _FOLLOWERS[0]
-    hint_x, hint_w = _snapshot(ui)[hint_name]
-    base_x, base_w = base[hint_name]
-    assert hint_x + hint_w == base_x + base_w, (
-        f"窄态 {width} 宽下从动项「{hint_name}」右缘被带偏: 基线右缘={base_x + base_w} 实际右缘={hint_x + hint_w}"
+    # 第九组把隐藏入口行的提示词删了：该行现在只剩两枚复选框，nfo 仍须钉回
+    # sizeHint 宽（不钉会被余量撑开、点空白处误触），故直接钉住它自己的宽度。
+    nfo = ui.checkBox_hide_nfo_nav
+    assert nfo.width() == nfo.sizeHint().width(), (
+        f"窄态 {width} 宽下「隐藏NFO库管理」没被钉回 sizeHint: {nfo.width()} vs {nfo.sizeHint().width()}"
     )
-    assert hint_w >= max(base_w, ui.label_nav_hide_hint.sizeHint().width()), (
-        f"窄态 {width} 宽下从动项「{hint_name}」宽度={hint_w}，"
-        f"基线={base_w} sizeHint={ui.label_nav_hide_hint.sizeHint().width()}"
-    )
-    assert hint_x == (
-        _abs(ui, ui.checkBox_hide_nfo_nav) + ui.checkBox_hide_nfo_nav.width() + ui.horizontalLayout_nav_hide.spacing()
-    ), f"窄态 {width} 宽下从动项「{hint_name}」没有紧贴 nfo 右缘"
     for name in _REFS_X_ONLY:
         assert _snapshot(ui)[name][0] == base[name][0], (
             f"窄态 {width} 宽下搬运工/容器「{name}」左缘被带偏: 基线={base[name]} 实际={_snapshot(ui)[name]}"
@@ -1022,8 +1026,7 @@ def test_narrow_auto_exit_lands_on_menu_icon(win, app, monkeypatch, width, heigh
     # 它在「只有通用宽幅逻辑」的基线**之上**仍停在该组已定的竖线上——已由上面
     # got == want 覆盖。本组只允许动第 2 行的两枚控件，故第 8 行的 Fixed 前缀
     # 「隐藏Dock图标」必须逐位不动（menu_icon 自身是第四组目标，不在此列）。
-    # label_42 不在此列：v2.7.6 需求①把它挪到「隐藏菜单图标」右侧，
-    # 它的左缘按设计要变（由 test_menu_icon_row_aligns_or_defers 断言）。
+    # 第九组之后该行没有提示词标签了，故这里只需要比 Dock 图标这一枚。
     for name in ("checkBox_hide_dock_icon",):
         assert _abs(ui, getattr(ui, name)) == base[name][0], (
             f"窄态 {width} 宽下第五组不该动的 Fixed 前缀「{name}」被带偏: 基线={base[name][0]}"
