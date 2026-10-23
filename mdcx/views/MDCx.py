@@ -13501,7 +13501,7 @@ class Ui_MDCx(object):
         self.radioButton_mode_common.setText(_translate("MDCx", "正常模式"))
         self.checkBox_read_has_nfo_update.setText(_translate("MDCx", "本地刮削成功的文件，按更新模式重新整理分类"))
         self.label_345.setText(_translate("MDCx", "可无需联网重新整理分类"))
-        self.checkBox_read_download_file_again.setText(_translate("MDCx", "本地信息文件内有链接，重新下载封面图片"))
+        self.checkBox_read_download_file_again.setText(_translate("MDCx", "本地信息文件有链接，重新下载封面图与缩略图"))
         self.label_347.setText(_translate("MDCx", "将按设置 -「下载」更新"))
         self.checkBox_nfo_merge_strategy.setText(_translate("MDCx", "本地信息合并及策略"))
         self.comboBox_nfo_merge_strategy.setItemText(0, _translate("MDCx", "全新数据优先"))
@@ -13566,7 +13566,7 @@ class Ui_MDCx(object):
         self.label_21.setText(
             _translate(
                 "MDCx",
-                "<p style='line-height:20px'>⚠️ 保留文件：请到设置>下载>保留目标文件或下载，设置要保留或更新的文件内容<br>\n"
+                "<p style='line-height:20px'>⚠️ 保留文件：请到设置>下载>使用本地文件或下载，设置要保留或更新的文件内容<br>\n"
                 "                          ⚠️ 跳过文件：在视频目录新建一个名为skip的空文件，即可自动跳过该目录及子目录，所有模式均有效<br>\n"
                 "                          ⚠️ 移动文件：失败时不移动文件，文件刮削成功后按更新模式规则移动视频文件<br>\n"
                 "                          ⚠️ 重命名文件：在「成功后重命名文件」中设置是否重命名，命名规则同「命名」-「视频文件名」相同</p>",
@@ -13763,7 +13763,7 @@ class Ui_MDCx(object):
         self.label_310.setText(
             _translate("MDCx", "⚠️ 下载剧照、预告片，请选择「字段优先」或「指定网站」！「速度优先」模式信息不完整")
         )
-        self.groupBox_33.setTitle(_translate("MDCx", "保留目标文件"))
+        self.groupBox_33.setTitle(_translate("MDCx", "使用本地文件"))
         self.checkBox_old_poster.setText(_translate("MDCx", "封面图"))
         self.checkBox_old_thumb.setText(_translate("MDCx", "缩略图"))
         self.checkBox_old_fanart.setText(_translate("MDCx", "背景图"))
