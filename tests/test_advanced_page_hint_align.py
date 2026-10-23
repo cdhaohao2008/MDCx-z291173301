@@ -6,8 +6,8 @@
   2026-10-23 第二批：**删除**前两条（`ui.label_42` / `ui.label_nav_hide_hint` 已从
     MDCx.ui 移除，本文件不再引用它们），只剩下面两条要守：
 
-  - 改对话框行「目录中的文件较多时，可以勾选此项提高文件打开速度」→ 显示字段来源信息；
-  - 分屏缩放行「保存后重启生效，可能会有点模糊」→ 显示字段来源信息。
+  - 改对话框行「勾选提高打开速度」→ 显示字段来源信息；
+  - 分屏缩放行「保存重启程序生效」→ 显示字段来源信息。
 
 根因防线（任一回归都会让本文件失败）：
   - 这两条提示词都是所在 QHBoxLayout 的末位项、horizontal sizePolicy 为 Minimum：
@@ -110,7 +110,7 @@ def _extra(win) -> int:
 
 # 两条提示词 → (所在行内布局, 前导控件, 目标锚点)。
 # 锚点取「左缘」而不是文字起点：本页所有竖线需求（隐藏菜单图标、使用暗黑模式、
-# 隐藏NFO库管理…）一律以复选框方框的左缘为准，这里保持一致。
+# 隐藏信息管理…）一律以复选框方框的左缘为准，这里保持一致。
 _HINTS = (
     ("label_421", "horizontalLayout_149", "checkBox_dialog_qt", "checkBox_show_from_log"),
     ("label_427", "horizontalLayout_dock_2", "comboBox_ui_scale", "checkBox_show_from_log"),

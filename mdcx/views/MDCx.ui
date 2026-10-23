@@ -24910,7 +24910,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                   <string notr="true">color: rgb(8, 128, 128);</string>
                                 </property>
                                 <property name="text">
-                                  <string>目录中的文件较多时，可以勾选此项提高文件打开速度</string>
+                                  <string>勾选提高打开速度</string>
                                 </property>
                                 <property name="alignment">
                                   <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
@@ -25319,7 +25319,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                    <string notr="true">color: rgb(8, 128, 128);</string>
                                  </property>
                                  <property name="text">
-                                   <string>保存后重启生效，可能会有点模糊</string>
+                                   <string>保存重启程序生效</string>
                                  </property>
                                  <property name="alignment">
                                    <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
@@ -25361,7 +25361,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                    <string>隐藏左侧导航的「演员管理」入口，可随时在此重新开启</string>
                                  </property>
                                  <property name="text">
-                                   <string>隐藏Emby演员管理</string>
+                                   <string>隐藏演员管理</string>
                                  </property>
                                </widget>
                              </item>
@@ -25377,7 +25377,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                    <string>隐藏左侧导航的「信息管理」入口，可随时在此重新开启</string>
                                  </property>
                                  <property name="text">
-                                   <string>隐藏NFO库管理</string>
+                                   <string>隐藏信息管理</string>
                                  </property>
                                </widget>
                              </item>

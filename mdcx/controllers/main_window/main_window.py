@@ -381,7 +381,7 @@ class MyMAinWindow(
                 self._nfo_scroll = _sa
             elif _content is not None and _content.objectName() == "scrollAreaWidgetContents_gaoji":
                 # 高级页同病：网格里两项均分的行（界面外观行的「使用暗黑模式」、隐藏入口
-                # 行的「隐藏NFO库管理」）会被通用拉伸推到右缘，本控制器下一拍才拉回
+                # 行的「隐藏信息管理」）会被通用拉伸推到右缘，本控制器下一拍才拉回
                 # 基准线 → 用户看到「先在右侧、再向左漂移」（最大化与还原两个方向
                 # 各出现一次）。挂在拉伸之后的钩子上即可同拍完成。
                 _sa._post_wide_sync_hook = self._sync_advanced_page_wide_hook

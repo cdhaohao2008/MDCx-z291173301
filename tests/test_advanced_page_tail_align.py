@@ -17,7 +17,7 @@
     上一批（第四组需求①）曾把它窄态右移到 nfo 那一列，本批与那一批方向相反，
     故 `_sync_advanced_page_debug_row` 连同调用一并删除——该行两项回到自然位。
   第八组（提示词右移）：「保存后重启生效」→「显示字段内容信息」、
-    「目录中的文件较多时…」与「保存后重启生效，可能会有点模糊」→「显示字段来源信息」、
+    「目录中的文件较多时…」与「保存重启程序生效」→「显示字段来源信息」、
     「仅隐藏入口，保存后立即生效」→「显示字段内容信息」。这四条提示词原本是各自行
     的末位从动项，右移后不再紧贴前导控件，落点由 `_set_adv_hint_gap` 插的 Fixed
     间隔决定；本文件只保留「右缘不动、不许压到裁字」这两条，落点断言全部搬到
@@ -807,7 +807,7 @@ def test_narrow_nav_row_lands_on_from_log_when_it_fits(win, app, width, height):
         assert actor.minimumWidth() == actor.maximumWidth() == _nav_row(ui, "checkBox_show_from_log")["pin"], (
             f"窄态 {width} 宽下前导项未按 pin 钉宽: min={actor.minimumWidth()} max={actor.maximumWidth()}"
         )
-        # 本批需求的三项：隐藏NFO库管理 + 两枚「关」，同落 from_log 那条竖线
+        # 本批需求的三项：隐藏信息管理 + 两枚「关」，同落 from_log 那条竖线
         for name in ("checkBox_hide_nfo_nav", "radioButton_log_off", "radioButton_update_off"):
             assert _abs(ui, getattr(ui, name)) == from_x, (
                 f"窄态 {width} 宽下「{name}」未与「显示字段来源信息」严格上下对齐: "
@@ -836,7 +836,7 @@ def test_wide_nav_row_anchor_is_state_independent(win, app, width, height):
     「刮削结束后自动退出软件」钉到 src_from 那条竖线，anchor 恒等于
     col_x(src_from)（真机 1200/1366/1536 三档实测 anchor≡nav_x）。
     本用例把这条不变量写成断言：宽态下 anchor 与 col_x(from) 必须逐位相等，
-    且「隐藏NFO库管理」与两枚「关」都精确落在它上面；顺手钉住
+    且「隐藏信息管理」与两枚「关」都精确落在它上面；顺手钉住
     「显示字段来源信息」自身不动（需求明写它位置保持不变）。
     """
     ui = win.Ui
@@ -959,7 +959,7 @@ def test_narrow_never_moves_anchors(win, app, monkeypatch, width, height):
     # sizeHint 宽（不钉会被余量撑开、点空白处误触），故直接钉住它自己的宽度。
     nfo = ui.checkBox_hide_nfo_nav
     assert nfo.width() == nfo.sizeHint().width(), (
-        f"窄态 {width} 宽下「隐藏NFO库管理」没被钉回 sizeHint: {nfo.width()} vs {nfo.sizeHint().width()}"
+        f"窄态 {width} 宽下「隐藏信息管理」没被钉回 sizeHint: {nfo.width()} vs {nfo.sizeHint().width()}"
     )
     for name in _REFS_X_ONLY:
         assert _snapshot(ui)[name][0] == base[name][0], (
