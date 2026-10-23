@@ -309,6 +309,16 @@ markupsafe>=3.0.4    pydantic-core>=2.50.1  PyQt6-sip>=13.13.0
 - 界面文案没有 lint 守，靠测试按字面逐字比对（如 `tests/test_site_source_copy_menu.py`）。
 - 本纪律属纯界面措辞，不单独占 Changelog 一行；但版本段里已有条目若引用这些文案要一并更新。
 
+### 10.10 提交与推送纪律
+
+**默认不碰 git。** 只有需求里明确出现「提交」「推送」「commit」「push」「提交到 GitHub」「推到远程」这类字样时，才允许动 git；「改完了」「修好了」「继续」「优化一下」都不构成授权。
+
+- 授权只对当次需求有效，不跨需求延续。下一轮需求默认重新回到「只改工作区、不动 git」。
+- 未获授权时交付口径是「文件已改好 + 未提交」，不 `git add`、不 `git commit`、不 `git push`，也不擅自建分支。
+- 说「提交」= 只 `git commit`；说「推送」「推到 GitHub」「推远程」才 `git push`。两件事不合并推断。
+- 理由：本仓库直推 `main` 不触发 CI（见 10.6），误提交会直接进主干历史；事后回滚要 `git revert` 甚至 `reset`，恢复成本远高于少提交一次。
+- 获授权后的动作仍守 10.6 门禁与 `DADA/MEMORY.md` 的「检查与提交纪律」：`git add -- <具体文件>`、提交前看 `git status` 查残留、按需 `uv run quick-check` / `uv run check --skip-hook-install`。
+
 ---
 
 ## 11. 左下角状态区图标规范
