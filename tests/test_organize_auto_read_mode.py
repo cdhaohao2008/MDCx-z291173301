@@ -31,7 +31,7 @@ from mdcx.core.scraper import Scraper
 from mdcx.models.enums import FileMode
 from mdcx.models.flags import Flags
 
-pytestmark = pytest.mark.skipif(sys.version_info < (3, 13), reason="项目配置模型需要 Python 3.13+")
+pytestmark = pytest.mark.skipif(sys.version_info < (3, 15), reason="项目配置模型需要 Python 3.15+")
 
 
 class _DummyCrawlerProvider:

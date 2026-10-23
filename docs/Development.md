@@ -167,7 +167,7 @@ aiofiles>=25.1.0     cffi>=2.1.1         jiter>=0.17.0
 markupsafe>=3.0.4    pydantic-core>=2.50.1  PyQt6-sip>=13.13.0
 ```
 
-- `requires-python` 保持 `>=3.14`，不带 upper bound。
+- `requires-python` 固定 `>=3.15`（3.15 是当前唯一构建目标），不带 upper bound。
 - 131 个锁包里 129 个有 wheel，唯一例外 pyyaml（无 cp315 wheel），靠 `PYYAML_FORCE_LIBYAML=0` 出纯 Python wheel。
 
 ---

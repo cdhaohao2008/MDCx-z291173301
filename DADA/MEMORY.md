@@ -44,6 +44,7 @@
 ## 本机环境
 
 - Windows，Python 3.15 装在 `C:\Program Files\Python315`。
+- **项目默认 Python = 3.15**（2026-10-23 起）：`requires-python = ">=3.15"`，3.14 及以下不再支持。版本声明五处同步改：`pyproject.toml`、`uv.lock` 的 `requires-python`、`requirements.txt` 头注、`README.md` 徽章、`docs/Development.md` 第 8 节；测试里的 `skipif(sys.version_info < (3, 15))` 守卫同步升版。改依赖下限仍守 cp315 wheel。
 - **本机没装 uv，用户 2026-10-21 明确不装** → 一律用 `python main.py`、`python -m pytest tests/ --tb=short -m "not network"`、`python scripts/quick_check.py`、`python scripts/check.py --skip-hook-install`。脚本自带 `resolve_tool()` 兜底退 `-m ruff` / `-m mypy`，不必改 PATH。
 - 仓库标准仍是 uv，**别把 CI 写法改成本机口径**。
 - 沙箱陷阱：①shell 直接调系统 python 触发 stdout 捕获异常 → 写 .bat 或 Python 包装脚本，命令内 `> file 2>&1` 落盘后再读文件；②`.bat` 里 `set VAR=value` 不传子进程 → 在 PowerShell 里先设 `$env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"`；③中文 Windows 子进程默认 GBK，控制台乱码只影响显示不影响数据；④用 `python -m ruff` / `python -m mypy` 走当前解释器。

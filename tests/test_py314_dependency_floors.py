@@ -148,10 +148,10 @@ def test_locked_versions_admit_python_314():
 
 
 def test_requires_python_has_no_upper_bound():
-    """`requires-python` 不能带 upper bound，否则 3.14 直接不是合法解释器。"""
+    """`requires-python` 不能带 upper bound，否则下一个 3.x 又被挡在门外。"""
     requires_python = _pyproject()["project"]["requires-python"]
 
     assert "<" not in requires_python, (
-        f'requires-python = "{requires_python}" 带 upper bound，会把 Python 3.14 排除在外，'
+        f'requires-python = "{requires_python}" 带 upper bound，会把后续 Python 版本排除在外，'
         "build-py315.yml 与 pyproject 前提冲突"
     )

@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # 锁定 3.15：程序已迁移到 Python 3.15（pyproject 的 requires-python 为 >=3.14，
-      # 3.15 为当前构建目标），这里显式钉死，避免 uv 自行挑选解释器导致结果不可预期。
+      # 锁定 3.15：程序已迁移到 Python 3.15（pyproject 的 requires-python 为 >=3.15，
+      # 3.15 是当前唯一构建目标），这里显式钉死，避免 uv 自行挑选解释器导致结果不可预期。
       UV_PYTHON: "3.15"
       # PyYAML 至今没有 cp315 wheel（见「Install locked dependencies」）：置 0 让它
       # 跳过 `yaml._yaml` C 扩展，从 sdist 直接产出纯 Python wheel，不需要编译器。

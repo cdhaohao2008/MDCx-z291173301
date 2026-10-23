@@ -20,7 +20,7 @@ import pytest
 from mdcx.config.extend import normalize_strm_policy
 from mdcx.config.migrations import migrate_config_data
 
-pytestmark = pytest.mark.skipif(sys.version_info < (3, 13), reason="项目配置模型需要 Python 3.13+")
+pytestmark = pytest.mark.skipif(sys.version_info < (3, 15), reason="项目配置模型需要 Python 3.15+")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 UI_PATH = REPO_ROOT / "mdcx" / "views" / "MDCx.ui"

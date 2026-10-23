@@ -156,9 +156,15 @@ def test_hide_window_rows_do_not_overlap(win, app, width, height):
         center = _pos(ui, w)[1] + w.height() / 2
         label_center = _pos(ui, label_313)[1] + label_313.height() / 2
         assert abs(center - label_center) <= 1, f"{w.objectName()} 未与「隐藏窗口：」垂直居中"
-    # 「隐藏图标：」仍与「隐藏边框（美观样式）」「暗黑模式」同行居中
+    # 「隐藏图标：」与「隐藏Dock图标（Mac）」那一行同行居中
     label_314 = ui.label_314
     label_314_center = _pos(ui, label_314)[1] + label_314.height() / 2
-    for w in (ui.checkBox_hide_window_title, ui.checkBox_dark_mode):
+    for w in (ui.checkBox_hide_dock_icon, ui.checkBox_hide_menu_icon, ui.label_42):
         center = _pos(ui, w)[1] + w.height() / 2
         assert abs(center - label_314_center) <= 1, f"{w.objectName()} 未与「隐藏图标：」垂直居中"
+    # 「界面外观：」与「隐藏边框（美观样式）」「暗黑模式」同行居中
+    label_246 = ui.label_246
+    label_246_center = _pos(ui, label_246)[1] + label_246.height() / 2
+    for w in (ui.checkBox_hide_window_title, ui.checkBox_dark_mode):
+        center = _pos(ui, w)[1] + w.height() / 2
+        assert abs(center - label_246_center) <= 1, f"{w.objectName()} 未与「界面外观：」垂直居中"

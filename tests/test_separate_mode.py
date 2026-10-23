@@ -37,7 +37,7 @@ if importlib.util.find_spec("PyQt6") is None:
     sys.modules["PyQt6.QtCore"] = qtcore
 
 
-pytestmark = pytest.mark.skipif(sys.version_info < (3, 13), reason="项目配置模型需要 Python 3.13+")
+pytestmark = pytest.mark.skipif(sys.version_info < (3, 15), reason="项目配置模型需要 Python 3.15+")
 
 
 def _separate_config(monkeypatch, tmp_path, *, mode=2, data_dir=None):

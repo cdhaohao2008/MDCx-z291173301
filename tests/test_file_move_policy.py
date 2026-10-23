@@ -31,7 +31,7 @@ from mdcx.core.file import creat_folder, move_movie
 from mdcx.core.organize import OrganizeTransaction, organize_files
 from mdcx.models.model_types import FileInfo, OtherInfo
 
-pytestmark = pytest.mark.skipif(sys.version_info < (3, 13), reason="项目配置模型需要 Python 3.13+")
+pytestmark = pytest.mark.skipif(sys.version_info < (3, 15), reason="项目配置模型需要 Python 3.15+")
 
 UI_PATH = Path(__file__).resolve().parents[1] / "mdcx" / "views" / "MDCx.ui"
 

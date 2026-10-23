@@ -1,5 +1,5 @@
 # 从 pyproject.toml [project].dependencies 提取，适用于 pip install -r requirements.txt
-# requires-python >=3.14（Python 3.14 / 3.15 均已实测可安装）
+# requires-python >=3.15（3.15 为当前唯一构建目标，3.14 及以下不再支持）
 # 版本下限已抬到「首个提供 Python 3.15（cp315 / abi3）可用 wheel」的版本；
 # 末尾的 cffi / jiter / markupsafe / pydantic-core / PyQt6-sip 是带原生扩展的传递依赖，
 # 显式钉住 cp315 wheel 起步版本，避免重新解析时回退到需要源码编译的老版本。

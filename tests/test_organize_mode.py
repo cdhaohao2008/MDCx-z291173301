@@ -32,7 +32,7 @@ from mdcx.core.utils import get_video_size_for_file
 from mdcx.models.enums import FileMode
 from mdcx.models.flags import Flags
 
-pytestmark = pytest.mark.skipif(sys.version_info < (3, 13), reason="项目配置模型需要 Python 3.13+")
+pytestmark = pytest.mark.skipif(sys.version_info < (3, 15), reason="项目配置模型需要 Python 3.15+")
 
 
 def test_is_organize_mode_only_for_mode_six(monkeypatch: pytest.MonkeyPatch):

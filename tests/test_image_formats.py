@@ -23,7 +23,7 @@ from mdcx.utils.picture import (
     resolve_main_image,
 )
 
-pytestmark = pytest.mark.skipif(sys.version_info < (3, 13), reason="项目配置模型需要 Python 3.13+")
+pytestmark = pytest.mark.skipif(sys.version_info < (3, 15), reason="项目配置模型需要 Python 3.15+")
 
 
 def _prepare(monkeypatch: pytest.MonkeyPatch) -> None:

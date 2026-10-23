@@ -22,7 +22,7 @@ from mdcx.config.migrations import migrate_config_data
 from mdcx.core import organize as organize_module
 from mdcx.core.organize import organize_companion_files
 
-pytestmark = pytest.mark.skipif(sys.version_info < (3, 13), reason="项目配置模型需要 Python 3.13+")
+pytestmark = pytest.mark.skipif(sys.version_info < (3, 15), reason="项目配置模型需要 Python 3.15+")
 
 UI_PATH = Path(__file__).resolve().parents[1] / "mdcx" / "views" / "MDCx.ui"
 
