@@ -5948,7 +5948,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                                   </sizepolicy>
                                                 </property>
                                                 <property name="text">
-                                                  <string>本地NFO内有链接，重新下载封面图片等文件</string>
+                                                  <string>本地信息文件内有链接，重新下载封面图片</string>
                                                 </property>
                                               </widget>
                                             </item>
@@ -5984,7 +5984,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                       <string notr="true">color: rgb(0, 0, 0);</string>
                                     </property>
                                     <property name="text">
-                                      <string>本地NFO合并及策略</string>
+                                      <string>本地信息合并及策略</string>
                                     </property>
                                   </widget>
                                 </item>
