@@ -157,6 +157,9 @@
 - **删 `.ui` 控件 = 删代码里的 `ui.<name>`**：动手前 grep 全仓（控制器、`_snapshot`/`_STATICS` 名单、`sizeHint` 参与的行内最小宽算式），删完必须重跑 pyuic 并跑 `test_ui_structure`。参与「行内最小宽」的项（如 `tail_b` / `need_d` / `room`）要同步去掉它的 sizeHint，否则会按一个不存在的宽度卡门、整段对齐永远放弃。
 - **位置类需求（「X 右缘与 Y 右缘严格对齐」）不要自作聪明加「不裁字」下限**：`max(锚点宽, 控件.minimumSizeHint())` 在小比例界面缩放（真机 80%）下会让控件停在最小可用宽、比锚点右出约 20px，用户直接返工。判据只有锚点坐标；宽度因此小于 minimumSizeHint、档位文字略挤，是用户自己选的取舍，最多在回帖里提一句。同理，锚点必须用 `sizeHint()` 而不是 `width()`——被 `pin_d` 钉过的复选框，`width()` 是钉宽不是文字宽。
 - **行首「空 QLabel 做缩进」是对齐需求的隐形敌人**：这类标签（如已删的 `label_252`，10px Fixed + 空文本）只贡献宽度，grep 文案永远搜不到；把它的最小宽改 0 也不行——QHBoxLayout 的 spacing 还会再留 6px。要左对齐就直接从 `.ui` 删掉那枚 item，删完 pyuic 重生成即可（`horizontalLayout_85` 只剩一个子布局也合法）。排查手法 = 打印 `mapTo(content, (0,0))` 的 x 与父 cell 的 `cellRect(row, col)` 左缘做差，差值就是行首占位项总宽。
+- **「文字右缘」不等于 widget 右缘，两边都要换算**：`QCheckBox` 的 sizeHint 里指示器左内缩 4px、文字后还留 ~5px，拿 `x + width()` 当文字右缘会右出 5px（用户能看出来）；正确值 = `x + style().subElementRect(QStyle.SubElement.SE_CheckBoxContents, opt, box).x() + fontMetrics().horizontalAdvance(text)`（`opt` 用 `initStyleOption` 填）。`QLabel` 相反：Minimum 策略下宽态被拉宽到整格，`width()` 比文字宽出几十像素（实测窄态 +43、宽态 +897），文字右缘只能用 `x + horizontalAdvance(text)`。
+- **QBoxLayout 的 spacing 不在 spacer 两侧生效**：spacer 与 widget 相邻那一侧实测不占 spacing（只有 widget↔widget 之间才有）。算行内「已占用宽度 / 可用余量」时按控件段数计（4 枚复选框 = 3 段），按 `count()-1` 多算会把行撑破、Fixed 控件被挤扁（实测复选框 120 → 93，文字被裁）。
+- **「让末位控件右缘对齐锚点」要留两级调节手段**：先收中间那枚 Fixed gap spacer（原大空档，收窄最不碍眼），收到 0 还偏右（字体更宽、连设计 spacing 都放不下）再逐像素压 `row.setSpacing()`（最低 0），每遍先把 spacing 复位成设计值再收敛，才能幂等、往返自愈。只靠 gap spacer 会卡在 0，末位控件永远差几十像素对不上。
 
 ## 并发与网络库
 
