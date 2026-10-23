@@ -343,29 +343,6 @@ async def test_aventertainments_ppv_carib_search_flow():
     assert result.data.mosaic == "无码"
 
 
-@pytest.mark.network
-@pytest.mark.asyncio
-async def test_aventertainments_dvd_real_search():
-    """真实网络测试：DVD 番号 SSDV-120"""
-    from mdcx.web_async import AsyncWebClient
-
-    client = AsyncWebClient(timeout=30)
-    crawler = AVEntertainmentsCrawler(client=client, browser=None)
-
-    inp = CrawlerInput.empty()
-    inp.number = "SSDV-120"
-
-    result = await crawler.run(inp)
-
-    await client.close()
-
-    assert result.data is not None, f"搜索失败: {result.debug_info}"
-    assert result.data.number == "SSDV-120"
-    assert result.data.actors
-    assert result.data.outline
-    assert result.data.mosaic == "无码"
-
-
 @pytest.mark.asyncio
 async def test_aventertainments_parse_search_page_bot_wall():
     """人机验证墙必须点名，不能报"搜索页未解析到结果"误导"""

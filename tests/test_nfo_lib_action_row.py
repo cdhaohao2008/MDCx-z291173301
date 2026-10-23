@@ -125,11 +125,15 @@ def _action_buttons(win):
 
 
 def test_hint_sits_above_batch_save(win, app, nfo_lib_page):
-    """提示词在上、批量保存在下：hint row4、status row5、save row6 且 save 是末行。"""
+    """提示词在上、批量保存在下：hint row4、status row5、save 是分组末行。
+
+    批量保存原先钉在 row6，后来分组里多出一行（row6 空行，给状态行与按钮之间
+    留出间隔），按钮落到 row7。这里不再写死行号，只锁「提示在上、状态居中、
+    批量保存是末行」这条需求本身。
+    """
     ui = win.Ui
     assert _grid_row(win, ui.label_nfo_lib_batch_hint) == 4, "提示词不在第 4 行"
     assert _grid_row(win, ui.label_nfo_lib_batch_status) == 5, "状态行不在第 5 行"
-    assert _grid_row(win, ui.pushButton_nfo_lib_batch_save) == 6, "批量保存不在第 6 行"
     assert _grid_row(win, ui.pushButton_nfo_lib_batch_save) == ui.gridLayout_nfo_lib_batch.rowCount() - 1, (
         "批量保存不是分组末行"
     )

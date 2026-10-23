@@ -49,16 +49,14 @@ REPO = Path(__file__).resolve().parent.parent
 UI_PATH = REPO / "mdcx" / "views" / "MDCx.ui"
 PY_PATH = REPO / "mdcx" / "views" / "MDCx.py"
 
-# gridLayout_2 第 1 列同列复选框：STRM 生成 / STRM 覆盖 / 元数据复用 / 视频模式删除
-# + 整理模式间隔行（本地不限制间隔 / 网盘按自动休息间隔）。
+# gridLayout_2 第 1 列同列复选框：STRM 生成 / STRM 覆盖 / 元数据复用 / 视频模式删除。
 # 全部同处第 1 列，左缘必须严格一致。
+# （原「整理模式间隔行」的两枚复选框已随任务模式迁移到「设置-高级」，此处不再登记。）
 _MODE_CHECKBOXES = (
     "checkBox_separate_generate_strm",
     "checkBox_separate_overwrite_strm",
     "checkBox_separate_reuse_meta",
     "checkBox_sortmode_delpic",
-    "checkBox_organize_local_no_interval",
-    "checkBox_organize_netdisk_rest_interval",
 )
 
 # gridLayout_2 第 1 列 6 个描述 label：正常 / 整理 / 分离 / 视频 / 更新 / 读取。
@@ -249,15 +247,11 @@ def test_mode_checkboxes_left_aligned(win, app):
             "checkBox_separate_generate_strm",
             "checkBox_separate_reuse_meta",
             "checkBox_sortmode_delpic",
-            "checkBox_organize_local_no_interval",
         )
     }
     assert len(set(aligned.values())) == 1, f"同列复选框左缘不一致: {narrow}"
     assert narrow["checkBox_separate_overwrite_strm"] > narrow["checkBox_separate_generate_strm"], (
         f"覆盖框应同行居右: {narrow}"
-    )
-    assert narrow["checkBox_organize_netdisk_rest_interval"] > narrow["checkBox_organize_local_no_interval"], (
-        f"网盘间隔框应同行居右: {narrow}"
     )
     _resize(win, app, 1920, 1170)
     wide = snapshot()
@@ -296,7 +290,7 @@ def test_video_move_checkbox_aligns_with_overwrite_strm(win, app):
     """视频模式「移动已下载图片和文件到新目录」与「覆盖本地已存在的STRM链接文本」严格上下对齐。
 
     锚点框（覆盖 STRM）位置保持不变，只把新复选框右移到与它同 x；
-    该 x 与复用行、整理间隔行的右侧框一致（同一列的右对齐基准）。
+    该 x 与复用行的右侧框一致（同一列的右对齐基准）。
     """
     ui = win.Ui
     win.show()
@@ -310,14 +304,11 @@ def test_video_move_checkbox_aligns_with_overwrite_strm(win, app):
     narrow_move = pos("checkBox_sortmode_movefile")
     narrow_strm = pos("checkBox_separate_overwrite_strm")
     narrow_meta = pos("checkBox_separate_overwrite_meta")
-    narrow_netdisk = pos("checkBox_organize_netdisk_rest_interval")
     narrow_delete = pos("checkBox_sortmode_delpic")
     assert narrow_move[0] == narrow_strm[0], f"移动框未与覆盖 STRM 框对齐: {narrow_move} vs {narrow_strm}"
-    assert narrow_move[0] == narrow_meta[0] == narrow_netdisk[0], (
-        f"移动框未与其它行右侧框对齐: {narrow_move} vs {narrow_meta} / {narrow_netdisk}"
-    )
+    assert narrow_move[0] == narrow_meta[0], f"移动框未与其它行右侧框对齐: {narrow_move} vs {narrow_meta}"
     # 锚点框位置保持不变：仍与同列其它右侧框同 x
-    assert narrow_strm[0] == narrow_meta[0] == narrow_netdisk[0], f"覆盖 STRM 框位置被改动: {narrow_strm}"
+    assert narrow_strm[0] == narrow_meta[0], f"覆盖 STRM 框位置被改动: {narrow_strm}"
     # 移动框在「删除…」框右侧（同行的第二枚复选框）
     assert narrow_move[0] > narrow_delete[0], f"移动框应在删除框右侧: {narrow_move} vs {narrow_delete}"
     _resize(win, app, 1920, 1170)
@@ -326,58 +317,6 @@ def test_video_move_checkbox_aligns_with_overwrite_strm(win, app):
     _resize(win, app, 1030, 753)
     assert pos("checkBox_sortmode_movefile") == narrow_move, "窄→宽→窄往返未复原"
     assert pos("checkBox_separate_overwrite_strm") == narrow_strm, "窄→宽→窄往返未复原"
-
-
-def test_organize_interval_row_right_aligns_with_strm(win, app):
-    """整理间隔行的右侧复选框与 STRM/复用行的右侧复选框同 x 严格对齐。"""
-    ui = win.Ui
-    win.show()
-    _goto_guaxiaomoshi(win, app)
-
-    def pos(name):
-        p = getattr(ui, name).mapTo(ui.scrollAreaWidgetContents_guaxiaomoshi, QPoint(0, 0))
-        return (p.x(), p.y())
-
-    _resize(win, app, 1030, 753)
-    narrow_netdisk = pos("checkBox_organize_netdisk_rest_interval")
-    narrow_strm = pos("checkBox_separate_overwrite_strm")
-    narrow_meta = pos("checkBox_separate_overwrite_meta")
-    assert narrow_netdisk[0] == narrow_strm[0], (
-        f"整理间隔行右侧框未与覆盖 STRM 框对齐: {narrow_netdisk} vs {narrow_strm}"
-    )
-    assert narrow_netdisk[0] == narrow_meta[0], (
-        f"整理间隔行右侧框未与覆盖元数据框对齐: {narrow_netdisk} vs {narrow_meta}"
-    )
-    assert narrow_netdisk[1] < narrow_strm[1], "整理间隔行应在 STRM 行上方"
-    _resize(win, app, 1920, 1170)
-    wide_netdisk = pos("checkBox_organize_netdisk_rest_interval")
-    assert wide_netdisk == narrow_netdisk, f"宽态整理间隔框位置变动: {narrow_netdisk} -> {wide_netdisk}"
-    _resize(win, app, 1030, 753)
-    assert pos("checkBox_organize_netdisk_rest_interval") == narrow_netdisk, "窄→宽→窄往返未复原"
-
-
-def test_organize_interval_checkboxes_mutually_exclusive(win, app):
-    """整理间隔两枚复选框互斥：勾选其一自动去勾另一，去勾不动作。"""
-    ui = win.Ui
-    win.show()
-    _goto_guaxiaomoshi(win, app)
-    _resize(win, app, 1030, 753)
-    local = ui.checkBox_organize_local_no_interval
-    netdisk = ui.checkBox_organize_netdisk_rest_interval
-    local.setChecked(False)
-    netdisk.setChecked(False)
-    app.processEvents()
-    local.setChecked(True)
-    app.processEvents()
-    assert local.isChecked() and not netdisk.isChecked(), "勾选本地不限制间隔后网盘框应自动去勾"
-    netdisk.setChecked(True)
-    app.processEvents()
-    assert netdisk.isChecked() and not local.isChecked(), "勾选网盘间隔后本地框应自动去勾"
-    netdisk.setChecked(False)
-    app.processEvents()
-    assert not netdisk.isChecked() and not local.isChecked(), "去勾不应影响另一方"
-    local.setChecked(False)
-    app.processEvents()
 
 
 def test_read_mode_options_not_squeezed(win, app):

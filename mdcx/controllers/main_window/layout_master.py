@@ -458,6 +458,11 @@ class LayoutMasterMixin:
         # 「隐藏边框（美观样式）」「暗黑模式」严格上下对齐（锚点两枚不动）。
         # 必须排在上面两个方法之后：它要量锚点行两枚复选框的终态坐标。
         self._sync_advanced_page_move_file_align()
+        # 高级页：「任务模式」行的「存储在网盘」与「界面外观」行的「暗黑模式」
+        # 严格上下对齐（还原态左移、最大化态右移，「暗黑模式」不动）。
+        # 与「移动文件」行同款手法，必须排在上面几个方法之后：它同样要量锚点行
+        # 两枚复选框的终态宽度。
+        self._sync_advanced_page_task_mode_align()
 
         # ============ page_setting / 演员页: 两行控件对齐到各自基准线 ============
         # 同样排在通用拉伸之后：本方法先落设计几何再按最大化分支覆盖。
@@ -1008,6 +1013,74 @@ class LayoutMasterMixin:
             lay_m.activate()
         # 末位项的最终左缘必须与「暗黑模式」一致，否则说明前导项宽度没生效
         # （例如字体未就绪导致 sizeHint 变化），此时不强行改动锚点。
+
+    def _sync_advanced_page_task_mode_align(self) -> None:
+        """高级页：「任务模式」行的「存储在网盘」与「暗黑模式」严格上下对齐。
+
+        需求（2026-10-23，最小化/最大化两态各一张截图）：
+          还原态「存储在网盘」**向左**移到与「暗黑模式」严格上下对齐；
+          最大化态「存储在网盘」**向右**移到与「暗黑模式」严格上下对齐；
+          「暗黑模式」自身位置保持不变（一个字都不动）。
+
+        为什么不能靠 .ui 里的固定几何：任务模式行的内嵌 widget 在设计态是
+        `(0,-10,550,51)`，而「界面外观」行的 layoutWidget5 宽度会被
+        `_sync_advanced_page_align` 按窗口状态改写（还原态钉前导项、最大化态
+        加宽到 `2*(anchor-row_x)-spacing`，实测 1085×793 是 416、1536×864 是 716），
+        两行宽度一旦不等，两项均分的第 2 项就落不到同一条竖线上（实测 1085 时
+        「存储在网盘」379 vs「暗黑模式」312，1536 时 379 vs 462）。
+
+        做法与 `_sync_advanced_page_move_file_align` 同构（两行同处 gridLayout_20
+        的 col1，行左缘天然相等）：
+          ① 容器宽度取锚点容器 layoutWidget5 的实测宽度；
+          ② 前导项「存储在本地」钉成锚点前导项「隐藏边框（美观样式）」的实测
+             宽度——锚点行在还原态是「钉前导项」、最大化态是「两项均分」，两种
+             情况下这条等式都成立，末位「存储在网盘」于是精确落在「暗黑模式」
+             的竖线上；
+          ③ 放不下（剩余空间不足末位项 sizeHint，会裁字）时把容器加宽，绝不压窄
+             末位项——压窄会改变它的左缘，需求就破了。
+        锚点行只读不写，位置保持不变。
+        """
+
+        ui = self.Ui
+        host = ui.gridLayoutWidget_20
+        if not host.isVisibleTo(self):
+            return
+
+        lw_c = ui.layoutWidget5  # 锚点容器（界面外观行）
+        lay_c = ui.horizontalLayout_62  # 锚点行内布局
+        lead_c = ui.checkBox_hide_window_title  # 锚点第 1 项（宽度即前导项目标宽度）
+        lw_t = getattr(ui, "layoutWidget_task_mode", None)  # 任务模式行容器
+        lay_t = getattr(ui, "horizontalLayout_task_mode", None)  # 任务模式行内布局
+        local = getattr(ui, "checkBox_task_store_local", None)  # 任务模式行第 1 项
+        netdisk = getattr(ui, "checkBox_task_store_netdisk", None)  # 任务模式行末位项
+        if lw_t is None or lay_t is None or local is None or netdisk is None:
+            return
+
+        # 锚点行必须先落定：钉宽只改约束不重排，末位项的坐标要等布局真正
+        # activate 之后才是终态。
+        lay_c.invalidate()
+        lay_c.activate()
+
+        # 容器与锚点容器同宽：两行行内几何一致，第 2 项才落在同一条竖线
+        if lw_t.width() != lw_c.width():
+            lw_t.setGeometry(lw_t.x(), lw_t.y(), lw_c.width(), lw_t.height())
+        lay_t.invalidate()
+        lay_t.activate()
+
+        margins = lay_t.contentsMargins()
+        spacing = lay_t.spacing()
+        pin = lead_c.width()
+        need = margins.left() + pin + spacing + netdisk.sizeHint().width() + margins.right()
+        if lw_t.width() < need:
+            # 装不下就把容器加宽（frame 的普通子 QWidget，允许略微溢出 frame），
+            # 绝不压窄末位项——压窄会改变它的左缘，需求就破了。
+            lw_t.setGeometry(lw_t.x(), lw_t.y(), need, lw_t.height())
+            lay_t.invalidate()
+            lay_t.activate()
+        ok = pin >= local.sizeHint().width()
+        if self._pin_row_lead_width(local, pin if ok else None):
+            lay_t.invalidate()
+            lay_t.activate()
 
     def _sync_advanced_page_rest_interval_align(self, wide: bool) -> None:
         """还原态：「每次间隔」时长框右缘缩到与「间歇刮削」文件数框右缘严格对齐。

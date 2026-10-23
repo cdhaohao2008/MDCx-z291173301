@@ -488,14 +488,15 @@ def test_ui_has_move_policy_checkboxes_in_advanced_page():
     text = label.find("property[@name='text']/string")
     assert text is not None and text.text == "移动文件："
 
-    # 两枚复选框都在高级页网格 gridLayout_20 的第 6 行（保留任务行下方）
+    # 两枚复选框都在高级页网格 gridLayout_20 的第 7 行（保留任务 / 任务模式两行下方；
+    # 任务模式行插入后本行由 row6 顺延到 row7）
     grid = widgets.get("gridLayout_20")
     assert grid is not None
-    items = {(item.get("row"), item.get("column")): item for item in grid.iter("item") if item.get("row") == "6"}
-    assert ("6", "0") in items and ("6", "1") in items
-    col0 = items[("6", "0")].find("widget")
+    items = {(item.get("row"), item.get("column")): item for item in grid.iter("item") if item.get("row") == "7"}
+    assert ("7", "0") in items and ("7", "1") in items
+    col0 = items[("7", "0")].find("widget")
     assert col0 is not None and col0.get("name") == "label_move_file"
-    col1 = items[("6", "1")].find("widget")
+    col1 = items[("7", "1")].find("widget")
     assert col1 is not None and col1.get("name") == "frame_move_file"
     layout = col1.find(".//layout[@name='horizontalLayout_move_file']")
     assert layout is not None
