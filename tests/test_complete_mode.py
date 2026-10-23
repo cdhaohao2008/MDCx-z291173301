@@ -555,3 +555,88 @@ def test_download_functions_reset_marked_flags():
 
     missing = [name for name, ok in found.items() if not ok]
     assert not missing, f"以下下载函数没有复位 *_marked，重下的新图不会打水印：{missing}"
+
+
+@pytest.mark.asyncio
+async def test_redownloaded_images_follow_watermark_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """勾选「重新下载封面图片等文件」后，重下的图按「设置→水印」正常打水印。
+
+    链路：下载函数成功写图 → 复位对应 *_marked → `_download_images` 末尾的
+    `add_mark()` 按 设置→水印（thumb_mark / poster_mark / fanart_mark + mark_type）
+    执行。未重下（本地保留）的图标记保持 True，不重复打水印。
+    """
+    from types import SimpleNamespace
+
+    from mdcx.config.enums import DownloadableFile, MarkType
+    from mdcx.core import image as image_module
+    from mdcx.models.model_types import CrawlersResult, OtherInfo
+
+    monkeypatch.setattr(manager.config, "main_mode", COMPLETE_MAIN_MODE)
+    monkeypatch.setattr(manager.config, "thumb_mark", 1)
+    monkeypatch.setattr(manager.config, "poster_mark", 1)
+    monkeypatch.setattr(manager.config, "fanart_mark", 1)
+    monkeypatch.setattr(manager.config, "mark_type", [MarkType.YOUMA])
+    monkeypatch.setattr(
+        manager.config,
+        "download_files",
+        [DownloadableFile.THUMB, DownloadableFile.POSTER, DownloadableFile.FANART],
+    )
+
+    marked: list[str] = []
+
+    async def _fake_mark_thread(path, marks):
+        marked.append(Path(path).name)
+
+    monkeypatch.setattr(image_module, "add_mark_thread", _fake_mark_thread)
+
+    thumb = tmp_path / "thumb.jpg"
+    poster = tmp_path / "poster.jpg"
+    fanart = tmp_path / "fanart.jpg"
+    for item in (thumb, poster, fanart):
+        item.write_bytes(b"img")
+
+    def _install_download_stubs(reset_mark: bool) -> None:
+        async def _thumb(_res, other, _cd, _folder, _final, _ctx=None):
+            other.thumb_path = thumb
+            if reset_mark:
+                other.thumb_marked = False  # 真实下载函数成功后的复位
+            return True
+
+        async def _fanart(_number, other, _cd, _final):
+            other.fanart_path = fanart
+            if reset_mark:
+                other.fanart_marked = other.thumb_marked
+            return True
+
+        async def _poster(_res, other, _cd, _folder, _final, _ctx=None):
+            other.poster_path = poster
+            if reset_mark:
+                other.poster_marked = False
+            return True
+
+        monkeypatch.setattr(scraper_module, "thumb_download", _thumb)
+        monkeypatch.setattr(scraper_module, "fanart_download", _fanart)
+        monkeypatch.setattr(scraper_module, "poster_download", _poster)
+
+    def _make_other() -> object:
+        other = OtherInfo.empty()
+        # 本地已有三张图：补全模式会预标记为「已处理」
+        other.thumb_path, other.poster_path, other.fanart_path = thumb, poster, fanart
+        other.thumb_marked = other.poster_marked = other.fanart_marked = True
+        return other
+
+    scraper = Scraper(_DummyCrawlerProvider())
+    res = CrawlersResult.empty()
+    res.number = "ABS-040"
+    res.mosaic = "有码"
+    file_info = SimpleNamespace(cd_part="", has_sub=False, definition="")
+
+    # 1）未重下（本地图保留）：不重复打水印
+    _install_download_stubs(reset_mark=False)
+    assert await scraper._download_images(res, _make_other(), file_info, tmp_path, thumb, fanart, poster) is True
+    assert marked == [], "保留的本地图不应重复打水印"
+
+    # 2）重新下载：下载复位标记后按「设置→水印」打水印
+    _install_download_stubs(reset_mark=True)
+    assert await scraper._download_images(res, _make_other(), file_info, tmp_path, thumb, fanart, poster) is True
+    assert set(marked) == {"thumb.jpg", "poster.jpg", "fanart.jpg"}, marked
