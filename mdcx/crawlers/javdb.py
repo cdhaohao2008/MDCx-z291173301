@@ -157,6 +157,10 @@ class Parser(DetailPageParser):
 class JavDBCrawler(BaseCrawler):
     description = "综合：有码+无码"
     parser = Parser()
+    # 源地址 + 镜像地址（镜像号会变，聚合层按「源 → 镜像 → 源 → 镜像」交替重试时用）。
+    # 这里声明出来只影响 known_hosts（代理按站点路由）与网络检测的探测地址，
+    # 不改变 base_url_()：正常请求仍走源地址。
+    _domains = ["https://javdb.com", "https://javdb580.com"]
 
     def __init__(self, client, base_url: str = "", browser=None):
         super().__init__(client=client, base_url=base_url, browser=browser)

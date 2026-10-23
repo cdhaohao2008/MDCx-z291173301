@@ -2,6 +2,37 @@
 
 按日期分段记录（`## YYYY-MM-DD`，新 → 旧）。每条只写「做了什么 / 改了什么 / 修了什么」，原因与排查过程见 `docs/Development.md` 与 `DADA/MEMORY.md`。
 
+## 2026-10-24
+
+### 刮削请求：普通站点一个番号最多 3 次，JavDB / JavBus / JavLibrary 源镜像交替最多 4 次
+
+- `core/file_crawler.py` 用「番号 × 站点」的请求次数封顶取代原来的逐字段重试：`_MAX_SITE_REQUESTS = 3`（首次 1 次 + 重试 2 次），用尽后本番号不再请求该站（连超时都不用再等），只记一行「已请求 3 次仍失败，本番号后续字段不再请求该站」。
+- 有「源地址 + 镜像地址」的三个站点改用 `_MIRROR_SITE_TARGETS` + `_MAX_MIRROR_SITE_REQUESTS = 4`：**第一次源地址、第二次镜像地址、第三次源地址、第四次镜像地址**，4 次都没数据就放过该站。镜像地址先写死（用户 2026-10-24：短期不会换，不要每次刮削都去官方首页解析）：JavDB → `https://javdb580.com`，JavBus → `https://www.dmmsee.casa`，JavLibrary → `https://www.f101w.com/cn`。
+- JavLibrary 的镜像走独立爬虫 `JavLibraryMirror`（页面结构相同、单独站点可选），其余两个只是同一爬虫换域名。
+- `crawlers/base/base.py` 新增 `use_base_url()`：把本次请求钉在指定地址，同时关掉爬虫内部的镜像轮换与动态域名解析——否则「一次尝试」会被内部轮换放大成多次请求，用户看到的次数就不再是上限；退出时完整还原（爬虫实例在整个批次内复用）。聚合层每打一次镜像都会在字段日志里记一行「第 N 次请求改用镜像地址」。
+- 用户单独禁用 `Javlibrary·镜像` 站点时不走镜像（「禁用即不请求」不能被绕路）。
+- 此前 `REDUCED_FIELDS` 19 个字段各重试一次，一个连不上的站点会被重试十几次、每次都陪跑到超时，整批刮削被拖成分钟级。
+- `crawlers/javdb.py` 声明 `_domains = ["https://javdb.com", "https://javdb580.com"]`：镜像域名一并进 `known_hosts`（代理按站点路由）与网络检测的探测地址，`base_url_()` 不变，正常请求仍走源地址。
+- 测试：`tests/test_field_crawler_retry.py` 新增「源 → 镜像 → 源 → 镜像」交替（JavDB）与「偶数次走 JavLibraryMirror」两条用例，普通站点封顶 3 次的用例改用非镜像站点；`tests/crawlers/test_javbus_new.py` 新增 `use_base_url()` 钉地址/还原用例。
+
+### JavBus 默认站点改回主站，防屏蔽地址换成 dmmsee.casa
+
+- `crawlers/javbus.py::_JAVBUS_DOMAINS` 首选改为 `https://www.javbus.com`（原来首选 `https://www.dmmsee.cyou`），镜像里的 `dmmsee.cyou` 换成 `https://www.dmmsee.casa`。
+- `resources/config/default_config.json` 里 JavBus 的 `custom_url` 默认值清空：防屏蔽地址会变来变去，预填在默认配置里等于逼用户天天改配置；清空后走爬虫自带的域名列表（主站优先，主站不可达时自动轮换镜像）。
+- `tools/actor_sources.py` 的 javbus 镜像表、`docs/Scraper.md` 的站点地址表、`scripts/series_collect.py` 与 `scripts/studio_label_collect.py` 的采集域名同步。
+
+### 补全模式：nfo 关键字段齐全时直接进成功列表
+
+- 新增 `scraper.missing_complete_fields()`：校验 番号、演员、标题、封面图、缩略图、简介、标签、日期、时长、导演、系列、制作、发行 13 项是否都有具体值；纯空白、`null`/`None`/`nan` 之类占位文本、空列表一律算缺失，封面图/缩略图额外认「本地图片文件已存在」。
+- 13 项全都有值时，补全模式不再联网刮削（一次请求都不发），直接沿用本地 nfo 走完流程并计入成功列表；只有字段不齐才按原逻辑联网合并补全。字段齐全的文件不会再被一个慢站点的重试拖住。
+
+### 简介/原简介占位值：发行日期与「看更多」一律视为没有简介
+
+- 新增 `core/outline_guard.py`：把「发行日期/發行日期/販売日/発売日/配信日/Release date + 日期」这类文本剥掉标签与日期后若无实质内容，即判定为占位（兼容 `2025-11-13`、`2025/11/13`、`2025.11.13`、`2025年11月13日`、全角数字等变体）；`看更多/查看更多/もっとみる/続きを読む/See more/Read more` 等展开链接文本判定为原简介占位。
+- 字段优先级循环里对简介、原简介做占位判定：命中即舍弃并继续尝试下一来源（去其他站点取真简介）；所有来源都拿不到就保持为空，绝不回填发行日期或「看更多」。
+- `core/nfo.py::get_nfo_data()` 读 nfo 时清空占位简介并记一行日志；补全模式据此把清空后的空值写回 nfo（`CrawlersResult.cleared_placeholder_fields`），避免磁盘上的「发行日期 2025-11-13」一直留着。
+- 新增 `tests/test_outline_placeholder.py`（占位判定、清空逻辑、跨站回退、无来源时保持为空）；`tests/test_complete_mode.py` 增加字段齐全跳过联网、占位简介触发联网、无来源时清空写回三条用例。
+
 ## 2026-10-23
 
 ### 分离模式 / 更新模式：伴生文件搬移也改为「番号关联 + 事务 + 回滚」

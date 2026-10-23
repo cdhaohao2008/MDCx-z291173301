@@ -5,10 +5,16 @@
 限流、CDN 抖动都是瞬时的。故命中 failed 的站点在每个字段照常重试，重试成功
 即恢复供后续字段使用；每次重试也如实记一行，静默只会把用户引向错误结论。
 
+但重试有预算（2026-10-24 用户定规）：同一番号对同一站点最多重试 2 次，用尽后
+本番号不再请求该站，只留一行「不再请求该站」。19 个字段各重试一次 = 19 次超时
+等待，纯属浪费——既不可能在第 13 次突然恢复，也让整批刮削慢到不可用。
+
 历史背景（保留以说明为何曾有过相反设计）：2026-08 曾把失败标记做成站点级
 去重 + 后续字段静默跳过，理由是「同一文件内 140+ 行重复标记」。该权衡现已
 被用户明确否决——日志冗余的代价远小于整站字段被一次抖动打掉。
 """
+
+import contextlib
 
 import pytest
 
@@ -93,43 +99,142 @@ class _FlakyCrawlerProvider:
         return self._crawler
 
 
-async def test_failed_site_retried_and_logged_for_every_field(monkeypatch: pytest.MonkeyPatch):
-    """核心断言：javbus 失败后 4 个字段各重试一次，且每次都如实记一行（不再静默跳过）。"""
-    monkeypatch.setattr(
-        ManualConfig,
-        "REDUCED_FIELDS",
-        (
-            CrawlerResultFields.TITLE,
-            CrawlerResultFields.OUTLINE,
-            CrawlerResultFields.SERIES,
-            CrawlerResultFields.STUDIO,
-        ),
+async def test_retry_capped_per_site(monkeypatch: pytest.MonkeyPatch):
+    """请求上限：普通站点一个番号最多请求 3 次，之后不再发请求也不再刷日志。
+
+    用户诉求（2026-10-24）：「一个番号对一个站点默认最多请求三次，重试请求十几次
+    人都要疯掉，不仅耗时间还没卵用」。此前每个字段各重试一次，19 个字段就是 19 次
+    超时等待；这里断言预算用尽后彻底停手，并只留一行「不再请求该站」。
+    """
+    fields = (
+        CrawlerResultFields.TITLE,
+        CrawlerResultFields.OUTLINE,
+        CrawlerResultFields.SERIES,
+        CrawlerResultFields.STUDIO,
+        CrawlerResultFields.PUBLISHER,
+        CrawlerResultFields.TRAILER,
     )
+    monkeypatch.setattr(ManualConfig, "REDUCED_FIELDS", fields)
 
     calls: list[Website] = []
-    ok_data = _build_result(Website.AVBASE, "存活站的标题")
+    ok_data = _build_result(Website.JAVDB, "存活站的标题")
 
     class _OneFlakyOneAlive:
-        """JAVBUS 持续超时；AVBASE 正常返回（让整体结果非 None，才能检查 field_log）。"""
+        """AVBASE 持续超时；JAVDB 正常返回（让整体结果非 None，才能检查 field_log）。"""
 
         async def get(self, site: Website):
-            if site is Website.AVBASE:
+            if site is Website.JAVDB:
                 return _StaticCrawler(ok_data)
-            return _FlakyCrawler(Website.JAVBUS, calls, None, fail_times=999)
+            return _FlakyCrawler(Website.AVBASE, calls, None, fail_times=999)
 
-    scraper = FileScraper(_RetryConfig([Website.JAVBUS, Website.AVBASE]), _OneFlakyOneAlive())
+    scraper = FileScraper(_RetryConfig([Website.AVBASE, Website.JAVDB]), _OneFlakyOneAlive())
     task_input = CrawlerInput.empty()
     task_input.number = "TEST-55"
 
-    result = await scraper._call_crawlers(task_input, {Website.JAVBUS, Website.AVBASE})
+    result = await scraper._call_crawlers(task_input, {Website.AVBASE, Website.JAVDB})
 
     assert result is not None, "存活站应让整体结果非 None，才能检查 field_log"
-    # 预取 1 次 + 4 个字段各 1 次 = 5 次，证明每个字段都重试了（未被永久跳过）
-    assert len(calls) == 5, f"应逐字段重试（预取1+字段4），实际 {len(calls)} 次。\ncalls: {calls}"
-    # 每次重试都记一行，序号递增——重试是被要求看见的行为
-    for n in range(1, 5):
-        assert f"重试第 {n} 次仍失败" in result.field_log, f"第 {n} 次重试未记日志。\n{result.field_log}"
-    assert result.field_log.count("重试第") == 4, result.field_log
+    # 预取 1 次 + 重试 2 次 = 3 次；第 3 个字段起直接跳过，不再产生请求
+    assert len(calls) == 3, f"单站请求应封顶 3 次（预取1+重试2），实际 {len(calls)} 次。\ncalls: {calls}"
+    assert "重试第 1 次仍失败" in result.field_log, result.field_log
+    assert "重试第 2 次仍失败" in result.field_log, result.field_log
+    assert "重试第 3 次" not in result.field_log, result.field_log
+    # 放弃只记一行，后续字段静默跳过（不刷屏）
+    assert result.field_log.count("本番号后续字段不再请求该站") == 1, result.field_log
+
+
+class _MirrorAwareCrawler:
+    """记录每次请求实际打到的地址；恒定超时。
+
+    `use_base_url` 模拟 BaseCrawler 的钉地址行为（聚合层按源/镜像交替时调用）。
+    """
+
+    def __init__(self, site: Website, records: list[tuple[Website, str]]):
+        self._site = site
+        self._records = records
+        self._pinned = ""
+
+    @contextlib.contextmanager
+    def use_base_url(self, url: str):
+        self._pinned = url
+        try:
+            yield
+        finally:
+            self._pinned = ""
+
+    async def run(self, task_input):
+        self._records.append((self._site, self._pinned))
+        raise TimeoutError("read timed out")
+
+
+def _mirror_provider(records: list[tuple[Website, str]], alive_site: Website, alive_data):
+    class _Provider:
+        async def get(self, site: Website):
+            if site is alive_site:
+                return _StaticCrawler(alive_data)
+            return _MirrorAwareCrawler(site, records)
+
+    return _Provider()
+
+
+async def test_mirrored_site_alternates_source_and_mirror(monkeypatch: pytest.MonkeyPatch):
+    """JavDB/JavBus/JavLibrary：一个番号最多请求 4 次，按「源 → 镜像 → 源 → 镜像」交替。
+
+    用户 2026-10-24：「第一次源地址，第二次镜像地址，第三次源地址，第四次镜像地址，
+    四次还没获取到数据就 pass 掉」。
+    """
+    monkeypatch.setattr(
+        ManualConfig,
+        "REDUCED_FIELDS",
+        (CrawlerResultFields.TITLE, CrawlerResultFields.OUTLINE, CrawlerResultFields.SERIES),
+    )
+
+    records: list[tuple[Website, str]] = []
+    ok_data = _build_result(Website.AVBASE, "存活站的标题")
+    provider = _mirror_provider(records, Website.AVBASE, ok_data)
+    scraper = FileScraper(_RetryConfig([Website.JAVDB, Website.AVBASE]), provider)
+    task_input = CrawlerInput.empty()
+    task_input.number = "TEST-MIRROR"
+
+    result = await scraper._call_crawlers(task_input, {Website.JAVDB, Website.AVBASE})
+
+    assert result is not None
+    javdb_requests = [url for site, url in records if site is Website.JAVDB]
+    assert javdb_requests == [
+        "",  # 第 1 次：源地址
+        "https://javdb580.com",  # 第 2 次：镜像地址
+        "",  # 第 3 次：源地址
+        "https://javdb580.com",  # 第 4 次：镜像地址
+    ], javdb_requests
+    assert "已请求 4 次仍失败" in result.field_log, result.field_log
+    assert "改用镜像地址" in result.field_log, result.field_log
+
+
+async def test_javlibrary_mirror_uses_mirror_crawler(monkeypatch: pytest.MonkeyPatch):
+    """JavLibrary 的镜像由独立爬虫提供：偶数次请求走 JavLibraryMirror。"""
+    monkeypatch.setattr(
+        ManualConfig,
+        "REDUCED_FIELDS",
+        (CrawlerResultFields.TITLE, CrawlerResultFields.OUTLINE, CrawlerResultFields.SERIES),
+    )
+
+    records: list[tuple[Website, str]] = []
+    ok_data = _build_result(Website.AVBASE, "存活站的标题")
+    provider = _mirror_provider(records, Website.AVBASE, ok_data)
+    scraper = FileScraper(_RetryConfig([Website.JAVLIBRARY, Website.AVBASE]), provider)
+    task_input = CrawlerInput.empty()
+    task_input.number = "TEST-JAVLIB"
+
+    result = await scraper._call_crawlers(task_input, {Website.JAVLIBRARY, Website.AVBASE})
+
+    assert result is not None
+    javlib_requests = [(site, url) for site, url in records if site is not Website.AVBASE]
+    assert javlib_requests == [
+        (Website.JAVLIBRARY, ""),
+        (Website.JAVLIBRARY_MIRROR, "https://www.f101w.com/cn"),
+        (Website.JAVLIBRARY, ""),
+        (Website.JAVLIBRARY_MIRROR, "https://www.f101w.com/cn"),
+    ], javlib_requests
 
 
 async def test_every_failed_site_is_retried_and_named(monkeypatch: pytest.MonkeyPatch):

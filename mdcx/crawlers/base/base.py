@@ -1,3 +1,4 @@
+import contextlib
 import re
 import time
 import traceback
@@ -56,6 +57,9 @@ class GenericBaseCrawler[T: Context = Context](ABC):
     # 站点镜像域名列表（可选）。声明后请求失败（连接/SSL/超时等）会自动切到下一域名重试。
     # 留空表示不轮询。子类可调用 _init_rotator() 用 custom_url 初始化。
     _domains: list[str] = []
+
+    # 镜像域名轮询器（由 _init_rotator 创建；未声明镜像的站点保持 None）
+    _rotator: DomainRotator | None = None
 
     # 站点定位说明（供 UI 列表 tooltip 展示）。如"免 CF 通道"、"综合站（有码+无码）"、
     # "仅覆盖本厂作品"等。留空则不显示说明。
@@ -118,6 +122,35 @@ class GenericBaseCrawler[T: Context = Context](ABC):
     def _init_rotator(self, domains: list[str], custom_url: str) -> None:
         """初始化镜像域名轮询器（含用户自定义 URL 优先）。"""
         self._rotator = DomainRotator(domains, custom_url=custom_url)
+
+    @contextlib.contextmanager
+    def use_base_url(self, url: str):
+        """本次请求钉在指定地址：换掉 base_url，同时关掉镜像轮换与动态域名解析。
+
+        聚合层按「源地址 → 镜像地址 → 源地址 → 镜像地址」交替重试 JavDB / JavBus /
+        JavLibrary 时用。必须连轮换一起关掉——否则「一次尝试」会被爬虫内部的镜像
+        轮换放大成多次请求，用户看到的请求次数就不再是配置里那个上限。
+
+        退出时还原全部被改写的状态（爬虫实例在整个刮削批次内复用）。
+        """
+        if not url:
+            yield
+            return
+        saved_base_url = self.base_url
+        saved_explicit = getattr(self, "_explicit_base_url", None)
+        saved_rotator = getattr(self, "_rotator", None)
+        self.base_url = url
+        # javlibrary / javlibrary 镜像在 _run 里按这个标志决定要不要联网解析最新地址
+        self._explicit_base_url = True
+        if saved_rotator is not None:
+            self._rotator = DomainRotator([url])
+        try:
+            yield
+        finally:
+            self.base_url = saved_base_url
+            if saved_explicit is not None:
+                self._explicit_base_url = saved_explicit
+            self._rotator = saved_rotator
 
     async def _get_text_with_rotate(
         self,

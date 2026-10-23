@@ -13,16 +13,19 @@ from .base import BaseCrawler, Context, CrawlerData, CrawlerException
 from .base.base_types import split_csv
 
 # javbus 镜像域名列表（主站 + 备用，按可用性排列；用户配置 custom_url 时优先使用）
+# 2026-10-24 用户定规：默认走主站 javbus.com，不再默认用防屏蔽地址（dmmsee 系列
+# 域名会变来变去，写死在默认值里等于让用户天天去改配置）；防屏蔽地址的正确值是
+# https://www.dmmsee.casa（旧值 dmmsee.cyou 已失效）。
 # 2026-08-25 实测：busjav.bond/seejav.cyou/buscdn.bond/javbus.bond SSL 连接失效已移除；
 # busdmm.bond 持续 CF 挑战未纳入。
 _JAVBUS_DOMAINS = [
-    "https://www.dmmsee.cyou",
+    "https://www.javbus.com",
+    "https://www.dmmsee.casa",
     "https://www.javsee.cyou",
     "https://www.cdnbus.bond",
     "https://www.cdnbus.cyou",
     "https://www.fanbus.bond",
     "https://www.dmmbus.bond",
-    "https://www.javbus.com",
 ]
 
 

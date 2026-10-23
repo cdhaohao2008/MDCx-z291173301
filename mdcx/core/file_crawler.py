@@ -28,6 +28,7 @@ from ..number import get_number_letters, is_uncensored
 from ..utils import parse_score_number
 from ..utils.dataclass import update
 from ..utils.xml import XML_TEXT_FIELDS, normalize_xml_text
+from .outline_guard import clear_placeholder_plots, is_placeholder_originalplot, is_placeholder_plot
 
 if TYPE_CHECKING:
     from ..config.models import Config
@@ -43,6 +44,25 @@ MULTI_LANGUAGE_WEBSITES = [  # 支持多语言, language 参数有意义
 # 整批站点请求的总超时（秒）：防止单个慢站点拖垮整批抓取
 # 借鉴 jav-pack-api 的 AbortSignal.timeout——主流程等待以总超时为界，超时未返回的站点降级为失败
 _CRAWLER_BATCH_TIMEOUT = 60.0
+
+# 单个番号对单个站点的请求上限（含首次请求）。
+# 失败站点会在后续每个字段各重试一次，REDUCED_FIELDS 有 19 个字段时，一个连不上的站点
+# 会被重试十几次——既拖慢整批（每次都要等超时），又不可能在第 13 次突然恢复。
+# 3 次足够覆盖网络抖动/限流这类瞬时故障；超过上限后本番号不再请求该站。
+_MAX_SITE_REQUESTS = 3
+
+# 有「源地址 + 镜像地址」的站点：一个番号最多请求 4 次，按
+# 「源地址 → 镜像地址 → 源地址 → 镜像地址」交替，4 次都没数据才放过该站。
+# 值是 (镜像用的爬虫站点, 镜像地址)：
+# - JavDB / JavBus 的镜像只是同一个爬虫换域名；
+# - JavLibrary 的镜像是独立爬虫（JavLibraryMirror，页面结构相同、地址来自 zlibz 发布）。
+# 镜像地址先写死（用户 2026-10-24：短期不会换，不要每次刮削都去官方首页解析一次）。
+_MIRROR_SITE_TARGETS: dict[Website, tuple[Website, str]] = {
+    Website.JAVDB: (Website.JAVDB, "https://javdb580.com"),
+    Website.JAVBUS: (Website.JAVBUS, "https://www.dmmsee.casa"),
+    Website.JAVLIBRARY: (Website.JAVLIBRARY_MIRROR, "https://www.f101w.com/cn"),
+}
+_MAX_MIRROR_SITE_REQUESTS = 4
 
 # 同番号刮削结果的 TTL 缓存（秒）：同批次中相同番号的文件（如多 CD、重复文件）直接复用结果，
 # 避免对同一番号重复请求所有站点。缓存键除文件路径外还带上「这次实际参与请求的站点、
@@ -305,6 +325,10 @@ def _deal_res(res: CrawlersResult) -> CrawlersResult:
     if not res.publisher:
         res.publisher = res.studio
 
+    # 简介占位值兜底清理：字段循环已逐站拒绝，这里再兜一次（缓存命中、字段来源
+    # 直接写入等旁路），保证写进 NFO 的简介不会是「发行日期 2025-11-13」或「看更多」
+    clear_placeholder_plots(res)
+
     # 字符转义，避免显示问题
     for each in XML_TEXT_FIELDS:
         setattr(res, each, normalize_xml_text(getattr(res, each)))
@@ -353,7 +377,7 @@ class FileScraper:
         return all_res.get((site, Language.UNDEFINED))
 
     async def _call_crawler(
-        self, task_input: CrawlerInput, website: Website, timeout: float | None = 30
+        self, task_input: CrawlerInput, website: Website, timeout: float | None = 30, *, base_url: str = ""
     ) -> CrawlerResponse:
         """
         调用指定网站的爬虫函数
@@ -362,6 +386,7 @@ class FileScraper:
             task_input (CrawlerInput): 包含爬虫所需的输入数据
             website (str): 网站名称
             timeout (float | None): 请求超时时间，默认为30秒
+            base_url (str): 指定本次请求的地址（源/镜像交替重试用）；空串表示用站点默认地址
 
         Raises:
             asyncio.TimeoutError: 如果请求超时
@@ -380,8 +405,12 @@ class FileScraper:
 
             # 移除外层超时限制，让内层的 GatherGroup 处理超时和重试
             # 原有的超时机制已由各个 HTTP 请求单独处理
-            r = await c.run(task_input)
-            return r
+            pin = getattr(c, "use_base_url", None)
+            if base_url and pin is not None:
+                # 钉住地址：关掉爬虫内部的镜像轮换与动态域名解析，保证「一次尝试 = 一次请求」
+                with pin(base_url):
+                    return await c.run(task_input)
+            return await c.run(task_input)
         finally:
             task_input.number = original_number
 
@@ -452,12 +481,19 @@ class FileScraper:
                 all_needed_keys.add(key)
 
         # 并发请求所有尚未请求的网站
+        #
+        # 请求次数按「番号 × 站点」计：普通站点最多 3 次，有源/镜像的站点最多 4 次
+        # （源 → 镜像 → 源 → 镜像）。用尽后本番号不再请求该站，只记一行「已放弃」。
+        request_counts: dict[Website, int] = {}
+        exhausted: set[Website] = set()
+
         async def _fetch_site(key: tuple[Website, Language]) -> None:
             site, lang = key
             try:
                 ti = _dc_replace(task_input, language=lang, org_language=lang)
                 if site in MULTI_LANGUAGE_WEBSITES and lang == Language.UNDEFINED:
                     ti = _dc_replace(ti, language=Language.JP, org_language=Language.JP)
+                request_counts[site] = request_counts.get(site, 0) + 1
                 web_data = await self._call_crawler(ti, site)
                 req_info.append(f"{sprint_source(*key)} ({web_data.debug_info.execution_time:.2f}s)")
                 if web_data.data is None:
@@ -508,7 +544,9 @@ class FileScraper:
         # 即写入 all_res，后续字段全部命中缓存、不再产生任何请求（重试代价只付一次）。
         # 同理，每次重试都如实记一行——重试本身就是需要被看见的行为，静默只会在用户
         # 排查「这站怎么一直没数据」时把人引向错误结论。
-        retry_attempts: dict[Website, int] = {}
+        # 但请求次数必须有上限：普通站点 3 次、有镜像的站点 4 次。到上限后打一行
+        # 「本番号已放弃」再彻底停手，既不让日志刷屏，也不让一个连不上的站点把整批
+        # 刮削拖成分钟级。
 
         def _failure_reason_text(site: Website) -> str:
             """议题 #101：标注失败类因，让用户分辨"站点连不上/被拦截"与"逻辑问题"。"""
@@ -523,15 +561,48 @@ class FileScraper:
             }
             return f"，原因: {reason_map.get(fr[0], '请求异常')}"
 
+        def _request_budget(site: Website) -> int:
+            return _MAX_MIRROR_SITE_REQUESTS if site in _MIRROR_SITE_TARGETS else _MAX_SITE_REQUESTS
+
+        def _retry_index(site: Website) -> int:
+            """本次是第几次「重试」：请求次数从 1 起算，第 2 次请求即重试第 1 次。"""
+            return max(request_counts.get(site, 1) - 1, 1)
+
         def _note_attempt_failed(site: Website, is_retry: bool, first_try_detail: str) -> None:
             """记录本次尝试的失败。首次请求打原始细节，重试打第 N 次 + 归类原因。"""
             if not is_retry:
                 reduced.field_log += f"\n    🔴 {site:<15} ({first_try_detail})"
                 return
-            retry_attempts[site] = retry_attempts.get(site, 0) + 1
             reduced.field_log += (
-                f"\n    🔴 {site:<15} (重试第 {retry_attempts[site]} 次仍失败{_failure_reason_text(site)})"
+                f"\n    🔴 {site:<15} (重试第 {_retry_index(site)} 次仍失败{_failure_reason_text(site)})"
             )
+
+        def _request_budget_spent(site: Website) -> bool:
+            """该站本番号的请求次数是否已用尽；用尽时只记一次「已放弃」，后续字段静默跳过。"""
+            budget = _request_budget(site)
+            if request_counts.get(site, 0) < budget:
+                return False
+            if site not in exhausted:
+                exhausted.add(site)
+                reduced.field_log += (
+                    f"\n    ⏭️ {site:<15} (已请求 {budget} 次仍失败，"
+                    f"本番号后续字段不再请求该站{_failure_reason_text(site)})"
+                )
+            return True
+
+        def _attempt_target(site: Website, attempt: int) -> tuple[Website, str]:
+            """第 attempt 次请求（从 1 起）该用的爬虫站点与地址覆盖。
+
+            有源/镜像的站点奇数次打源地址、偶数次打镜像地址；其余站点一律用自己的默认地址。
+            """
+            mirror = _MIRROR_SITE_TARGETS.get(site)
+            if mirror is None or attempt % 2 == 1:
+                return site, ""
+            mirror_site, mirror_url = mirror
+            # 镜像站点被用户单独禁用时不走镜像（「禁用即不请求」的承诺不能被绕开）
+            if mirror_site is not site and _is_site_disabled(self.config, mirror_site):
+                return site, ""
+            return mirror
 
         for field in ManualConfig.REDUCED_FIELDS:
             # 获取该字段的优先级列表
@@ -568,15 +639,24 @@ class FileScraper:
                 if key in all_res:
                     site_data = all_res[key]
                 else:
+                    # 请求预算已用尽：本番号不再对该站发起任何请求（连超时都不用再等）
+                    if _request_budget_spent(site):
+                        continue
                     # 命中 failed 不再直接放弃：改走下方同一段请求逻辑重试。
                     # 预取批已把该站标记为失败，这里是第 1 次重试。
                     is_retry = key in failed
+                    # 第几次请求（含预取批那次）决定这次打源地址还是镜像地址
+                    attempt = request_counts.get(site, 0) + 1
+                    target_site, target_url = _attempt_target(site, attempt)
+                    if target_url:
+                        reduced.field_log += f"\n    🌐 {site:<15} (第 {attempt} 次请求改用镜像地址: {target_url})"
+                    request_counts[site] = attempt
                     # 如果网站数据尚未请求，则进行请求（首次请求或失败重试，同一段逻辑）
                     try:
                         ti = _dc_replace(task_input, language=f_lang, org_language=f_lang)
                         if site in MULTI_LANGUAGE_WEBSITES and key[1] == Language.UNDEFINED:
                             ti = _dc_replace(ti, language=Language.JP, org_language=Language.JP)
-                        web_data = await self._call_crawler(ti, site)
+                        web_data = await self._call_crawler(ti, target_site, base_url=target_url)
                         req_info.append(f"{sprint_source(*key)} ({web_data.debug_info.execution_time:.2f}s)")
                         if web_data.data is None:
                             if e := web_data.debug_info.error:
@@ -596,14 +676,15 @@ class FileScraper:
                             failed.discard(key)
                             failed.discard((site, Language.UNDEFINED))
                             failure_reasons.pop(site, None)
-                            retry_attempts[site] = retry_attempts.get(site, 0) + 1
                             reduced.field_log += (
-                                f"\n    🟢 {site:<15} (第 {retry_attempts[site]} 次重试成功，已恢复供后续字段使用)"
+                                f"\n    🟢 {site:<15} (第 {_retry_index(site)} 次重试成功，已恢复供后续字段使用)"
                             )
                     except TimeoutError:
                         _note_attempt_failed(site, is_retry, "请求超时")
                         failure_reasons.setdefault(site, (FailureReason.TIMEOUT, "请求超时"))
                         failed.add(key)
+                        # 本次失败正好用尽预算时立刻记「已放弃」，不必等到下一个字段才出现
+                        _request_budget_spent(site)
                         continue
                     except Exception as e:
                         _note_attempt_failed(site, is_retry, f"失败: {e!s}")
@@ -611,6 +692,7 @@ class FileScraper:
                             site, (FailureReason.classify(e), str(e).strip() or e.__class__.__name__)
                         )
                         failed.add(key)
+                        _request_budget_spent(site)
                         continue
 
                 # 检查字段数据
@@ -633,6 +715,14 @@ class FileScraper:
                         reduced.field_log += f"\n    🟡 {site:<15} (year无效, 舍弃: {field_value})"
                         continue
                     field_value = normalized_year
+                # 简介占位：站点把「販売日」或「もっとみる」当简介返回（FC2 常见），
+                # 这类值零信息量。舍弃后继续尝试下一来源，全都拿不到就保持为空。
+                if field == CrawlerResultFields.OUTLINE and is_placeholder_plot(field_value):
+                    reduced.field_log += f"\n    🟡 {site:<15} (简介为发行日期/看更多占位, 舍弃: {field_value})"
+                    continue
+                if field == CrawlerResultFields.ORIGINALPLOT and is_placeholder_originalplot(field_value):
+                    reduced.field_log += f"\n    🟡 {site:<15} (原简介为看更多占位, 舍弃: {field_value})"
+                    continue
 
                 is_primary_field_value = not getattr(reduced, field.value, None)
 

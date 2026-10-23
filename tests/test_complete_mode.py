@@ -133,6 +133,34 @@ class _FakeFileScraper:
         return data
 
 
+def _write_complete_nfo(folder: Path, number: str = "ABS-040") -> Path:
+    """写一份 13 个关键字段全都有值的 nfo（补全模式应直接跳过联网补全）。"""
+    folder.mkdir(parents=True, exist_ok=True)
+    nfo = folder / f"{number}.nfo"
+    nfo.write_text(
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        "<movie>\n"
+        f"  <title>{number} 完整标题</title>\n"
+        "  <originaltitle>complete original</originaltitle>\n"
+        f"  <num>{number}</num>\n"
+        "  <plot>这是一段真正的简介，不是发行日期。</plot>\n"
+        "  <originalplot>本編のあらすじ。二人の出会いから始まる物語。</originalplot>\n"
+        "  <release>2017-11-21</release>\n"
+        "  <runtime>120</runtime>\n"
+        "  <director>导演甲</director>\n"
+        "  <series>系列甲</series>\n"
+        "  <studio>プレステージ</studio>\n"
+        "  <publisher>プレステージ</publisher>\n"
+        "  <tag>剧情</tag>\n"
+        "  <actor><name>演员甲</name></actor>\n"
+        "  <poster>https://example.com/poster.jpg</poster>\n"
+        "  <cover>https://example.com/thumb.jpg</cover>\n"
+        "</movie>\n",
+        encoding="utf-8",
+    )
+    return nfo
+
+
 def _stub_heavy_steps(monkeypatch: pytest.MonkeyPatch) -> None:
     """把联网/耗时步骤换成空实现，只验证补全模式的编排逻辑。"""
     monkeypatch.setattr(scraper_module, "FileScraper", _FakeFileScraper)
@@ -381,6 +409,146 @@ async def test_complete_mode_moves_file_with_local_first_fields(monkeypatch: pyt
     assert "刮削标题" not in content, "本地已有标题不能被刮削值覆盖"
     assert "刮削简介" in content, "本地缺失的简介应该被补上"
     assert not video.exists()
+    assert Flags.fail_count == 0
+
+
+def test_missing_complete_fields_lists_blank_and_null_fields():
+    """空白、null、空列表都算缺失；封面/缩略图认本地图片文件。"""
+    data = CrawlersResult.empty()
+    data.number = "ABS-040"
+    data.title = "标题"
+    data.actors = ["演员"]
+    data.tags = ["标签"]
+    data.release = "2017-11-21"
+    data.runtime = "120"
+    data.directors = ["导演"]
+    data.series = "系列"
+    data.studio = "片商"
+    data.publisher = "   "  # 纯空格 = 没有值
+    data.outline = "null"  # 占位文本 = 没有值
+    data.poster = ""  # 空 = 缺失
+    data.thumb = ""  # 空 = 缺失
+
+    missing = scraper_module.missing_complete_fields(data)
+
+    assert missing == ["封面图", "缩略图", "简介", "发行"], missing
+
+    info = SimpleNamespace(poster_path=Path("poster.jpg"), thumb_path=None)
+    assert scraper_module.missing_complete_fields(data, info) == ["缩略图", "简介", "发行"]
+
+
+@pytest.mark.asyncio
+async def test_complete_mode_skips_scrape_when_nfo_fields_complete(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """13 个关键字段全都有值：补全模式不再联网，直接进成功列表。"""
+    media_dir = tmp_path / "media"
+    success_dir = media_dir / "JAV_output" / "ABS-040"
+    success_dir.mkdir(parents=True)
+    video = success_dir / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    nfo = _write_complete_nfo(success_dir)
+    original_nfo = nfo.read_text(encoding="utf-8")
+
+    _configure_complete_mode(monkeypatch, media_dir)
+    _stub_heavy_steps(monkeypatch)
+
+    def _boom(*_args, **_kwargs):
+        raise AssertionError("nfo 字段齐全时补全模式不应联网刮削")
+
+    monkeypatch.setattr(scraper_module, "FileScraper", _boom)
+
+    await Scraper(_DummyCrawlerProvider()).run(FileMode.Default, None)
+
+    assert video.exists(), "已在成功输出目录内的视频不能被移动"
+    assert nfo.read_text(encoding="utf-8") == original_nfo, "字段齐全时不应改写 nfo"
+    assert Flags.fail_count == 0
+    assert Flags.succ_count == 1, "字段齐全的文件应直接计入成功"
+
+
+@pytest.mark.asyncio
+async def test_complete_mode_scrapes_when_outline_is_release_date_placeholder(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """简介是「发行日期 2025-11-13」、原简介是「看更多」= 没有简介：仍要联网去其他站点取。"""
+    media_dir = tmp_path / "media"
+    success_dir = media_dir / "JAV_output" / "ABS-040"
+    success_dir.mkdir(parents=True)
+    video = success_dir / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    nfo = _write_complete_nfo(success_dir)
+    # 把真简介/原简介换成占位值：该文件因此不再"字段齐全"
+    nfo.write_text(
+        nfo.read_text(encoding="utf-8")
+        .replace("<plot>这是一段真正的简介，不是发行日期。</plot>", "<plot>发行日期 2025-11-13</plot>")
+        .replace(
+            "<originalplot>本編のあらすじ。二人の出会いから始まる物語。</originalplot>",
+            "<originalplot>看更多</originalplot>",
+        ),
+        encoding="utf-8",
+    )
+
+    _configure_complete_mode(monkeypatch, media_dir)
+    _stub_heavy_steps(monkeypatch)
+
+    scraped = {"called": False}
+
+    class _RecordingScraper(_FakeFileScraper):
+        async def run(self, task, file_mode):
+            scraped["called"] = True
+            data = await super().run(task, file_mode)
+            data.outline = "其他站点取到的真简介"
+            data.originalplot = "其他站点取到的真原简介"
+            return data
+
+    monkeypatch.setattr(scraper_module, "FileScraper", _RecordingScraper)
+
+    await Scraper(_DummyCrawlerProvider()).run(FileMode.Default, None)
+
+    assert scraped["called"] is True, "简介是发行日期占位时必须联网补全"
+    content = nfo.read_text(encoding="utf-8")
+    assert "其他站点取到的真简介" in content
+    assert "发行日期 2025-11-13" not in content, "占位简介必须被清掉，不能留在 nfo 里"
+    assert "看更多" not in content, "「看更多」原简介必须被清掉"
+    assert Flags.fail_count == 0
+
+
+@pytest.mark.asyncio
+async def test_complete_mode_clears_placeholder_outline_when_nothing_found(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """其他站点也没有简介时：简介/原简介保持为空，且空值要写回 nfo。"""
+    media_dir = tmp_path / "media"
+    success_dir = media_dir / "JAV_output" / "ABS-040"
+    success_dir.mkdir(parents=True)
+    video = success_dir / "ABS-040.mp4"
+    video.write_bytes(b"video")
+    nfo = _write_complete_nfo(success_dir)
+    nfo.write_text(
+        nfo.read_text(encoding="utf-8")
+        .replace("<plot>这是一段真正的简介，不是发行日期。</plot>", "<plot>发行日期 2025-11-13</plot>")
+        .replace(
+            "<originalplot>本編のあらすじ。二人の出会いから始まる物語。</originalplot>",
+            "<originalplot>看更多</originalplot>",
+        ),
+        encoding="utf-8",
+    )
+
+    _configure_complete_mode(monkeypatch, media_dir)
+    _stub_heavy_steps(monkeypatch)
+
+    class _EmptyScraper(_FakeFileScraper):
+        async def run(self, task, file_mode):
+            data = await super().run(task, file_mode)
+            data.outline = ""
+            data.originalplot = ""
+            return data
+
+    monkeypatch.setattr(scraper_module, "FileScraper", _EmptyScraper)
+
+    await Scraper(_DummyCrawlerProvider()).run(FileMode.Default, None)
+
+    content = nfo.read_text(encoding="utf-8")
+    assert "发行日期 2025-11-13" not in content, "占位简介必须从 nfo 里消失"
+    assert "看更多" not in content, "「看更多」原简介必须从 nfo 里消失"
     assert Flags.fail_count == 0
 
 

@@ -21,7 +21,7 @@ from lxml import html as lxml_html
 
 from mdcx.web_async import AsyncWebClient
 
-BASE = "https://www.dmmsee.cyou"
+BASE = "https://www.dmmsee.casa"
 
 CENSORED_MAX_PAGES = 196
 UNCENSORED_MAX_PAGES = 23

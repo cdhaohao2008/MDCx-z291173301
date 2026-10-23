@@ -32,7 +32,8 @@ from ..utils.domain_rotate import DomainRotator
 _LIBREDMM = "https://www.libredmm.com"
 _IQQTV_DOMAINS = ["https://iqqq3.quest", "https://iqq5.xyz", "https://iqqk4.quest"]
 _JAVBUS_DOMAINS = [
-    "https://www.dmmsee.cyou",
+    "https://www.javbus.com",
+    "https://www.dmmsee.casa",
     "https://www.busjav.bond",
     "https://www.cdnbus.bond",
     "https://www.seejav.cyou",
@@ -43,7 +44,6 @@ _JAVBUS_DOMAINS = [
     "https://www.cdnbus.cyou",
     "https://www.dmmbus.bond",
     "https://www.javbus.bond",
-    "https://www.javbus.com",
 ]
 _HEADERS = {"Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,ja;q=0.6"}
 

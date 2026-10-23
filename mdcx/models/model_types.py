@@ -412,6 +412,9 @@ class CrawlersResult(BaseCrawlerResult):
     # NFO <title> 的最终文本（最近一次写入 / 从 NFO 读到的原始标题）。
     # 「编辑 NFO」窗口按所见即所得展示与回写，避免二次套用命名模板造成字段重复。
     nfo_title: str = ""
+    # 从 NFO 读入后被判定为占位（发行日期 / 看更多）而清空的字段中文名。
+    # 补全模式据此判定"本地确实改了内容"，需要把清空后的值写回 NFO。
+    cleared_placeholder_fields: list[str] = field(default_factory=list)
 
     @classmethod
     def empty(cls) -> CrawlersResult:

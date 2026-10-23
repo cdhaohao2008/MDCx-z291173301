@@ -33,6 +33,23 @@ class FakeJavbusClient:
         )
 
 
+def test_use_base_url_pins_address_and_disables_rotation():
+    """聚合层按源/镜像交替重试时钉地址：只打指定域名、不轮换，退出后完整还原。"""
+    crawler = JavBusCrawler(client=FakeJavbusClient(), base_url="https://www.javbus.com")
+    original_domains = list(crawler._rotator.domains)
+    assert len(original_domains) > 1
+
+    with crawler.use_base_url("https://www.dmmsee.casa"):
+        assert crawler.base_url == "https://www.dmmsee.casa"
+        # 轮换表被收成单域名 = 这一次尝试最多只发一次请求
+        assert crawler._rotator is not None
+        assert crawler._rotator.domains == ["https://www.dmmsee.casa"]
+
+    assert crawler.base_url == "https://www.javbus.com"
+    assert crawler._rotator is not None
+    assert crawler._rotator.domains == original_domains
+
+
 @pytest.mark.asyncio
 async def test_javbus_crawler_maps_detail_page():
     crawler = JavBusCrawler(client=FakeJavbusClient(), base_url="https://www.javbus.com")
@@ -68,14 +85,14 @@ async def test_javbus_crawler_maps_detail_page():
 
 
 class RotatingJavbusClient:
-    """第一个域名连接失败，第二个域名成功，验证轮询切换。"""
+    """第一个域名（默认主站 javbus.com）连接失败，第二个域名成功，验证轮询切换。"""
 
     def __init__(self):
         self.requested: list[str] = []
 
     async def get_text(self, url, **kwargs):
         self.requested.append(url)
-        if url.startswith("https://www.dmmsee.cyou"):
+        if url.startswith("https://www.javbus.com"):
             return None, "Failed to perform, curl: (35) BoringSSL"
         return (
             """
@@ -96,8 +113,8 @@ class RotatingJavbusClient:
 @pytest.mark.asyncio
 async def test_javbus_crawler_rotates_domain_on_failure():
     client = RotatingJavbusClient()
-    crawler = JavBusCrawler(client=client, base_url="https://www.dmmsee.cyou")
-    # 用第一个域名初始化，验证失败后自动切到下一个
+    crawler = JavBusCrawler(client=client, base_url="https://www.javbus.com")
+    # 用默认主站初始化，验证失败后自动切到镜像
     res = await crawler.run(
         CrawlerInput(
             appoint_number="",
@@ -116,6 +133,6 @@ async def test_javbus_crawler_rotates_domain_on_failure():
     assert res.data.title == "Sample Title"
     # 至少请求了两个不同域名
     assert len(client.requested) >= 2
-    assert client.requested[0].startswith("https://www.dmmsee.cyou")
-    assert any(not u.startswith("https://www.dmmsee.cyou") for u in client.requested)
-    assert crawler.base_url != "https://www.dmmsee.cyou"
+    assert client.requested[0].startswith("https://www.javbus.com")
+    assert any(not u.startswith("https://www.javbus.com") for u in client.requested)
+    assert crawler.base_url != "https://www.javbus.com"

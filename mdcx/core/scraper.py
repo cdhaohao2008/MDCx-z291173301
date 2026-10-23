@@ -140,6 +140,57 @@ COMPANION_INDEX_MODES = (NORMAL_MAIN_MODE, SEPARATE_MAIN_MODE, UPDATE_MAIN_MODE)
 
 _COMPANION_MODE_LABELS = {NORMAL_MAIN_MODE: "正常模式", SEPARATE_MAIN_MODE: "分离模式", UPDATE_MAIN_MODE: "更新模式"}
 
+# 补全模式的「nfo 字段齐全」判定表：(属性名, 中文名)。
+# 这 13 项是用户明确要求校验的字段（2026-10-24）：全部有具体值时，补全模式直接跳过
+# 联网补全——为一份已经完整的 nfo 重新请求所有站点纯属浪费，站点慢/失败时还要陪着
+# 重试，整批刮削被拖成分钟级。
+_COMPLETE_REQUIRED_FIELDS: tuple[tuple[str, str], ...] = (
+    ("number", "番号"),
+    ("actors", "演员"),
+    ("title", "标题"),
+    ("poster", "封面图"),
+    ("thumb", "缩略图"),
+    ("outline", "简介"),
+    ("tags", "标签"),
+    ("release", "日期"),
+    ("runtime", "时长"),
+    ("directors", "导演"),
+    ("series", "系列"),
+    ("studio", "制作"),
+    ("publisher", "发行"),
+)
+
+# 看起来有值、实际等于空的占位文本（NFO 里被写成 null/None 的情况）
+_NULL_TEXT_VALUES = frozenset({"null", "none", "nan", "undefined", "n/a", "na"})
+
+
+def _is_blank_value(value: object) -> bool:
+    """字段是否没有具体值：None / 空白字符串 / 空列表 / "null" 之类的占位文本。"""
+    if value is None:
+        return True
+    if isinstance(value, str):
+        text = value.strip()
+        return not text or text.lower() in _NULL_TEXT_VALUES
+    if isinstance(value, (list, tuple, set)):
+        return not any(not _is_blank_value(item) for item in value)
+    return False
+
+
+def missing_complete_fields(data: CrawlersResult, info: OtherInfo | None = None) -> list[str]:
+    """补全模式：返回 nfo 里还没有具体值的关键字段（中文名，按固定顺序）。
+
+    封面图/缩略图额外认「本地图片文件存在」：nfo 里没写链接但图已下载到同目录时
+    也算有值，否则每次补全都会为一张已经躺在磁盘上的图重新联网。
+    """
+    missing: list[str] = []
+    for attr, label in _COMPLETE_REQUIRED_FIELDS:
+        if not _is_blank_value(getattr(data, attr, None)):
+            continue
+        if attr in ("poster", "thumb") and info is not None and getattr(info, f"{attr}_path", None):
+            continue
+        missing.append(label)
+    return missing
+
 
 class _LazyQMessageBox:
     """延迟解析的 `QMessageBox` 代理，使 `mdcx.core` 在导入期不依赖 Qt。
@@ -1459,6 +1510,8 @@ class Scraper:
         complete_local_info: OtherInfo | None = None
         # 补全模式：本次实际补到的空字段名（决定是否需要写回 nfo）
         complete_filled_fields: list[str] = []
+        # 补全模式：nfo 里还缺具体值的关键字段（中文名）；为空表示字段齐全、无需联网
+        complete_missing_fields: list[str] = []
         # 读取模式 / 整理模式 / 补全模式：都从同目录 nfo 读取已有字段
         file_can_download = True
         if runtime_mode in (READ_MAIN_MODE, ORGANIZE_MAIN_MODE, COMPLETE_MAIN_MODE):
@@ -1495,6 +1548,13 @@ class Scraper:
                     complete_local = nfo_data
                     complete_local_info = info
                     file_can_download = True
+                    # 先算清缺哪些关键字段：一个都不缺就没有联网的必要（用户 2026-10-24）
+                    complete_missing_fields = missing_complete_fields(nfo_data, info)
+                    if not complete_missing_fields:
+                        LogBuffer.log().write(
+                            "\n 📖 补全模式：nfo 关键字段齐全（番号/演员/标题/封面/缩略图/简介/标签/"
+                            "日期/时长/导演/系列/制作/发行），跳过联网补全"
+                        )
                 else:
                     # 读取模式：只读取 nfo 字段与本地封面/缩略图并展示，
                     # 不联网、不下载、不写 nfo、不移动文件。
@@ -1772,28 +1832,38 @@ class Scraper:
         # 补全模式：本地已有 nfo 时也要联网刮削一次，但只把「本地空着的字段」补上，
         # 本地已有的值一律保留（合并策略默认「本地信息优先」，勾选合并策略后按所选策略）。
         if complete_mode and complete_local is not None:
-            crawl_task = file_info.crawl_task()
-            crawl_task.media_context = media_context  # type: ignore[attr-defined]
-            complete_scraped = await FileScraper(manager.config, self.crawler_provider).run(crawl_task, file_mode)
-            if complete_scraped is None:
-                LogBuffer.log().write("\n 🟡 补全模式：联网刮削未取得数据，改用本地 nfo 字段继续补全封面/缩略图/字幕")
-            else:
-                strategy = complete_merge_strategy()
-                merged = merge_nfo_fields(complete_scraped, complete_local, strategy)
-                merged.number = movie_number
-                complete_filled_fields = filled_missing_fields(complete_local, merged)
-                res = merged
-                if complete_filled_fields:
+            if complete_missing_fields:
+                crawl_task = file_info.crawl_task()
+                crawl_task.media_context = media_context  # type: ignore[attr-defined]
+                complete_scraped = await FileScraper(manager.config, self.crawler_provider).run(crawl_task, file_mode)
+                if complete_scraped is None:
                     LogBuffer.log().write(
-                        f"\n 📖 补全模式：已补全 {len(complete_filled_fields)} 个空字段"
-                        f"（{', '.join(complete_filled_fields)}）"
+                        "\n 🟡 补全模式：联网刮削未取得数据，改用本地 nfo 字段继续补全封面/缩略图/字幕"
                     )
                 else:
-                    LogBuffer.log().write("\n 📖 补全模式：本地 nfo 字段已齐全，无需补全字段")
-            # 定稿：只有真的补到空字段（或补到新的演员 tmdbid）才写回 nfo。
+                    strategy = complete_merge_strategy()
+                    merged = merge_nfo_fields(complete_scraped, complete_local, strategy)
+                    merged.number = movie_number
+                    complete_filled_fields = filled_missing_fields(complete_local, merged)
+                    res = merged
+                    if complete_filled_fields:
+                        LogBuffer.log().write(
+                            f"\n 📖 补全模式：已补全 {len(complete_filled_fields)} 个空字段"
+                            f"（{', '.join(complete_filled_fields)}）"
+                        )
+                    else:
+                        LogBuffer.log().write("\n 📖 补全模式：本地 nfo 字段已齐全，无需补全字段")
+            # 字段齐全时不联网，res 就是本地 nfo（后续封面/缩略图/字幕按需补、nfo 不重写）
+            # 定稿：只有真的补到空字段（或补到新的演员 tmdbid / 清空了占位简介）才写回 nfo。
             # 这一步必须排在「字段处理/翻译」之前——翻译与标题模板渲染都依赖它。
             new_tmdb_ids = set(res.actor_tmdb_ids or {}) - set(complete_local.actor_tmdb_ids or {})
-            update_nfo = bool(complete_filled_fields) or bool(new_tmdb_ids)
+            update_nfo = (
+                bool(complete_filled_fields)
+                or bool(new_tmdb_ids)
+                # 占位简介（发行日期 / 看更多）已被清空：即使其他站点也拿不到真简介，
+                # 也要把「空」写回 nfo，否则磁盘上那行垃圾会一直留着
+                or bool(complete_local.cleared_placeholder_fields)
+            )
 
         # 显示json_data结果或日志
         show_result(res, start_time)

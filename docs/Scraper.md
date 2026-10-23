@@ -32,7 +32,7 @@ MDCx 刮削网站类型汇总表
     AVMOO             https://avmoo.shop                「AVMOO - 你的线上日本成人影片情报站」，纯日系有码
     FreeJavBT         https://freejavbt22.cc            导航 有碼 / 無碼 / 歐美 / FC2 + 系列 LUXU / ARA / SIRO / AV Bro
     IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
+    JavBus            https://www.javbus.com            导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
     JavDay            https://javday.app                「JAVDAY | 免費高清AV在線看| 麻豆 SWAG 看到飽」
     JavDB             https://javdb.com                 Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
@@ -63,7 +63,7 @@ MDCx 刮削网站类型汇总表
     AVEntertainments  https://www.aventertainments.com  AV 安态。「正規無修正」DVD 販売 / 配信
     FreeJavBT         https://freejavbt22.cc            导航 有碼 / 無碼 / 歐美 / FC2 + 系列 LUXU / ARA / SIRO / AV Bro
     IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
+    JavBus            https://www.javbus.com            导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
     JavDB             https://javdb.com                 Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
     JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
@@ -83,7 +83,7 @@ MDCx 刮削网站类型汇总表
     AVSOX             https://avsox.click               avsox.click。与 avmoo/avheat 同 tellme.pw AIO 平台，纯无码
     FC2PPVDB          https://fc2cmadb.com              fc2cmadb.com。FC2 目录站，卖家名多为素人（マスクde本物素人 等）
     IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
+    JavBus            https://www.javbus.com            导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
     JavDB             https://javdb.com                 Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
     JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
@@ -100,7 +100,7 @@ MDCx 刮削网站类型汇总表
     7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     AVheat            https://avheat.shop               「AVHEAT - 你的线上欧美成人影片情报站」
     IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
+    JavBus            https://www.javbus.com            导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
     JavDB             https://javdb.com                 Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
     JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
@@ -118,7 +118,7 @@ MDCx 刮削网站类型汇总表
   ── 第三方 / 聚合站 (8) ──
     7mmtv             https://www.7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     IQQTV             https://iqqq3.quest               iqq5.xyz + iqqq3.quest。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus            https://www.dmmsee.cyou           导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
+    JavBus            https://www.javbus.com            导航 有碼/無碼/歐美。FC2 归在有碼類別下，无独立标签
     JavDB             https://javdb.com                 Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API         https://javdb573.com              JavDB 镜像 API（javdb573.com），内容集同 JavDB
     JavDB_APP         https://apidd.czssdgz.com         JavDB App 接口镜像（apidd.*），内容集同 JavDB
@@ -187,7 +187,7 @@ FC2PPVDB          FC2：FC2网站             素人+FC2                        
 FreeJavBT         有码：仅限有码            有码+无码+FC2+欧美                https://freejavbt22.cc                  
 Getchu            综合：有码+游戏+视频       有码（另有里番/同人/书籍/动漫）   http://www.getchu.com                   AIV
 IQQTV             综合：有码+无码+素人+国产  有码+无码+素人+欧美+国产          https://iqqq3.quest                     
-JavBus            综合：有码+无码           有码+无码+FC2+欧美                https://www.dmmsee.cyou                 
+JavBus            综合：有码+无码           有码+无码+FC2+欧美                https://www.javbus.com                 
 JavDay            综合：有码+无码+国产       有码+无码+国产                    https://javday.app                      
 JavDB             综合：有码+无码           有码+无码+FC2+欧美                https://javdb.com                       
 JavDB_API         综合：有码+无码           有码+无码+FC2+欧美                https://javdb573.com                    

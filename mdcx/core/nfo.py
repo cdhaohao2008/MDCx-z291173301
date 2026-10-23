@@ -33,6 +33,7 @@ from ..utils.picture import resolve_existing_image
 from ..utils.xml import build_cdata, escape_xml_text, normalize_xml_text
 from .naming import NameRenderOptions, NamingTarget, decompose_rendered_title, render_name
 from .nfo_merger import should_merge_nfo
+from .outline_guard import clear_placeholder_plots
 from .tag_priority import prioritize_nfo_tags
 
 
@@ -692,6 +693,10 @@ async def get_nfo_data(file_path: Path, movie_number: str) -> tuple[CrawlersResu
     if manager.config.get_field_config(CrawlerResultFields.OUTLINE).language == Language.JP and originalplot:
         json_data.outline = originalplot
     json_data.originalplot = originalplot
+    # 简介占位清理：站点写进 NFO 的「发行日期 2025-11-13」与「看更多」零信息量，
+    # 一律按"没有简介"处理——补全模式会去其他站点取，取不到就保持为空。
+    # 记下被清空的字段名，补全模式据此把清空后的值回写 NFO。
+    json_data.cleared_placeholder_fields = clear_placeholder_plots(json_data)
     json_data.tag = tag
     # 会写回 NFO 的模式（整理 / 补全）剥离「后续由 translate_info() 重建」的标签，
     # 避免重写时标签重复；读取模式只展示、不重建标签，保留原样。
@@ -716,5 +721,10 @@ async def get_nfo_data(file_path: Path, movie_number: str) -> tuple[CrawlersResu
     info.thumb_path = thumb_path
     info.fanart_path = fanart_path
     LogBuffer.log().write(f"\n 📄 [NFO] {local_nfo_name}")
+    if json_data.cleared_placeholder_fields:
+        LogBuffer.log().write(
+            f"\n 📖 简介占位已清空（{', '.join(json_data.cleared_placeholder_fields)}）："
+            "发行日期/看更多不是简介，补全时会去其他站点重新获取，取不到就保持为空"
+        )
     log_console.show_traceback_log(f"{number} {json_data.mosaic}")
     return json_data, info
