@@ -263,10 +263,14 @@ class Parser(DetailPageParser):
         return ""
 
 
+# missav 域名（用户 2026-10-24：missav.ai 已失效；默认改用 missav.live——没有 CF 墙、
+# 更容易过 CF；missav.ws 留作兜底）。
+# 地址末尾固定带 `/dm247/cn`：站点会把不带语言段的请求 302 到 `/dm265/en`（英文页），
+# 显式写 `/dm247/cn` 才能拿到中文页（同族还有 `/dm265/en` 英文、`/dm285/ja` 日文等）。
+_MISSAV_LANG_PATH = "/dm247/cn"
 _MISSAV_DOMAINS = [
-    "https://www.missav.ws",
-    "https://missav.live",
-    "https://missav.ai",
+    f"https://missav.live{_MISSAV_LANG_PATH}",
+    f"https://missav.ws{_MISSAV_LANG_PATH}",
 ]
 
 

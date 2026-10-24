@@ -12,20 +12,18 @@ from ..number import number_search_variants
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException
 from .base.base_types import split_csv
 
-# javbus 镜像域名列表（主站 + 备用，按可用性排列；用户配置 custom_url 时优先使用）
-# 2026-10-24 用户定规：默认走主站 javbus.com，不再默认用防屏蔽地址（dmmsee 系列
-# 域名会变来变去，写死在默认值里等于让用户天天去改配置）；防屏蔽地址的正确值是
-# https://www.dmmsee.casa（旧值 dmmsee.cyou 已失效）。
+# javbus 四条线路（用户 2026-10-24 定规）：主站 + 三个防屏蔽地址，一律不带 www。
+# 刮削时由聚合层 `core/file_crawler.py::_MULTI_ADDRESS_SITE_TARGETS` 按「一个地址一次」
+# 轮流使用：第 1 次 javbus.com、第 2 次 dmmsee.casa、第 3 次 javsee.cyou、第 4 次
+# cdnbus.bond，4 次都没数据才放过该站。爬虫内部不再自己做域名轮换（否则一次尝试会被
+# 放大成多次请求，用户看到的「四次」就不作数了）。
 # 2026-08-25 实测：busjav.bond/seejav.cyou/buscdn.bond/javbus.bond SSL 连接失效已移除；
 # busdmm.bond 持续 CF 挑战未纳入。
 _JAVBUS_DOMAINS = [
-    "https://www.javbus.com",
-    "https://www.dmmsee.casa",
-    "https://www.javsee.cyou",
-    "https://www.cdnbus.bond",
-    "https://www.cdnbus.cyou",
-    "https://www.fanbus.bond",
-    "https://www.dmmbus.bond",
+    "https://javbus.com",
+    "https://dmmsee.casa",
+    "https://javsee.cyou",
+    "https://cdnbus.bond",
 ]
 
 
@@ -469,11 +467,6 @@ class JavBusCrawler(BaseCrawler):
     @override
     def display_name(cls) -> str:
         return "JavBus"
-
-    @override
-    def __init__(self, client, base_url: str = "", browser=None):
-        super().__init__(client, base_url=base_url, browser=browser)
-        self._init_rotator(self._domains, custom_url=manager.config.get_site_url(Website.JAVBUS, ""))
 
     @override
     async def _run(self, ctx: Context):

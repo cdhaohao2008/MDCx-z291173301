@@ -232,7 +232,7 @@ def select_fingerprint(
     if normalized_host == "lulubar.co" or normalized_host.endswith(".lulubar.co"):
         return _choose_fingerprint(_LULUBAR_FINGERPRINTS, exclude_fingerprint_id=exclude_fingerprint_id)
     # missav 多镜像域名（DomainRotator 轮换），指纹池需全覆盖避免切换后回落通用池
-    for _missav_domain in ("missav.ai", "missav.ws", "missav.live"):
+    for _missav_domain in ("missav.ws", "missav.live"):
         if normalized_host == _missav_domain or normalized_host.endswith(f".{_missav_domain}"):
             return _choose_fingerprint(_MISSAV_FINGERPRINTS, exclude_fingerprint_id=exclude_fingerprint_id)
     if normalized_host.endswith("amazon.co.jp"):

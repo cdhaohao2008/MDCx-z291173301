@@ -160,7 +160,7 @@ class JavDBCrawler(BaseCrawler):
     # 源地址 + 镜像地址（镜像号会变，聚合层按「源 → 镜像 → 源 → 镜像」交替重试时用）。
     # 这里声明出来只影响 known_hosts（代理按站点路由）与网络检测的探测地址，
     # 不改变 base_url_()：正常请求仍走源地址。
-    _domains = ["https://javdb.com", "https://javdb580.com"]
+    _domains = ["https://javdb580.com", "https://javdb.com"]
 
     def __init__(self, client, base_url: str = "", browser=None):
         super().__init__(client=client, base_url=base_url, browser=browser)
@@ -175,7 +175,7 @@ class JavDBCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.JAVDB, "https://www.javdb.com")
+        return manager.config.get_site_url(Website.JAVDB, "https://javdb580.com")
 
     @classmethod
     @override

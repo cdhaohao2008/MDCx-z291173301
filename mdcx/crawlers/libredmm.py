@@ -204,7 +204,7 @@ class LibreDMMCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.LIBREDMM, "https://www.libredmm.com")
+        return manager.config.get_site_url(Website.LIBREDMM, "https://libredmm.com")
 
     @classmethod
     @override

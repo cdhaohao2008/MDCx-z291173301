@@ -1,15 +1,14 @@
 """JavLibrary 镜像站爬虫。
 
 与 `javlibrary.py` 分成两个站点而不是同一个站的可切换地址，因为两者可达性不同：
-`www.javlibrary.com` 对大陆 IP 有 CF 墙（要过挑战），镜像站（zlibz.com 发布、当前是
-`www.f101w.com`）没有 CF 墙。混成一个站则取到哪个全看运气，用户也无法单独指定镜像。
+`javlibrary.com` 对大陆 IP 有 CF 墙（要过挑战），镜像站（zlibz.com 发布、当前是
+`f101w.com`）没有 CF 墙。混成一个站则取到哪个全看运气，用户也无法单独指定镜像。
 
 地址来自 zlibz.com 首页右上角发布的那张图（见 `mdcx/base/web.py` 里
 `_JAVLIBRARY_MIRROR_IMAGE_HASHES` 的说明），带 1 天缓存；刮削默认用中文页 `/cn`。
 页面结构与原站一致，解析逻辑全部继承自 `JavLibraryCrawler`。
 """
 
-import re
 from typing import override
 
 from ..base.web import (
@@ -17,18 +16,16 @@ from ..base.web import (
     _JAVLIBRARY_MIRROR_PUBLISHER,
     _get_cached_javlibrary_mirror_domain,
     get_javlibrary_mirror_domain,
+    site_root,
 )
 from ..config.enums import Language, Website
 from ..config.manager import manager
 from .javlibrary import JavLibraryCrawler
 
-# 地址末尾可能带语言段（/cn、/ja、/tw），刮削时要按语言再拼一次，故先把根域名剥出来
-_MIRROR_LANGUAGE_SUFFIX = re.compile(r"/(?:cn|ja|tw)/?$")
-
 
 def mirror_root(url: str) -> str:
-    """把镜像地址剥成根域名：`https://www.f101w.com/cn` → `https://www.f101w.com`。"""
-    return _MIRROR_LANGUAGE_SUFFIX.sub("", str(url).rstrip("/"))
+    """把镜像地址剥成根域名：`https://f101w.com/cn` → `https://f101w.com`。"""
+    return site_root(url)
 
 
 class JavLibraryMirrorCrawler(JavLibraryCrawler):

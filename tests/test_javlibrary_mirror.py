@@ -75,7 +75,7 @@ def test_mirror_image_hash_maps_to_the_published_address():
     assert _JAVLIBRARY_MIRROR_IMAGE_HASHES["74b57aaf7d89868a0d43aa6ec180dcfc503b6668aca24c98bdfde78d4e294579"]
     assert (
         _match_javlibrary_mirror_image("74b57aaf7d89868a0d43aa6ec180dcfc503b6668aca24c98bdfde78d4e294579")
-        == "https://www.f101w.com/cn"
+        == "https://f101w.com/cn"
     )
 
 
@@ -88,7 +88,7 @@ def test_unknown_image_hash_yields_empty():
 def test_known_addresses_are_chinese_pages():
     """兜底列表必须是中文页地址——用户要的就是「默认使用中文地址」。"""
     assert all(domain.endswith("/cn") for domain in _JAVLIBRARY_MIRROR_DOMAINS)
-    assert _JAVLIBRARY_MIRROR_DOMAINS[0] == "https://www.f101w.com/cn"
+    assert _JAVLIBRARY_MIRROR_DOMAINS[0] == "https://f101w.com/cn"
 
 
 # --------------------------------------------------------------------------- 抓取地址
@@ -165,11 +165,11 @@ async def test_resolve_domain_falls_back_to_probing_when_image_is_unknown(monkey
         if url.endswith("text.gif?101"):
             return _FakeResponse(b"brand-new-image")
         probed.append(url)
-        return _FakeResponse(b"ok") if url.startswith("https://www.c97k.com") else None
+        return _FakeResponse(b"ok") if url.startswith("https://f101w.com") else None
 
     _patch_manager(monkeypatch, handler)
 
-    assert await get_javlibrary_mirror_domain() == "https://www.c97k.com/cn"
+    assert await get_javlibrary_mirror_domain() == "https://f101w.com/cn"
     assert probed == _JAVLIBRARY_MIRROR_DOMAINS
 
 
@@ -191,10 +191,12 @@ async def test_resolve_domain_survives_a_dead_publisher(monkeypatch, clear_mirro
 
 def test_mirror_root_strips_the_language_suffix():
     """镜像站的 base_url 允许带 /cn，解析最新地址时要把语言后缀摘掉。"""
-    assert mirror_root("https://www.f101w.com/cn") == "https://www.f101w.com"
-    assert mirror_root("https://www.c97k.com/tw/") == "https://www.c97k.com"
-    assert mirror_root("https://www.f101w.com") == "https://www.f101w.com"
-    assert mirror_root("https://www.f101w.com/ja") == "https://www.f101w.com"
+    assert mirror_root("https://f101w.com/cn") == "https://f101w.com"
+    assert mirror_root("https://f101w.com/tw/") == "https://f101w.com"
+    assert mirror_root("https://f101w.com") == "https://f101w.com"
+    assert mirror_root("https://f101w.com/ja") == "https://f101w.com"
+    # 带其它路径（首页 main.php）时退回站点根，避免拼出 /cn/main.php/cn/xxx
+    assert mirror_root("https://f101w.com/cn/main.php") == "https://f101w.com"
 
 
 def test_mirror_crawler_is_registered():
@@ -232,7 +234,7 @@ def test_mirror_crawler_identity():
 
 def test_mirror_crawler_default_base_url_is_the_chinese_page():
     """下拉框与刮削默认都用中文地址（未配置自定义网址时）。"""
-    assert _crawler().base_url_() == "https://www.f101w.com/cn"
+    assert _crawler().base_url_() == "https://f101w.com/cn"
     assert _crawler().base_url_().endswith("/cn")
 
 
@@ -240,8 +242,9 @@ def test_mirror_crawler_knows_all_published_hosts():
     """CF 判定/换域名要认得镜像的域名，以及发布地址的站点本身。"""
     hosts = _crawler().known_hosts()
     assert any("f101w.com" in host for host in hosts)
-    assert any("c97k.com" in host for host in hosts)
     assert any("zlibz.com" in host for host in hosts)
+    # c97k.com 已失效（用户 2026-10-24），代码里已删除，不应再出现在已知域名里
+    assert not any("c97k.com" in host for host in hosts)
 
 
 def test_mirror_crawler_defaults_to_the_chinese_language():

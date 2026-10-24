@@ -627,13 +627,31 @@ async def check_url(url: str, length: bool = False, real_url: bool = False):
                     return None
 
 
+# 入口地址末尾的语言段（/cn、/ja、/tw）：默认地址允许带它（用户指定直接进中文页），
+# 但拼「站点根 + 语言段 + 页面」前必须先剥掉，否则会拼出 /cn/cn/xxx。
+_LANGUAGE_PATH_RE = re.compile(r"/(?:cn|ja|tw)$")
+
+
+def site_root(url: str) -> str:
+    """把入口地址收敛成可当前缀拼的站点根：`https://javlibrary.com/cn` → `https://javlibrary.com`。
+
+    只剥语言段；如果剥完还剩其它路径（用户填了 `https://f101w.com/cn/main.php` 这类首页地址），
+    直接退回 `scheme://host`——这些站点的页面路径全部从站点根开始，带路径拼一定 404。
+    """
+    parts = urlsplit(str(url or "").strip())
+    path = _LANGUAGE_PATH_RE.sub("", parts.path.rstrip("/"))
+    if path and path != "/":
+        path = ""
+    return urlunsplit((parts.scheme or "https", parts.netloc, path, "", ""))
+
+
 # tellme.pw AIO 导航页: 同时提供 avmoo(jav)/avsox(javu)/avheat(wav) 三个站点的最新直连地址。
 # 页面含 `window.__AIO_SITE_URLS__ = {"jav": "...", "javu": "...", "wav": "..."}`,
 # 任一站点路径返回的导航页都包含三站地址, 可互相兜底。
 _AIO_SITE_KEYS = {
-    "avmoo": ("jav", "https://www.avmoo.shop/cn"),
-    "avsox": ("javu", "https://www.avsox.click/cn"),
-    "avheat": ("wav", "https://www.avheat.shop/cn"),
+    "avmoo": ("jav", "https://avmoo.shop/cn"),
+    "avsox": ("javu", "https://avsox.click/cn"),
+    "avheat": ("wav", "https://avheat.shop/cn"),
 }
 
 _AIO_DOMAIN_CACHE: dict[str, tuple[str, float]] = {}
@@ -741,9 +759,9 @@ _JAVLIBRARY_DOMAIN_CACHE_LOCK = threading.Lock()
 _JAVLIBRARY_DOMAIN_CACHE_TTL = 24 * 3600.0  # 1 天
 
 # javlibrary 已知镜像域名（动态获取失败时的回退列表）
+# c97k.com 已失效（用户 2026-10-24），已从代码里移除，只留 f101w.com。
 _JAVLIBRARY_DOMAINS = [
-    "https://www.f101w.com",
-    "https://www.c97k.com",
+    "https://f101w.com",
 ]
 
 
@@ -817,11 +835,10 @@ async def get_javlibrary_domain() -> str:
 # 原站对大陆 IP 有 CF 墙，镜像没有，可达性不同，故分成两个站点各自配置、各自缓存。
 _JAVLIBRARY_MIRROR_PUBLISHER = "https://zlibz.com/"
 
-# 镜像站的中文页地址（/cn 即用户截图里「右上角 f101w → www.f101w.com/cn」那个形态）。
-# 排在前面的是当前在发布的，其余是地址轮换后仍可能活着的兜底。
+# 镜像站的中文页地址（/cn 即用户截图里「右上角 f101w → f101w.com/cn」那个形态）。
+# c97k.com 已失效（用户 2026-10-24），已从代码里移除，只留 f101w.com。
 _JAVLIBRARY_MIRROR_DOMAINS = [
-    "https://www.f101w.com/cn",
-    "https://www.c97k.com/cn",
+    "https://f101w.com/cn",
 ]
 
 # zlibz.com 把当前地址画成一张图（<img class="text" src="text.gif?101">）贴在页面右上角，
@@ -830,7 +847,7 @@ _JAVLIBRARY_MIRROR_DOMAINS = [
 # 换地址=换图，哈希对不上时走下面的探测列表，日志里会记一笔，便于补这一行。
 _JAVLIBRARY_MIRROR_IMAGE_HASHES = {
     # 2026-10-17 抓取：1592 字节的 320×60 位图，内容为 f101w / www.f101w.com/cn
-    "74b57aaf7d89868a0d43aa6ec180dcfc503b6668aca24c98bdfde78d4e294579": "https://www.f101w.com/cn",
+    "74b57aaf7d89868a0d43aa6ec180dcfc503b6668aca24c98bdfde78d4e294579": "https://f101w.com/cn",
 }
 
 _JAVLIBRARY_MIRROR_DOMAIN_CACHE: dict[str, tuple[str, float]] = {}

@@ -1,6 +1,5 @@
 """7mmtv 爬虫解析逻辑测试（纯函数，无网络依赖）."""
 
-import asyncio
 from importlib import import_module
 
 import pytest
@@ -146,7 +145,7 @@ def test_get_mosaic_fallback_by_number_type():
 
 def test_get_cover_relative_url_gets_site_prefix():
     html = '<div class="player-cover" ><a><img src="/media/cover/123.jpg"></div>'
-    assert mmtv.get_cover(html) == "https://www.7mmtv.sx/media/cover/123.jpg"
+    assert mmtv.get_cover(html) == "https://7mmtv.sx/media/cover/123.jpg"
 
 
 def test_get_cover_absolute_url_kept():
@@ -204,54 +203,16 @@ def test_crawler_registered():
     values = [s.value for s in get_registered_crawler_sites()]
     assert "7mmtv" in values
     crawler = get_crawler(Website.MMTV)
-    assert crawler.base_url_() == "https://www.7mmtv.sx"
+    assert crawler.base_url_() == "https://7mmtv.sx"
 
 
-def test_rotator_domains_and_custom_url_priority():
-    from mdcx.utils.domain_rotate import DomainRotator
-
-    crawler = mmtv.MmtvCrawler(client=None)
-    # 默认无自定义 URL：轮询列表 = 两个镜像域名
-    assert crawler._rotator.domains == ["https://www.7mmtv.sx", "https://7tv022.com"]
-
-    # 自定义 URL 插队优先；爬虫层的「custom 不参与轮询」由 _get_text_with_rotate 保证
-    rotator = DomainRotator(mmtv._7MMTV_DOMAINS, custom_url="https://my.7mmtv.example")
-    assert rotator.current == "https://my.7mmtv.example"
-    assert rotator.current_is_custom()
-    assert rotator.domains[0] == "https://my.7mmtv.example"
-
-
-def test_get_text_with_rotate_switches_domain():
-    """镜像轮询：第一个域名失败自动切 7tv022.com 重试."""
-
-    class FakeClient:
-        def __init__(self):
-            self.seen_urls: list[str] = []
-
-        async def get_text(self, url, headers=None, cookies=None, **kwargs):
-            self.seen_urls.append(url)
-            if "7mmtv.sx" in url:
-                return None, "连接错误: SSL reset"
-            return "<html>ok</html>", ""
-
-    class FakeCtx:
-        def debug(self, *a, **k):
-            pass
-
-    crawler = mmtv.MmtvCrawler(client=FakeClient())
-    html, err = asyncio.run(crawler._get_text_with_rotate(FakeCtx(), "https://www.7mmtv.sx/zh/x.html"))
-    assert html == "<html>ok</html>"
-    assert err == ""
-    assert crawler._rotator.current == "https://7tv022.com"
-    assert crawler._rotator.domains == ["https://www.7mmtv.sx", "https://7tv022.com"]
-
-
-def test_proxy_default_contains_7mmtv_domains():
+def test_proxy_default_contains_7mmtv_domain():
+    """7tv022.com 已失效并删除，代理名单里只留主站。"""
     from mdcx.config.models import Config
 
     sites = Config().proxy_hosts_list()
     assert "7mmtv.sx" in sites
-    assert "7tv022.com" in sites
+    assert "7tv022.com" not in sites
 
 
 @pytest.mark.asyncio
@@ -265,8 +226,7 @@ async def test_generate_search_url_normal_and_fc2():
     ctx = crawler.new_context(replace(CrawlerInput.empty(), number="HEYZO-0865"))
     url = await crawler._generate_search_url(ctx)
     assert url == (
-        "https://www.7mmtv.sx/zh/searchform_search/all/index.html"
-        "?search_keyword=HEYZO-0865&search_type=searchall&op=search"
+        "https://7mmtv.sx/zh/searchform_search/all/index.html?search_keyword=HEYZO-0865&search_type=searchall&op=search"
     )
 
     ctx = crawler.new_context(replace(CrawlerInput.empty(), number="FC2-1234567"))

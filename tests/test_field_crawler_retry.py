@@ -203,13 +203,42 @@ async def test_mirrored_site_alternates_source_and_mirror(monkeypatch: pytest.Mo
     assert result is not None
     javdb_requests = [url for site, url in records if site is Website.JAVDB]
     assert javdb_requests == [
-        "",  # 第 1 次：源地址
-        "https://javdb580.com",  # 第 2 次：镜像地址
+        "",  # 第 1 次：源地址（默认 javdb580.com）
+        "https://javdb.com",  # 第 2 次：镜像地址（原站）
         "",  # 第 3 次：源地址
-        "https://javdb580.com",  # 第 4 次：镜像地址
+        "https://javdb.com",  # 第 4 次：镜像地址
     ], javdb_requests
     assert "已请求 4 次仍失败" in result.field_log, result.field_log
-    assert "改用镜像地址" in result.field_log, result.field_log
+    assert "改用地址" in result.field_log, result.field_log
+
+
+async def test_javbus_tries_four_addresses_one_each(monkeypatch: pytest.MonkeyPatch):
+    """JavBus 四条线路：一个番号 4 次请求，分别用 javbus.com / dmmsee.casa /
+    javsee.cyou / cdnbus.bond，正好一个地址一次（用户 2026-10-24 定规）。"""
+    monkeypatch.setattr(
+        ManualConfig,
+        "REDUCED_FIELDS",
+        (CrawlerResultFields.TITLE, CrawlerResultFields.OUTLINE, CrawlerResultFields.SERIES),
+    )
+
+    records: list[tuple[Website, str]] = []
+    ok_data = _build_result(Website.AVBASE, "存活站的标题")
+    provider = _mirror_provider(records, Website.AVBASE, ok_data)
+    scraper = FileScraper(_RetryConfig([Website.JAVBUS, Website.AVBASE]), provider)
+    task_input = CrawlerInput.empty()
+    task_input.number = "TEST-JAVBUS"
+
+    result = await scraper._call_crawlers(task_input, {Website.JAVBUS, Website.AVBASE})
+
+    assert result is not None
+    javbus_requests = [url for site, url in records if site is Website.JAVBUS]
+    assert javbus_requests == [
+        "",  # 第 1 次：默认地址（javbus.com）
+        "https://dmmsee.casa",  # 第 2 次
+        "https://javsee.cyou",  # 第 3 次
+        "https://cdnbus.bond",  # 第 4 次
+    ], javbus_requests
+    assert "已请求 4 次仍失败" in result.field_log, result.field_log
 
 
 async def test_javlibrary_mirror_uses_mirror_crawler(monkeypatch: pytest.MonkeyPatch):
@@ -233,9 +262,9 @@ async def test_javlibrary_mirror_uses_mirror_crawler(monkeypatch: pytest.MonkeyP
     javlib_requests = [(site, url) for site, url in records if site is not Website.AVBASE]
     assert javlib_requests == [
         (Website.JAVLIBRARY, ""),
-        (Website.JAVLIBRARY_MIRROR, "https://www.f101w.com/cn"),
+        (Website.JAVLIBRARY_MIRROR, "https://f101w.com/cn"),
         (Website.JAVLIBRARY, ""),
-        (Website.JAVLIBRARY_MIRROR, "https://www.f101w.com/cn"),
+        (Website.JAVLIBRARY_MIRROR, "https://f101w.com/cn"),
     ], javlib_requests
 
 
@@ -317,7 +346,7 @@ async def test_custom_url_on_mirror_site_is_used_instead_of_builtin_mirror(monke
         (Website.JAVLIBRARY, ""),
         (Website.JAVLIBRARY_MIRROR, "https://my-javlib-mirror.example"),
     ], javlib_requests
-    assert "https://www.f101w.com/cn" not in str(javlib_requests)
+    assert "https://f101w.com/cn" not in str(javlib_requests)
 
 
 async def test_every_failed_site_is_retried_and_named(monkeypatch: pytest.MonkeyPatch):

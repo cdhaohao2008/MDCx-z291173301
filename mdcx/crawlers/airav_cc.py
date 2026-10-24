@@ -148,7 +148,7 @@ class AiravCcCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.AIRAV_CC, "https://www.airav.io")
+        return manager.config.get_site_url(Website.AIRAV_CC, "https://airav.io")
 
     @classmethod
     @override

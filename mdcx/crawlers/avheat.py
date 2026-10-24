@@ -9,7 +9,7 @@ class AVheatCrawler(AioSiteCrawler):
     description = "欧美：欧美番号"
     namespace = "wav"
     domain_site = "avheat"
-    fallback_domain = "https://www.avheat.shop/cn"
+    fallback_domain = "https://avheat.shop/cn"
     mosaic = "欧美"
     with_outline = True
     probe_number = "Men.26.08.17"

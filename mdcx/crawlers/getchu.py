@@ -144,7 +144,7 @@ class GetchuCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.GETCHU, "http://www.getchu.com")
+        return manager.config.get_site_url(Website.GETCHU, "http://getchu.com")
 
     @override
     async def _run(self, ctx: Context):

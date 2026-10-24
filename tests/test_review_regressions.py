@@ -174,13 +174,12 @@ def test_is_proxy_host_direct_sites_priority():
     ("site_value", "host"),
     [
         # 议题附检测日志中的失配证据逐条锁定
-        ("Missav", "missav.ai"),
+        ("Missav", "missav.live"),
         ("Missav", "missav.ws"),
         ("JavDay", "javday.app"),
         ("MyWife", "mywife.cc"),
         ("7mmtv", "www.7mmtv.sx"),
         ("7mmtv", "7mmtv.sx"),
-        ("7mmtv", "7tv022.com"),
         ("Madou.club", "madou.club"),
         ("JavLibrary", "www.f101w.com"),
         ("JavLibrary", "f101w.com"),
@@ -193,7 +192,7 @@ def test_proxy_host_matches_crawler_declared_domains(site_value, host):
     """站点值（UI 下拉框所选 crawler 名）必须命中爬虫声明的真实域名/镜像。
 
     根因：域名映射原来只靠 WEB_DIC + 六个 TLD 兜底，.ai/.ws/.app/.cc/.sx/.club
-    及完全异名镜像（7tv022.com、动态域名 f101w.com）全部失配——用户在 UI 选了
+    及完全异名镜像（动态域名 f101w.com）全部失配——用户在 UI 选了
     走代理，实际请求仍直连。修复后映射并入爬虫注册表的 known_hosts（默认主域
     + _domains 镜像 + 用户自定义 URL，javlibrary 另并入动态学习域名）。
     """

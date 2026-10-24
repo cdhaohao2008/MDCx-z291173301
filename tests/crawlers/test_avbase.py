@@ -39,8 +39,8 @@ async def test_generate_search_url_tries_the_z_variant_first_for_ibw():
     urls = await crawler._generate_search_url(ctx)
 
     assert urls == [
-        "https://www.avbase.net/works?q=IBW-794z",
-        "https://www.avbase.net/works?q=IBW-794",
+        "https://avbase.net/works?q=IBW-794z",
+        "https://avbase.net/works?q=IBW-794",
     ]
 
 
@@ -53,7 +53,7 @@ async def test_generate_search_url_keeps_single_url_for_other_series():
 
     urls = await crawler._generate_search_url(ctx)
 
-    assert urls == ["https://www.avbase.net/works?q=MIDE-831"]
+    assert urls == ["https://avbase.net/works?q=MIDE-831"]
 
 
 @pytest.mark.asyncio

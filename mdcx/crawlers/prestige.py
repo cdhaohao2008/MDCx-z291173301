@@ -70,7 +70,7 @@ class PrestigeCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return "https://www.prestige-av.com"
+        return "https://prestige-av.com"
 
     @classmethod
     @override

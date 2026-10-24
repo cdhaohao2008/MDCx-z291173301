@@ -40,7 +40,7 @@ class AVEntertainmentsCrawler(BaseCrawler[AVEntertainmentsContext]):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return "https://www.aventertainments.com"
+        return "https://aventertainments.com"
 
     @classmethod
     @override

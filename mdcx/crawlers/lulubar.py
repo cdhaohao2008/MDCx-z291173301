@@ -12,7 +12,7 @@ from ..config.models import Website
 from ..models.model_types import CrawlerInput
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException, get_year
 
-_DEFAULT_BASE_URL = "https://www.lulubar.co"
+_DEFAULT_BASE_URL = "https://lulubar.co"
 
 
 def _absolute_url(url: str, base_url: str = "") -> str:
@@ -159,7 +159,7 @@ class LulubarCrawler(BaseCrawler[LulubarContext]):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.LULUBAR, "https://www.lulubar.co")
+        return manager.config.get_site_url(Website.LULUBAR, "https://lulubar.co")
 
     @classmethod
     @override

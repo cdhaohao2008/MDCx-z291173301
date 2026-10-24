@@ -7,7 +7,7 @@ from mdcx.models.model_types import CrawlerInput
 
 class FakePrestigeClient:
     async def get_json(self, url, **kwargs):
-        if url.startswith("https://www.prestige-av.com/api/search"):
+        if url.startswith("https://prestige-av.com/api/search"):
             return (
                 {
                     "hits": {

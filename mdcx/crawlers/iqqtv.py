@@ -4,6 +4,7 @@ from typing import override
 
 from lxml import etree
 
+from ..base.web import site_root
 from ..config.enums import Website
 from ..config.manager import manager
 from ..number import match_number
@@ -215,16 +216,15 @@ def _normalize_language(language: str) -> str:
     return language if language in _SUPPORTED_LANGUAGES else "zh_cn"
 
 
-_IQQTV_DOMAINS = [
-    "https://www.iqqq3.quest",
-    "https://iqq5.xyz",
-    "https://iqqk4.quest",
-]
+# 用户 2026-10-24 指定：默认地址直接进中文页 /cn，且不带 www——带 www 会被站内 302 到
+# `https://iqqr1.org/?fromsite=www`，反而多一跳。拼搜索地址前用 site_root() 剥掉语言段。
+# 旧域名 iqqq3.quest / iqq5.xyz / iqqk4.quest 都会自动跳到 iqqr1.org，已全部删除，
+# 站点只剩一个地址，故不再做镜像轮换。
+_DEFAULT_BASE_URL = "https://iqqr1.org/cn"
 
 
 class IQQTVCrawler(BaseCrawler):
     description = "综合：有码+无码+素人+国产"
-    _domains: list[str] = _IQQTV_DOMAINS
 
     @classmethod
     @override
@@ -234,24 +234,21 @@ class IQQTVCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.IQQTV, _IQQTV_DOMAINS[0])
+        return manager.config.get_site_url(Website.IQQTV, _DEFAULT_BASE_URL)
 
     @classmethod
     @override
     def display_name(cls) -> str:
         return "IQQTV"
 
-    @override
-    def __init__(self, client, base_url: str = "", browser=None):
-        super().__init__(client, base_url=base_url, browser=browser)
-        self._init_rotator(self._domains, custom_url=manager.config.get_site_url(Website.IQQTV, ""))
-
     def _language_base_url(self, language: str) -> str:
+        # 默认地址带 /cn，语言段在这里按所选语言重拼，先把末尾语言段剥掉免得拼成 /cn/cn/
+        base = site_root(self.base_url)
         if language == "zh_cn":
-            return self.base_url + "/cn/"
+            return base + "/cn/"
         if language == "zh_tw":
-            return self.base_url + "/"
-        return self.base_url + "/jp/"
+            return base + "/"
+        return base + "/jp/"
 
     async def _fetch_language(self, ctx: Context, number: str, appoint_url: str, language: str) -> CrawlerData:
         language = _normalize_language(language)

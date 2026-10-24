@@ -8,7 +8,7 @@ from mdcx.models.model_types import CrawlerInput
 
 class FakeMywifeClient:
     async def get_text(self, url, **kwargs):
-        if url == "https://www.mywife.cc/teigaku/model/no/1500":
+        if url == "https://mywife.cc/teigaku/model/no/1500":
             return (
                 """
                 <html>

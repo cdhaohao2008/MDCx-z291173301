@@ -151,3 +151,24 @@ async def test_missav_run_maps_fields_and_thumb():
     assert res.data.actors == ["演员A"]
     assert res.data.release == "2024-01-01"
     assert res.data.thumb == "https://fourhoi.com/ssni-647/cover-n.jpg"
+
+
+def test_default_base_url_pins_chinese_language_path():
+    """默认地址固定带 /dm247/cn（中文页），避免站点把请求 302 到 /dm265/en 英文页。"""
+    from mdcx.config.manager import manager
+    from mdcx.config.models import Config
+
+    original = manager.config
+    manager.config = Config()
+    try:
+        assert MissavCrawler.base_url_() == "https://missav.live/dm247/cn"
+        crawler = MissavCrawler(client=None)
+        assert crawler._build_search_url("SSNI-647") == "https://missav.live/dm247/cn/search/SSNI-647"
+        assert crawler._build_direct_detail_url("SSNI-647") == "https://missav.live/dm247/cn/SSNI-647"
+        # 轮换到备用域名时同样带中文语言段
+        assert crawler._rotator.domains == [
+            "https://missav.live/dm247/cn",
+            "https://missav.ws/dm247/cn",
+        ]
+    finally:
+        manager.config = original

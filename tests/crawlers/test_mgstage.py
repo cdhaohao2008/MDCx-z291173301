@@ -59,13 +59,13 @@ async def test_fetch_search_auto_confirms_age_gate():
     client = FakeClient({"adc=1": product_html, "product_detail": AGE_GATE_HTML})
     crawler, ctx = _crawler_and_ctx("ABF-389", client=client)
 
-    text, error = await crawler._fetch_search(ctx, "https://www.mgstage.com/product/product_detail/ABF-389/")
+    text, error = await crawler._fetch_search(ctx, "https://mgstage.com/product/product_detail/ABF-389/")
 
     assert text == product_html
     assert error == ""
     assert client.calls == [
-        "https://www.mgstage.com/product/product_detail/ABF-389/",
-        "https://www.mgstage.com/index.php?adc=1&from=age",
+        "https://mgstage.com/product/product_detail/ABF-389/",
+        "https://mgstage.com/index.php?adc=1&from=age",
     ]
 
 
@@ -75,7 +75,7 @@ async def test_fetch_search_passes_through_when_not_age_gate():
     client = FakeClient({"product_detail": product_html})
     crawler, ctx = _crawler_and_ctx("ABF-389", client=client)
 
-    text, _ = await crawler._fetch_search(ctx, "https://www.mgstage.com/product/product_detail/ABF-389/")
+    text, _ = await crawler._fetch_search(ctx, "https://mgstage.com/product/product_detail/ABF-389/")
 
     assert text == product_html
     assert len(client.calls) == 1
@@ -87,7 +87,7 @@ async def test_fetch_detail_auto_confirms_age_gate():
     client = FakeClient({"adc=1": detail_html, "product_detail": AGE_GATE_HTML})
     crawler, ctx = _crawler_and_ctx("ABF-389", client=client)
 
-    text, _ = await crawler._fetch_detail(ctx, "https://www.mgstage.com/product/product_detail/ABF-389/")
+    text, _ = await crawler._fetch_detail(ctx, "https://mgstage.com/product/product_detail/ABF-389/")
 
     assert text == detail_html
     assert len(client.calls) == 2
@@ -98,7 +98,7 @@ async def test_fetch_search_keeps_age_gate_page_when_no_adult_link():
     client = FakeClient({"product_detail": "<html><body>年齢認証</body></html>"})
     crawler, ctx = _crawler_and_ctx("ABF-389", client=client)
 
-    text, error = await crawler._fetch_search(ctx, "https://www.mgstage.com/product/product_detail/ABF-389/")
+    text, error = await crawler._fetch_search(ctx, "https://mgstage.com/product/product_detail/ABF-389/")
 
     assert "年齢認証" in text
     assert error == ""
@@ -110,7 +110,7 @@ async def test_fetch_search_falls_back_to_age_gate_page_when_confirm_fails():
     client = FakeClient({"adc=1": None, "product_detail": AGE_GATE_HTML})
     crawler, ctx = _crawler_and_ctx("ABF-389", client=client)
 
-    text, error = await crawler._fetch_search(ctx, "https://www.mgstage.com/product/product_detail/ABF-389/")
+    text, error = await crawler._fetch_search(ctx, "https://mgstage.com/product/product_detail/ABF-389/")
 
     assert text == AGE_GATE_HTML
     assert error == "404 not found"
@@ -130,7 +130,7 @@ async def test_probe_number_points_at_live_product_page():
 async def test_probe_number_search_url_shape():
     """探测番号拼出的 URL 就是用户实测能解析成功的详情页地址"""
     crawler, ctx = _crawler_and_ctx("ABF-389")
-    assert await crawler._generate_search_url(ctx) == ["https://www.mgstage.com/product/product_detail/ABF-389/"]
+    assert await crawler._generate_search_url(ctx) == ["https://mgstage.com/product/product_detail/ABF-389/"]
 
 
 async def test_parse_search_page_names_cloudfront_geo_block():

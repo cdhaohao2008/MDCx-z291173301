@@ -19,8 +19,8 @@
 
 - **界面改动默认不写 `docs/Changelog.md`**（用户 2026-10-23 定规）：需求里没有明确出现「写 changelog」「记一条变更日志」「更新变更日志」这类字样时，纯界面调整（位置、间距、尺寸、对齐、配色、字号、措辞、控件换行/换列，只要用户可观察到的行为没变）一律不占 Changelog 行，也不在当天日期段里补一句「界面微调」。行为变了（增删控件改变可达路径、改默认值/分支、窄窗不可用）才按功能条目写。口径见 `docs/Development.md` 10.7。
 - **没写明就不提交**（用户 2026-10-23 明示）：需求里没有明确出现「提交」「推送」「commit」「push」「提交到 GitHub」「推到远程」这类字样时，一律只改工作区文件，不 `git add`、不 `git commit`、不 `git push`，也不擅自建分支。「改完了」「修好了」「继续」「优化一下」都不算授权。授权只对当次需求有效，下一轮重新从「不碰 git」开始。说「提交」= 只 commit，说「推送/推到 GitHub」才 push。理由：直推 main 无 CI 门禁，误提交直接进主干，回滚比少提交一次麻烦得多。
-- 改代码后跑 `uv run quick-check`。
-- 提交前跑 `uv run check --skip-hook-install`。
+- **本机没装 uv、也不要装**（用户 2026-10-24）：门禁命令直接用系统 Python `"C:/Program Files/Python315/python.exe" -m ruff format --check mdcx tests scripts`、`-m ruff check ...`、`-m mypy mdcx/`、`-m pytest -m "not network" -q`，不要写 `uv run`。
+- 改代码后跑快速门禁（`ruff format --check` + `ruff check` + `mypy mdcx/`），提交前加跑全量 `pytest -m "not network"`；命令见上一条。
 - 只改 `docs/*.md` 或本文件时只需 `git diff --check`。
 - 全绿判定 = 退出码 0，且 `grep -E "\.py:[0-9]+: error|Found [0-9]+ error"` 无输出（mypy 输出可能被 tail 截断）。
 - `ruff check` 过 ≠ `ruff format --check` 过；改了 .py 必须 `ruff format` 落地。
@@ -28,9 +28,9 @@
 - 升 ruff 版本后必须 `uv lock` + `uv sync`，再全量 format + check（新版本会新增规则，0.17.1 新增 `C416`）。
 - `scripts/` 也在 check 范围内。
 - xlsx 校验按路径跳过：`check_actor_db` / `check_info_db` 只在对应出厂库或校验脚本有改动时跑。
-- `check_ui_layout` 已移出门禁，只作手工诊断：`uv run python -m scripts.check_ui_layout`。
+- `check_ui_layout` 已移出门禁，只作手工诊断：`"C:/Program Files/Python315/python.exe" -m scripts.check_ui_layout`。
 - `check.py` 的 ALWAYS 段顺序 = `ruff format --check` → `ruff check` → `mypy mdcx/` → `check_thread_safety`（**不含 pytest**）。全量测试挪到 `--with-tests`。
-- 要全量门禁必须显式：`uv run check --skip-hook-install --with-tests`。
+- 要全量门禁必须显式加 `--with-tests`：`"C:/Program Files/Python315/python.exe" scripts/check.py --skip-hook-install --with-tests`。
 - `ci.yaml` 的 `on:` 只有 `pull_request: branches: [main]`，**直推 main 不触发 CI**。门禁靠「PR + 本地自检」两道，别指望 CI 兜底。
 - `git add -- <具体文件>`，绝不用 `git add -A`。
 - 提交前看 `git status` 的未跟踪文件，运行残留与中间产物不得入库。
@@ -136,7 +136,7 @@
 
 ## UI 开发与排错
 
-- 改 UI 先改 `.ui`（唯一权威源）→ `uv run python -m PyQt6.uic.pyuic`（相对路径）→ `scripts/fix_qt_enums.py` → `ruff format` → `tests/test_ui_structure.py`。禁止手工改 `MDCx.py`。
+- 改 UI 先改 `.ui`（唯一权威源）→ `"C:/Program Files/Python315/python.exe" -m PyQt6.uic.pyuic`（相对路径）→ `scripts/fix_qt_enums.py` → `ruff format` → `tests/test_ui_structure.py`。禁止手工改 `MDCx.py`。
 - Qt 布局问题先写最小复现脚本验证 Qt 原生行为，再动项目代码。根因常是 BoxLayout 缺末尾 Expanding spacer，而非 setVisible。`setVisible(False)` 管不到 QSpacerItem 等非 widget 占位项。
 - `WA_DeleteOnClose` 对话框带工作线程时，closeEvent 必须等齐。
 - **重影/重叠先问「渲染层还是定义层」**。定义层同 cell 多控件的几何检测抓不到，须 .ui 文本级哨兵 grep 该 grid 全部 `<item row=` 确认严格递增。实机截图是最终判据。
@@ -184,10 +184,14 @@
 - **下拉框顺序与枚举声明序不再相同**：`load_config.py` / `save_config.py` 的下标↔值映射改读 `FixedScrapingType.dropdown_values()`（顺序源 `dropdown_order()`，**不能写成类体里的常量** —— Enum 会当成员报 `TypeError: too many arguments for str()`）。
 - **「锁定类型」运行期只有一张真相表（2.6.2 收敛）**：锁定分支查 `models.SCRAPING_TYPE_SITE_FIELDS`，不再在 `core/file_crawler.py` 里自带硬编码的「类型 → website_* 字段」字典。保留 `getattr(config, field, None)` 惰性取值（旧配置与测试桩类 `_ClassificationConfig` / `_SkipFieldConfig` 只带部分 `website_*` 属性、没有 `get_type_sites`，去掉会 AttributeError）。锁定分支只给 `GUOCHAN` 硬塞 `mosaic="国产"`，其余档留空（给 WUMA/DONGMAN 加会被 `is_plain_uncensored_mosaic()` 推成 wuma=True 写成「无码」）。`type_field_configs` 回退到类型名单时必须用有序的 `get_type_sites()`，不能用 `list(set)`（Website 枚举 str 的 hash 按进程随机化，每次重启命中不同站点）。
 - 无码官网五站由 `official_uncensored.py` 统一路由，均需代理。1pondo / pacopacomama / 10musume 的 dyn/phpauto JSON API 直通。
-- 被墙站测试：`uv run python -m scripts.dev_proxy start|status|test <url>|stop`；日本 IP 限制站用 `--port 7891 --regions "jp|日本"`。devbox 限制：超时 ≠ 站点死亡；连通性验证必须用 curl_cffi impersonate；批量探测要校验 `data.title` 防假阳性。
+- 被墙站测试：`"C:/Program Files/Python315/python.exe" -m scripts.dev_proxy start|status|test <url>|stop`；日本 IP 限制站用 `--port 7891 --regions "jp|日本"`。devbox 限制：超时 ≠ 站点死亡；连通性验证必须用 curl_cffi impersonate；批量探测要校验 `data.title` 防假阳性。
 - **HTTP 4xx/5xx 错误串必须携带截断响应体**（保留 `"HTTP {status}"` 前缀不破坏匹配）。
 - **番号归一化：前导单数字双重语义**（studio 名单数字保留 vs DMM 预约版 `9` 前缀剥掉）。改正则前 grep 全部分支，改后跑相邻语义的既有测试。
 - **站点域名优先级与删站属产品取舍，查证给方案不擅动**。删站影响面 = 注册表 + Website 枚举 + 默认 proxy 列表 + `migrations.py` 清洗 + UI 列表。
+- **站点默认地址一律不带 `www.`**（用户 2026-10-24 定规，**没有例外**；MGStage 也去掉了）：`base_url_()` 的默认值、AIO 的 `fallback_domain`、`network_check.DEFAULT_SITE_URLS` 都不加；自定义网址也不再自动补 www（`models.normalize_custom_url`）。改默认地址时一并核对 `docs/Scraper.md` 的两张表。
+- **失效域名直接删，不留兜底**（用户 2026-10-24）：c97k.com、7tv022.com、missav.ai、freejavbt22.cc、iqqq3.quest / iqq5.xyz / iqqk4.quest 均已从代码里删干净（含镜像列表、指纹池、代理名单、文档）。删到只剩一个地址的站点（7mmtv / IQQTV / freejavbt）连镜像轮换一起删。
+- **JavBus 四条线路、一个地址一次**：第 1 次 javbus.com、第 2 次 dmmsee.casa、第 3 次 javsee.cyou、第 4 次 cdnbus.bond，由 `core/file_crawler.py::_MULTI_ADDRESS_SITE_TARGETS` 派发；爬虫内部不再自建轮换（否则一次尝试会被放大成多次请求）。JavDB 则是默认 `javdb580.com`、第 2/4 次回退 `javdb.com`。
+- **带语言段的入口地址不能直接当前缀拼**：`base/web.py::site_root()` 先收敛成 `scheme://host` 再拼路径（JavLibrary `/cn`、IQQTV `/cn`、镜像 `/cn/main.php`）；missav 默认地址固定带 `/dm247/cn`，不带语言段会被站点 302 到 `/dm265/en` 英文页。
 - **javdb 三源**：javdb（网页）/ javdb_api（镜像站）/ javdb_app（App API，免 CF 最稳）。thejavdb 与 javdb 无关。App 签名机制见 `docs/Javdb_App_Signature.md`，排障锚点 = 三主机同时 4xx 或 InvalidSignature，环境变量 `MDCX_JAVDB_APP_SIG_*` 可免改码覆盖。搜索 limit ≤ 50，分页须 `movie_sort_by=release`。
 - **javdb 图源无水印体系**：`tp.spfcas.com` 是 App 专用（单字节 XOR，首字节 key），`c0.jdbstatic.com` 带水印。解密/变换集中在 `base/web.py`。加密流尺寸探测 (0,0) 属预期。
 

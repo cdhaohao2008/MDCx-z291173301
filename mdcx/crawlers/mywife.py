@@ -76,7 +76,7 @@ class MyWifeCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return "https://www.mywife.cc"
+        return "https://mywife.cc"
 
     @classmethod
     @override

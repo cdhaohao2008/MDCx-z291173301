@@ -385,13 +385,13 @@ def test_select_fingerprint_madou_club_uses_safari_pool():
 
 
 def test_select_fingerprint_missav_uses_safari_firefox_pool():
-    """missav 的 CF 对 Chrome 系拦截强，应命中 Safari/Firefox 专属池；三镜像域名全覆盖."""
+    """missav 的 CF 对 Chrome 系拦截强，应命中 Safari/Firefox 专属池；在用的镜像域名全覆盖."""
     from mdcx.network_fingerprint import _MISSAV_FINGERPRINTS, select_fingerprint
 
     for _ in range(8):
-        fp = select_fingerprint("missav.ai")
+        fp = select_fingerprint("missav.live")
         assert fp in _MISSAV_FINGERPRINTS
         assert fp.impersonate in ("safari17_2_ios", "firefox133")
 
-    for host in ("www.missav.ai", "missav.ws", "www.missav.ws", "missav.live", "www.missav.live"):
+    for host in ("missav.ws", "www.missav.ws", "missav.live", "www.missav.live"):
         assert select_fingerprint(host) in _MISSAV_FINGERPRINTS, host

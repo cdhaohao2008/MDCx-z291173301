@@ -33,21 +33,19 @@ class FakeJavbusClient:
         )
 
 
-def test_use_base_url_pins_address_and_disables_rotation():
-    """聚合层按源/镜像交替重试时钉地址：只打指定域名、不轮换，退出后完整还原。"""
-    crawler = JavBusCrawler(client=FakeJavbusClient(), base_url="https://www.javbus.com")
-    original_domains = list(crawler._rotator.domains)
-    assert len(original_domains) > 1
+def test_use_base_url_pins_address_and_restores():
+    """聚合层按四条线路重试时钉地址：本次只打指定域名，退出后完整还原。
 
-    with crawler.use_base_url("https://www.dmmsee.casa"):
-        assert crawler.base_url == "https://www.dmmsee.casa"
-        # 轮换表被收成单域名 = 这一次尝试最多只发一次请求
-        assert crawler._rotator is not None
-        assert crawler._rotator.domains == ["https://www.dmmsee.casa"]
+    JavBus 的四个地址由 `core/file_crawler.py::_MULTI_ADDRESS_SITE_TARGETS` 轮流指定，
+    爬虫内部不再自己轮换（否则一次尝试会被放大成多次请求）。
+    """
+    crawler = JavBusCrawler(client=FakeJavbusClient(), base_url="https://javbus.com")
+    assert crawler._rotator is None
 
-    assert crawler.base_url == "https://www.javbus.com"
-    assert crawler._rotator is not None
-    assert crawler._rotator.domains == original_domains
+    with crawler.use_base_url("https://dmmsee.casa"):
+        assert crawler.base_url == "https://dmmsee.casa"
+
+    assert crawler.base_url == "https://javbus.com"
 
 
 @pytest.mark.asyncio
@@ -84,37 +82,21 @@ async def test_javbus_crawler_maps_detail_page():
     assert res.data.extrafanart == ["https://www.javbus.com/sample1.jpg"]
 
 
-class RotatingJavbusClient:
-    """第一个域名（默认主站 javbus.com）连接失败，第二个域名成功，验证轮询切换。"""
+class AlwaysFailingJavbusClient:
+    """四个地址全失败：爬虫只发一次请求，不再自己换域名。"""
 
     def __init__(self):
         self.requested: list[str] = []
 
     async def get_text(self, url, **kwargs):
         self.requested.append(url)
-        if url.startswith("https://www.javbus.com"):
-            return None, "Failed to perform, curl: (35) BoringSSL"
-        return (
-            """
-            <html>
-              <body>
-                <li class="active"><a>有碼</a></li>
-                <h3>SSIS-243 Sample Title</h3>
-                <p><span class="header">識別碼:</span><span>SSIS-243</span></p>
-                <a class="bigImage" href="/pics/cover/ssis243_b.jpg"></a>
-                <div class="star-name"><a>演员A</a></div>
-              </body>
-            </html>
-            """,
-            "",
-        )
+        return None, "Failed to perform, curl: (35) BoringSSL"
 
 
 @pytest.mark.asyncio
-async def test_javbus_crawler_rotates_domain_on_failure():
-    client = RotatingJavbusClient()
-    crawler = JavBusCrawler(client=client, base_url="https://www.javbus.com")
-    # 用默认主站初始化，验证失败后自动切到镜像
+async def test_javbus_crawler_does_not_rotate_internally():
+    client = AlwaysFailingJavbusClient()
+    crawler = JavBusCrawler(client=client, base_url="https://javbus.com")
     res = await crawler.run(
         CrawlerInput(
             appoint_number="",
@@ -127,12 +109,5 @@ async def test_javbus_crawler_rotates_domain_on_failure():
             org_language=Language.UNDEFINED,
         )
     )
-    assert res.debug_info.error is None
-    assert res.data is not None
-    assert res.data.number == "SSIS-243"
-    assert res.data.title == "Sample Title"
-    # 至少请求了两个不同域名
-    assert len(client.requested) >= 2
-    assert client.requested[0].startswith("https://www.javbus.com")
-    assert any(not u.startswith("https://www.javbus.com") for u in client.requested)
-    assert crawler.base_url != "https://www.javbus.com"
+    assert res.debug_info.error is not None
+    assert client.requested == ["https://javbus.com/SSIS-243"]

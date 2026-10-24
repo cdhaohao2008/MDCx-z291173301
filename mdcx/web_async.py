@@ -67,8 +67,8 @@ def _web_dic_domains_by_value() -> dict[str, frozenset[str]]:
 
     议题 #83：映射另并入爬虫注册表的权威域名（crawler 声明的默认主域 + 镜像 +
     用户自定义 URL）。此前 UI「走代理网站」下拉框提供 crawler 站点值（missav/
-    javday/7mmtv…），但域名映射只靠 WEB_DIC + 六个 TLD 兜底，missav.ai、
-    7tv022.com、madou.club 等实际域名全部失配——UI 选了代理实际仍直连。
+    javday/7mmtv…），但域名映射只靠 WEB_DIC + 六个 TLD 兜底，missav.live、
+    madou.club 等实际域名全部失配——UI 选了代理实际仍直连。
     """
     global _WEB_DIC_DOMAINS_BY_VALUE
     if _WEB_DIC_DOMAINS_BY_VALUE is None:

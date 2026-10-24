@@ -199,8 +199,8 @@ def test_parse_javlibcom_domain():
     html = '<a rel="nofollow me" href="https://www.f101w.com">https://www.f101w.com</a>'
     assert _parse_javlibcom_domain(html) == "https://www.f101w.com"
     # 属性顺序不同也能解析
-    html2 = '<a href="https://www.c97k.com" rel="nofollow me">c97k</a>'
-    assert _parse_javlibcom_domain(html2) == "https://www.c97k.com"
+    html2 = '<a href="https://mirror.example.com" rel="nofollow me">mirror</a>'
+    assert _parse_javlibcom_domain(html2) == "https://mirror.example.com"
     # 非 me 链接忽略
     html3 = '<a rel="nofollow" href="https://www.javlibrary.com">x</a>'
     assert _parse_javlibcom_domain(html3) == ""
@@ -240,10 +240,10 @@ async def test_get_javlibrary_domain_uses_cache(monkeypatch):
     monkeypatch.setattr(web.manager, "acquire_computed", lambda: FakeManager())
 
     domain = await get_javlibrary_domain()
-    assert domain == "https://www.f101w.com"
+    assert domain == "https://f101w.com"
     # 缓存命中，第二次不重新请求
     domain2 = await get_javlibrary_domain()
-    assert domain2 == "https://www.f101w.com"
+    assert domain2 == "https://f101w.com"
     web._JAVLIBRARY_DOMAIN_CACHE.clear()
 
 

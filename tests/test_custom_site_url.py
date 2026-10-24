@@ -41,17 +41,17 @@ def _ensure_app() -> QApplication:
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        # 裸域名补 www，已带 www 不重复
-        ("javdb580.com", "https://www.javdb580.com"),
-        ("javdb580.com/", "https://www.javdb580.com"),
+        # 不自动补 www（用户 2026-10-24：加了 www 有些站点反而打不开），host 按填的来
+        ("javdb580.com", "https://javdb580.com"),
+        ("javdb580.com/", "https://javdb580.com"),
         ("www.javdb580.com", "https://www.javdb580.com"),
-        ("https://javdb580.com/", "https://www.javdb580.com"),
-        (" https://javdb580.com/ ", "https://www.javdb580.com"),
+        ("https://javdb580.com/", "https://javdb580.com"),
+        (" https://javdb580.com/ ", "https://javdb580.com"),
         # 误写两个 www 收成一个
         ("https://www.www.javdb580.com/", "https://www.javdb580.com"),
-        # 带路径：只补 www，不丢路径、不留尾斜杠
-        ("https://example.com/cn/", "https://www.example.com/cn"),
-        # 已是子域名、IP、带端口的地址都不补 www
+        # 带路径：保留路径、不留尾斜杠
+        ("https://example.com/cn/", "https://example.com/cn"),
+        # 子域名、IP、带端口的地址原样保留
         ("api.example.com", "https://api.example.com"),
         ("192.168.1.5:8080", "https://192.168.1.5:8080"),
         ("http://www.javbus.com/", "http://www.javbus.com"),
@@ -73,19 +73,20 @@ def test_normalize_custom_url(raw: str, expected: str):
 
 
 def test_resolve_custom_url_ignores_default_address():
-    """填的就是站点默认地址时按「没自定义」处理（含补 www 后等于默认地址的情况）。"""
-    default = "https://www.javbus.com"
-    assert resolve_custom_url("https://www.javbus.com/", default) == ""
+    """填的就是站点默认地址时按「没自定义」处理（只差一个 www 也算同一个站）。"""
+    default = "https://javbus.com"
+    assert resolve_custom_url("https://javbus.com/", default) == ""
     assert resolve_custom_url("javbus.com", default) == ""
-    assert resolve_custom_url("https://www.javbus.com/other", default) == "https://www.javbus.com/other"
+    assert resolve_custom_url("https://www.javbus.com/", default) == ""
+    assert resolve_custom_url("https://javbus.com/other", default) == "https://javbus.com/other"
     assert resolve_custom_url("", default) == ""
-    assert resolve_custom_url("javdb580.com", "") == "https://www.javdb580.com"
+    assert resolve_custom_url("javdb580.com", "") == "https://javdb580.com"
 
     # 默认地址本身没有 www（JavDB 就是 javdb.com）：补出来的 www 视为同一个站
     assert resolve_custom_url("javdb.com", "https://javdb.com") == ""
     assert resolve_custom_url("www.javdb.com", "https://javdb.com") == ""
     # 换的是另一个域名，照旧保存
-    assert resolve_custom_url("javdb580.com", "https://javdb.com") == "https://www.javdb580.com"
+    assert resolve_custom_url("javdb580.com", "https://javdb.com") == "https://javdb580.com"
 
 
 def test_site_default_url_ignores_configured_custom_url(monkeypatch: pytest.MonkeyPatch):
@@ -94,7 +95,7 @@ def test_site_default_url_ignores_configured_custom_url(monkeypatch: pytest.Monk
     config.site_configs[Website.JAVBUS] = SiteConfig(custom_url="https://my-javbus.example/")
     monkeypatch.setattr(manager, "config", config)
 
-    assert site_default_url(Website.JAVBUS) == "https://www.javbus.com"
+    assert site_default_url(Website.JAVBUS) == "https://javbus.com"
     # 临时置空后必须原样还原，否则用户的自定义网址会被这次判断吃掉
     assert config.get_site_url(Website.JAVBUS) == "https://my-javbus.example"
 
@@ -158,4 +159,4 @@ def test_site_combo_url_follows_custom_url(monkeypatch: pytest.MonkeyPatch):
 
     assert _resolve_site_url("JavDB") == "https://javdb580.com/"
     # 没改过的站点仍显示自己的默认地址
-    assert _resolve_site_url("JavBus") == "https://www.javbus.com/"
+    assert _resolve_site_url("JavBus") == "https://javbus.com/"

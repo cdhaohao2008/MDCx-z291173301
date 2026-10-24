@@ -49,8 +49,8 @@ class MissavApiCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        # 占位, 实际不发 missav.ws 请求(走 Recombee + fourhoi)
-        return manager.config.get_site_url(Website.MISSAV_API, "https://www.missav.ws")
+        # 占位, 实际不发 missav 请求(走 Recombee + fourhoi)；与主站默认地址保持一致（中文页）
+        return manager.config.get_site_url(Website.MISSAV_API, "https://missav.live/dm247/cn")
 
     @classmethod
     def _sign_path(cls, path: str) -> str:

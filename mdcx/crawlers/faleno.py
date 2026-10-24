@@ -261,7 +261,7 @@ class FalenoCrawler(GenericBaseCrawler[FalenoContext]):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return "https://www.faleno.jp"
+        return "https://faleno.jp"
 
     @classmethod
     @override

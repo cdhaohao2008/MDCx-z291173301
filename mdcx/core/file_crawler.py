@@ -54,15 +54,29 @@ _MAX_SITE_REQUESTS = 3
 # 有「源地址 + 镜像地址」的站点：一个番号最多请求 4 次，按
 # 「源地址 → 镜像地址 → 源地址 → 镜像地址」交替，4 次都没数据才放过该站。
 # 值是 (镜像用的爬虫站点, 镜像地址)：
-# - JavDB / JavBus 的镜像只是同一个爬虫换域名；
+# - JavDB 的镜像只是同一个爬虫换域名（默认 javdb580.com，回退原站 javdb.com）；
 # - JavLibrary 的镜像是独立爬虫（JavLibraryMirror，页面结构相同、地址来自 zlibz 发布）。
 # 镜像地址先写死（用户 2026-10-24：短期不会换，不要每次刮削都去官方首页解析一次）。
 _MIRROR_SITE_TARGETS: dict[Website, tuple[Website, str]] = {
-    Website.JAVDB: (Website.JAVDB, "https://javdb580.com"),
-    Website.JAVBUS: (Website.JAVBUS, "https://www.dmmsee.casa"),
-    Website.JAVLIBRARY: (Website.JAVLIBRARY_MIRROR, "https://www.f101w.com/cn"),
+    Website.JAVDB: (Website.JAVDB, "https://javdb.com"),
+    Website.JAVLIBRARY: (Website.JAVLIBRARY_MIRROR, "https://f101w.com/cn"),
 }
 _MAX_MIRROR_SITE_REQUESTS = 4
+
+# 有多个并列线路的站点：第 N 次请求用列表里的第 N 个地址，正好一个地址试一次
+# （用户 2026-10-24：JavBus 的四次连接分别用 javbus.com / dmmsee.casa / javsee.cyou /
+# cdnbus.bond）。与上面的「源 ↔ 镜像交替」不同，这里每个地址只打一次，不回头重试。
+_MULTI_ADDRESS_SITE_TARGETS: dict[Website, tuple[Website, tuple[str, ...]]] = {
+    Website.JAVBUS: (
+        Website.JAVBUS,
+        (
+            "https://javbus.com",
+            "https://dmmsee.casa",
+            "https://javsee.cyou",
+            "https://cdnbus.bond",
+        ),
+    ),
+}
 
 # 同番号刮削结果的 TTL 缓存（秒）：同批次中相同番号的文件（如多 CD、重复文件）直接复用结果，
 # 避免对同一番号重复请求所有站点。缓存键除文件路径外还带上「这次实际参与请求的站点、
@@ -573,7 +587,9 @@ class FileScraper:
             return f"，原因: {reason_map.get(fr[0], '请求异常')}"
 
         def _request_budget(site: Website) -> int:
-            return _MAX_MIRROR_SITE_REQUESTS if site in _MIRROR_SITE_TARGETS else _MAX_SITE_REQUESTS
+            if site in _MIRROR_SITE_TARGETS or site in _MULTI_ADDRESS_SITE_TARGETS:
+                return _MAX_MIRROR_SITE_REQUESTS
+            return _MAX_SITE_REQUESTS
 
         def _retry_index(site: Website) -> int:
             """本次是第几次「重试」：请求次数从 1 起算，第 2 次请求即重试第 1 次。"""
@@ -604,11 +620,19 @@ class FileScraper:
         def _attempt_target(site: Website, attempt: int) -> tuple[Website, str]:
             """第 attempt 次请求（从 1 起）该用的爬虫站点与地址覆盖。
 
-            有源/镜像的站点奇数次打源地址、偶数次打镜像地址；其余站点一律用自己的默认地址。
+            - 多线路站点（JavBus）：第 N 次打列表里第 N 个地址，一个地址只试一次；
+            - 有源/镜像的站点奇数次打源地址、偶数次打镜像地址；
+            - 其余站点一律用自己的默认地址。
             用户给本站配置了自定义网址时，任何一次重试都继续用自定义网址，绝不被内置镜像覆盖。
             """
             if _site_custom_url(self.config, site):
                 return site, ""
+            multi = _MULTI_ADDRESS_SITE_TARGETS.get(site)
+            if multi is not None:
+                target_site, urls = multi
+                if target_site is not site and _is_site_disabled(self.config, target_site):
+                    return site, ""
+                return target_site, urls[min(attempt, len(urls)) - 1]
             mirror = _MIRROR_SITE_TARGETS.get(site)
             if mirror is None or attempt % 2 == 1:
                 return site, ""
@@ -667,7 +691,7 @@ class FileScraper:
                     attempt = request_counts.get(site, 0) + 1
                     target_site, target_url = _attempt_target(site, attempt)
                     if target_url:
-                        reduced.field_log += f"\n    🌐 {site:<15} (第 {attempt} 次请求改用镜像地址: {target_url})"
+                        reduced.field_log += f"\n    🌐 {site:<15} (第 {attempt} 次请求改用地址: {target_url})"
                     request_counts[site] = attempt
                     # 如果网站数据尚未请求，则进行请求（首次请求或失败重试，同一段逻辑）
                     try:

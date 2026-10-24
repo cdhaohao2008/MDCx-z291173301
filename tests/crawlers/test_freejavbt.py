@@ -7,7 +7,7 @@ from mdcx.models.model_types import CrawlerInput
 
 class FakeFreejavbtClient:
     async def get_text(self, url, **kwargs):
-        assert url == "https://www.freejavbt22.cc/SSNI-531"
+        assert url == "https://freejavbt.com/SSNI-531"
         return (
             """
             <html>
@@ -67,32 +67,20 @@ async def test_freejavbt_crawler_maps_detail_page():
     assert res.data.source == "FreeJavBT"
 
 
-class RotatingFreejavbtClient:
-    """freejavbt22.cc 失败，freejavbt.com 成功，验证轮询切换。"""
+class FailingFreejavbtClient:
+    """默认地址只有一个域名：请求失败直接报错，不再换域重试。"""
 
     def __init__(self):
         self.requested: list[str] = []
 
     async def get_text(self, url, **kwargs):
         self.requested.append(url)
-        if url.startswith("https://www.freejavbt22.cc"):
-            return None, "Failed to perform, curl: (35) BoringSSL"
-        return (
-            """
-            <html>
-              <head><title>SSNI-531 Sample Title | FREE JAV BT</title></head>
-              <body>
-                <div class="single-video-info col-12"></div>
-              </body>
-            </html>
-            """,
-            "",
-        )
+        return None, "HTTP 429"
 
 
 @pytest.mark.asyncio
-async def test_freejavbt_crawler_rotates_domain_on_failure():
-    client = RotatingFreejavbtClient()
+async def test_freejavbt_crawler_has_single_domain_and_no_rotation():
+    client = FailingFreejavbtClient()
     crawler = FreejavbtCrawler(client=client)
     res = await crawler.run(
         CrawlerInput(
@@ -106,9 +94,6 @@ async def test_freejavbt_crawler_rotates_domain_on_failure():
             org_language=Language.UNDEFINED,
         )
     )
-    assert res.debug_info.error is None
-    assert res.data is not None
-    assert res.data.number == "SSNI-531"
-    assert len(client.requested) >= 2
-    assert client.requested[0].startswith("https://www.freejavbt22.cc")
-    assert any(not u.startswith("https://www.freejavbt22.cc") for u in client.requested)
+    assert res.debug_info.error is not None
+    assert client.requested == ["https://freejavbt.com/SSNI-531"]
+    assert crawler._rotator is None

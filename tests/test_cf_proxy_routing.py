@@ -60,9 +60,8 @@ def test_migrate_config_data_normalizes_loopback_https():
         "www.javlibrary.com",
         "www.f101w.com",
         "f101w.com",
-        "www.c97k.com",
         "r18.dev",
-        "missav.ai",
+        "missav.live",
         "missav.ws",
         "javbus.com",
     ],
@@ -104,8 +103,8 @@ def test_getchu_base_url_follows_custom_url():
     assert "get_site_url(Website.GETCHU" in src
 
 
-def test_getchu_default_base_url_unchanged():
-    """无自定义 URL 时 getchu 默认域名保持 http://www.getchu.com。"""
+def test_getchu_default_base_url_has_no_www():
+    """无自定义 URL 时 getchu 默认域名不带 www（用户 2026-10-24 定规）。"""
     from mdcx.crawlers.getchu import GetchuCrawler
 
-    assert GetchuCrawler.base_url_() == "http://www.getchu.com"
+    assert GetchuCrawler.base_url_() == "http://getchu.com"

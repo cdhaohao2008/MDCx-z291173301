@@ -168,15 +168,15 @@ def _is_valid_host(host: str) -> bool:
     return bool(_TLD_RE.match(labels[-1]))
 
 
-def _with_www(host: str) -> str:
-    """裸域名补 `www.`；已是子域名（含 `www.`）不动，误写的 `www.www.` 收成一个。"""
-    if _is_ipv4(host):
-        return host
-    labels = host.split(".")
-    if len(labels) == 2 and labels[0].lower() != "www":
-        return f"www.{host}"
-    if len(labels) > 2 and labels[0].lower() == "www" and labels[1].lower() == "www":
-        return ".".join([labels[0]] + labels[2:])
+def _normalize_host(host: str) -> str:
+    """host 原样保留（**不再自动补 `www.`**），只把误写的 `www.www.` 收成一个。
+
+    用户 2026-10-24：默认地址一律不带 www，自定义网址也照用户填的来——自动补 www
+    会把本来能开的站补成打不开（`www.madouqu.shop` 是 NXDOMAIN、`www.javfree.me`
+    证书不匹配），等于把用户输入改坏。
+    """
+    while host.lower().startswith("www.www."):
+        host = host[4:]
     return host
 
 
@@ -185,8 +185,8 @@ def normalize_custom_url(value: str) -> str:
 
     - 空串返回空串，表示清除自定义网址；
     - 省略协议时补 `https://`（用户常直接粘贴 `javdb580.com`）；
-    - 裸域名补 `www.`（`javdb580.com` → `https://www.javdb580.com`），已带子域名的
-      不动，`www.www.` 这种重复前缀收成一个；IP、带端口的地址不补（本地代理常见）；
+    - host 按用户填的来，不补 `www.`（用户 2026-10-24 定规：加 www 有些站点反而打不开），
+      只把 `www.www.` 这种重复前缀收成一个；IP、带端口的地址原样保留；
     - 格式不合基本网址要求（无顶级域、非法字符、端口越界、带账号密码等）返回空串，
       由调用方决定提示或保留旧值。
     """
@@ -212,7 +212,7 @@ def normalize_custom_url(value: str) -> str:
         return ""
     if any(ch.isspace() for ch in parts.path + parts.query + parts.fragment):
         return ""
-    netloc = host if port is not None else _with_www(host)
+    netloc = host if port is not None else _normalize_host(host)
     if port is not None:
         netloc = f"{netloc}:{port}"
     candidate = urlunsplit((scheme, netloc, parts.path.rstrip("/"), parts.query, parts.fragment))
@@ -1092,7 +1092,7 @@ class Config(BaseModel):
     use_proxy: bool = Field(default=False, title="代理类型")
     proxy: str = Field(default="http://127.0.0.1:7890", title="代理地址")
     proxy_sites: str = Field(
-        default="amazon.co.jp,m.media-amazon.com,xcity.jp,minnano-av.com,avbase.net,javbus.com,javdb.com,javlibrary.com,r18.dev,mgstage.com,prestige-av.com,seesaawiki.jp,avsox.click,avsox.com,avmoo.shop,avmoo.com,avheat.shop,avheat.com,caribbeancom.com,heyzo.com,1pondo.tv,pacopacomama.com,10musume.com,mywife.cc,github.com,raw.githubusercontent.com,google.com,missav.ws,missav.ai,missav.live,aventertainments.com,javfree.me,7mmtv.sx,7tv022.com,avsex.cc,getchu.com,dl.getchu.com",
+        default="amazon.co.jp,m.media-amazon.com,xcity.jp,minnano-av.com,avbase.net,javbus.com,javdb.com,javlibrary.com,r18.dev,mgstage.com,prestige-av.com,seesaawiki.jp,avsox.click,avsox.com,avmoo.shop,avmoo.com,avheat.shop,avheat.com,caribbeancom.com,heyzo.com,1pondo.tv,pacopacomama.com,10musume.com,mywife.cc,github.com,raw.githubusercontent.com,google.com,missav.ws,missav.live,aventertainments.com,javfree.me,7mmtv.sx,avsex.cc,getchu.com,dl.getchu.com",
         title="使用代理网站",
     )
     direct_sites: str = Field(

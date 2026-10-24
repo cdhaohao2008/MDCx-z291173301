@@ -36,7 +36,7 @@ class AVBaseCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return "https://www.avbase.net"
+        return "https://avbase.net"
 
     @classmethod
     @override

@@ -13,10 +13,8 @@ from ..number import is_uncensored
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException
 from .guochan import get_extra_info
 
-_7MMTV_DOMAINS = [
-    "https://www.7mmtv.sx",
-    "https://7tv022.com",
-]
+# 7mmtv 默认地址（用户 2026-10-24：7tv022.com 已失效，只剩主站，镜像轮换已移除）
+_7MMTV_BASE_URL = "https://7mmtv.sx"
 
 
 def get_title(html, web_number):
@@ -69,7 +67,7 @@ def get_cover(html):
     if result:
         result = result[0]
         if "http" not in result:
-            result = "https://www.7mmtv.sx" + result
+            result = "https://7mmtv.sx" + result
     return result if result else ""
 
 
@@ -177,7 +175,6 @@ def get_number(html, number):
 
 class MmtvCrawler(BaseCrawler):
     description = "综合：有码+无码+素人+FC2"
-    _domains: list[str] = _7MMTV_DOMAINS
 
     @classmethod
     @override
@@ -187,12 +184,7 @@ class MmtvCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.MMTV, _7MMTV_DOMAINS[0])
-
-    @override
-    def __init__(self, client, base_url: str = "", browser=None):
-        super().__init__(client, base_url=base_url, browser=browser)
-        self._init_rotator(self._domains, custom_url=manager.config.get_site_url(Website.MMTV, ""))
+        return manager.config.get_site_url(Website.MMTV, _7MMTV_BASE_URL)
 
     @override
     async def _generate_search_url(self, ctx: Context) -> list[str] | str | None:

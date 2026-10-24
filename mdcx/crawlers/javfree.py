@@ -141,7 +141,8 @@ class JavFreeCrawler(BaseCrawler[JavFreeContext]):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return "https://www.javfree.me"
+        # 不能加 www：www.javfree.me 的证书与域名不匹配（实测 TLS 直接失败），主域 200。
+        return "https://javfree.me"
 
     @classmethod
     @override

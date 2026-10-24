@@ -74,8 +74,8 @@ class GenericBaseCrawler[T: Context = Context](ABC):
         """该站点已知的全部请求域名（默认主域 + 镜像 + 用户自定义 URL），供代理路由按站点归属判断。
 
         议题 #83：「走代理网站」下拉框按 crawler 站点值（如 missav）选择，但实际请求按
-        host 路由，站点值→域名的映射只来自 WEB_DIC + 六个 TLD 兜底，missav.ai /
-        7tv022.com / madou.club / mywife.cc 等实际域名全部失配，UI 选了代理仍直连。
+        host 路由，站点值→域名的映射只来自 WEB_DIC + 六个 TLD 兜底，missav.live /
+        madou.club / mywife.cc 等实际域名全部失配，UI 选了代理仍直连。
         权威数据源就在爬虫自身声明里：base_url_()（含用户自定义 URL）与 _domains 镜像。
 
         返回小写 host，统一去 `www.` 前缀并存两形态（is_proxy_host 的子域后缀匹配

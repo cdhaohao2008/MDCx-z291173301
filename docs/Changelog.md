@@ -4,21 +4,26 @@
 
 ## 2026-10-24
 
-### 站点默认地址统一带 www（api / 子域站点除外），AIO 三站默认走中文首页 `/cn`
+### 站点默认地址一律不带 `www.`，四个站点换地址，失效域名清理
 
-- 所有站点的内置默认地址补齐 `www.`（`base_url_()` 的默认值，即设置页「当前网站」右侧显示的网址与刮削实际用的地址）：Airav.cc、AVSEX、Dahlia、Faleno、FreeJavBT、JavDay、JavDB、JavDB_API、JavFree、Lulubar、Madou.club、Missav、Missav_API、MyWife、R18.dev、FC2PPVDB、IQQTV、AVSOX、AVMOO、AVheat、TheJavDB。
-- 两处按用户指定换掉默认域名：`JavDB_API` 由 `javdb573.com` 改为 `https://www.javdb580.com`。
-- 明确不加 `www.` 的站点（用户 2026-10-24 指定，地址格式特殊、加了反而连不上）：`DMM_API`（`api.dmm.com`）、`FC2`（`adult.contents.fc2.com`）、`JavDB_APP`（`apidd.czssdgz.com`）、`ThepornDB`（`api.theporndb.net`）、`Xcity`（`tc.xcity.jp`）。
-- `TheJavDB` 保持 `https://thejavdb.net`（用户浏览器实测：`www.thejavdb.net` 无响应、DNS 上也没有这条记录；主域有 CF 墙但能正常过）；`Madouqu` 保持 `https://madouqu.shop`（用户浏览器实测正常，`www.madouqu.shop` 是 NXDOMAIN）。
-- AVMOO / AVSOX / AVheat 默认地址改为中文首页 `https://www.avmoo.shop/cn`、`https://www.avsox.click/cn`、`https://www.avheat.shop/cn`（`crawlers/*.py` 的 `fallback_domain` 与 `base/web.py::_AIO_SITE_KEYS` 同步）。新增 `AioSiteCrawler._api_base()`：JSON API 固定在站点根（语言由 body 里的 `lang` 指定），拼 `{base}/{namespace}/data/api/search|getMovie` 前先去掉 `/cn` 语言段，避免搜索请求打到 `/cn/jav/...` 404。
-- 新增 `tests/test_site_default_urls.py` 逐站校验：任何站点默认地址都不能出现 `www.www.`；两段式裸域名必须带 `www.`（例外站点除外）；例外站点不得被加 `www.`；AIO 三站的 `/cn` 默认地址与 `_api_base()` 去语言段行为。
-- `core/network_check.py::DEFAULT_SITE_URLS` 与 `controllers/main_window/net_check.py` 的 JavDB 探测地址同步成新的 www 地址。
-- 联网核查（本机沙箱）：41 个默认地址的域名全部可解析；9 个站点确认有 HTTP 响应（Airav.cc / Dahlia / FC2PPVDB / AVheat 200，MGStage / TheJavDB 403 为 WAF，DMM_API / JavDB_APP / ThepornDB 404 属 API 根路径正常）；其余 33 个是本机代理拒绝隧道（502）或直连被重置/超时，属环境问题，已列出清单交用户在浏览器复核。
+- 用户 2026-10-24 定规：**所有站点的内置默认地址都不加 `www.`**——「加了 www 有些网站反而有问题」。全部站点的 `base_url_()` 默认值（即设置页「当前网站」右侧显示的网址与刮削实际用的地址）逐个去掉 `www.`，**没有例外**（`MGStage` 先前按代理实测保留 www，用户浏览器实测 `mgstage.com` 正常后也去掉了）。
+- 四个站点按用户指定换默认地址：`JavLibrary` → `https://javlibrary.com/cn`（直接进中文页）、`IQQTV` → `https://iqqr1.org/cn`（新域名，带 www 会被站内 302 到 `?fromsite=www`，反而多一跳）、`JavFree` → `https://javfree.me`、`Madouqu` → `https://madouqu.shop`。
+- `Missav` / `Missav_API` 默认地址改为 `https://missav.live/dm247/cn`：`missav.live` 没有 CF 墙、更容易过 CF；地址末尾固定带 `/dm247/cn`——站点会把不带语言段的请求 302 到 `/dm265/en`（英文页），显式写中文语言段才拿得到中文页（同族还有 `/dm265/en` 英文、`/dm285/ja` 日文）。备用域名 `missav.ws` 同样带该语言段。
+- 删除已失效域名：`c97k.com`（JavLibrary 动态解析与镜像兜底列表，代码内全部移除）、`7tv022.com`（7mmtv 唯一镜像，连带删掉该站的镜像轮换机制）、`missav.ai`（missav 镜像与指纹池）、`freejavbt22.cc`（HTTP 429，改为只用 `https://freejavbt.com`，不再轮换）。代理名单默认值里的 `7tv022.com` / `missav.ai` 同步清掉。
+- `JavDB_API` 默认地址仍是 `https://javdb580.com`（原 `javdb573.com` 已换）。
+- `JavDB` 默认地址改为 `https://javdb580.com`（原 `javdb.com` 降为镜像）：刮削仍是 4 次，第 1/3 次打 `javdb580.com`、第 2/4 次打 `javdb.com`。
+- `JavBus` 改成四条并列线路、每条只打一次（用户 2026-10-24）：第 1 次 `javbus.com`、第 2 次 `dmmsee.casa`、第 3 次 `javsee.cyou`、第 4 次 `cdnbus.bond`，四个地址一律不带 www。新增 `core/file_crawler.py::_MULTI_ADDRESS_SITE_TARGETS` 承载这套「一个地址一次」；`JavBusCrawler` 不再自建域名轮换（否则一次尝试会被内部轮换放大成多次请求）。
+- `IQQTV` 删除 `iqqq3.quest` / `iqq5.xyz` / `iqqk4.quest`（三个旧域名都会自动跳到 `iqqr1.org`），站点只剩 `iqqr1.org` 一个地址，镜像轮换一并移除。
+- AVMOO / AVSOX / AVheat 默认地址保持中文首页 `/cn`（`crawlers/*.py` 的 `fallback_domain` 与 `base/web.py::_AIO_SITE_KEYS` 同步）。`AioSiteCrawler._api_base()`：JSON API 固定在站点根（语言由 body 里的 `lang` 指定），拼 `{base}/{namespace}/data/api/search|getMovie` 前先去掉 `/cn` 语言段，避免搜索请求打到 `/cn/jav/...` 404。
+- 入口地址带语言段/首页路径时不再直接当前缀拼：新增 `base/web.py::site_root()`，`JavLibrary`、`JavLibrary·镜像`、`IQQTV` 拼搜索/详情地址前先收敛成 `scheme://host`，避免拼出 `/cn/cn/vl_searchbyid.php`、`/cn/main.php/cn/xxx`。
+- 自定义网址不再自动补 `www.`：`models.normalize_custom_url()` 的 host 按用户填的来，只把误写的 `www.www.` 收成一个——自动补 www 会把本来能开的站补成打不开（`www.madouqu.shop` 是 NXDOMAIN、`www.javfree.me` 证书不匹配）。
+- 同步 `core/network_check.py::DEFAULT_SITE_URLS`、`controllers/main_window/net_check.py` 的 JavDB 探测地址、`core/file_crawler.py` 的 JavLibrary 镜像目标（`https://f101w.com/cn`）、`network_fingerprint.py` 的 missav 域名池。
+- `tests/test_site_default_urls.py` 改为「默认地址一律不带 www（MGStage 例外）+ 四个点名地址 + `site_root()` 去语言段 + 语言段不重复」；`tests/test_custom_site_url.py`、`tests/crawlers/*`、`tests/test_review_regressions.py` 相关断言同步。
 
 ### 自定义网址：保存后回显、没改过的站点留空，刮削全程只打自定义地址
 
 - 设置页「自定义网址」不再回填站点默认地址：只有用户真正改过并保存过的站点才显示网址，格式统一为 `https://javdb580.com/`（结尾带斜杠）；没改过的站点输入框保持空白，并新增占位提示「显示修改后的网址如 https://javdb580.com/，没修改的不显示」。
-- 新增 `Config.get_site_url_display()`（展示用，补尾斜杠）与 `models.normalize_custom_url()`（保存用）：省略协议时自动补 `https://`；**裸域名自动补 `www.`**（`javdb580.com` → `https://www.javdb580.com`），已带 `www.` 不重复叠加、误写的 `www.www.` 收成一个；已是子域名（`api.example.com`）、IP、带端口的地址不补（本地代理常见）。
+- 新增 `Config.get_site_url_display()`（展示用，补尾斜杠）与 `models.normalize_custom_url()`（保存用）：省略协议时自动补 `https://`；**不自动补 `www.`**（用户 2026-10-24 定规，host 按填的来），只把误写的 `www.www.` 收成一个；已是子域名（`api.example.com`）、IP、带端口的地址原样保留。
 - 输入格式校验：必须是 http/https 网址，域名要有合法标签与字母后缀（支持 punycode）、端口在 1–65535、不能带账号密码与空格；不通过时保存前就弹窗提示并留在设置页，配置不落盘，不再静默丢弃或覆盖用户输入。
 - **与默认地址相同按「没自定义」处理**：`models.resolve_custom_url()` 把输入与站点内置默认地址（`models.site_default_url()`，临时忽略自定义网址后取爬虫的 `base_url_()`）比对，相同就返回空串——不写配置、自定义网址输入框也不显示，避免默认地址被当成自定义网址、把 JavDB/JavBus/JavLibrary 的源/镜像轮换挡掉；只差一个 `www.` 也认作同一个站（JavDB 默认地址是 `javdb.com`，用户补成 `www.javdb.com` 时不落配置，免得补出一个可能不存在的地址）。
 - 保存、切换配置、恢复默认之后调用 `init.refresh_site_combo_urls()`，把「当前网站」「自定义网址」「使用代理」三个下拉框右侧的网址列同步成最新地址（检测图标与缓存不动）。
@@ -28,7 +33,7 @@
 ### 刮削请求：普通站点一个番号最多 3 次，JavDB / JavBus / JavLibrary 源镜像交替最多 4 次
 
 - `core/file_crawler.py` 用「番号 × 站点」的请求次数封顶取代原来的逐字段重试：`_MAX_SITE_REQUESTS = 3`（首次 1 次 + 重试 2 次），用尽后本番号不再请求该站（连超时都不用再等），只记一行「已请求 3 次仍失败，本番号后续字段不再请求该站」。
-- 有「源地址 + 镜像地址」的三个站点改用 `_MIRROR_SITE_TARGETS` + `_MAX_MIRROR_SITE_REQUESTS = 4`：**第一次源地址、第二次镜像地址、第三次源地址、第四次镜像地址**，4 次都没数据就放过该站。镜像地址先写死（用户 2026-10-24：短期不会换，不要每次刮削都去官方首页解析）：JavDB → `https://javdb580.com`，JavBus → `https://www.dmmsee.casa`，JavLibrary → `https://www.f101w.com/cn`。
+- 有「源地址 + 镜像地址」的三个站点改用 `_MIRROR_SITE_TARGETS` + `_MAX_MIRROR_SITE_REQUESTS = 4`：**第一次源地址、第二次镜像地址、第三次源地址、第四次镜像地址**，4 次都没数据就放过该站。镜像地址先写死（用户 2026-10-24：短期不会换，不要每次刮削都去官方首页解析）：JavDB → `https://javdb580.com`，JavBus → `https://www.dmmsee.casa`，JavLibrary → `https://f101w.com/cn`。
 - JavLibrary 的镜像走独立爬虫 `JavLibraryMirror`（页面结构相同、单独站点可选），其余两个只是同一爬虫换域名。
 - `crawlers/base/base.py` 新增 `use_base_url()`：把本次请求钉在指定地址，同时关掉爬虫内部的镜像轮换与动态域名解析——否则「一次尝试」会被内部轮换放大成多次请求，用户看到的次数就不再是上限；退出时完整还原（爬虫实例在整个批次内复用）。聚合层每打一次镜像都会在字段日志里记一行「第 N 次请求改用镜像地址」。
 - 用户单独禁用 `Javlibrary·镜像` 站点时不走镜像（「禁用即不请求」不能被绕路）。

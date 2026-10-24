@@ -304,7 +304,7 @@ class NetCheckMixin:
         # self.Ui.pushButton_check_javdb_cookie.setEnabled(False)
         tips = "✅ 连接正常！"
         header = {"cookie": input_cookie}
-        javdb_url = manager.config.get_site_url(Website.JAVDB, "https://www.javdb.com") + "/v/D16Q5?locale=zh"
+        javdb_url = manager.config.get_site_url(Website.JAVDB, "https://javdb580.com") + "/v/D16Q5?locale=zh"
         try:
             response, error = get_text_sync(javdb_url, headers=header)
             if response is None:

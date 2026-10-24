@@ -5,7 +5,7 @@ from typing import override
 
 from lxml import etree
 
-from ..base.web import _JAVLIBRARY_DOMAINS, get_javlibrary_domain
+from ..base.web import _JAVLIBRARY_DOMAINS, get_javlibrary_domain, site_root
 from ..cf_bypass.selenium_adapter import is_cf_html as is_selenium_cf_html
 from ..config.enums import Language, Website
 from ..config.manager import manager
@@ -156,7 +156,9 @@ class JavLibraryCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.JAVLIBRARY, "https://www.javlibrary.com")
+        # 用户 2026-10-24 指定：默认地址直接进中文页 /cn（不带 www）。
+        # 拼搜索/详情地址前会先用 site_root() 剥掉语言段，见 _scrape_language。
+        return manager.config.get_site_url(Website.JAVLIBRARY, "https://javlibrary.com/cn")
 
     @classmethod
     @override
@@ -260,7 +262,8 @@ class JavLibraryCrawler(BaseCrawler):
     async def _scrape_language(self, ctx: Context, language: Language, appoint_url: str = "") -> CrawlerData:
         number = ctx.input.number
         lang_path = language_path(language)
-        domain_2 = f"{self.base_url}/{lang_path}"
+        # 默认地址带 /cn（直接进中文页），语言段由这里按所选语言重拼，故先收敛成站点根
+        domain_2 = f"{site_root(self.base_url)}/{lang_path}"
         real_url = appoint_url
         # 浏览器 bypass 解出的 cookie：搜索页带上后，详情页直连大概率直接 200，省一次解挑战
         search_cookies: dict[str, str] = {}

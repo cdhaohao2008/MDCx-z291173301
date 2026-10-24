@@ -15,7 +15,7 @@ from mdcx.models.model_types import CrawlerInput
 
 class FakeGetchuClient:
     async def get_text(self, url, **kwargs):
-        if url == "http://www.getchu.com/php/search.phtml?genre=all&search_keyword=TITLE-001&gc=gc":
+        if url == "http://getchu.com/php/search.phtml?genre=all&search_keyword=TITLE-001&gc=gc":
             return (
                 """
                 <html><body>

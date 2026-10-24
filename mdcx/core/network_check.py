@@ -133,14 +133,14 @@ SPECIAL_CHECK_PATHS: dict[Website, str] = {
 }
 
 DEFAULT_SITE_URLS: dict[Website, str] = {
-    Website.DMM: "https://www.dmm.co.jp",
-    Website.AVSOX: "https://www.avsox.click/cn",
-    Website.AVMOO: "https://www.avmoo.shop/cn",
-    Website.AVHEAT: "https://www.avheat.shop/cn",
+    Website.DMM: "https://dmm.co.jp",
+    Website.AVSOX: "https://avsox.click/cn",
+    Website.AVMOO: "https://avmoo.shop/cn",
+    Website.AVHEAT: "https://avheat.shop/cn",
     # javlibrary / madouqu 最新获取网址写入代码（议题 #132）：检测前先用代码里
     # 的网址，无法联通时再通过 get_javlibrary_domain / get_madouqu_domains 获取新网址重试。
-    Website.JAVLIBRARY: "https://www.javlibrary.com",
-    Website.JAVLIBRARY_MIRROR: "https://www.f101w.com",
+    Website.JAVLIBRARY: "https://javlibrary.com/cn",
+    Website.JAVLIBRARY_MIRROR: "https://f101w.com",
     Website.MADOUQU: "https://madouqu.shop",
     Website.OFFICIAL: "",
 }
