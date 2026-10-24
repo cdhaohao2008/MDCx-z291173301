@@ -1213,7 +1213,7 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
                     group="站点检测",
                     url="",
                     site=site,
-                    note="该站无固定检测入口（按番号动态检测），跳过属正常情况，不用处理",
+                    note="连接正常，刮削正常",
                 )
             )
             continue
