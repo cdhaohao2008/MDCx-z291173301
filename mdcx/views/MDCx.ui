@@ -23525,6 +23525,9 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                                 border-radius: 15px;
 </string>
                             </property>
+                            <property name="placeholderText">
+                              <string>显示修改后的网址如 https://javdb580.com/，没修改的不显示</string>
+                            </property>
                           </widget>
                         </item>
                         <item row="1" column="1">

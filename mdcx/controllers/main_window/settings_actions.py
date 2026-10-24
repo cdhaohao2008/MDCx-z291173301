@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 from mdcx.config.enums import Website
 from mdcx.config.extend import parse_media_paths
 from mdcx.config.manager import manager
+from mdcx.config.models import normalize_custom_url
 from mdcx.consts import IS_WINDOWS
 from mdcx.models.enums import FileMode
 from mdcx.models.flags import Flags
@@ -61,24 +62,10 @@ class SettingsActionsMixin:
         # 显示文本格式为“站点名（区域标签） 定位说明”，先按空格取首段、再剥区域标签后缀后再转枚举
         site = site.split(" ")[0].split("（")[0].strip()
         if site not in Website:
-            # official 子行（Official·HEYZO 等）：自定义网址框仅作该子站地址展示，
-            # 保存时按非枚举值跳过，不会写入 Official 配置
-            if site.startswith("Official·") or site.startswith("official·"):
-                from mdcx.crawlers.official_uncensored import UNCENSORED_OFFICIAL_SITES
-
-                suffix = site.split("·", 1)[1].strip()
-                spec = UNCENSORED_OFFICIAL_SITES.get(suffix)
-                if spec is None:
-                    lowered = suffix.lower()
-                    for key, candidate in UNCENSORED_OFFICIAL_SITES.items():
-                        if key.lower() == lowered or candidate.studio.lower() == lowered:
-                            spec = candidate
-                            break
-                if spec is not None:
-                    self.Ui.lineEdit_site_custom_url.setText(spec.base_url.rstrip("/") + "/")
+            self.Ui.lineEdit_site_custom_url.clear()
             return
-        site = Website(site)
-        self.Ui.lineEdit_site_custom_url.setText(manager.config.get_site_url(site))
+        # 只显示用户真正改过的自定义网址；没改过的站点保持空白，格式统一带结尾斜杠
+        self.Ui.lineEdit_site_custom_url.setText(manager.config.get_site_url_display(Website(site)))
 
     # 设置 - 网络 - 使用代理 - 添加网站
     def _add_no_proxy_site(self, site_value: str):
@@ -109,6 +96,10 @@ class SettingsActionsMixin:
             temp_dark = self.dark_mode
             temp_window_radius = self.window_radius
             self.load_config()
+            # 换配置后各站点的自定义网址可能完全不同，下拉右侧网址列同步刷新
+            from .init import refresh_site_combo_urls
+
+            refresh_site_combo_urls(self)
             if temp_dark != self.dark_mode and temp_window_radius == self.window_radius:
                 self.show_flag = True
                 self._windows_auto_adjust()
@@ -122,6 +113,10 @@ class SettingsActionsMixin:
         temp_dark = self.dark_mode
         temp_window_radius = self.window_radius
         self.load_config()
+        # 恢复默认会清掉所有自定义网址，下拉右侧网址列一并回到默认地址
+        from .init import refresh_site_combo_urls
+
+        refresh_site_combo_urls(self)
         if temp_dark and temp_window_radius:
             self.show_flag = True
             self._windows_auto_adjust()
@@ -219,9 +214,25 @@ class SettingsActionsMixin:
 
     # 设置-保存
     def pushButton_save_config_clicked(self):
+        raw_custom_url = self.Ui.lineEdit_site_custom_url.text().strip()
+        if raw_custom_url and not normalize_custom_url(raw_custom_url):
+            # 非空但解析不了：当场提示并留在原页，避免保存后输入框被旧值覆盖、
+            # 用户以为改成功了（自定义网址只在留空时才表示清除）
+            QMessageBox.warning(
+                self,
+                "自定义网址格式不正确",
+                f"当前填写的自定义网址无法识别：\n{raw_custom_url}\n\n"
+                "请填写符合基本格式的网址，例如 https://javdb580.com/\n"
+                "只支持 http/https 网址，域名要带后缀（如 .com）；没写 www 会自动补上。\n\n"
+                "留空表示不使用自定义网址（恢复该站点默认地址）。",
+            )
+            return
         try:
             self.save_config()
             self.load_config()  # 确保界面显示和实际配置一致
+            from .init import refresh_site_combo_urls
+
+            refresh_site_combo_urls(self)  # 自定义网址保存后同步下拉框右侧网址
             # 重建网络派生对象：AsyncWebClient 的重试/超时/代理在构造时固化，
             # 仅改 manager.config 不会生效（如检测网络仍用旧重试次数）。
             # _replace_config 原子切换新客户端，旧客户端由持有方租约保护、

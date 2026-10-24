@@ -4,6 +4,16 @@
 
 ## 2026-10-24
 
+### 自定义网址：保存后回显、没改过的站点留空，刮削全程只打自定义地址
+
+- 设置页「自定义网址」不再回填站点默认地址：只有用户真正改过并保存过的站点才显示网址，格式统一为 `https://javdb580.com/`（结尾带斜杠）；没改过的站点输入框保持空白，并新增占位提示「显示修改后的网址如 https://javdb580.com/，没修改的不显示」。
+- 新增 `Config.get_site_url_display()`（展示用，补尾斜杠）与 `models.normalize_custom_url()`（保存用）：省略协议时自动补 `https://`；**裸域名自动补 `www.`**（`javdb580.com` → `https://www.javdb580.com`），已带 `www.` 不重复叠加、误写的 `www.www.` 收成一个；已是子域名（`api.example.com`）、IP、带端口的地址不补（本地代理常见）。
+- 输入格式校验：必须是 http/https 网址，域名要有合法标签与字母后缀（支持 punycode）、端口在 1–65535、不能带账号密码与空格；不通过时保存前就弹窗提示并留在设置页，配置不落盘，不再静默丢弃或覆盖用户输入。
+- **与默认地址相同按「没自定义」处理**：`models.resolve_custom_url()` 把输入与站点内置默认地址（`models.site_default_url()`，临时忽略自定义网址后取爬虫的 `base_url_()`）比对，相同就返回空串——不写配置、自定义网址输入框也不显示，避免默认地址被当成自定义网址、把 JavDB/JavBus/JavLibrary 的源/镜像轮换挡掉；只差一个 `www.` 也认作同一个站（JavDB 默认地址是 `javdb.com`，用户补成 `www.javdb.com` 时不落配置，免得补出一个可能不存在的地址）。
+- 保存、切换配置、恢复默认之后调用 `init.refresh_site_combo_urls()`，把「当前网站」「自定义网址」「使用代理」三个下拉框右侧的网址列同步成最新地址（检测图标与缓存不动）。
+- 刮削侧（`core/file_crawler.py`）：`_attempt_target()` 先看该站点有没有自定义网址——有就每次重试都打自定义地址，不再按「源 → 镜像 → 源 → 镜像」切到内置镜像（JavDB 的 `javdb580.com`、JavBus 的 `dmmsee.casa`、JavLibrary 的 `f101w.com` 一律不碰）；镜像站（JavLibrary·镜像）自己配了自定义网址时同样优先用它。`crawlers/base` 的域名轮询器本来就把自定义网址放在首位、命中自定义时不再轮换，两边口径一致。
+- 测试：新增 `tests/test_custom_site_url.py`（补 www / 去重 / 非法输入拒绝、默认地址去重、默认地址取值不被自定义网址污染、只显示改过的站点、配置读写往返、下拉切换回显、下拉网址列解析）；`tests/crawlers/test_crawler.py` 增加「CrawlerProvider 用自定义网址初始化爬虫」；`tests/test_field_crawler_retry.py` 增加「自定义网址下重试全部打自定义地址」「镜像站自定义网址优先于内置镜像」两条用例。
+
 ### 刮削请求：普通站点一个番号最多 3 次，JavDB / JavBus / JavLibrary 源镜像交替最多 4 次
 
 - `core/file_crawler.py` 用「番号 × 站点」的请求次数封顶取代原来的逐字段重试：`_MAX_SITE_REQUESTS = 3`（首次 1 次 + 重试 2 次），用尽后本番号不再请求该站（连超时都不用再等），只记一行「已请求 3 次仍失败，本番号后续字段不再请求该站」。

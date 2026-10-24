@@ -99,6 +99,17 @@ def _is_site_disabled(config: Config, site: Website) -> bool:
     return site in (getattr(config, "website_disabled", None) or ())
 
 
+def _site_custom_url(config: Config, site: Website) -> str:
+    """用户为站点配置的自定义网址；未配置或测试桩不支持时返回空串。"""
+    getter = getattr(config, "get_site_url", None)
+    if not callable(getter):
+        return ""
+    try:
+        return str(getter(site, "") or "").strip()
+    except Exception:
+        return ""
+
+
 def sprint_source(website: Website, language: Language) -> str:
     if language == Language.UNDEFINED:
         return f"{website.value}"
@@ -594,7 +605,10 @@ class FileScraper:
             """第 attempt 次请求（从 1 起）该用的爬虫站点与地址覆盖。
 
             有源/镜像的站点奇数次打源地址、偶数次打镜像地址；其余站点一律用自己的默认地址。
+            用户给本站配置了自定义网址时，任何一次重试都继续用自定义网址，绝不被内置镜像覆盖。
             """
+            if _site_custom_url(self.config, site):
+                return site, ""
             mirror = _MIRROR_SITE_TARGETS.get(site)
             if mirror is None or attempt % 2 == 1:
                 return site, ""
@@ -602,6 +616,10 @@ class FileScraper:
             # 镜像站点被用户单独禁用时不走镜像（「禁用即不请求」的承诺不能被绕开）
             if mirror_site is not site and _is_site_disabled(self.config, mirror_site):
                 return site, ""
+            # 镜像站自己也配置了自定义网址时，优先用它的自定义网址（空 base_url 让
+            # 爬虫实例使用初始化时传入的自定义地址）
+            if mirror_site is not site and _site_custom_url(self.config, mirror_site):
+                return mirror_site, ""
             return mirror
 
         for field in ManualConfig.REDUCED_FIELDS:

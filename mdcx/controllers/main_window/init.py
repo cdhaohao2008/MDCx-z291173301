@@ -182,6 +182,24 @@ def _populate_site_combo(combo: QComboBox, site_values: list[str], *, with_capti
         view.setTextElideMode(Qt.TextElideMode.ElideRight)
 
 
+def refresh_site_combo_urls(self: MyMAinWindow) -> None:
+    """保存自定义网址后同步站点下拉框右侧的「当前网址」（不动检测图标与缓存）。"""
+    for combo in (
+        self.Ui.comboBox_website_all,
+        self.Ui.comboBox_custom_website,
+        self.Ui.comboBox_no_proxy_sites,
+    ):
+        for i in range(combo.count()):
+            value = (
+                combo.itemData(i, Qt.ItemDataRole.UserRole) or combo.itemText(i).split(" ")[0].split("（")[0].strip()
+            )
+            if not value:
+                continue
+            url = combo.itemData(i, _SITE_URL_EXPLICIT_ROLE) or _resolve_site_url(value)
+            combo.setItemData(i, url, _SITE_URL_ROLE)
+        _fit_site_url_popup(combo)
+
+
 def refresh_network_check_badges(self: MyMAinWindow) -> None:
     """检测完成后刷新三个站点下拉框的状态图标与 tooltip（不重排文本，保留当前选中项）。"""
     invalidate_check_cache()

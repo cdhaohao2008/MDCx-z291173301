@@ -4,8 +4,9 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Literal, cast
+from urllib.parse import urlsplit, urlunsplit
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, ValidationError, field_validator
 from pydantic.fields import FieldInfo
 
 from ..crawler_registry import registered_site_values
@@ -140,6 +141,138 @@ class TranslateConfig(BaseModel):
 
 class SiteConfig(BaseModel):
     custom_url: HttpUrl | None = Field(default=None, title="自定义网址")
+
+
+_HOST_LABEL_RE = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
+_IPV4_RE = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
+_TLD_RE = re.compile(r"^(?:[a-z]{2,63}|xn--[a-z0-9-]+)$", re.IGNORECASE)
+
+
+def _is_ipv4(host: str) -> bool:
+    if not _IPV4_RE.match(host):
+        return False
+    return all(0 <= int(part) <= 255 for part in host.split("."))
+
+
+def _is_valid_host(host: str) -> bool:
+    """主机名是否像样：IP，或「标签.标签」形式且顶级域是字母（或 punycode）。"""
+    if not host or len(host) > 253:
+        return False
+    if _is_ipv4(host):
+        return True
+    labels = host.split(".")
+    if len(labels) < 2:
+        return False
+    if not all(_HOST_LABEL_RE.match(label) for label in labels):
+        return False
+    return bool(_TLD_RE.match(labels[-1]))
+
+
+def _with_www(host: str) -> str:
+    """裸域名补 `www.`；已是子域名（含 `www.`）不动，误写的 `www.www.` 收成一个。"""
+    if _is_ipv4(host):
+        return host
+    labels = host.split(".")
+    if len(labels) == 2 and labels[0].lower() != "www":
+        return f"www.{host}"
+    if len(labels) > 2 and labels[0].lower() == "www" and labels[1].lower() == "www":
+        return ".".join([labels[0]] + labels[2:])
+    return host
+
+
+def normalize_custom_url(value: str) -> str:
+    """把用户输入的自定义网址规范化成可保存的形式（结尾无斜杠）。
+
+    - 空串返回空串，表示清除自定义网址；
+    - 省略协议时补 `https://`（用户常直接粘贴 `javdb580.com`）；
+    - 裸域名补 `www.`（`javdb580.com` → `https://www.javdb580.com`），已带子域名的
+      不动，`www.www.` 这种重复前缀收成一个；IP、带端口的地址不补（本地代理常见）；
+    - 格式不合基本网址要求（无顶级域、非法字符、端口越界、带账号密码等）返回空串，
+      由调用方决定提示或保留旧值。
+    """
+    url = str(value or "").strip()
+    if not url:
+        return ""
+    if "://" not in url:
+        url = f"https://{url}"
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return ""
+    scheme = parts.scheme.lower()
+    if scheme not in ("http", "https"):
+        return ""
+    if parts.username or parts.password:
+        return ""
+    host = parts.hostname or ""
+    if not _is_valid_host(host):
+        return ""
+    if port is not None and not 1 <= port <= 65535:
+        return ""
+    if any(ch.isspace() for ch in parts.path + parts.query + parts.fragment):
+        return ""
+    netloc = host if port is not None else _with_www(host)
+    if port is not None:
+        netloc = f"{netloc}:{port}"
+    candidate = urlunsplit((scheme, netloc, parts.path.rstrip("/"), parts.query, parts.fragment))
+    try:
+        return str(HttpUrl(candidate)).rstrip("/")
+    except ValidationError:
+        return ""
+
+
+def _host_without_www(url: str) -> str:
+    """把网址里的 `www.` 前缀去掉，用于判断「是不是同一个站」。"""
+    parts = urlsplit(url)
+    host = (parts.hostname or "").removeprefix("www.")
+    netloc = host
+    if parts.port is not None:
+        netloc = f"{host}:{parts.port}"
+    return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+
+
+def resolve_custom_url(value: str, default_url: str = "") -> str:
+    """把自定义网址输入框的内容解析成要写入配置的地址（空串 = 不自定义）。
+
+    - 留空或格式不合法 → 空串；
+    - 归一化后与站点默认地址相同（只差一个 `www.` 也算同一个站）→ 空串：
+      等同于没自定义，既不写配置，自定义网址输入框也不再显示（否则默认地址会把
+      源/镜像轮换挡掉，补出来的 `www.` 还可能指向不存在的地址）。
+    """
+    url = normalize_custom_url(value)
+    if not url:
+        return ""
+    if default_url:
+        default = str(default_url).strip().rstrip("/")
+        if url == default or _host_without_www(url) == _host_without_www(default):
+            return ""
+    return url
+
+
+def site_default_url(site: Website) -> str:
+    """站点内置默认地址（结尾无斜杠，不受自定义网址影响）。
+
+    爬虫的默认地址写在各自的 `base_url_()` 里、没有第二份可查，所以临时把该站点的
+    自定义网址置空再取一次，取完立刻还原（只改一个字段，不落盘）。
+    """
+    from ..crawlers import get_crawler
+    from .manager import manager
+
+    crawler_cls = get_crawler(site)
+    if crawler_cls is None:
+        return ""
+    entry = manager.config.site_configs.get(site)
+    saved = entry.custom_url if entry is not None else None
+    if entry is not None and saved is not None:
+        entry.custom_url = None
+    try:
+        return str(crawler_cls.base_url_() or "").strip().rstrip("/")
+    except Exception:
+        return ""
+    finally:
+        if entry is not None and saved is not None:
+            entry.custom_url = saved
 
 
 class FieldConfig(BaseModel):
@@ -1152,6 +1285,22 @@ class Config(BaseModel):
     def get_site_url(self, site: Website, default: str = "") -> str:
         """获取指定网站的用户自定义 URL, 结尾无斜杠."""
         return str(self.get_site_config(site).custom_url or default).rstrip("/")
+
+    def get_site_url_display(self, site: Website) -> str:
+        """自定义网址输入框的展示值：未自定义返回空串，已自定义补结尾斜杠。
+
+        输入框只展示「用户改过的网址」；没改过的站点保持空白，避免把默认地址
+        误当成用户配置。展示格式统一为 `https://example.com/`（只补 path 的
+        结尾斜杠，带 query 的网址不会被拼成 `?a=1/`）。
+        """
+        custom_url = self.get_site_config(site).custom_url
+        if not custom_url:
+            return ""
+        parts = urlsplit(str(custom_url))
+        path = parts.path or "/"
+        if not path.endswith("/"):
+            path += "/"
+        return urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment))
 
     def get_field_config(self, field: CrawlerResultFields) -> FieldConfig:
         return self.field_configs.get(field, FieldConfig())

@@ -36,7 +36,15 @@ from mdcx.config.extend import (
     normalize_task_mode_switches,
 )
 from mdcx.config.manager import manager
-from mdcx.config.models import MIN_REST_TIME_SECONDS, SiteConfig, normalize_site_list, str_to_list
+from mdcx.config.models import (
+    MIN_REST_TIME_SECONDS,
+    SiteConfig,
+    normalize_custom_url,
+    normalize_site_list,
+    resolve_custom_url,
+    site_default_url,
+    str_to_list,
+)
 from mdcx.consts import LOCAL_VERSION, SYSTEM_INFO, VERSION_NAME
 from mdcx.gen.field_enums import CrawlerResultFields
 from mdcx.models.flags import Flags
@@ -715,12 +723,18 @@ def save_config(self: MyMAinWindow):
         site = Website(site_text)
         if site == Website.AIRAV:
             site = Website.AIRAV_CC
-        url = self.Ui.lineEdit_site_custom_url.text().strip("/ ")
+        raw_url = self.Ui.lineEdit_site_custom_url.text()
+        # 归一化 + 校验（补 www、补协议），并识别「填的就是站点默认地址」：
+        # 与默认地址相同视为没自定义，不写配置，输入框也不再显示
+        url = resolve_custom_url(raw_url, site_default_url(site) if raw_url.strip() else "")
         if url:
             with suppress(ValidationError):
                 manager.config.site_configs.setdefault(site, SiteConfig()).custom_url = HttpUrl(url)
-        elif site in manager.config.site_configs:
-            manager.config.site_configs[site].custom_url = None
+        elif not raw_url.strip() or normalize_custom_url(raw_url):
+            # 留空＝清除；格式合法但与默认地址相同＝等同没自定义，同样清除。
+            # 非空且格式非法时保留旧值（保存前已由界面拦下，这里只是兜底）
+            if site in manager.config.site_configs:
+                manager.config.site_configs[site].custom_url = None
 
     manager.config.javdb = self.Ui.plainTextEdit_cookie_javdb.toPlainText()  # javdb cookie
     manager.config.fc2ppvdb = self.Ui.plainTextEdit_cookie_fc2ppvdb.toPlainText()  # fc2ppvdb cookie

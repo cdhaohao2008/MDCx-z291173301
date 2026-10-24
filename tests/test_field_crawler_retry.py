@@ -147,11 +147,13 @@ class _MirrorAwareCrawler:
     """记录每次请求实际打到的地址；恒定超时。
 
     `use_base_url` 模拟 BaseCrawler 的钉地址行为（聚合层按源/镜像交替时调用）。
+    `base_url` 模拟 CrawlerProvider 初始化时传入的自定义地址：没有钉地址时就用它。
     """
 
-    def __init__(self, site: Website, records: list[tuple[Website, str]]):
+    def __init__(self, site: Website, records: list[tuple[Website, str]], base_url: str = ""):
         self._site = site
         self._records = records
+        self._base_url = base_url
         self._pinned = ""
 
     @contextlib.contextmanager
@@ -163,7 +165,7 @@ class _MirrorAwareCrawler:
             self._pinned = ""
 
     async def run(self, task_input):
-        self._records.append((self._site, self._pinned))
+        self._records.append((self._site, self._pinned or self._base_url))
         raise TimeoutError("read timed out")
 
 
@@ -235,6 +237,87 @@ async def test_javlibrary_mirror_uses_mirror_crawler(monkeypatch: pytest.MonkeyP
         (Website.JAVLIBRARY, ""),
         (Website.JAVLIBRARY_MIRROR, "https://www.f101w.com/cn"),
     ], javlib_requests
+
+
+async def test_custom_url_disables_source_mirror_alternation(monkeypatch: pytest.MonkeyPatch):
+    """用户给源站配置了自定义网址后，所有重试都打自定义地址，绝不切回内置镜像。
+
+    用户诉求（2026-10-24）：当前网站下拉项改了网址并保存后，刮削必须一直用改后的
+    网址，不能第一次用自定义地址、第二次又跑回 javdb580.com 之类的默认镜像。
+    """
+    monkeypatch.setattr(
+        ManualConfig,
+        "REDUCED_FIELDS",
+        (CrawlerResultFields.TITLE, CrawlerResultFields.OUTLINE, CrawlerResultFields.SERIES),
+    )
+
+    class _CustomUrlConfig(_RetryConfig):
+        def get_site_url(self, site: Website, default: str = "") -> str:
+            if site is Website.JAVDB:
+                return "https://my-javdb.example"
+            return default
+
+    records: list[tuple[Website, str]] = []
+    ok_data = _build_result(Website.AVBASE, "存活站的标题")
+
+    class _Provider:
+        async def get(self, site: Website):
+            if site is Website.JAVDB:
+                return _MirrorAwareCrawler(site, records, base_url="https://my-javdb.example")
+            return _StaticCrawler(ok_data)
+
+    scraper = FileScraper(_CustomUrlConfig([Website.JAVDB, Website.AVBASE]), _Provider())
+    task_input = CrawlerInput.empty()
+    task_input.number = "TEST-CUSTOM-URL"
+
+    result = await scraper._call_crawlers(task_input, {Website.JAVDB, Website.AVBASE})
+
+    assert result is not None
+    javdb_requests = [url for site, url in records if site is Website.JAVDB]
+    assert javdb_requests == ["https://my-javdb.example"] * 4, javdb_requests
+    assert "改用镜像地址" not in result.field_log, result.field_log
+
+
+async def test_custom_url_on_mirror_site_is_used_instead_of_builtin_mirror(monkeypatch: pytest.MonkeyPatch):
+    """JavLibrary 镜像站自己配置了自定义网址时，偶数次请求用它而不是写死的 f101w 地址。"""
+    monkeypatch.setattr(
+        ManualConfig,
+        "REDUCED_FIELDS",
+        (CrawlerResultFields.TITLE, CrawlerResultFields.OUTLINE, CrawlerResultFields.SERIES),
+    )
+
+    class _CustomMirrorConfig(_RetryConfig):
+        def get_site_url(self, site: Website, default: str = "") -> str:
+            if site is Website.JAVLIBRARY_MIRROR:
+                return "https://my-javlib-mirror.example"
+            return default
+
+    records: list[tuple[Website, str]] = []
+    ok_data = _build_result(Website.AVBASE, "存活站的标题")
+
+    class _Provider:
+        async def get(self, site: Website):
+            if site is Website.JAVLIBRARY:
+                return _MirrorAwareCrawler(site, records)
+            if site is Website.JAVLIBRARY_MIRROR:
+                return _MirrorAwareCrawler(site, records, base_url="https://my-javlib-mirror.example")
+            return _StaticCrawler(ok_data)
+
+    scraper = FileScraper(_CustomMirrorConfig([Website.JAVLIBRARY, Website.AVBASE]), _Provider())
+    task_input = CrawlerInput.empty()
+    task_input.number = "TEST-CUSTOM-MIRROR"
+
+    result = await scraper._call_crawlers(task_input, {Website.JAVLIBRARY, Website.AVBASE})
+
+    assert result is not None
+    javlib_requests = [(site, url) for site, url in records if site is not Website.AVBASE]
+    assert javlib_requests == [
+        (Website.JAVLIBRARY, ""),
+        (Website.JAVLIBRARY_MIRROR, "https://my-javlib-mirror.example"),
+        (Website.JAVLIBRARY, ""),
+        (Website.JAVLIBRARY_MIRROR, "https://my-javlib-mirror.example"),
+    ], javlib_requests
+    assert "https://www.f101w.com/cn" not in str(javlib_requests)
 
 
 async def test_every_failed_site_is_retried_and_named(monkeypatch: pytest.MonkeyPatch):

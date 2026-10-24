@@ -42,3 +42,20 @@ async def test_crawler_provider_always_uses_http_only():
     assert crawler is not None
     assert crawler.browser is None
     await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_crawler_provider_uses_custom_site_url():
+    """配置了自定义网址时，爬虫实例的 base_url 必须是自定义地址。
+
+    用户诉求（2026-10-24）：当前网站下拉项改了网址并保存后，刮削必须打改后的地址，
+    不能再打站点默认地址。这里守住「配置 → 爬虫实例」这一段。
+    """
+    config = Config()
+    config.site_configs[Website.JAVDB] = SiteConfig(custom_url="https://javdb580.com/")
+    provider = CrawlerProvider(config=config, client=AsyncWebClient(timeout=1))
+
+    crawler = await provider.get(Website.JAVDB)
+
+    assert crawler.base_url == "https://javdb580.com"
+    await provider.close()

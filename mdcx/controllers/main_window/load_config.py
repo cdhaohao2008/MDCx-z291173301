@@ -1016,7 +1016,7 @@ def load_config(self: MyMAinWindow):
         # site config
         site = self.Ui.comboBox_custom_website.currentData() or self.Ui.comboBox_custom_website.currentText()
         if site in Website:
-            self.Ui.lineEdit_site_custom_url.setText(manager.config.get_site_url(Website(site)))
+            self.Ui.lineEdit_site_custom_url.setText(manager.config.get_site_url_display(Website(site)))
 
         self.Ui.lineEdit_api_token_theporndb.setText(manager.config.theporndb_api_token)
         self.Ui.lineEdit_tmdb_api_base.setText(manager.config.tmdb_api_base)

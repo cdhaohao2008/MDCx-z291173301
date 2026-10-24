@@ -14510,6 +14510,9 @@ class Ui_MDCx(object):
         self.checkBox_verify_ssl.setText(_translate("MDCx", "启用HTTPS证书校验，自签名代理/MITM调试时关闭"))
         self.groupBox_44.setTitle(_translate("MDCx", "网站设置"))
         self.label_401.setText(_translate("MDCx", "当前网站："))
+        self.lineEdit_site_custom_url.setPlaceholderText(
+            _translate("MDCx", "显示修改后的网址如 https://javdb580.com/，没修改的不显示")
+        )
         self.label_132.setText(
             _translate(
                 "MDCx",
