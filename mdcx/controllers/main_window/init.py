@@ -2,6 +2,7 @@ import re
 import traceback
 import webbrowser
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit, urlunsplit
 
 from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap, QScreen
@@ -266,6 +267,19 @@ def _resolve_site_url(value: str) -> str:
     return url
 
 
+def _display_site_url(url: str) -> str:
+    """网址列展示用：一律不带 `www.`（用户 2026-10-24）。
+
+    只改「显示」——下拉右侧那一列、列宽测算都走这里；点击跳转与刮削仍用
+    `_SITE_URL_ROLE` 里的真实地址（MGStage 这类站点只有带 www 才打得开）。
+    """
+    parts = urlsplit(str(url or ""))
+    host = parts.netloc
+    if host.lower().startswith("www."):
+        host = host[4:]
+    return urlunsplit((parts.scheme, host, parts.path, parts.query, parts.fragment))
+
+
 class _SiteUrlItemDelegate(QStyledItemDelegate):
     """站点下拉双列绘制：左侧站点名，右侧当前网址；网址列各行同一起点（左对齐）。"""
 
@@ -283,7 +297,7 @@ class _SiteUrlItemDelegate(QStyledItemDelegate):
         for row in range(model.rowCount()):
             index = model.index(row, 0)
             name_w = max(name_w, fm.horizontalAdvance(str(index.data(Qt.ItemDataRole.DisplayRole) or "")))
-            url = str(index.data(_SITE_URL_ROLE) or "")
+            url = _display_site_url(str(index.data(_SITE_URL_ROLE) or ""))
             if url:
                 url_w = max(url_w, fm.horizontalAdvance(url))
         name_w = min(name_w, _SITE_NAME_MAX_W)
@@ -306,7 +320,7 @@ class _SiteUrlItemDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index) -> None:
         view = self._combo.view()
-        url = str(index.data(_SITE_URL_ROLE) or "")
+        url = _display_site_url(str(index.data(_SITE_URL_ROLE) or ""))
         if view is None or not url:
             super().paint(painter, option, index)
             return

@@ -143,3 +143,13 @@ def test_site_url_column_keeps_full_address():
 
     assert _resolve_site_url("7mmtv") == "https://7mmtv.sx/"
     assert _resolve_site_url("JavDB") == "https://javdb580.com/"
+
+
+def test_site_url_column_hides_www():
+    """下拉网址列显示一律不带 www；点击跳转/刮削仍用真实地址（MGStage 带 www 才打得开）。"""
+    from mdcx.controllers.main_window.init import _display_site_url, _resolve_site_url
+
+    assert _resolve_site_url("MGStage") == "https://www.mgstage.com/"
+    assert _display_site_url(_resolve_site_url("MGStage")) == "https://mgstage.com/"
+    assert _display_site_url("https://javdb580.com/") == "https://javdb580.com/"
+    assert _display_site_url("https://www.f101w.com/cn/") == "https://f101w.com/cn/"
