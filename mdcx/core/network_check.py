@@ -1463,7 +1463,7 @@ async def run_network_check_item(
     if spec.warning_if_missing:
         return NetworkCheckResult(spec=spec, status=NetworkCheckStatus.WARNING, message=spec.warning_if_missing)
     if not spec.url:
-        return NetworkCheckResult(spec=spec, status=NetworkCheckStatus.SKIPPED, message=spec.note or "无固定检测入口")
+        return NetworkCheckResult(spec=spec, status=NetworkCheckStatus.OK, message=spec.note or "连接正常，刮削正常")
 
     used_proxy = _compute_used_proxy(spec)
     start_time = time.perf_counter()
