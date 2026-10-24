@@ -55,7 +55,7 @@ def _set_saved_cookie(monkeypatch, cookie: str) -> None:
 def test_javdb_cookie_not_cleared_on_network_error(win, monkeypatch):
     """网络/站点不可达（response is None 且 error 含 Cookie）：保留 cookie。"""
     from mdcx.config.manager import manager
-    from mdcx.controllers.main_window import net_check
+    from mdcx.controllers.main_window import cookie_checks
 
     window, mw_mod = win
     saved = "locale=zh; _jdb_session=KEEP_ME"
@@ -64,8 +64,8 @@ def test_javdb_cookie_not_cleared_on_network_error(win, monkeypatch):
     def fake_get_text_sync(url, headers=None, **kwargs):
         return None, "HTTP 403 Cookie Invalid"
 
-    # _check_javdb_cookie 已随「检测网络」集群切到 NetCheckMixin，补丁改指向其所在模块。
-    monkeypatch.setattr(net_check, "get_text_sync", fake_get_text_sync)
+    # JavDB 检测已改成「多节点投票」：请求与判定都在 cookie_checks 里，补丁要打在那里。
+    monkeypatch.setattr(cookie_checks, "get_text_sync", fake_get_text_sync)
 
     window._check_javdb_cookie(saved)
 
@@ -75,7 +75,7 @@ def test_javdb_cookie_not_cleared_on_network_error(win, monkeypatch):
 def test_javdb_cookie_not_cleared_when_logout_missing(win, monkeypatch):
     """页面无 /logout（可能维护页/拦截页）：只告警，保留 cookie。"""
     from mdcx.config.manager import manager
-    from mdcx.controllers.main_window import net_check
+    from mdcx.controllers.main_window import cookie_checks
 
     window, mw_mod = win
     saved = "locale=zh; _jdb_session=KEEP_ME"
@@ -84,7 +84,7 @@ def test_javdb_cookie_not_cleared_when_logout_missing(win, monkeypatch):
     def fake_get_text_sync(url, headers=None, **kwargs):
         return "<html>maintenance</html>", ""
 
-    monkeypatch.setattr(net_check, "get_text_sync", fake_get_text_sync)
+    monkeypatch.setattr(cookie_checks, "get_text_sync", fake_get_text_sync)
 
     window._check_javdb_cookie(saved)
 

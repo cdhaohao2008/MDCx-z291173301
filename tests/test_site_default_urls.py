@@ -5,7 +5,10 @@
 `www.javfree.me` 的证书与域名不匹配（TLS 直接失败），iqqtv 的 www 还会被站内 302 到
 `?fromsite=www`。
 
-唯一例外是 MGStage：用户 2026-10-24 明确要求它保留 www（`https://www.mgstage.com`）。
+两个按实测定的例外：
+- MGStage：用户 2026-10-24 明确要求保留 www（`https://www.mgstage.com`）；
+- JavBus：四条线路的裸域全部 301 到各自 www，跨主机跳转会丢掉请求头里的 Cookie
+  （2026-10-24 实测，有效 Cookie 被网络检测误报成「可能无效」），故一律用 www 变体。
 
 另外「默认地址千万不要写成 www.www. 这样」——这里也一并校验。
 """
@@ -22,8 +25,8 @@ from mdcx.config.manager import manager
 from mdcx.config.models import Config, site_default_url
 from mdcx.crawlers.base import crawler_registry
 
-# 用户 2026-10-24 指定保留 www 的站点（其余站点一律不带 www）
-WWW_ONLY_SITES = frozenset({Website.MGSTAGE})
+# 按实测保留 www 的站点（其余站点一律不带 www）
+WWW_ONLY_SITES = frozenset({Website.MGSTAGE, Website.JAVBUS})
 
 # 没有固定入口地址的站点（base_url_() 返回空串）
 EMPTY_URL_SITES = frozenset({Website.DMM, Website.OFFICIAL})

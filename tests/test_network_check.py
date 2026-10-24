@@ -202,8 +202,12 @@ async def test_build_network_check_specs_uses_registered_sites_without_key_error
 
 
 @pytest.mark.anyio
-async def test_build_network_check_specs_skips_disabled_sites(monkeypatch: pytest.MonkeyPatch):
-    """被禁用的站点不在检测清单里生成任何一行，连请求都不发。"""
+async def test_build_network_check_specs_includes_disabled_sites(monkeypatch: pytest.MonkeyPatch):
+    """禁用站点照样生成检测项（用户 2026-10-24）。
+
+    网络不是天天测，偶尔测一次时更需要知道被禁用的站现在通不通；
+    刮削里的「禁用」只影响刮削，不该把检测页也一起关掉。
+    """
 
     class DisabledConfig(FakeConfig):
         website_disabled = [Website.JAVDB]
@@ -227,12 +231,12 @@ async def test_build_network_check_specs_skips_disabled_sites(monkeypatch: pytes
     specs = await build_network_check_specs()
 
     assert any(spec.site == Website.AVBASE for spec in specs)
-    assert all(spec.site != Website.JAVDB for spec in specs)
+    assert any(spec.site == Website.JAVDB for spec in specs), "禁用站点也要出现在网络检测清单里"
 
 
 @pytest.mark.anyio
-async def test_build_network_check_specs_skips_disabled_official_only(monkeypatch: pytest.MonkeyPatch):
-    """禁用 Official 只跳过 Official 本行，五个无码官网拆出的独立站点不受影响。"""
+async def test_build_network_check_specs_includes_disabled_official_and_subsites(monkeypatch: pytest.MonkeyPatch):
+    """禁用 Official 不影响任何一行：Official 本行与五个无码官网都照常检测。"""
 
     five_sites = [
         Website.OFFICIAL_10MUSUME,
@@ -253,20 +257,21 @@ async def test_build_network_check_specs_skips_disabled_official_only(monkeypatc
 
     monkeypatch.setattr(
         "mdcx.crawlers.get_registered_crawler_sites",
-        lambda include_hidden=False: list(five_sites),
+        lambda include_hidden=False: [Website.OFFICIAL, *five_sites],
     )
     monkeypatch.setattr("mdcx.crawlers.get_crawler", real_get_crawler)
     monkeypatch.setattr("mdcx.core.network_check._manager", lambda: DisabledManager())
 
     specs = await build_network_check_specs()
+    sites = [spec.site for spec in specs]
 
-    assert all(spec.site != Website.OFFICIAL for spec in specs)
-    assert [spec.site for spec in specs if spec.site in five_sites] == five_sites
+    assert Website.OFFICIAL in sites
+    assert [site for site in sites if site in five_sites] == five_sites
 
 
 @pytest.mark.anyio
-async def test_build_network_check_specs_skips_one_disabled_uncensored_site(monkeypatch: pytest.MonkeyPatch):
-    """禁用某个无码官网只隐藏它自己，其余四站与 Official 本行照旧。"""
+async def test_build_network_check_specs_includes_one_disabled_uncensored_site(monkeypatch: pytest.MonkeyPatch):
+    """禁用某个无码官网也不隐藏它：该行与其余四站、Official 本行一起检测。"""
 
     class DisabledConfig(FakeConfig):
         website_disabled = [Website.OFFICIAL_HEYZO]
@@ -287,14 +292,14 @@ async def test_build_network_check_specs_skips_one_disabled_uncensored_site(monk
     specs = await build_network_check_specs()
     sites = [spec.site for spec in specs]
 
-    assert Website.OFFICIAL_HEYZO not in sites
+    assert Website.OFFICIAL_HEYZO in sites
     assert Website.OFFICIAL_10MUSUME in sites
     assert Website.OFFICIAL in sites
 
 
 @pytest.mark.anyio
-async def test_run_network_check_retry_skips_sites_disabled_after_failure(monkeypatch: pytest.MonkeyPatch):
-    """重试旧失败项时按当前禁用名单过滤，不再请求刚被禁用的站。"""
+async def test_run_network_check_retry_includes_sites_disabled_after_failure(monkeypatch: pytest.MonkeyPatch):
+    """重试旧失败项时不再按禁用名单过滤：禁用站也要照常重测（用户 2026-10-24）。"""
 
     class DisabledConfig(FakeConfig):
         website_disabled = [Website.JAVDB]
@@ -313,7 +318,7 @@ async def test_run_network_check_retry_skips_sites_disabled_after_failure(monkey
         concurrency=1,
     )
 
-    assert results == []
+    assert [result.spec.site for result in results] == [Website.JAVDB]
 
 
 @pytest.mark.anyio
@@ -384,7 +389,8 @@ async def test_mirror_sample_spec_runs_scrape_probe(monkeypatch: pytest.MonkeyPa
         url="https://www.f101w.com/cn/?v=javme2j2tu",
         site=Website.JAVLIBRARY_MIRROR,
     )
-    result = await run_network_check_item(spec, client=FakeClient())
+    # 真实页面不会是 2 字节的 "ok"：空壳 200 现在先判「空白页」、不再进刮削探测
+    result = await run_network_check_item(spec, client=ProbeFakeClient(text="<html>" + "鏡像站頁面" * 20 + "</html>"))
 
     assert probe_called == ["Javlibrary·镜像"], "镜像项必须真的发起刮削探测"
     assert result.status == NetworkCheckStatus.OK
@@ -1357,7 +1363,8 @@ async def test_probe_retry_emits_no_intermediate_progress_lines(monkeypatch: pyt
     spec = NetworkCheckSpec(name="AVBase", group="站点检测", url="https://www.avbase.net", site=Website.AVBASE)
     results = await run_network_check(
         specs=[spec],
-        client=ProbeFakeClient(),
+        # 连通性那一跳要给一页像样的 HTML：空壳 200 会被「空白页」判定拦在探测之前
+        client=ProbeFakeClient(text="<html>" + "站點首頁" * 30 + "</html>"),
         progress=emitted.append,
         emit_header=False,
     )

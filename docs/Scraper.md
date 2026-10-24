@@ -32,7 +32,7 @@ MDCx 刮削网站类型汇总表
     AVMOO           https://avmoo.shop/cn         「AVMOO - 你的线上日本成人影片情报站」，纯日系有码
     FreeJavBT       https://freejavbt.com         导航 有碼 / 無碼 / 歐美 / FC2 + 系列 LUXU / ARA / SIRO / AV Bro
     IQQTV           https://iqqr1.org/cn          iqqr1.org。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus          https://javbus.com            四条线路轮流：javbus.com → dmmsee.casa → javsee.cyou → cdnbus.bond
+    JavBus          https://www.javbus.com        四条线路轮流：www.javbus.com → www.dmmsee.casa → www.javsee.cyou → www.cdnbus.bond
     JavDay          https://javday.app            「JAVDAY | 免費高清AV在線看| 麻豆 SWAG 看到飽」
     JavDB           https://javdb580.com          默认走 580 镜像；Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API       https://javdb580.com          JavDB 镜像 API（javdb580.com），内容集同 JavDB
@@ -63,7 +63,7 @@ MDCx 刮削网站类型汇总表
     AVEntertainments https://aventertainments.com  AV 安态。「正規無修正」DVD 販売 / 配信
     FreeJavBT        https://freejavbt.com         导航 有碼 / 無碼 / 歐美 / FC2 + 系列 LUXU / ARA / SIRO / AV Bro
     IQQTV            https://iqqr1.org/cn          iqqr1.org。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus           https://javbus.com            四条线路轮流：javbus.com → dmmsee.casa → javsee.cyou → cdnbus.bond
+    JavBus           https://www.javbus.com        四条线路轮流：www.javbus.com → www.dmmsee.casa → www.javsee.cyou → www.cdnbus.bond
     JavDB            https://javdb580.com          默认走 580 镜像；Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API        https://javdb580.com          JavDB 镜像 API（javdb580.com），内容集同 JavDB
     JavDB_APP        https://apidd.czssdgz.com     JavDB App 接口镜像（apidd.*），内容集同 JavDB
@@ -83,7 +83,7 @@ MDCx 刮削网站类型汇总表
     AVSOX         https://avsox.click/cn        avsox.click。与 avmoo/avheat 同 tellme.pw AIO 平台，纯无码
     FC2PPVDB      https://fc2cmadb.com          fc2cmadb.com。FC2 目录站，卖家名多为素人（マスクde本物素人 等）
     IQQTV         https://iqqr1.org/cn          iqqr1.org。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus        https://javbus.com            四条线路轮流：javbus.com → dmmsee.casa → javsee.cyou → cdnbus.bond
+    JavBus        https://www.javbus.com        四条线路轮流：www.javbus.com → www.dmmsee.casa → www.javsee.cyou → www.cdnbus.bond
     JavDB         https://javdb580.com          默认走 580 镜像；Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API     https://javdb580.com          JavDB 镜像 API（javdb580.com），内容集同 JavDB
     JavDB_APP     https://apidd.czssdgz.com     JavDB App 接口镜像（apidd.*），内容集同 JavDB
@@ -100,7 +100,7 @@ MDCx 刮削网站类型汇总表
     7mmtv         https://7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     AVheat        https://avheat.shop/cn        「AVHEAT - 你的线上欧美成人影片情报站」
     IQQTV         https://iqqr1.org/cn          iqqr1.org。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus        https://javbus.com            四条线路轮流：javbus.com → dmmsee.casa → javsee.cyou → cdnbus.bond
+    JavBus        https://www.javbus.com        四条线路轮流：www.javbus.com → www.dmmsee.casa → www.javsee.cyou → www.cdnbus.bond
     JavDB         https://javdb580.com          默认走 580 镜像；Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API     https://javdb580.com          JavDB 镜像 API（javdb580.com），内容集同 JavDB
     JavDB_APP     https://apidd.czssdgz.com     JavDB App 接口镜像（apidd.*），内容集同 JavDB
@@ -118,7 +118,7 @@ MDCx 刮削网站类型汇总表
   ── 第三方 / 聚合站 (8) ──
     7mmtv         https://7mmtv.sx              导航 有碼AV/無碼AV/素人AV/無碼破解/國產影片；FC2 前缀单独判定
     IQQTV         https://iqqr1.org/cn          iqqr1.org。导航 日本/獨家/國產/無碼/歐美；识别 1pondo 系前缀
-    JavBus        https://javbus.com            四条线路轮流：javbus.com → dmmsee.casa → javsee.cyou → cdnbus.bond
+    JavBus        https://www.javbus.com        四条线路轮流：www.javbus.com → www.dmmsee.casa → www.javsee.cyou → www.cdnbus.bond
     JavDB         https://javdb580.com          默认走 580 镜像；Tags: Censored/Uncensored/Western/FC2/Anime；Makers 含「麻豆傳媒映畫」
     JavDB_API     https://javdb580.com          JavDB 镜像 API（javdb580.com），内容集同 JavDB
     JavDB_APP     https://apidd.czssdgz.com     JavDB App 接口镜像（apidd.*），内容集同 JavDB
@@ -187,7 +187,7 @@ FC2PPVDB          FC2：FC2网站                素人+FC2                     
 FreeJavBT         有码：仅限有码              有码+无码+FC2+欧美                  https://freejavbt.com
 Getchu            综合：有码+游戏+视频        有码（另有里番/同人/书籍/动漫）     http://getchu.com                       AIV
 IQQTV             综合：有码+无码+素人+国产   有码+无码+素人+欧美+国产            https://iqqr1.org/cn
-JavBus            综合：有码+无码             有码+无码+FC2+欧美                  https://javbus.com
+JavBus            综合：有码+无码             有码+无码+FC2+欧美                  https://www.javbus.com
 JavDay            综合：有码+无码+国产        有码+无码+国产                      https://javday.app
 JavDB             综合：有码+无码             有码+无码+FC2+欧美                  https://javdb580.com
 JavDB_API         综合：有码+无码             有码+无码+FC2+欧美                  https://javdb580.com

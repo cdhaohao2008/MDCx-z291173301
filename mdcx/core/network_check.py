@@ -12,6 +12,7 @@ from urllib.parse import quote_plus, urljoin
 
 from mdcx.config.enums import Website
 from mdcx.utils import mask_proxy_url
+from mdcx.utils.site_url import strip_redundant_www, without_www
 from mdcx.utils.url_display import decode_url_escapes
 
 if TYPE_CHECKING:
@@ -231,6 +232,11 @@ def _configured_or_default_url(site: Website, default_url: str) -> tuple[str, bo
     manager = _manager()
     custom_url = manager.config.get_site_url(site)
     if custom_url:
+        # 自定义网址只比默认地址多个 www. 时按默认地址走：javdb580.com 的 www 变体
+        # 是只回 1 字节的空壳，JavDB/JavDB_API 因此一直被判「站点无效」。
+        stripped = strip_redundant_www(custom_url, default_url)
+        if stripped != custom_url:
+            return stripped.rstrip("/"), False
         return custom_url, True
     return default_url.rstrip("/"), False
 
@@ -436,7 +442,81 @@ def _clean_probe_error(error: str) -> str:
     return decode_url_escapes(f"{prefix}: {tail}") if tail else decode_url_escapes(cleaned)
 
 
-def _classify_http_result(spec: NetworkCheckSpec, status_code: int, text: str) -> tuple[NetworkCheckStatus, str]:
+def _blank_body(text: str) -> bool:
+    """页面是否为空壳（`www.javdb580.com` 这类占位域名只回 1 字节换行）。"""
+    return len((text or "").strip()) < 64
+
+
+def _redirect_host_changed(spec: NetworkCheckSpec, final_url: str) -> str:
+    """请求被跳到别的主机时返回落地 host，否则返回空串。
+
+    跨主机跳转会丢掉请求头里的 Cookie（JavBus 裸域 301 到 www 就是如此），
+    这种情况下的「未登录」不能算到 Cookie 头上。
+    """
+    if not final_url:
+        return ""
+    try:
+        from httpx import URL
+
+        requested = (URL(spec.url).host or "").lower()
+        landed = (URL(final_url).host or "").lower()
+    except Exception:
+        return ""
+    if not landed or landed == requested:
+        return ""
+    return landed
+
+
+async def _retry_without_www(
+    client: Any,
+    spec: NetworkCheckSpec,
+    response: Any,
+    text: str,
+    start_time: float,
+) -> tuple[NetworkCheckSpec, Any, str, int]:
+    """站点检测项拿到空壳 200 时，改打去掉 www 的地址再试一次。
+
+    `www.javdb580.com` 只回 1 字节换行（主站是 `javdb580.com`）：这种 200 既不能算
+    连通，也不能拿去做刮削探测（搜索页解析必然为空，回退真实刮削后就是 30s/45s
+    双超时）。去 www 后能拿到真页面就改用该地址，后续探测也跟着换。
+    """
+    if spec.site is None or spec.group != "站点检测" or not _blank_body(text):
+        return spec, response, text, int((time.perf_counter() - start_time) * 1000)
+    alt_url = without_www(spec.url)
+    if not alt_url:
+        return spec, response, text, int((time.perf_counter() - start_time) * 1000)
+    manager = _manager()
+    try:
+        retry_response, _retry_error = await client.request(
+            spec.method,  # type: ignore[arg-type]
+            alt_url,
+            headers=spec.headers or None,
+            cookies=spec.cookies or None,
+            json_data=spec.json_data,
+            use_proxy=spec.use_proxy,
+            timeout=_diagnostic_timeout(),
+            enable_cf_bypass=spec.enable_cf_bypass and _bypass_available(manager.config),
+        )
+    except Exception:
+        return spec, response, text, int((time.perf_counter() - start_time) * 1000)
+    if retry_response is None:
+        return spec, response, text, int((time.perf_counter() - start_time) * 1000)
+    try:
+        retry_response.encoding = spec.encoding
+        retry_text = retry_response.text or ""
+    except Exception:
+        return spec, response, text, int((time.perf_counter() - start_time) * 1000)
+    if _blank_body(retry_text):
+        return spec, response, text, int((time.perf_counter() - start_time) * 1000)
+    return replace(spec, url=alt_url), retry_response, retry_text, int((time.perf_counter() - start_time) * 1000)
+
+
+def _classify_http_result(
+    spec: NetworkCheckSpec,
+    status_code: int,
+    text: str,
+    final_url: str = "",
+) -> tuple[NetworkCheckStatus, str]:
     if _is_cloudflare_challenge(text):
         return (
             NetworkCheckStatus.WARNING,
@@ -454,10 +534,19 @@ def _classify_http_result(spec: NetworkCheckSpec, status_code: int, text: str) -
             )
         if "Due to copyright restrictions" in text or "Access denied" in text:
             return NetworkCheckStatus.FAILED, "当前节点 IP 被 JavDB 限制（版权区域限制），请使用非日本节点"
-        if "/logout" in text:
+        # 与「设置 → 网络」里的 JavDB Cookie 检测同源判定：官方对未登录访问详情页一律
+        # 302 到 /login，登录后才返回详情页；旧实现只认 `/logout`，换了域名后误报。
+        from mdcx.controllers.main_window.cookie_checks import classify_javdb_login_state
+
+        javdb_state = classify_javdb_login_state(text)
+        if javdb_state == "logged_in":
             return NetworkCheckStatus.OK, "连接正常，Cookie 有效"
-        if manager.config.javdb:
+        if manager.config.javdb and javdb_state == "logged_out":
             return NetworkCheckStatus.WARNING, "访问正常，但JavDB网站Cookie可能无效"
+        if javdb_state == "blocked":
+            return NetworkCheckStatus.WARNING, "被 Cloudflare 拦截，未能判定 JavDB Cookie"
+        if javdb_state == "unknown":
+            return NetworkCheckStatus.WARNING, "无法识别 JavDB 页面结构，未能判定 Cookie"
         return NetworkCheckStatus.OK, "连接正常"
 
     if spec.site == Website.JAVBUS:
@@ -471,6 +560,14 @@ def _classify_http_result(spec: NetworkCheckSpec, status_code: int, text: str) -
         if state == "logged_in":
             return NetworkCheckStatus.OK, "连接正常，Cookie 有效"
         if manager.config.javbus and state == "logged_out":
+            landed = _redirect_host_changed(spec, final_url)
+            if landed:
+                # 裸域 301 到 www 时 Cookie 会被丢掉：这是跳转的锅，不是 Cookie 失效
+                return (
+                    NetworkCheckStatus.WARNING,
+                    f"请求被跳转到 {landed}，Cookie 未随跨主机跳转保留；"
+                    f"请把 JavBus 网址改成 https://{landed} 后重新检测",
+                )
             return NetworkCheckStatus.WARNING, "访问正常，但Javbus网站Cookie可能无效"
         if state == "logged_out" and "lostpasswd" in text.lower():
             return NetworkCheckStatus.WARNING, "当前节点可能需要 JavBus Cookie"
@@ -501,6 +598,12 @@ def _classify_http_result(spec: NetworkCheckSpec, status_code: int, text: str) -
             "外部CF服务正在启动（浏览器池初始化中），请稍候重新检测；若持续 503 请检查服务日志",
         )
     if 200 <= status_code < 400:
+        # 空壳域名（`www.javdb580.com` 只回 1 字节）也是 200，不能当成「连接正常」
+        if spec.site is not None and spec.group == "站点检测" and _blank_body(text):
+            return (
+                NetworkCheckStatus.WARNING,
+                "站点返回空白页（常见于网址里的 www 变体），请把网址改成不带 www 的地址后重试",
+            )
         return NetworkCheckStatus.OK, "连接正常"
     if 500 <= status_code:
         return NetworkCheckStatus.FAILED, f"站点服务异常 HTTP {status_code}"
@@ -1086,14 +1189,11 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
     # GitHub Raw / 通用HTTPS 都迟迟不显示。改为并发解析 + 单项限时后，
     # 整段从"各站耗时之和"降为"最慢的那一站（且封顶）"，检测项顺序与内容不变。
     plans: list[tuple[Website, Any, str, bool]] = []
-    disabled_sites = set(getattr(manager.config, "website_disabled", None) or ())
     for site in get_registered_crawler_sites(include_hidden=False):
         if site == Website.THEPORNDB:
             continue
-        # 禁用站点连检测项都不生成：没有请求、报告里也不占一行。
-        # Official 被禁用时，下面五个子站一并不再生成。
-        if site in disabled_sites:
-            continue
+        # 禁用站点照样生成检测项（用户 2026-10-24：网络不是天天测，偶尔测一次时
+        # 更要知道被禁用的站现在通不通，不能因为刮削里禁用就把检测页也一起关掉）。
         crawler_cls = get_crawler(site)
         if crawler_cls is None:
             continue
@@ -1247,7 +1347,6 @@ async def _build_site_specs() -> list[NetworkCheckSpec]:
 
 def _build_static_specs() -> list[NetworkCheckSpec]:
     manager = _manager()
-    disabled_sites = set(getattr(manager.config, "website_disabled", None) or ())
     specs = [
         NetworkCheckSpec(
             name="GitHub Raw",
@@ -1319,9 +1418,9 @@ def _build_static_specs() -> list[NetworkCheckSpec]:
         )
 
     api_token = manager.config.theporndb_api_token.strip()
-    if Website.THEPORNDB in disabled_sites:
-        pass
-    elif api_token:
+    # 禁用站点同样检测（用户 2026-10-24）：网络检测是「现在通不通」的体检，
+    # 与刮削里是否启用该站无关。
+    if api_token:
         specs.append(
             NetworkCheckSpec(
                 name="ThePornDB Token",
@@ -1518,6 +1617,10 @@ async def run_network_check_item(
                 used_proxy=used_proxy,
             )
 
+        # 空壳 200（`www.javdb580.com` 只回 1 字节）先换去掉 www 的地址再判：
+        # 不换的话后面既判不了 Cookie，刮削探测也只会退到真实刮削等 30s/45s 超时。
+        spec, response, text, elapsed_ms = await _retry_without_www(request_client, spec, response, text, start_time)
+
         if _is_cloudflare_challenge(text) and spec.enable_cf_bypass and _bypass_available(_manager().config):
             bypass_response, bypass_error = await _try_bypass_for_check(request_client, spec)
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
@@ -1565,7 +1668,9 @@ async def run_network_check_item(
                     bypass_mode = response.headers.get("x-mdcx-bypass-mode", "")
                 except Exception:
                     bypass_mode = ""
-                status, message = _classify_http_result(spec, int(response.status_code), text)
+                status, message = _classify_http_result(
+                    spec, int(response.status_code), text, str(getattr(response, "url", "") or "")
+                )
                 if status == NetworkCheckStatus.OK:
                     mode_text = f"（{bypass_mode}）" if bypass_mode else ""
                     message = f"连接正常，通过挑战{mode_text}"
@@ -1579,7 +1684,9 @@ async def run_network_check_item(
                     used_proxy=used_proxy,
                 )
 
-        status, message = _classify_http_result(spec, int(response.status_code), text)
+        status, message = _classify_http_result(
+            spec, int(response.status_code), text, str(getattr(response, "url", "") or "")
+        )
         if spec.validator == "theporndb_token":
             status, message = _classify_theporndb_token(int(response.status_code), text)
         elif spec.validator == "DMM_API":
@@ -1714,10 +1821,10 @@ async def run_network_check(
     # 都不显示。改为：静态项立刻开跑，站点 specs 丢后台并发构建，等真要跑到后面
     # 的分组时再 join——第一组结果几秒内就出来。
     site_specs_task: asyncio.Task[list[NetworkCheckSpec]] | None = None
-    disabled_sites = set(getattr(_manager().config, "website_disabled", None) or ())
     if specs is not None:
-        # 「重试失败项」传进来的是上一轮的结果集，过滤一次，避免禁用后又把旧项捡回来。
-        check_specs: list[NetworkCheckSpec] = [spec for spec in specs if spec.site not in disabled_sites]
+        # 「重试失败项」原样重测：禁用站点也照样检测（用户 2026-10-24），
+        # 不再按 website_disabled 过滤。
+        check_specs: list[NetworkCheckSpec] = list(specs)
     else:
         check_specs = _build_static_specs()
 

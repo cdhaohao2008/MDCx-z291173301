@@ -12,18 +12,21 @@ from ..number import number_search_variants
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException
 from .base.base_types import split_csv
 
-# javbus 四条线路（用户 2026-10-24 定规）：主站 + 三个防屏蔽地址，一律不带 www。
+# javbus 四条线路（用户 2026-10-24 定规）：主站 + 三个防屏蔽地址。
 # 刮削时由聚合层 `core/file_crawler.py::_MULTI_ADDRESS_SITE_TARGETS` 按「一个地址一次」
 # 轮流使用：第 1 次 javbus.com、第 2 次 dmmsee.casa、第 3 次 javsee.cyou、第 4 次
 # cdnbus.bond，4 次都没数据才放过该站。爬虫内部不再自己做域名轮换（否则一次尝试会被
 # 放大成多次请求，用户看到的「四次」就不作数了）。
 # 2026-08-25 实测：busjav.bond/seejav.cyou/buscdn.bond/javbus.bond SSL 连接失效已移除；
 # busdmm.bond 持续 CF 挑战未纳入。
+# 2026-10-24 实测：四个裸域全部 301 到各自的 www（javbus.com → www.javbus.com 等），
+# 而跨主机跳转时请求头里的 Cookie 会被丢掉——带 Cookie 的请求跳转后一律变成匿名，
+# 网络检测因此把有效 Cookie 误报成「可能无效」。这里直接写 www 变体，让 Cookie 一次到位。
 _JAVBUS_DOMAINS = [
-    "https://javbus.com",
-    "https://dmmsee.casa",
-    "https://javsee.cyou",
-    "https://cdnbus.bond",
+    "https://www.javbus.com",
+    "https://www.dmmsee.casa",
+    "https://www.javsee.cyou",
+    "https://www.cdnbus.bond",
 ]
 
 

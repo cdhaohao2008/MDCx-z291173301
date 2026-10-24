@@ -3,7 +3,6 @@
 从 `main_window.py` 按集群切出，逻辑与文案逐字不变。"""
 
 import platform
-import re
 import threading
 import time
 import traceback
@@ -12,8 +11,6 @@ from PyQt6.QtWidgets import (
     QApplication,
 )
 
-from mdcx.base.web_sync import get_text_sync
-from mdcx.config.enums import Website
 from mdcx.config.manager import manager
 from mdcx.consts import (
     LOCAL_VERSION,
@@ -33,6 +30,7 @@ from mdcx.utils import (
     executor,
 )
 
+from .cookie_checks import javdb_cookie_verdict_sync
 from .handlers import net_separator_width
 
 
@@ -301,48 +299,25 @@ class NetCheckMixin:
         if not input_cookie:
             self.set_javdb_status.emit(tips)
             return tips
-        # self.Ui.pushButton_check_javdb_cookie.setEnabled(False)
-        tips = "✅ 连接正常！"
-        header = {"cookie": input_cookie}
-        javdb_url = manager.config.get_site_url(Website.JAVDB, "https://javdb580.com") + "/v/D16Q5?locale=zh"
+        # 逐个候选节点实测（自定义网址 → 去 www 变体 → javdb580.com / javdb.com）：
+        # 单个节点是空壳或拦截页并不能证明 Cookie 无效，取可信度最高的一票。
         try:
-            response, error = get_text_sync(javdb_url, headers=header)
-            if response is None:
-                if "Cookie" in error:
-                    # 议题 #130：网络/站点不可达不等于 cookie 失效，一律只告警、保留 cookie
-                    tips = "❌ Cookie 检查失败（网络/站点不可达），已保留原 Cookie"
-                else:
-                    tips = f"❌ 连接失败！请检查网络或代理设置！ {response}"
-            else:
-                if "The owner of this website has banned your access based on your browser's behaving" in response:
-                    ip_adress_list = re.findall(r"(\d+\.\d+\.\d+\.\d+)", response)
-                    ip_adress = ip_adress_list[0] + " " if ip_adress_list else ""
-                    tips = f"❌ 你的 IP {ip_adress}被 JavDb 封了！"
-                elif "Due to copyright restrictions" in response or "Access denied" in response:
-                    tips = "❌ 当前 IP 被禁止访问！请使用非日本节点！"
-                elif "ray-id" in response:
-                    tips = "❌ 访问被 CloudFlare 拦截！"
-                elif "/logout" in response:  # 已登录，有登出按钮
-                    # vip_info 自带标点/括号：未开通沿用括号补注，已开通则独立成句感叹
-                    vip_info = "（未开通VIP）"
-                    tips = f"✅ 连接正常！{vip_info}"
-                    if input_cookie:
-                        if "icon-diamond" in response or "/v/D16Q5" in response:  # 有钻石图标或者跳到详情页表示已开通
-                            vip_info = "已开通VIP！"
-                        if manager.config.javdb != input_cookie:  # 保存cookie
-                            tips = f"✅ 连接正常！{vip_info}Cookie 已保存！"
-                            self.exec_save_config.emit()
-                        else:
-                            tips = f"✅ 连接正常！{vip_info}"
-                else:
-                    # 议题 #130：/logout 缺失只说明"未检测到登录态"，可能是维护页/拦截页，
-                    # 不构成 cookie 失效的确凿证据——只告警、保留 cookie，由用户手动替换。
-                    tips = "❌ 未检测到登录态，Cookie可能无效（已保留，可手动替换）"
+            state, tips, html = javdb_cookie_verdict_sync(input_cookie)
         except Exception as e:
-            tips = f"❌ 连接失败！请检查网络或代理设置！ {e}"
-            signal_qt.show_traceback_log(tips)
-        if input_cookie:
-            self.set_javdb_status.emit(tips)
-            # self.Ui.pushButton_check_javdb_cookie.setEnabled(True)
+            signal_qt.show_traceback_log(traceback.format_exc())
+            state, tips, html = "unreachable", f"❌ 连接失败！请检查网络或代理设置！ {e}", ""
+
+        if state == "valid":
+            # vip_info 自带标点/括号：未开通沿用括号补注，已开通则独立成句感叹
+            vip_info = "（未开通VIP）"
+            if "icon-diamond" in html or "/v/D16Q5" in html:  # 有钻石图标或者跳到详情页表示已开通
+                vip_info = "已开通VIP！"
+            if manager.config.javdb != input_cookie:  # 保存cookie
+                tips = f"✅ 连接正常！{vip_info}Cookie 已保存！"
+                self.exec_save_config.emit()
+            else:
+                tips = f"✅ 连接正常！{vip_info}"
+
+        self.set_javdb_status.emit(tips)
         self.show_log_text(with_site_prefix(tips, "JavDb"))
         return tips

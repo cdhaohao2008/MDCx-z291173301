@@ -12,6 +12,7 @@ from ..config.manager import manager
 from ..config.models import Website
 from ..models.model_types import CrawlerResult
 from ..number import match_number, number_search_variants
+from ..utils.site_url import strip_redundant_www
 from .base import BaseCrawler, CrawlerData, CrawlerException, DetailPageParser, extract_all_texts, extract_text
 from .base.parser import extract_javdb_score
 
@@ -175,7 +176,10 @@ class JavDBCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.JAVDB, "https://javdb580.com")
+        # 自定义网址只比默认地址多个 www. 时按默认地址走：`www.javdb580.com`
+        # 是只回 1 字节的空壳（主站是 javdb580.com），留着它等于整站不可用。
+        url = manager.config.get_site_url(Website.JAVDB, "https://javdb580.com")
+        return strip_redundant_www(url, "https://javdb580.com")
 
     @classmethod
     @override

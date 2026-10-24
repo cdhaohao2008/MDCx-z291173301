@@ -213,8 +213,11 @@ async def test_mirrored_site_alternates_source_and_mirror(monkeypatch: pytest.Mo
 
 
 async def test_javbus_tries_four_addresses_one_each(monkeypatch: pytest.MonkeyPatch):
-    """JavBus 四条线路：一个番号 4 次请求，分别用 javbus.com / dmmsee.casa /
-    javsee.cyou / cdnbus.bond，正好一个地址一次（用户 2026-10-24 定规）。"""
+    """JavBus 四条线路：一个番号 4 次请求，分别用 www.javbus.com / www.dmmsee.casa /
+    www.javsee.cyou / www.cdnbus.bond，正好一个地址一次（用户 2026-10-24 定规）。
+
+    一律带 www：四个裸域都会 301 到 www，跨主机跳转会丢掉请求头里的 Cookie。
+    """
     monkeypatch.setattr(
         ManualConfig,
         "REDUCED_FIELDS",
@@ -233,10 +236,10 @@ async def test_javbus_tries_four_addresses_one_each(monkeypatch: pytest.MonkeyPa
     assert result is not None
     javbus_requests = [url for site, url in records if site is Website.JAVBUS]
     assert javbus_requests == [
-        "",  # 第 1 次：默认地址（javbus.com）
-        "https://dmmsee.casa",  # 第 2 次
-        "https://javsee.cyou",  # 第 3 次
-        "https://cdnbus.bond",  # 第 4 次
+        "",  # 第 1 次：默认地址（www.javbus.com）
+        "https://www.dmmsee.casa",  # 第 2 次
+        "https://www.javsee.cyou",  # 第 3 次
+        "https://www.cdnbus.bond",  # 第 4 次
     ], javbus_requests
     assert "已请求 4 次仍失败" in result.field_log, result.field_log
 

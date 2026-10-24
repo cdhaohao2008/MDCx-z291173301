@@ -4,6 +4,39 @@
 
 ## 2026-10-24
 
+### JavBus 四条线路一律改用 www 入口：网络检测不再误报「Cookie 可能无效」
+
+- 实测（2026-10-24，真实 Cookie + 代理）：`javbus.com`、`dmmsee.casa`、`javsee.cyou`、`cdnbus.bond` 四个裸域**全部 301 到各自的 www**，而跨主机跳转时请求头里的 Cookie 会被丢掉——网络检测打裸域时服务端看到的是匿名用户，头像恒为 `avatar.php?uid=0`，于是「设置 → 网络」里 Cookie 检测明明是 `✅ 连接正常`，网络检测却报 `⚠️ 访问正常，但Javbus网站Cookie可能无效`。
+- `crawlers/javbus.py::_JAVBUS_DOMAINS` 与 `core/file_crawler.py::_MULTI_ADDRESS_SITE_TARGETS` 的四个地址统一改成 www 变体（`www.javbus.com` / `www.dmmsee.casa` / `www.javsee.cyou` / `www.cdnbus.bond`），Cookie 一次到位；刮削侧同样受益（此前带 Cookie 的请求跳转后等于白带）。这是「默认地址一律不带 www」的功能性例外，与 MGStage（裸域打不开）同属「按站点实测定的例外」。
+- `controllers/main_window/cookie_checks.py::_JAVBUS_COOKIE_CHECK_BASES` 补全四条线路，并把写错的 `www.dmmbus.casa` 改回 `www.dmmsee.casa`（与 `javbus.py` 声明的镜像一致）。
+- 网络检测加「跳转丢 Cookie」保护：`core/network_check.py::_classify_http_result` 在判未登录时比对落地 host，发现请求被跳到别的主机（如用户自定义网址仍写裸域）就提示「请求被跳转到 xxx，Cookie 未随跨主机跳转保留；请把 JavBus 网址改成 https://xxx」，不再把锅算到 Cookie 头上。
+
+### JavDB / JavDB_API 换到 javdb580.com 后的检测失败与刮削探测超时
+
+- 根因：用户自定义网址里残留早前版本自动补的 `https://www.javdb580.com/`，而 `www.javdb580.com` 是个**只回 1 字节换行的空壳域名**（主站是 `javdb580.com`）。JavDB_API 的搜索页解析不出任何结果，回退真实刮削后 `_try_mirrors` 又只轮 `javdb573/574/575`、且硬编码 `use_proxy=False`（开了「全部流量走代理」也照样直连），一次探测要把三个旧镜像全打一遍，于是稳定卡到 30s/45s 双超时。
+- 新增 `mdcx/utils/site_url.py`：`without_www()`（去 host 的 www 前缀）与 `strip_redundant_www()`（自定义网址只比默认地址多个 `www.` 时按默认地址走），纯字符串处理、不触网、不改用户配置。
+- `core/network_check.py`：`_configured_or_default_url()` 先做 www 归一化；新增 `_retry_without_www()`——站点检测项拿到空壳 200（正文 < 64 字符）时自动改打去掉 www 的地址，拿到真页面就把检测项地址换过去（后续刮削探测也跟着用新地址）；空壳 200 不再判「连接正常」，改为「站点返回空白页（常见于网址里的 www 变体）」。
+- `crawlers/javdb_api.py`：`base_url_()` 做 www 归一化；`_try_mirrors()` 的候选地址改为「配置地址 → 去 www 变体 → 默认 `javdb580.com` → 573/574/575」，从上次成功的地址起步；请求改走全局代理路由（`use_proxy=True`），空响应按失败处理。`crawlers/javdb.py::base_url_()` 同步做 www 归一化。
+- 实测效果：同一台机器、同一代理，JavDB_API 检测从 `66.7s / 站点无效：刮削探测2次30s/45s均超时` 变为 `4.2s / ✅ 连接正常，刮削正常`；直接构造 `https://www.javdb580.com` 的检测项也能在 1.5s 内自动落到 `https://javdb580.com/`。
+
+### JavDB Cookie 检测：多节点投票 + 详情页登录态判定
+
+- 旧实现只打「配置网址 + `/v/D16Q5?locale=zh`」一个地址、且只认页面里的 `/logout`：官方换到 `javdb580.com` 后用户配置里的 www 空壳页既没有 `/logout` 也没有任何内容，于是有效 Cookie 也一直报「❌ 未检测到登录态，Cookie可能无效」。
+- 新增 `cookie_checks.classify_javdb_login_state()`：详情页标记（`current-title` / `video-cover` / `copy-to-clipboard`）或 `/logout` / `登出` → 已登录；登录表单（`action="/user_sessions"`）或页头 `href="/login"` / `href="/users/new"` / `登入` → 未登录；CF 挑战页 → 拦截；空壳页（< 64 字符）→ 判不了。实测：未登录访问 `/v/{id}` 一律 302 到 `/login`，登录后才返回详情页。
+- 新增 `javdb_cookie_verdict()` / `javdb_cookie_check_urls()` / `javdb_cookie_verdict_sync()`：候选地址为「配置网址 → 去 www 变体 → `javdb580.com` → `javdb.com`」，逐节点实测取可信度最高的一票，任一节点判有效立即收工；IP 被封、版权区域限制、CF 拦截各有独立文案。沿用议题 #130 口径：只有 `valid` 才写盘，其余只告警并保留用户填的 Cookie。
+- `controllers/main_window/net_check.py::_check_javdb_cookie()` 改用上述多节点判定，保留 VIP 图标展示与「Cookie 有变化才保存」；`core/network_check.py` 的 JavDB 站点检测也改用同一套登录态判定（不再只认 `/logout`）。
+
+### 禁用站点照样参与网络检测
+
+- 用户 2026-10-24：网络不是天天测、只是偶尔测一次，被禁用的站现在通不通同样需要知道，没必要把禁用站从检测页关掉。
+- `core/network_check.py::_build_site_specs()` 删除按 `website_disabled` 跳过站点检测项的整段逻辑；`_build_static_specs()` 的 ThePornDB Token 检测同样不再因站点被禁用而跳过；`run_network_check()` 的「重试失败项」也不再按当前禁用名单过滤。刮削侧的「禁用即不请求」不变，两边互不影响。
+
+### 测试
+
+- `tests/test_network_check.py`：三条「禁用站点不生成检测项 / 重试时过滤」的用例改写为「禁用站点照样检测」；镜像项与探测重试用例的假响应改成真实长度的 HTML（空壳 200 现在会先被「空白页」判定拦下）。
+- `tests/test_javbus_cookie_check.py`：检测节点期望值补全为四条 www 线路，节点打桩 key 由 `dmmbus.casa` 改为 `dmmsee.casa`。
+- `tests/test_field_crawler_retry.py`、`tests/test_custom_site_url.py`：JavBus 地址与默认网址断言同步为 www 变体。
+
 ### 站点默认地址一律不带 `www.`（唯一例外 MGStage），四个站点换地址，失效域名清理
 
 - 用户 2026-10-24 定规：**所有站点的内置默认地址都不加 `www.`**——「加了 www 有些网站反而有问题」。全部站点的 `base_url_()` 默认值（即设置页「当前网站」右侧显示的网址与刮削实际用的地址）逐个去掉 `www.`；唯一例外是 `MGStage`（用户 2026-10-24 指定保留 `https://www.mgstage.com`）。
@@ -12,7 +45,7 @@
 - 删除已失效域名：`c97k.com`（JavLibrary 动态解析与镜像兜底列表，代码内全部移除）、`7tv022.com`（7mmtv 唯一镜像，连带删掉该站的镜像轮换机制）、`missav.ai`（missav 镜像与指纹池）、`freejavbt22.cc`（HTTP 429，改为只用 `https://freejavbt.com`，不再轮换）。代理名单默认值里的 `7tv022.com` / `missav.ai` 同步清掉。
 - `JavDB_API` 默认地址仍是 `https://javdb580.com`（原 `javdb573.com` 已换）。
 - `JavDB` 默认地址改为 `https://javdb580.com`（原 `javdb.com` 降为镜像）：刮削仍是 4 次，第 1/3 次打 `javdb580.com`、第 2/4 次打 `javdb.com`。
-- `JavBus` 改成四条并列线路、每条只打一次（用户 2026-10-24）：第 1 次 `javbus.com`、第 2 次 `dmmsee.casa`、第 3 次 `javsee.cyou`、第 4 次 `cdnbus.bond`，四个地址一律不带 www。新增 `core/file_crawler.py::_MULTI_ADDRESS_SITE_TARGETS` 承载这套「一个地址一次」；`JavBusCrawler` 不再自建域名轮换（否则一次尝试会被内部轮换放大成多次请求）。
+- `JavBus` 改成四条并列线路、每条只打一次（用户 2026-10-24）：第 1 次 `javbus.com`、第 2 次 `dmmsee.casa`、第 3 次 `javsee.cyou`、第 4 次 `cdnbus.bond`。**同日修正**：四个裸域都会 301 到各自的 www、跨主机跳转丢 Cookie，四个地址已统一改为 www 变体（见上方「JavBus 四条线路一律改用 www 入口」）。新增 `core/file_crawler.py::_MULTI_ADDRESS_SITE_TARGETS` 承载这套「一个地址一次」；`JavBusCrawler` 不再自建域名轮换（否则一次尝试会被内部轮换放大成多次请求）。
 - `IQQTV` 删除 `iqqq3.quest` / `iqq5.xyz` / `iqqk4.quest`（三个旧域名都会自动跳到 `iqqr1.org`），站点只剩 `iqqr1.org` 一个地址，镜像轮换一并移除。
 - AVMOO / AVSOX / AVheat 默认地址保持中文首页 `/cn`（`crawlers/*.py` 的 `fallback_domain` 与 `base/web.py::_AIO_SITE_KEYS` 同步）。`AioSiteCrawler._api_base()`：JSON API 固定在站点根（语言由 body 里的 `lang` 指定），拼 `{base}/{namespace}/data/api/search|getMovie` 前先去掉 `/cn` 语言段，避免搜索请求打到 `/cn/jav/...` 404。
 - 入口地址带语言段/首页路径时不再直接当前缀拼：新增 `base/web.py::site_root()`，`JavLibrary`、`JavLibrary·镜像`、`IQQTV` 拼搜索/详情地址前先收敛成 `scheme://host`，避免拼出 `/cn/cn/vl_searchbyid.php`、`/cn/main.php/cn/xxx`。

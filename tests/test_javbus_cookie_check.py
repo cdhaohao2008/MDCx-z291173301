@@ -354,7 +354,9 @@ def test_network_check_javbus_follows_same_verdict(monkeypatch, html, cookie, ex
 # 无条件 `headers.pop("Cookie", None)`，跳转后的请求成了匿名请求——服务端照样返回
 # 200 的完整详情页，只是头像恒为 `avatar.php?uid=0`，于是有效的 Cookie 被误报成
 # 「❌ Cookie无效或已过期！」。实测：javbus.com → uid=0；
-# www.javbus.com / www.dmmbus.casa → uid=678400 且无重定向。
+# www.javbus.com / www.dmmsee.casa → uid=678400 且无重定向。
+# 2026-10-24 复核：四条线路（javbus.com / dmmsee.casa / javsee.cyou / cdnbus.bond）
+# 的裸域仍全部 301 到 www，节点表随之补全为四个 www 入口。
 
 
 def test_check_urls_default_to_www_nodes_only(monkeypatch):
@@ -367,7 +369,9 @@ def test_check_urls_default_to_www_nodes_only(monkeypatch):
 
     assert urls == [
         "https://www.javbus.com/FSDSS-660",
-        "https://www.dmmbus.casa/FSDSS-660",
+        "https://www.dmmsee.casa/FSDSS-660",
+        "https://www.javsee.cyou/FSDSS-660",
+        "https://www.cdnbus.bond/FSDSS-660",
     ]
     assert not any(url.startswith("https://javbus.com/") for url in urls), "裸 apex 会丢 Cookie，不得作为检测节点"
 
@@ -380,14 +384,18 @@ def test_check_urls_prefer_custom_node_and_dedupe(monkeypatch):
 
     assert javbus_cookie_check_urls() == [
         "https://www.javbus.com/FSDSS-660",
-        "https://www.dmmbus.casa/FSDSS-660",
+        "https://www.dmmsee.casa/FSDSS-660",
+        "https://www.javsee.cyou/FSDSS-660",
+        "https://www.cdnbus.bond/FSDSS-660",
     ]
 
     _patch_custom_node(monkeypatch, "https://my.mirror.tv")
     assert javbus_cookie_check_urls() == [
         "https://my.mirror.tv/FSDSS-660",
         "https://www.javbus.com/FSDSS-660",
-        "https://www.dmmbus.casa/FSDSS-660",
+        "https://www.dmmsee.casa/FSDSS-660",
+        "https://www.javsee.cyou/FSDSS-660",
+        "https://www.cdnbus.bond/FSDSS-660",
     ]
 
 
@@ -399,7 +407,7 @@ def test_check_falls_back_to_next_node_when_one_says_logged_out(win, monkeypatch
         monkeypatch,
         {
             "javbus.com": _ANON_PAGE,  # 301 丢 Cookie → 服务端看到匿名用户
-            "dmmbus.casa": _LOGGED_IN_PAGE,
+            "dmmsee.casa": _LOGGED_IN_PAGE,
         },
     )
 
@@ -416,7 +424,7 @@ def test_check_reports_invalid_only_when_every_node_agrees(win, monkeypatch, sav
     """所有节点都判未登录时才报无效（此时确实是 Cookie 的问题）。"""
     saved_cookie("")
     _patch_custom_node(monkeypatch, "")
-    _patch_get_text_by_url(monkeypatch, {"javbus.com": _ANON_PAGE, "dmmbus.casa": _ANON_PAGE})
+    _patch_get_text_by_url(monkeypatch, {"javbus.com": _ANON_PAGE, "dmmsee.casa": _ANON_PAGE})
 
     saves = []
     win.exec_save_config.connect(lambda: saves.append(1))
@@ -432,7 +440,7 @@ def test_check_prefers_conclusive_verdict_over_inconclusive_one(win, monkeypatch
     """被 CloudFlare 拦 / 结构不认识只能算「判不了」，不能盖过站得住的结论。"""
     saved_cookie("")
     _patch_custom_node(monkeypatch, "")
-    _patch_get_text_by_url(monkeypatch, {"javbus.com": _CF_CHALLENGE_PAGE, "dmmbus.casa": _ANON_PAGE})
+    _patch_get_text_by_url(monkeypatch, {"javbus.com": _CF_CHALLENGE_PAGE, "dmmsee.casa": _ANON_PAGE})
 
     win.exec_save_config.connect(lambda: pytest.fail("无效判定不得触发写盘"))
 

@@ -66,14 +66,16 @@ _MAX_MIRROR_SITE_REQUESTS = 4
 # 有多个并列线路的站点：第 N 次请求用列表里的第 N 个地址，正好一个地址试一次
 # （用户 2026-10-24：JavBus 的四次连接分别用 javbus.com / dmmsee.casa / javsee.cyou /
 # cdnbus.bond）。与上面的「源 ↔ 镜像交替」不同，这里每个地址只打一次，不回头重试。
+# 一律写 www 变体：四个裸域都会 301 到 www，跨主机跳转会丢掉请求头里的 Cookie
+# （2026-10-24 实测），带 Cookie 的刮削等于白带。
 _MULTI_ADDRESS_SITE_TARGETS: dict[Website, tuple[Website, tuple[str, ...]]] = {
     Website.JAVBUS: (
         Website.JAVBUS,
         (
-            "https://javbus.com",
-            "https://dmmsee.casa",
-            "https://javsee.cyou",
-            "https://cdnbus.bond",
+            "https://www.javbus.com",
+            "https://www.dmmsee.casa",
+            "https://www.javsee.cyou",
+            "https://www.cdnbus.bond",
         ),
     ),
 }

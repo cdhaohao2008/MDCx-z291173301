@@ -95,7 +95,7 @@ def test_site_default_url_ignores_configured_custom_url(monkeypatch: pytest.Monk
     config.site_configs[Website.JAVBUS] = SiteConfig(custom_url="https://my-javbus.example/")
     monkeypatch.setattr(manager, "config", config)
 
-    assert site_default_url(Website.JAVBUS) == "https://javbus.com"
+    assert site_default_url(Website.JAVBUS) == "https://www.javbus.com"
     # 临时置空后必须原样还原，否则用户的自定义网址会被这次判断吃掉
     assert config.get_site_url(Website.JAVBUS) == "https://my-javbus.example"
 
@@ -159,7 +159,7 @@ def test_site_combo_url_follows_custom_url(monkeypatch: pytest.MonkeyPatch):
 
     assert _resolve_site_url("JavDB") == "https://javdb580.com/"
     # 没改过的站点仍显示自己的默认地址
-    assert _resolve_site_url("JavBus") == "https://javbus.com/"
+    assert _resolve_site_url("JavBus") == "https://www.javbus.com/"
 
 
 def test_remember_and_restore_custom_website(monkeypatch: pytest.MonkeyPatch):

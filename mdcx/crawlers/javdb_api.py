@@ -12,6 +12,7 @@ from ..config.manager import manager
 from ..config.models import Website
 from ..models.model_types import CrawlerResult
 from ..number import match_number, number_search_variants
+from ..utils.site_url import strip_redundant_www, without_www
 from .base import BaseCrawler, CrawlerData, CrawlerException, DetailPageParser, extract_all_texts, extract_text
 from .base.parser import extract_javdb_score
 
@@ -244,8 +245,7 @@ class JavdbApiCrawler(BaseCrawler):
         super().__init__(client=client, base_url=base_url, browser=browser)
         self._page_request_lock = asyncio.Lock()
         self._last_page_request_at = 0.0
-        self._mirror_index = 0  # 当前使用的 mirror 索引
-        self._successful_mirror = ""  # 记录成功使用的 mirror
+        self._successful_mirror = ""  # 记录成功使用的地址
 
     @property
     def base_url(self) -> str:
@@ -283,7 +283,10 @@ class JavdbApiCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.JAVDB_API, _DEFAULT_BASE)
+        # 自定义网址只比默认地址多个 www. 时按默认地址走：`www.javdb580.com`
+        # 是只回 1 字节的空壳（主站是 javdb580.com），留着它等于整站不可用。
+        url = manager.config.get_site_url(Website.JAVDB_API, _DEFAULT_BASE)
+        return strip_redundant_www(url, _DEFAULT_BASE)
 
     @override
     def _get_headers(self, ctx) -> dict[str, str] | None:
@@ -300,29 +303,43 @@ class JavdbApiCrawler(BaseCrawler):
                 await asyncio.sleep(wait_seconds)
         self._last_page_request_at = time.monotonic()
 
-    async def _try_mirrors(self, ctx, path: str, request_type: str) -> tuple[str | None, str]:
-        """尝试所有 mirror，返回 (html, error)。
+    def _candidate_bases(self) -> list[str]:
+        """本次可用的站点地址：配置地址 → 去 www 变体 → 默认地址 → 三个镜像。
 
-        每次先从上次成功的 mirror（或当前索引指向的 mirror）开始，失败后逐个轮换，
-        保证覆盖所有镜像——避免首次成功后 `base_url` getter 固定返回成功镜像，
-        导致后续请求在同一个失败域名上反复重试。
+        原实现只轮 `_MIRRORS`（javdb573/574/575），用户把地址换成 javdb580 后
+        真正能用的主站反而不在候选里——一次尝试要先把三个旧镜像全打一遍才结束，
+        网络检测因此稳定卡到 30s/45s 双超时。
+        """
+        bases: list[str] = []
+        for candidate in (self._base_url, without_www(self._base_url or ""), _DEFAULT_BASE, *_MIRRORS):
+            base = str(candidate or "").strip().rstrip("/")
+            if base and base not in bases:
+                bases.append(base)
+        return bases
+
+    async def _try_mirrors(self, ctx, path: str, request_type: str) -> tuple[str | None, str]:
+        """尝试所有候选地址，返回 (html, error)。
+
+        每次先从上次成功的地址开始，失败后逐个轮换，保证覆盖全部候选——避免首次
+        成功后 `base_url` getter 固定返回成功地址，导致后续请求在同一个失败域名上
+        反复重试。空响应（`www.javdb580.com` 那种 1 字节空壳）按失败处理。
         """
         last_error = ""
-        if self._successful_mirror and self._successful_mirror in _MIRRORS:
-            self._mirror_index = _MIRRORS.index(self._successful_mirror)
-        for _ in range(len(_MIRRORS)):
-            base = _MIRRORS[self._mirror_index]
+        bases = self._candidate_bases()
+        start = bases.index(self._successful_mirror) if self._successful_mirror in bases else 0
+        for offset in range(len(bases)):
+            base = bases[(start + offset) % len(bases)]
             self.base_url = base
             current_url = f"{base}{path}"
             ctx.debug(f"JavdbApi {request_type} 尝试: {current_url}")
-            html, error = await self.async_client.get_text(current_url, headers=self._get_headers(ctx), use_proxy=False)
-            if html:
+            # 路由交给全局代理配置决策（原先硬编码 use_proxy=False：开了「全部流量
+            # 走代理」也照样直连，直连不通时就只能等超时）
+            html, error = await self.async_client.get_text(current_url, headers=self._get_headers(ctx), use_proxy=True)
+            if html and html.strip():
                 self._successful_mirror = base
                 return html, ""
-            last_error = error
-            old = base
-            self._mirror_index = (self._mirror_index + 1) % len(_MIRRORS)
-            ctx.debug(f"JavdbApi {request_type} 失败: {old} -> 切换到 {_MIRRORS[self._mirror_index]}")
+            last_error = error or last_error
+            ctx.debug(f"JavdbApi {request_type} 失败: {base} -> 切换到 {bases[(start + offset + 1) % len(bases)]}")
         return None, last_error
 
     @override
