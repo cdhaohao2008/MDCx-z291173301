@@ -467,9 +467,15 @@ class WindowOpsMixin:
             else:
                 manager.config.switch_on.append(Switch.SHOW_LOGS)
             need_save_config = True
+        # 「当前网站」最后用过的站点：交互时只记脏标记，退出时统一落盘（用户 2026-10-24）
+        from .init import clear_custom_website_dirty, custom_website_dirty
+
+        if custom_website_dirty():
+            need_save_config = True
         if need_save_config:
             try:
                 manager.save()
+                clear_custom_website_dirty()
             except Exception:
                 signal_qt.show_traceback_log(traceback.format_exc())
         if hasattr(self, "preview_image_loader"):

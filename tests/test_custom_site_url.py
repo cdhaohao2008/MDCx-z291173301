@@ -160,3 +160,51 @@ def test_site_combo_url_follows_custom_url(monkeypatch: pytest.MonkeyPatch):
     assert _resolve_site_url("JavDB") == "https://javdb580.com/"
     # 没改过的站点仍显示自己的默认地址
     assert _resolve_site_url("JavBus") == "https://javbus.com/"
+
+
+def test_remember_and_restore_custom_website(monkeypatch: pytest.MonkeyPatch):
+    """「当前网站」记住上次实际使用的站点：下次打开、展开下拉都停在这一项。"""
+    _ensure_app()
+    from PyQt6.QtWidgets import QComboBox
+
+    from mdcx.controllers.main_window import init as init_mod
+
+    config = Config()
+    monkeypatch.setattr(manager, "config", config)
+    init_mod.clear_custom_website_dirty()
+
+    combo = QComboBox()
+    for value in ("7mmtv", "MGStage", "JavDB"):
+        combo.addItem(value, value)
+
+    init_mod._remember_custom_website("MGStage")
+    assert config.last_custom_website == "MGStage"
+    assert init_mod.custom_website_dirty() is True
+
+    # 非法站点值不记
+    init_mod._remember_custom_website("不存在的站点")
+    assert config.last_custom_website == "MGStage"
+
+    combo.setCurrentIndex(0)
+    init_mod._restore_custom_website_selection(combo)
+    assert combo.currentIndex() == 1
+
+    # 记进配置后能跟着配置文件往返（下次打开还在）
+    restored = Config.model_validate_json(config.model_dump_json())
+    assert restored.last_custom_website == "MGStage"
+
+
+def test_switch_custom_website_remembers_selection(monkeypatch: pytest.MonkeyPatch):
+    """在下拉里切换站点就算「实际使用」，要记下来。"""
+    _ensure_app()
+    from mdcx.controllers.main_window import init as init_mod
+
+    config = Config()
+    monkeypatch.setattr(manager, "config", config)
+    init_mod.clear_custom_website_dirty()
+
+    ui = SimpleNamespace(lineEdit_site_custom_url=QLineEdit())
+    window = SimpleNamespace(Ui=ui)
+
+    SettingsActionsMixin.switch_custom_website_change(window, "JavDB（综合） 综合：有码/无码/欧美/传媒")
+    assert config.last_custom_website == "JavDB"

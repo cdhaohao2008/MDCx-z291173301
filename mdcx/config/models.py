@@ -1089,6 +1089,8 @@ class Config(BaseModel):
     # endregion
 
     # region: Network Settings
+    # 上次在「设置 - 网络 - 网站设置」里实际用过的站点：下次打开默认选中它，不再回到第一项
+    last_custom_website: str = Field(default="", title="上次使用的当前网站")
     use_proxy: bool = Field(default=False, title="代理类型")
     proxy: str = Field(default="http://127.0.0.1:7890", title="代理地址")
     proxy_sites: str = Field(

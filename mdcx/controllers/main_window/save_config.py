@@ -721,6 +721,10 @@ def save_config(self: MyMAinWindow):
     site_text = self.Ui.comboBox_custom_website.currentData() or self.Ui.comboBox_custom_website.currentText()
     with suppress(ValueError):
         site = Website(site_text)
+        # 改过这个站的网址＝实际用过它：下次打开/展开下拉都停在这一项（用户 2026-10-24）
+        from .init import _remember_custom_website
+
+        _remember_custom_website(site_text)
         if site == Website.AIRAV:
             site = Website.AIRAV_CC
         raw_url = self.Ui.lineEdit_site_custom_url.text()

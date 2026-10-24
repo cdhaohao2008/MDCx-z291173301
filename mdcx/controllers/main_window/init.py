@@ -267,6 +267,83 @@ def _resolve_site_url(value: str) -> str:
     return url
 
 
+# 「当前网站」选择是否已改但未落盘（关闭窗口时统一保存，见 window_ops.exit_app）
+_CUSTOM_WEBSITE_STATE: dict[str, bool] = {"dirty": False}
+
+
+def _site_value_of(combo, index) -> str:
+    """下拉某一行的纯站点值（UserRole 存的就是纯值，取不到再从显示文本剥区域标签）。"""
+    data = combo.itemData(index, Qt.ItemDataRole.UserRole) or combo.itemText(index)
+    return str(data or "").split(" ")[0].split("（")[0].strip()
+
+
+def _remember_custom_website(value: str) -> None:
+    """记住「当前网站」最后一次实际使用的站点，写进配置。
+
+    用户 2026-10-24：下次打开要停在上次用的那个站点，不再每次都回到第一项（7mmtv）；
+    点网址跳转、改自定义网址也算「实际使用」。
+    """
+    from mdcx.config.models import Website
+
+    site = str(value or "").split(" ")[0].split("（")[0].strip()
+    if not site:
+        return
+    try:
+        Website(site)
+    except ValueError:
+        return
+    if manager.config.last_custom_website == site:
+        return
+    manager.config.last_custom_website = site
+    # 只记脏标记，落盘交给「保存设置」或关闭窗口时统一写（交互中直接 manager.save()
+    # 会把整份配置写一遍，测试里 manager.config 是临时 Config，写下去等于覆盖用户配置）
+    _CUSTOM_WEBSITE_STATE["dirty"] = True
+
+
+def custom_website_dirty() -> bool:
+    """「当前网站」选择有没有改过、还没落盘。"""
+    return bool(_CUSTOM_WEBSITE_STATE["dirty"])
+
+
+def clear_custom_website_dirty() -> None:
+    _CUSTOM_WEBSITE_STATE["dirty"] = False
+
+
+def _restore_custom_website_selection(combo) -> None:
+    """把「当前网站」下拉归位到上次实际使用的站点。"""
+    site = str(getattr(manager.config, "last_custom_website", "") or "").strip()
+    if not site:
+        return
+    for i in range(combo.count()):
+        if _site_value_of(combo, i) == site:
+            if combo.currentIndex() != i:
+                combo.setCurrentIndex(i)
+            return
+
+
+class _SiteComboOpenFilter(QObject):
+    """展开下拉前先归位到上次使用的站点，Qt 会连同弹窗滚动位置一起对到那一行。"""
+
+    def __init__(self, combo) -> None:
+        super().__init__(combo)
+        self._combo = combo
+
+    def eventFilter(self, obj, event) -> bool:
+        try:
+            if event.type() == QEvent.Type.MouseButtonPress:
+                _restore_custom_website_selection(self._combo)
+            elif event.type() == QEvent.Type.KeyPress and not self._combo.view().isVisible():
+                # 键盘展开（Alt+↓ / ↓ / F4）同样先归位，再交给 Qt 打开弹窗
+                key = event.key()
+                if key in (Qt.Key.Key_Down, Qt.Key.Key_F4) or (
+                    key == Qt.Key.Key_Down and event.modifiers() & Qt.KeyboardModifier.AltModifier
+                ):
+                    _restore_custom_website_selection(self._combo)
+        except Exception:
+            pass
+        return False
+
+
 def _display_site_url(url: str) -> str:
     """网址列展示用：一律不带 `www.`（用户 2026-10-24）。
 
@@ -384,6 +461,7 @@ class _SiteUrlClickFilter(QObject):
                     # 仅左键点击网址才跳转浏览器；右键/中键吞掉事件、不关弹窗，网址依然显示
                     if event.button() == Qt.MouseButton.LeftButton:
                         webbrowser.open(str(index.data(_SITE_URL_ROLE)))
+                        _remember_custom_website(_site_value_of(self._combo, index))
                         self._combo.hidePopup()
                     return True
             elif event.type() == QEvent.Type.MouseMove and not event.buttons():
@@ -899,6 +977,9 @@ def Init_Ui(self: MyMAinWindow):
     self.Ui.comboBox_custom_website.clear()
     _populate_site_combo(self.Ui.comboBox_website_all, supported_websites)
     _populate_site_combo(self.Ui.comboBox_custom_website, supported_websites)
+    # 上次用的站点：打开软件、展开下拉都停在这一项（用户 2026-10-24）
+    _restore_custom_website_selection(self.Ui.comboBox_custom_website)
+    self.Ui.comboBox_custom_website.installEventFilter(_SiteComboOpenFilter(self.Ui.comboBox_custom_website))
     # 初始化使用代理网站下拉框
     self.Ui.comboBox_no_proxy_sites.clear()
     self.Ui.comboBox_no_proxy_sites.addItem("选择网站...", "")

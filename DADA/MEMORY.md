@@ -191,6 +191,7 @@
 - **站点默认地址一律不带 `www.`**（用户 2026-10-24 定规，**唯一例外 `MGStage`**——用户明确要求保留 `https://www.mgstage.com`）：`base_url_()` 的默认值、AIO 的 `fallback_domain`、`network_check.DEFAULT_SITE_URLS` 都不加；自定义网址也不再自动补 www（`models.normalize_custom_url`）。改默认地址时一并核对 `docs/Scraper.md` 的两张表。
 - **失效域名直接删，不留兜底**（用户 2026-10-24）：c97k.com、7tv022.com、missav.ai、freejavbt22.cc、iqqq3.quest / iqq5.xyz / iqqk4.quest 均已从代码里删干净（含镜像列表、指纹池、代理名单、文档）。删到只剩一个地址的站点（7mmtv / IQQTV / freejavbt）连镜像轮换一起删。
 - **JavBus 四条线路、一个地址一次**：第 1 次 javbus.com、第 2 次 dmmsee.casa、第 3 次 javsee.cyou、第 4 次 cdnbus.bond，由 `core/file_crawler.py::_MULTI_ADDRESS_SITE_TARGETS` 派发；爬虫内部不再自建轮换（否则一次尝试会被放大成多次请求）。JavDB 则是默认 `javdb580.com`、第 2/4 次回退 `javdb.com`。
+- **「当前网站」下拉显示与记忆**（用户 2026-10-24）：右侧网址列显示一律去掉 www（`init._display_site_url`，只改显示与列宽，点击跳转/刮削仍用真实地址，MGStage 就是显示 mgstage.com、实访 www.mgstage.com）；新增配置 `last_custom_website`，切换下拉/点网址跳转/改自定义网址都算实际使用，下次打开与展开下拉都停在那一项，交互中只置脏标记、`exit_app` 时落盘（别在交互里 `manager.save()`，测试里会覆盖用户配置）。
 - **带语言段的入口地址不能直接当前缀拼**：`base/web.py::site_root()` 先收敛成 `scheme://host` 再拼路径（JavLibrary `/cn`、IQQTV `/cn`、镜像 `/cn/main.php`）；missav 默认地址固定带 `/dm247/cn`，不带语言段会被站点 302 到 `/dm265/en` 英文页。
 - **javdb 三源**：javdb（网页）/ javdb_api（镜像站）/ javdb_app（App API，免 CF 最稳）。thejavdb 与 javdb 无关。App 签名机制见 `docs/Javdb_App_Signature.md`，排障锚点 = 三主机同时 4xx 或 InvalidSignature，环境变量 `MDCX_JAVDB_APP_SIG_*` 可免改码覆盖。搜索 limit ≤ 50，分页须 `movie_sort_by=release`。
 - **javdb 图源无水印体系**：`tp.spfcas.com` 是 App 专用（单字节 XOR，首字节 key），`c0.jdbstatic.com` 带水印。解密/变换集中在 `base/web.py`。加密流尺寸探测 (0,0) 属预期。

@@ -66,6 +66,10 @@ class SettingsActionsMixin:
             return
         # 只显示用户真正改过的自定义网址；没改过的站点保持空白，格式统一带结尾斜杠
         self.Ui.lineEdit_site_custom_url.setText(manager.config.get_site_url_display(Website(site)))
+        # 记住这次实际使用的站点：下次打开软件/展开下拉都回到它（用户 2026-10-24）
+        from .init import _remember_custom_website
+
+        _remember_custom_website(site)
 
     # 设置 - 网络 - 使用代理 - 添加网站
     def _add_no_proxy_site(self, site_value: str):

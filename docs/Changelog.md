@@ -20,6 +20,13 @@
 - 同步 `core/network_check.py::DEFAULT_SITE_URLS`、`controllers/main_window/net_check.py` 的 JavDB 探测地址、`core/file_crawler.py` 的 JavLibrary 镜像目标（`https://f101w.com/cn`）、`network_fingerprint.py` 的 missav 域名池。
 - `tests/test_site_default_urls.py` 改为「默认地址一律不带 www（MGStage 例外）+ 四个点名地址 + `site_root()` 去语言段 + 语言段不重复」；`tests/test_custom_site_url.py`、`tests/crawlers/*`、`tests/test_review_regressions.py` 相关断言同步。
 
+### 「当前网站」下拉：网址列一律不显示 www，并记住上次实际使用的站点
+
+- 下拉右侧网址列显示时去掉 host 的 `www.`（`init._display_site_url()`，只作用于绘制与列宽测算）：`MGStage` 显示 `https://mgstage.com/`，实际访问与点击跳转仍用 `https://www.mgstage.com/`（裸域浏览器打不开）。
+- 新增配置项 `last_custom_website`：下拉切换站点、点击网址跳转、修改自定义网址都算「实际使用」并记下来；下次打开软件默认选中该项（不再每次回到第一项 7mmtv），展开下拉前也会先归位到该行，Qt 连弹窗滚动位置一起对到那一行。
+- 落盘时机：交互中只置脏标记，`exit_app`（或「保存设置」）时统一写配置——避免每次切换都整份重写配置。
+- 测试：`test_site_url_column_hides_www`、`test_remember_and_restore_custom_website`、`test_switch_custom_website_remembers_selection`。
+
 ### 自定义网址：保存后回显、没改过的站点留空，刮削全程只打自定义地址
 
 - 设置页「自定义网址」不再回填站点默认地址：只有用户真正改过并保存过的站点才显示网址，格式统一为 `https://javdb580.com/`（结尾带斜杠）；没改过的站点输入框保持空白，并新增占位提示「显示修改后的网址如 https://javdb580.com/，没修改的不显示」。
