@@ -215,8 +215,8 @@ class MGStageCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        # 用户 2026-10-24：默认地址一律不带 www（浏览器实测 mgstage.com 正常）
-        return "https://mgstage.com"
+        # 用户 2026-10-24 指定：MGStage 是「默认地址一律不带 www」的唯一例外，保留www.
+        return "https://www.mgstage.com"
 
     @classmethod
     @override

@@ -5,7 +5,7 @@
 `www.javfree.me` 的证书与域名不匹配（TLS 直接失败），iqqtv 的 www 还会被站内 302 到
 `?fromsite=www`。
 
-MGStage 也曾实测裸域连不上，但用户浏览器实测 `mgstage.com` 正常，故一并去掉 www。
+唯一例外是 MGStage：用户 2026-10-24 明确要求它保留 www（`https://www.mgstage.com`）。
 
 另外「默认地址千万不要写成 www.www. 这样」——这里也一并校验。
 """
@@ -22,6 +22,9 @@ from mdcx.config.manager import manager
 from mdcx.config.models import Config, site_default_url
 from mdcx.crawlers.base import crawler_registry
 
+# 用户 2026-10-24 指定保留 www 的站点（其余站点一律不带 www）
+WWW_ONLY_SITES = frozenset({Website.MGSTAGE})
+
 # 没有固定入口地址的站点（base_url_() 返回空串）
 EMPTY_URL_SITES = frozenset({Website.DMM, Website.OFFICIAL})
 
@@ -32,7 +35,7 @@ EXPECTED_DEFAULTS = {
     Website.JAVFREE: "https://javfree.me",
     Website.MADOUQU: "https://madouqu.shop",
     Website.JAVDB: "https://javdb580.com",
-    Website.MGSTAGE: "https://mgstage.com",
+    Website.MGSTAGE: "https://www.mgstage.com",
 }
 
 
@@ -50,11 +53,16 @@ def test_no_www_in_any_site_default():
     offenders: list[str] = []
     for site in crawler_registry:
         url = site_default_url(site)
-        if not url:
+        if not url or site in WWW_ONLY_SITES:
             continue
         if _host(url).startswith("www."):
             offenders.append(f"{site.value}: {url}")
     assert offenders == [], "以下站点默认地址还带 www: " + "; ".join(offenders)
+
+
+def test_www_only_site_keeps_www():
+    """MGStage 是唯一保留 www 的站点（用户 2026-10-24 指定）。"""
+    assert site_default_url(Website.MGSTAGE) == "https://www.mgstage.com"
 
 
 def test_no_double_www_in_any_site_default():

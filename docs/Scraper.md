@@ -21,7 +21,7 @@ MDCx 刮削网站类型汇总表
     DMM_API       https://api.dmm.com           FANZA 官方 Web API（api.dmm.com）
     Faleno        https://faleno.jp             Faleno 厂牌官网。FNS/FLN/JIMMY 前缀自动锁定本站
     LibreDMM      https://libredmm.com          LibreFanza，DMM/FANZA 开源镜像
-    MGStage       https://mgstage.com           MGS 厂牌官网。菜单含 素人ホイホイ / はめちゃん。/ SODクリエイト
+    MGStage       https://www.mgstage.com       MGS 厂牌官网。菜单含 素人ホイホイ / はめちゃん。/ SODクリエイト
     Official                                            官网聚合入口。30 家有码片商官网，按番号前缀路由；无固定检测入口
     Prestige      https://prestige-av.com       PRESTIGE 厂牌官网。MDCx 站点描述「有码+素人」
     Xcity         https://tc.xcity.jp           XCITY 日系有码综合会员站（JS 渲染，导航不可读）
@@ -199,7 +199,7 @@ LibreDMM          有码：仅限有码              有码                     
 Lulubar           综合：仅限有码              有码+无码+素人+欧美+国产            https://lulubar.co                      IPZZ-547
 Madou.club        国产：麻豆番号              国产                                https://madou.club                      MDX0236
 Madouqu           国产：仅限国产              国产                                https://madouqu.shop                    MDX0216
-MGStage           有码：有码+素人             有码+素人                           https://mgstage.com                     ABF-389
+MGStage           有码：有码+素人             有码+素人                           https://www.mgstage.com                 ABF-389
 Missav            综合：有码+无码             有码+无码+素人                      https://missav.live/dm247/cn
 Missav_API        综合：有码+无码             有码+无码+素人                      https://missav.live/dm247/cn
 MyWife            有码：MyWife                不进任何类型组（单独指定）          https://mywife.cc                       mywife-2306

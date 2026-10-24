@@ -188,7 +188,7 @@
 - **HTTP 4xx/5xx 错误串必须携带截断响应体**（保留 `"HTTP {status}"` 前缀不破坏匹配）。
 - **番号归一化：前导单数字双重语义**（studio 名单数字保留 vs DMM 预约版 `9` 前缀剥掉）。改正则前 grep 全部分支，改后跑相邻语义的既有测试。
 - **站点域名优先级与删站属产品取舍，查证给方案不擅动**。删站影响面 = 注册表 + Website 枚举 + 默认 proxy 列表 + `migrations.py` 清洗 + UI 列表。
-- **站点默认地址一律不带 `www.`**（用户 2026-10-24 定规，**没有例外**；MGStage 也去掉了）：`base_url_()` 的默认值、AIO 的 `fallback_domain`、`network_check.DEFAULT_SITE_URLS` 都不加；自定义网址也不再自动补 www（`models.normalize_custom_url`）。改默认地址时一并核对 `docs/Scraper.md` 的两张表。
+- **站点默认地址一律不带 `www.`**（用户 2026-10-24 定规，**唯一例外 `MGStage`**——用户明确要求保留 `https://www.mgstage.com`）：`base_url_()` 的默认值、AIO 的 `fallback_domain`、`network_check.DEFAULT_SITE_URLS` 都不加；自定义网址也不再自动补 www（`models.normalize_custom_url`）。改默认地址时一并核对 `docs/Scraper.md` 的两张表。
 - **失效域名直接删，不留兜底**（用户 2026-10-24）：c97k.com、7tv022.com、missav.ai、freejavbt22.cc、iqqq3.quest / iqq5.xyz / iqqk4.quest 均已从代码里删干净（含镜像列表、指纹池、代理名单、文档）。删到只剩一个地址的站点（7mmtv / IQQTV / freejavbt）连镜像轮换一起删。
 - **JavBus 四条线路、一个地址一次**：第 1 次 javbus.com、第 2 次 dmmsee.casa、第 3 次 javsee.cyou、第 4 次 cdnbus.bond，由 `core/file_crawler.py::_MULTI_ADDRESS_SITE_TARGETS` 派发；爬虫内部不再自建轮换（否则一次尝试会被放大成多次请求）。JavDB 则是默认 `javdb580.com`、第 2/4 次回退 `javdb.com`。
 - **带语言段的入口地址不能直接当前缀拼**：`base/web.py::site_root()` 先收敛成 `scheme://host` 再拼路径（JavLibrary `/cn`、IQQTV `/cn`、镜像 `/cn/main.php`）；missav 默认地址固定带 `/dm247/cn`，不带语言段会被站点 302 到 `/dm265/en` 英文页。

@@ -4,9 +4,9 @@
 
 ## 2026-10-24
 
-### 站点默认地址一律不带 `www.`，四个站点换地址，失效域名清理
+### 站点默认地址一律不带 `www.`（唯一例外 MGStage），四个站点换地址，失效域名清理
 
-- 用户 2026-10-24 定规：**所有站点的内置默认地址都不加 `www.`**——「加了 www 有些网站反而有问题」。全部站点的 `base_url_()` 默认值（即设置页「当前网站」右侧显示的网址与刮削实际用的地址）逐个去掉 `www.`，**没有例外**（`MGStage` 先前按代理实测保留 www，用户浏览器实测 `mgstage.com` 正常后也去掉了）。
+- 用户 2026-10-24 定规：**所有站点的内置默认地址都不加 `www.`**——「加了 www 有些网站反而有问题」。全部站点的 `base_url_()` 默认值（即设置页「当前网站」右侧显示的网址与刮削实际用的地址）逐个去掉 `www.`；唯一例外是 `MGStage`（用户 2026-10-24 指定保留 `https://www.mgstage.com`）。
 - 四个站点按用户指定换默认地址：`JavLibrary` → `https://javlibrary.com/cn`（直接进中文页）、`IQQTV` → `https://iqqr1.org/cn`（新域名，带 www 会被站内 302 到 `?fromsite=www`，反而多一跳）、`JavFree` → `https://javfree.me`、`Madouqu` → `https://madouqu.shop`。
 - `Missav` / `Missav_API` 默认地址改为 `https://missav.live/dm247/cn`：`missav.live` 没有 CF 墙、更容易过 CF；地址末尾固定带 `/dm247/cn`——站点会把不带语言段的请求 302 到 `/dm265/en`（英文页），显式写中文语言段才拿得到中文页（同族还有 `/dm265/en` 英文、`/dm285/ja` 日文）。备用域名 `missav.ws` 同样带该语言段。
 - 删除已失效域名：`c97k.com`（JavLibrary 动态解析与镜像兜底列表，代码内全部移除）、`7tv022.com`（7mmtv 唯一镜像，连带删掉该站的镜像轮换机制）、`missav.ai`（missav 镜像与指纹池）、`freejavbt22.cc`（HTTP 429，改为只用 `https://freejavbt.com`，不再轮换）。代理名单默认值里的 `7tv022.com` / `missav.ai` 同步清掉。
