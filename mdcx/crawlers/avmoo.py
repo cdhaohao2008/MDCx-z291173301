@@ -9,7 +9,7 @@ class AvmooCrawler(AioSiteCrawler):
     description = "有码：仅限有码"
     namespace = "jav"
     domain_site = "avmoo"
-    fallback_domain = "https://avmoo.shop"
+    fallback_domain = "https://www.avmoo.shop/cn"
     mosaic = "有码"
 
     @classmethod

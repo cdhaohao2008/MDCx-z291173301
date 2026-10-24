@@ -7,7 +7,7 @@ from mdcx.models.model_types import CrawlerInput
 
 class FakeFreejavbtClient:
     async def get_text(self, url, **kwargs):
-        assert url == "https://freejavbt22.cc/SSNI-531"
+        assert url == "https://www.freejavbt22.cc/SSNI-531"
         return (
             """
             <html>
@@ -75,7 +75,7 @@ class RotatingFreejavbtClient:
 
     async def get_text(self, url, **kwargs):
         self.requested.append(url)
-        if url.startswith("https://freejavbt22.cc"):
+        if url.startswith("https://www.freejavbt22.cc"):
             return None, "Failed to perform, curl: (35) BoringSSL"
         return (
             """
@@ -110,5 +110,5 @@ async def test_freejavbt_crawler_rotates_domain_on_failure():
     assert res.data is not None
     assert res.data.number == "SSNI-531"
     assert len(client.requested) >= 2
-    assert client.requested[0].startswith("https://freejavbt22.cc")
-    assert any(not u.startswith("https://freejavbt22.cc") for u in client.requested)
+    assert client.requested[0].startswith("https://www.freejavbt22.cc")
+    assert any(not u.startswith("https://www.freejavbt22.cc") for u in client.requested)

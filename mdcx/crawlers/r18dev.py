@@ -7,7 +7,7 @@ from ..config.models import Website
 from ..models.model_types import CrawlerResult
 from .base import BaseCrawler, CrawlerData
 
-_API_BASE = "https://r18.dev"
+_API_BASE = "https://www.r18.dev"
 
 _content_id_prefixes = {
     "abf": ["118"],

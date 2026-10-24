@@ -175,7 +175,7 @@ class JavDBCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.JAVDB, "https://javdb.com")
+        return manager.config.get_site_url(Website.JAVDB, "https://www.javdb.com")
 
     @classmethod
     @override

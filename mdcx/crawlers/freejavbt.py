@@ -14,7 +14,7 @@ from .base.base_types import split_csv
 
 # freejavbt 镜像域名（主站 + 备用；用户配置 custom_url 时优先使用）
 _FREEJAVBT_DOMAINS = [
-    "https://freejavbt22.cc",
+    "https://www.freejavbt22.cc",
     "https://freejavbt.com",
 ]
 
@@ -350,7 +350,7 @@ class FreejavbtCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return manager.config.get_site_url(Website.FREEJAVBT, "https://freejavbt22.cc")
+        return manager.config.get_site_url(Website.FREEJAVBT, _FREEJAVBT_DOMAINS[0])
 
     @override
     def __init__(self, client, base_url: str = "", browser=None):

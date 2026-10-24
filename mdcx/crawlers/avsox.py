@@ -16,7 +16,7 @@ class AVSOXCrawler(AioSiteCrawler):
 
     namespace = "javu"
     domain_site = "avsox"
-    fallback_domain = "https://avsox.click"
+    fallback_domain = "https://www.avsox.click/cn"
     mosaic = "无码"
     with_outline = True
     probe_number = "081826_100"

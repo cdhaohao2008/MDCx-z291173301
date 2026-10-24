@@ -29,8 +29,11 @@ class AioSiteCrawler(BaseCrawler):
     domain_site: str = ""
     mosaic: str = ""
 
-    # 默认域名（动态获取失败时回退）
+    # 默认域名（动态获取失败时回退）。带中文首页路径 `/cn`：展示与首页预热都用它。
     fallback_domain: str = ""
+    # 首页语言路径：只在展示/预热时保留，JSON API 固定在站点根（body 里用 lang 指定语言，
+    # 路径不再带语言段），拼 API 地址前要把它去掉。
+    lang_path: str = "/cn"
 
     @classmethod
     def supports_custom_url(cls) -> bool:
@@ -39,6 +42,13 @@ class AioSiteCrawler(BaseCrawler):
     @classmethod
     def _default_url(cls) -> str:
         return cls.fallback_domain or f"https://{cls.domain_site}.shop"
+
+    def _api_base(self, base: str) -> str:
+        """API 基地址：去掉 base 末尾的语言路径（如 `/cn`）。"""
+        base = str(base or "").rstrip("/")
+        if self.lang_path and base.endswith(self.lang_path):
+            return base[: -len(self.lang_path)]
+        return base
 
     @classmethod
     @override
@@ -105,7 +115,7 @@ class AioSiteCrawler(BaseCrawler):
     async def _api_search(
         self, ctx: Context, base: str, number: str, cookies: dict[str, str] | None = None
     ) -> dict | None:
-        url = f"{base}/{self.namespace}/data/api/search"
+        url = f"{self._api_base(base)}/{self.namespace}/data/api/search"
         body = json.dumps([{"search": number, "lang": "cn"}, 60, 1])
         json_data, error = await self.async_client.post_json(
             url,
@@ -131,7 +141,7 @@ class AioSiteCrawler(BaseCrawler):
     async def _api_get_movie(
         self, ctx: Context, base: str, movie_id: str, cookies: dict[str, str] | None = None
     ) -> dict | None:
-        url = f"{base}/{self.namespace}/data/api/getMovie"
+        url = f"{self._api_base(base)}/{self.namespace}/data/api/getMovie"
         json_data, error = await self.async_client.post_json(
             url,
             data={"movieId": movie_id},

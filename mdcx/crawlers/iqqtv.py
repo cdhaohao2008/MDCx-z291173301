@@ -216,7 +216,7 @@ def _normalize_language(language: str) -> str:
 
 
 _IQQTV_DOMAINS = [
-    "https://iqqq3.quest",
+    "https://www.iqqq3.quest",
     "https://iqq5.xyz",
     "https://iqqk4.quest",
 ]

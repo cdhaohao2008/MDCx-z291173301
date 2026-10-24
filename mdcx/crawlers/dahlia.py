@@ -93,7 +93,7 @@ class DahliaCrawler(BaseCrawler):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return "https://dahlia-av.jp"
+        return "https://www.dahlia-av.jp"
 
     @classmethod
     @override

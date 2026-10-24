@@ -141,7 +141,7 @@ class JavFreeCrawler(BaseCrawler[JavFreeContext]):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return "https://javfree.me"
+        return "https://www.javfree.me"
 
     @classmethod
     @override

@@ -50,7 +50,7 @@ class MissavApiCrawler(BaseCrawler):
     @override
     def base_url_(cls) -> str:
         # 占位, 实际不发 missav.ws 请求(走 Recombee + fourhoi)
-        return manager.config.get_site_url(Website.MISSAV_API, "https://missav.ws")
+        return manager.config.get_site_url(Website.MISSAV_API, "https://www.missav.ws")
 
     @classmethod
     def _sign_path(cls, path: str) -> str:

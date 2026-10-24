@@ -4,6 +4,17 @@
 
 ## 2026-10-24
 
+### 站点默认地址统一带 www（api / 子域站点除外），AIO 三站默认走中文首页 `/cn`
+
+- 所有站点的内置默认地址补齐 `www.`（`base_url_()` 的默认值，即设置页「当前网站」右侧显示的网址与刮削实际用的地址）：Airav.cc、AVSEX、Dahlia、Faleno、FreeJavBT、JavDay、JavDB、JavDB_API、JavFree、Lulubar、Madou.club、Missav、Missav_API、MyWife、R18.dev、FC2PPVDB、IQQTV、AVSOX、AVMOO、AVheat、TheJavDB。
+- 两处按用户指定换掉默认域名：`JavDB_API` 由 `javdb573.com` 改为 `https://www.javdb580.com`。
+- 明确不加 `www.` 的站点（用户 2026-10-24 指定，地址格式特殊、加了反而连不上）：`DMM_API`（`api.dmm.com`）、`FC2`（`adult.contents.fc2.com`）、`JavDB_APP`（`apidd.czssdgz.com`）、`ThepornDB`（`api.theporndb.net`）、`Xcity`（`tc.xcity.jp`）。
+- `TheJavDB` 保持 `https://thejavdb.net`（用户浏览器实测：`www.thejavdb.net` 无响应、DNS 上也没有这条记录；主域有 CF 墙但能正常过）；`Madouqu` 保持 `https://madouqu.shop`（用户浏览器实测正常，`www.madouqu.shop` 是 NXDOMAIN）。
+- AVMOO / AVSOX / AVheat 默认地址改为中文首页 `https://www.avmoo.shop/cn`、`https://www.avsox.click/cn`、`https://www.avheat.shop/cn`（`crawlers/*.py` 的 `fallback_domain` 与 `base/web.py::_AIO_SITE_KEYS` 同步）。新增 `AioSiteCrawler._api_base()`：JSON API 固定在站点根（语言由 body 里的 `lang` 指定），拼 `{base}/{namespace}/data/api/search|getMovie` 前先去掉 `/cn` 语言段，避免搜索请求打到 `/cn/jav/...` 404。
+- 新增 `tests/test_site_default_urls.py` 逐站校验：任何站点默认地址都不能出现 `www.www.`；两段式裸域名必须带 `www.`（例外站点除外）；例外站点不得被加 `www.`；AIO 三站的 `/cn` 默认地址与 `_api_base()` 去语言段行为。
+- `core/network_check.py::DEFAULT_SITE_URLS` 与 `controllers/main_window/net_check.py` 的 JavDB 探测地址同步成新的 www 地址。
+- 联网核查（本机沙箱）：41 个默认地址的域名全部可解析；9 个站点确认有 HTTP 响应（Airav.cc / Dahlia / FC2PPVDB / AVheat 200，MGStage / TheJavDB 403 为 WAF，DMM_API / JavDB_APP / ThepornDB 404 属 API 根路径正常）；其余 33 个是本机代理拒绝隧道（502）或直连被重置/超时，属环境问题，已列出清单交用户在浏览器复核。
+
 ### 自定义网址：保存后回显、没改过的站点留空，刮削全程只打自定义地址
 
 - 设置页「自定义网址」不再回填站点默认地址：只有用户真正改过并保存过的站点才显示网址，格式统一为 `https://javdb580.com/`（结尾带斜杠）；没改过的站点输入框保持空白，并新增占位提示「显示修改后的网址如 https://javdb580.com/，没修改的不显示」。

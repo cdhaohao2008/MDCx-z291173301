@@ -631,9 +631,9 @@ async def check_url(url: str, length: bool = False, real_url: bool = False):
 # 页面含 `window.__AIO_SITE_URLS__ = {"jav": "...", "javu": "...", "wav": "..."}`,
 # 任一站点路径返回的导航页都包含三站地址, 可互相兜底。
 _AIO_SITE_KEYS = {
-    "avmoo": ("jav", "https://avmoo.shop"),
-    "avsox": ("javu", "https://avsox.click"),
-    "avheat": ("wav", "https://avheat.shop"),
+    "avmoo": ("jav", "https://www.avmoo.shop/cn"),
+    "avsox": ("javu", "https://www.avsox.click/cn"),
+    "avheat": ("wav", "https://www.avheat.shop/cn"),
 }
 
 _AIO_DOMAIN_CACHE: dict[str, tuple[str, float]] = {}

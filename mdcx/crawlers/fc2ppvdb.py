@@ -12,7 +12,7 @@ from ..config.manager import manager
 from ..config.models import Website
 from .base import BaseCrawler, Context, CrawlerData, CrawlerException
 
-FC2CMADB_BASE_URL = "https://fc2cmadb.com"
+FC2CMADB_BASE_URL = "https://www.fc2cmadb.com"
 
 # Cookie 关键字段白名单：fc2cmadb (Laravel/Inertia) 常见 session/CSRF/remember cookie 名，
 # 以及旧版 fc2ppvdb 兼容。命中其一即视为 cookie 至少含登录态字段，

@@ -81,7 +81,7 @@ class MadouClubCrawler(BaseCrawler[MadouClubContext]):
     @classmethod
     @override
     def base_url_(cls) -> str:
-        return "https://madou.club"
+        return "https://www.madou.club"
 
     @classmethod
     @override

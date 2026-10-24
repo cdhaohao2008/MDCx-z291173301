@@ -15,7 +15,7 @@ from ..number import match_number, number_search_variants
 from .base import BaseCrawler, CrawlerData, CrawlerException, DetailPageParser, extract_all_texts, extract_text
 from .base.parser import extract_javdb_score
 
-_DEFAULT_BASE = "https://javdb573.com"
+_DEFAULT_BASE = "https://www.javdb580.com"
 _MIRRORS = [
     "https://javdb573.com",
     "https://javdb574.com",

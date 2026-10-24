@@ -245,17 +245,17 @@ async def test_dynamic_domain_miss_falls_back_to_default():
     assert response.data.number == "SSNI-804"
     searched_hosts = [u for u, _ in crawler.async_client.calls if u.endswith("/search")]
     assert searched_hosts[0].startswith("https://stale.example")
-    assert searched_hosts[-1] == "https://avsox.click/javu/data/api/search"
+    assert searched_hosts[-1] == "https://www.avsox.click/javu/data/api/search"
 
 
 @pytest.mark.asyncio
 async def test_namespace_and_fallback_domain():
     assert AvmooCrawler.namespace == "jav"
-    assert AvmooCrawler.fallback_domain == "https://avmoo.shop"
+    assert AvmooCrawler.fallback_domain == "https://www.avmoo.shop/cn"
     assert AVheatCrawler.namespace == "wav"
-    assert AVheatCrawler.fallback_domain == "https://avheat.shop"
+    assert AVheatCrawler.fallback_domain == "https://www.avheat.shop/cn"
     assert AVSOXCrawler.namespace == "javu"
-    assert AVSOXCrawler.fallback_domain == "https://avsox.click"
+    assert AVSOXCrawler.fallback_domain == "https://www.avsox.click/cn"
 
 
 @pytest.mark.asyncio

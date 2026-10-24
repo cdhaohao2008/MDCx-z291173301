@@ -61,6 +61,8 @@ class TheJavDBCrawler(DmmCrawler):
     def base_url_(cls) -> str:
         # 占位站点地址（网页版首页），实际取数走 API_BASE，与 Missav_API 同思路：
         # 站点地址只用于拼详情页与「打开网站」，改它不影响免 CF 直连的取数通道。
+        # 必须用不带 www 的主域：www.thejavdb.net 浏览器无响应（DNS 上也没有这条记录），
+        # 主域本身有 CF 墙但能正常过。用户 2026-10-24 实测确认。
         return manager.config.get_site_url(Website.THEJAVDB, "https://thejavdb.net")
 
     @classmethod

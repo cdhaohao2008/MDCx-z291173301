@@ -264,7 +264,7 @@ class Parser(DetailPageParser):
 
 
 _MISSAV_DOMAINS = [
-    "https://missav.ws",
+    "https://www.missav.ws",
     "https://missav.live",
     "https://missav.ai",
 ]
