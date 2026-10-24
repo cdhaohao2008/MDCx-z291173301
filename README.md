@@ -16,6 +16,9 @@
     <td align="center"><img src="resources/Img/donate-alipay-redpacket.jpg" width="180" alt="支付宝红包"><br><sub>支付宝红包</sub></td>
   </tr>
 </table>
+一个功能都没改完就提示token烧完了，逼软件没法用了，停止更新了，没钱没token没赞助，一分钱赞助没收到过更新不起了
+<img width="1280" height="680" alt="image" src="https://github.com/user-attachments/assets/6e4a9ab3-8c28-4714-af0e-be41d5e71e67" />
+
 
 ## MDCx 是什么
 
