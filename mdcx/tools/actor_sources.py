@@ -1,15 +1,21 @@
 """
 演员作品数据源：为「检查演员缺失番号」提供按演员拉取全部番号的能力。
 
-按演员类型分组，每组内站点顺序即优先级（同一番号在多个站出现时，记在前面的站）：
+站点清单有两条路（`build_sources(actor_type, use_config_sites=...)`）：
 
-  有码: DMM → DMM_API → LibreDMM → JavDB → JavDB_API → JavDB_APP
-        → Javlibrary·镜像 → JavLibrary → JavBus
-  无码: AVSOX → JavDB → JavDB_API → JavDB_APP
-  FC2 : AVSOX → FC2 → FC2PPVDB → JavDB → JavDB_API → JavDB_APP
-  欧美: AVheat → ThepornDB → JavDB → JavDB_API → JavDB_APP
-  国产: IQQTV → Madou.club → Madouqu → JavDay
-  动漫: JavDB_APP（签名 API）→ Getchu
+* **自动判断**（下拉框选「自动判断」）走 `_AUTO_SITE_ORDER` 里的固定站点链：
+  有码 DMM→DMM_API→LibreDMM→JavDB→JavDB_API→JavDB_APP→Javlibrary·镜像→
+  JavLibrary→JavBus；无码 AVSOX→JavDB→JavDB_API→JavDB_APP；
+  FC2 AVSOX→FC2→FC2PPVDB→JavDB→JavDB_API→JavDB_APP；
+  欧美 AVheat→ThepornDB→JavDB→JavDB_API→JavDB_APP；
+  国产 IQQTV→Madou.club→Madouqu→JavDay；动漫 JavDB_APP→Getchu。
+  类型本身按演员名后的 `(无码)(欧美)(国产)(动漫)(FC2)` 标注判断，未标注按有码。
+* **指定类型**（下拉框选了有码/无码/个摄/欧美/传媒/动漫）走
+  「软件设置 → 类型刮削网站 → 编辑网站」里对应那一组，组内顺序即优先级，
+  **组内被禁用的站点照样参与查缺**（禁用只影响批量刮削）。
+
+能按演员/关键字列出全部作品的站点登记在 `_SITE_FETCHERS`；配置里其余站点
+（厂牌官网、聚合站等）没有这种入口，跳过并在日志里说明。
 
 两个硬约束：
 
@@ -18,6 +24,8 @@
 2. **各站点的番号先归一化再比较**：站点返回的形态五花八门（DMM 的
    `ssis00006`、JavDB 的 `SSIS-006`、FC2 的 `FC2-PPV-1234567`），统一经
    `normalize_key()` 折叠成比较键后，才与本地 number_list 比对。
+
+每条记录还会带上站点顺带给的元数据（演员 / 发行日 / 时长），缺失表里直接用。
 
 动漫 / FC2 没有「演员→作品」页可抓，这两类统一走关键字搜索，
 所以用户填的是社团名/作品关键词（动漫）或卖家名（FC2），不是演员名。
@@ -30,15 +38,16 @@ import time
 import unicodedata
 from collections.abc import Awaitable, Callable, Iterable
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, cast
 from urllib.parse import quote, urljoin
 
 from lxml import etree
 
 from ..base.web import get_aio_domain, get_javlibrary_domain, get_javlibrary_mirror_domain
+from ..config.enums import FixedScrapingType
 from ..config.manager import manager
-from ..config.models import Website
+from ..config.models import SCRAPING_TYPE_SITE_FIELDS, Website
 from ..log_console import log_console
 from ..utils.domain_rotate import DomainRotator
 from ..utils.site_url import strip_redundant_www
@@ -108,10 +117,15 @@ def _out_of_time() -> bool:
 # ---------------------------------------------------------------------------
 
 # 常见厂牌前缀（用于从标题/文件名里捞番号）
+#
+# 字母段与数字段之间**有分隔符**（`JN-4286`）或**无分隔符但数字 ≥3 位**（`SSIS006`）
+# 才算番号：无分隔符又只有两位数字的，几乎都是「团体名 + 人数」——IQQTV 的
+# 「SKE48的三上悠亚…」曾被抽成 `SKE-048` 这种假番号，故数字下限收到 3 位。
 _NUMBER_IN_TEXT = re.compile(
     r"(?<![A-Z0-9])("
     r"FC2[-_ ]?(?:PPV)?[-_ ]?\d{5,8}"
-    r"|[A-Z]{2,10}[-_ ]?\d{2,6}(?:[-_]\d{1,4})?"
+    r"|[A-Z]{2,10}[-_ ]\d{2,6}(?:[-_]\d{1,4})?"
+    r"|[A-Z]{2,10}\d{3,6}(?:[-_]\d{1,4})?"
     r"|1PONDO[-_ ]?\d{6}[-_ ]?\d{3}"
     r"|CARIBBEANCOM[-_ ]?\d{6}[-_ ]?\d{3}"
     r"|10MUSUME[-_ ]?\d{6}[-_ ]?\d{2}"
@@ -163,10 +177,16 @@ def display_number(raw: str) -> str:
     return text
 
 
-def extract_numbers(text: str) -> list[str]:
-    """从标题/文件名里捞出所有番号（已归一化为展示形态）。"""
+def extract_numbers(text: str, *, require_separator: bool = False) -> list[str]:
+    """从标题/文件名里捞出所有番号（已归一化为展示形态）。
+
+    `require_separator=True` 时只认「字母 + 分隔符 + 数字」的标准写法（`TEK-067`），
+    用于 IQQTV 这类标题里混着自造编号（`JN4286`）的站。
+    """
     found: list[str] = []
     for raw in _NUMBER_IN_TEXT.findall(str(text or "")):
+        if require_separator and not re.match(r"^[A-Z]{2,10}[-_ ]\d", raw, re.IGNORECASE):
+            continue
         number = display_number(raw)
         if number and number not in found:
             found.append(number)
@@ -175,11 +195,19 @@ def extract_numbers(text: str) -> list[str]:
 
 @dataclass(frozen=True, slots=True)
 class NumberHit:
-    """一条番号记录：番号 + 来自哪个站 + 该站的详情页地址。"""
+    """一条番号记录：番号 + 来自哪个站 + 该站的详情页地址 + 站点顺带给的元数据。
+
+    actors / release / duration 只填站点列表页真的给出来的值（DMM_API 的演员表、
+    JavDB 移动端的发行日与时长、AVSOX 的 releaseDate/length 等），拿不到就留空，
+    由调用方决定要不要用「查询用的演员名」兜底。
+    """
 
     number: str
     site: str
     url: str
+    actors: str = ""  # 演员，多个用逗号分隔
+    release: str = ""  # 发行日期 YYYY-MM-DD
+    duration: str = ""  # 时长（分钟）
 
 
 # ---------------------------------------------------------------------------
@@ -278,15 +306,85 @@ def _pick_name(names: Iterable[str], limit: int = _MAX_NAME_VARIANTS) -> list[st
     return seen[:limit]
 
 
-def _merge(hits: dict[str, NumberHit], number: str, site: str, url: str) -> None:
-    """把一条记录塞进结果集；同番号只保留最先出现的站点（即优先级最高的站）。"""
+def _merge(
+    hits: dict[str, NumberHit],
+    number: str,
+    site: str,
+    url: str,
+    *,
+    actors: str = "",
+    release: str = "",
+    duration: str = "",
+) -> None:
+    """把一条记录塞进结果集。
+
+    同番号只保留最先出现的站点（即优先级最高的站），但**元数据按字段补齐**：
+    前一个站没给发行日/时长/演员，后一个站给了就补上，不因为「已有记录」而丢弃。
+    """
     number = display_number(number)
     if not number:
         return
     key = normalize_key(number)
-    if not key or key in hits:
+    if not key:
         return
-    hits[key] = NumberHit(number=number, site=site, url=str(url or "").strip())
+    actors = _clean_meta(actors)
+    release = _clean_date(release)
+    duration = _clean_duration(duration)
+    old = hits.get(key)
+    if old is None:
+        hits[key] = NumberHit(
+            number=number,
+            site=site,
+            url=str(url or "").strip(),
+            actors=actors,
+            release=release,
+            duration=duration,
+        )
+        return
+    if not (actors or release or duration):
+        return
+    hits[key] = replace(
+        old,
+        actors=old.actors or actors,
+        release=old.release or release,
+        duration=old.duration or duration,
+    )
+
+
+def _clean_meta(value: object) -> str:
+    """演员串归一：去空白、顿号/斜杠统一成英文逗号、去重保序。"""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    parts = [part.strip() for part in re.split(r"[,，、/|]+", text)]
+    seen: list[str] = []
+    for part in parts:
+        if part and part not in seen:
+            seen.append(part)
+    return ",".join(seen)
+
+
+def _clean_date(value: object) -> str:
+    """发行日归一成 YYYY-MM-DD；认不出的日期返回空串（不猜）。"""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    m = re.search(r"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})", text)
+    if not m:
+        return ""
+    return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+
+
+def _clean_duration(value: object) -> str:
+    """时长归一成纯分钟数字（站点可能给 '96'、96、'96分钟'、'01:36:00'）。"""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if m := re.fullmatch(r"(\d{1,3}):(\d{2}):(\d{2})", text):
+        return str(int(m.group(1)) * 60 + int(m.group(2)))
+    if m := re.search(r"\d+", text):
+        return m.group(0)
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -357,10 +455,19 @@ async def _javbus_searchstar(rotator: _JavbusRotator, name: str, uncensored: boo
 
 async def _fetch_javbus(names: list[str]) -> dict[str, NumberHit]:
     """有码：javbus searchstar → star 页分页。"""
+    return await _javbus_numbers(names, uncensored=False)
+
+
+async def _fetch_javbus_uncensored(names: list[str]) -> dict[str, NumberHit]:
+    """无码：javbus 的 /uncensored/searchstar 通道，只列无码作品。"""
+    return await _javbus_numbers(names, uncensored=True)
+
+
+async def _javbus_numbers(names: list[str], *, uncensored: bool) -> dict[str, NumberHit]:
     rotator = _JavbusRotator()
     site = Website.JAVBUS.value
     for name in _pick_name(names):
-        star_url = await _javbus_searchstar(rotator, name, uncensored=False)
+        star_url = await _javbus_searchstar(rotator, name, uncensored=uncensored)
         if not star_url:
             continue
         hits: dict[str, NumberHit] = {}
@@ -378,9 +485,11 @@ async def _fetch_javbus(names: list[str]) -> dict[str, NumberHit]:
                 href = str(box.get("href") or "")
                 dates = box.xpath(".//date/text()")
                 number = str(dates[0]).strip() if dates else ""
+                # 演员页每个卡片两个 <date>：第一个是番号，第二个是发行日
+                release = str(dates[1]).strip() if len(dates) > 1 else ""
                 if not number and href:
                     number = href.rstrip("/").rsplit("/", 1)[-1]
-                _merge(hits, number, site, href)
+                _merge(hits, number, site, href, release=release)
             next_pages = root.xpath(
                 '//a[contains(text(),"下一頁") or contains(text(),"下一页") or contains(text(),"Next")]/@href'
             )
@@ -450,7 +559,9 @@ async def _javdb_actor_numbers(base: str, path: str) -> dict[str, NumberHit]:
         for box in boxes:
             href = str(box.get("href") or "")
             number = "".join(box.xpath('.//div[contains(@class,"video-title")]/strong/text()')).strip()
-            _merge(hits, number, site, urljoin(base, href))
+            # 列表卡片带发行日（<div class="meta">2026-09-29</div>），时长/演员列表页没有
+            meta = "".join(box.xpath('.//div[contains(@class,"meta")]/text()')).strip()
+            _merge(hits, number, site, urljoin(base, href), release=meta)
         if not root.xpath('//a[contains(@class,"pagination-next")]/@href'):
             break
         page += 1
@@ -468,7 +579,7 @@ async def _javdb_site_numbers(names: list[str], *, site: Website, fallback: str)
         hits = await _javdb_actor_numbers(base, path)
         if hits:
             # 站点名按各自站点标注（JavDB / JavDB_API 分开统计）
-            return {k: NumberHit(v.number, site.value, v.url) for k, v in hits.items()}
+            return {k: replace(v, site=site.value) for k, v in hits.items()}
     return {}
 
 
@@ -534,7 +645,15 @@ async def _fetch_javdb_app(names: list[str], *, fc2_only: bool = False) -> dict[
                     if fc2_only and not normalize_key(number).startswith("FC2"):
                         continue
                     movie_id = str(movie.get("id") or "")
-                    _merge(hits, number, site, f"{_JAVDB_FALLBACK}/v/{movie_id}" if movie_id else "")
+                    # 移动端搜索顺带给了发行日与时长（分钟）
+                    _merge(
+                        hits,
+                        number,
+                        site,
+                        f"{_JAVDB_FALLBACK}/v/{movie_id}" if movie_id else "",
+                        release=str(movie.get("release_date") or ""),
+                        duration=str(movie.get("duration") or ""),
+                    )
                 if len(movies) < _JAVDB_APP_LIMIT:
                     break
                 page += 1
@@ -748,11 +867,20 @@ async def _fetch_dmm_api(names: list[str]) -> dict[str, NumberHit]:
             url_detail = str(item.get("URL") or "")
             if not cid:
                 continue
+            # ItemList 顺带给了发行日、时长（volume=分钟）与演员表，直接填进表格
+            info = item.get("iteminfo") if isinstance(item.get("iteminfo"), dict) else {}
+            actress_list = info.get("actress") or []
+            actors = ",".join(
+                str(a.get("name") or "").strip() for a in actress_list if isinstance(a, dict) and a.get("name")
+            )
             _merge(
                 hits,
                 _dmm_number_from_cid(cid),
                 site,
                 url_detail or f"{_DMM}/digital/videoa/-/detail/=/cid={cid}/",
+                actors=actors,
+                release=str(item.get("date") or ""),
+                duration=str(item.get("volume") or ""),
             )
         if len(items) < 100:
             break
@@ -882,7 +1010,7 @@ async def _aio_locate_star_id(root: str, namespace: str, name: str, cookies: dic
     return ""
 
 
-async def _aio_numbers(site: str, namespace: str, names: list[str]) -> dict[str, NumberHit]:
+async def _aio_numbers(site: str, namespace: str, names: list[str], site_label: Website) -> dict[str, NumberHit]:
     domain_site = site.lower()
     try:
         base = await get_aio_domain(domain_site)
@@ -899,7 +1027,7 @@ async def _aio_numbers(site: str, namespace: str, names: list[str]) -> dict[str,
             break
     if not star_id:
         return {}
-    site_name = Website.AVSOX.value if namespace == "javu" else Website.AVHEAT.value
+    site_name = site_label.value
     hits: dict[str, NumberHit] = {}
     page = 1
     while not _out_of_time() and page <= 30:
@@ -918,7 +1046,14 @@ async def _aio_numbers(site: str, namespace: str, names: list[str]) -> dict[str,
             movie_id = str(row.get("movieId") or "").strip()
             if not number:
                 continue
-            _merge(hits, number, site_name, f"{root}/cn/movie/{movie_id}" if movie_id else "")
+            _merge(
+                hits,
+                number,
+                site_name,
+                f"{root}/cn/movie/{movie_id}" if movie_id else "",
+                release=str(row.get("releaseDate") or ""),
+                duration=str(row.get("length") or ""),
+            )
         if len(rows) < 60:
             break
         page += 1
@@ -926,11 +1061,16 @@ async def _aio_numbers(site: str, namespace: str, names: list[str]) -> dict[str,
 
 
 async def _fetch_avsox(names: list[str]) -> dict[str, NumberHit]:
-    return await _aio_numbers("avsox", "javu", names)
+    return await _aio_numbers("avsox", "javu", names, Website.AVSOX)
 
 
 async def _fetch_avheat(names: list[str]) -> dict[str, NumberHit]:
-    return await _aio_numbers("avheat", "wav", names)
+    return await _aio_numbers("avheat", "wav", names, Website.AVHEAT)
+
+
+async def _fetch_avmoo(names: list[str]) -> dict[str, NumberHit]:
+    """有码：AVMOO 与 avsox/avheat 同属 tellme.pw AIO 平台，只是命名空间是 jav（有码库）。"""
+    return await _aio_numbers("avmoo", "jav", names, Website.AVMOO)
 
 
 # ---------------------------------------------------------------------------
@@ -977,7 +1117,9 @@ async def _fetch_iqqtv(names: list[str]) -> dict[str, NumberHit]:
             for link in links:
                 title = str(link.get("title") or _joined_text(link))
                 href = str(link.get("href") or "")
-                for number in extract_numbers(title):
+                # IQQTV 标题里常混自造编号（「马赛克破坏版 … JN4286」），只认标准
+                # 「字母-数字」写法，避免把这类编号当成番号塞进缺失表
+                for number in extract_numbers(title, require_separator=True):
                     _merge(hits, number, site, urljoin(base, href))
             if len(links) < 48:
                 break
@@ -1168,9 +1310,17 @@ async def _fetch_theporndb(names: list[str]) -> dict[str, NumberHit]:
                 for row in rows:
                     title = str(row.get("title") or "")
                     site_info = row.get("site") if isinstance(row.get("site"), dict) else {}
-                    number = get_number(str(site_info.get("short_name") or ""), str(row.get("date") or ""), title)
+                    date = str(row.get("date") or "")
+                    number = get_number(str(site_info.get("short_name") or ""), date, title)
                     slug = str(row.get("slug") or "")
-                    _merge(hits, number, site, f"{_THEPORNDB_WEB}/{kind}/{slug}" if slug else "")
+                    _merge(
+                        hits,
+                        number,
+                        site,
+                        f"{_THEPORNDB_WEB}/{kind}/{slug}" if slug else "",
+                        release=date,
+                        duration=str(row.get("duration") or ""),
+                    )
                 if len(rows) < 100:
                     break
                 page += 1
@@ -1222,55 +1372,157 @@ class Source:
     timeout: float = 120.0
 
 
-SOURCES_BY_TYPE: dict[str, tuple[Source, ...]] = {
-    "有码": (
-        Source(Website.DMM.value, _fetch_dmm, "dmm", 60),
-        Source(Website.DMM_API.value, _fetch_dmm_api, "dmm", 120),
-        Source(Website.LIBREDMM.value, _fetch_libredmm, "libredmm", 120),
-        # JavDB 三站同一台域名，串行跑；作品多的演员（如欧美）页数很多，
-        # 到点就由翻页循环自己收手，把已拿到的番号带回来，不整站丢弃
-        Source(Website.JAVDB.value, _fetch_javdb, "javdb", 90),
-        Source(Website.JAVDB_API.value, _fetch_javdb_api, "javdb", 60),
-        Source(Website.JAVDB_APP.value, _fetch_javdb_app_all, "javdb", 60),
-        # JavLibrary 原站/镜像都有 CF 墙，过盾本身就慢；单个站点给 60s
-        Source(Website.JAVLIBRARY_MIRROR.value, _fetch_javlibrary_mirror, "javlibrary", 60),
-        Source(Website.JAVLIBRARY.value, _fetch_javlibrary, "javlibrary", 60),
-        Source(Website.JAVBUS.value, _fetch_javbus, "javbus", 120),
-    ),
-    "无码": (
-        Source(Website.AVSOX.value, _fetch_avsox, "avsox"),
-        Source(Website.JAVDB.value, _fetch_javdb, "javdb", 90),
-        Source(Website.JAVDB_API.value, _fetch_javdb_api, "javdb", 60),
-        Source(Website.JAVDB_APP.value, _fetch_javdb_app_all, "javdb", 60),
-    ),
-    "FC2": (
-        Source(Website.AVSOX.value, _fetch_avsox, "avsox"),
-        Source(Website.FC2.value, _fetch_fc2, "fc2"),
-        Source(Website.FC2PPVDB.value, _fetch_fc2ppvdb, "fc2"),
-        Source(Website.JAVDB.value, _fetch_javdb_fc2, "javdb", 90),
-        Source(Website.JAVDB_API.value, _fetch_javdb_api_fc2, "javdb", 60),
-        Source(Website.JAVDB_APP.value, _fetch_javdb_app_fc2, "javdb", 60),
-    ),
-    "欧美": (
-        Source(Website.AVHEAT.value, _fetch_avheat, "avheat"),
-        Source(Website.THEPORNDB.value, _fetch_theporndb, "theporndb"),
-        Source(Website.JAVDB.value, _fetch_javdb, "javdb", 90),
-        Source(Website.JAVDB_API.value, _fetch_javdb_api, "javdb", 60),
-        Source(Website.JAVDB_APP.value, _fetch_javdb_app_all, "javdb", 60),
-    ),
-    "国产": (
-        Source(Website.IQQTV.value, _fetch_iqqtv, "guochan"),
-        Source(Website.MADOUCLUB.value, _fetch_madou_club, "guochan"),
-        Source(Website.MADOUQU.value, _fetch_madouqu, "guochan"),
-        Source(Website.JAVDAY.value, _fetch_javday, "guochan"),
-    ),
-    "动漫": (
-        Source(Website.JAVDB_APP.value, _fetch_javdb_app_all, "javdb", 60),
-        Source(Website.GETCHU.value, _fetch_getchu, "getchu"),
-    ),
+# 内部演员类型 → 刮削类型（决定用「软件设置-类型刮削网站」里的哪一组站点）
+_ACTOR_TYPE_TO_SCRAPING: dict[str, FixedScrapingType] = {
+    "有码": FixedScrapingType.YOUMA,
+    "无码": FixedScrapingType.WUMA,
+    "FC2": FixedScrapingType.FC2,
+    "欧美": FixedScrapingType.OUMEI,
+    "国产": FixedScrapingType.GUOCHAN,
+    "动漫": FixedScrapingType.DONGMAN,
 }
 
-ACTOR_TYPES: tuple[str, ...] = tuple(SOURCES_BY_TYPE)
+ACTOR_TYPES: tuple[str, ...] = tuple(_ACTOR_TYPE_TO_SCRAPING)
+
+# 「自动判断」时用的固定站点链（用户 2026-10-25 定稿，顺序即优先级）。
+# 与「按类型取配置组」是两条路：自动判断不看软件设置里的站点组，
+# 只有下拉框选了具体类型才走配置组（含组内被禁用的站点）。
+_AUTO_SITE_ORDER: dict[str, tuple[Website, ...]] = {
+    "有码": (
+        Website.DMM,
+        Website.DMM_API,
+        Website.LIBREDMM,
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
+        Website.JAVLIBRARY_MIRROR,
+        Website.JAVLIBRARY,
+        Website.JAVBUS,
+        Website.IQQTV,
+    ),
+    "无码": (Website.AVSOX, Website.JAVDB, Website.JAVDB_API, Website.JAVDB_APP),
+    "FC2": (
+        Website.AVSOX,
+        Website.FC2,
+        Website.FC2PPVDB,
+        Website.JAVDB,
+        Website.JAVDB_API,
+        Website.JAVDB_APP,
+    ),
+    "欧美": (Website.AVHEAT, Website.THEPORNDB, Website.JAVDB, Website.JAVDB_API, Website.JAVDB_APP),
+    "国产": (Website.IQQTV, Website.MADOUCLUB, Website.MADOUQU, Website.JAVDAY),
+    "动漫": (Website.JAVDB_APP, Website.GETCHU),
+}
+
+# 站点 → 「按演员/关键字列出全部作品」的实现。
+# 只登记真有演员页/关键字搜索的站；配置里其余站点（厂牌官网、聚合站等）没有这种
+# 入口，查缺时跳过并在日志里说明，不会静默当成「查过了、没有番号」。
+_SITE_FETCHERS: dict[Website, Callable[[list[str]], Awaitable[dict[str, NumberHit]]]] = {
+    Website.DMM: _fetch_dmm,
+    Website.DMM_API: _fetch_dmm_api,
+    Website.LIBREDMM: _fetch_libredmm,
+    Website.AVMOO: _fetch_avmoo,
+    Website.AVSOX: _fetch_avsox,
+    Website.AVHEAT: _fetch_avheat,
+    Website.FC2: _fetch_fc2,
+    Website.FC2PPVDB: _fetch_fc2ppvdb,
+    Website.THEPORNDB: _fetch_theporndb,
+    Website.IQQTV: _fetch_iqqtv,
+    Website.MADOUCLUB: _fetch_madou_club,
+    Website.MADOUQU: _fetch_madouqu,
+    Website.JAVDAY: _fetch_javday,
+    Website.GETCHU: _fetch_getchu,
+    Website.JAVDB: _fetch_javdb,
+    Website.JAVDB_API: _fetch_javdb_api,
+    Website.JAVDB_APP: _fetch_javdb_app_all,
+    Website.JAVBUS: _fetch_javbus,
+    Website.JAVLIBRARY: _fetch_javlibrary,
+    Website.JAVLIBRARY_MIRROR: _fetch_javlibrary_mirror,
+}
+
+# FC2 类型下 JavDB 三站换成「只留 FC2- 番号」的版本：
+# 否则同一个演员的有码作品会混进 FC2 的缺失表。
+_SITE_FETCHERS_FC2: dict[Website, Callable[[list[str]], Awaitable[dict[str, NumberHit]]]] = {
+    **_SITE_FETCHERS,
+    Website.JAVDB: _fetch_javdb_fc2,
+    Website.JAVDB_API: _fetch_javdb_api_fc2,
+    Website.JAVDB_APP: _fetch_javdb_app_fc2,
+}
+
+# 无码类型下 JavBus 换成 uncensored 通道（JavBus 在有码/无码两个组里都有）
+_SITE_FETCHERS_WUMA: dict[Website, Callable[[list[str]], Awaitable[dict[str, NumberHit]]]] = {
+    **_SITE_FETCHERS,
+    Website.JAVBUS: _fetch_javbus_uncensored,
+}
+
+# 同一台域名（或同一份数据）的站点串行跑，避免并发打同一站被封
+_SITE_GROUPS: dict[Website, str] = {
+    Website.DMM: "dmm",
+    Website.DMM_API: "dmm",
+    Website.JAVDB: "javdb",
+    Website.JAVDB_API: "javdb",
+    Website.JAVDB_APP: "javdb",
+    Website.JAVLIBRARY: "javlibrary",
+    Website.JAVLIBRARY_MIRROR: "javlibrary",
+    Website.FC2: "fc2",
+    Website.FC2PPVDB: "fc2",
+}
+
+# 各站点单次等待上限（秒）：DMM 网页可能被地区封锁、JavLibrary 系要过盾，给得短些
+_SITE_TIMEOUTS: dict[Website, float] = {
+    Website.DMM: 60,
+    Website.JAVDB: 90,
+    Website.JAVDB_API: 60,
+    Website.JAVDB_APP: 60,
+    Website.JAVLIBRARY: 60,
+    Website.JAVLIBRARY_MIRROR: 60,
+    Website.JAVBUS: 120,
+}
+
+
+def sites_for_type(actor_type: str) -> list[Website]:
+    """按演员类型取「软件设置-类型刮削网站」里那一组站点（保持用户排的优先级顺序）。
+
+    **不看 website_disabled**：用户口径是「编辑网站里被禁用的站点，在演员名检查
+    缺失番号时不再禁用」——查缺是一次性手动工具，禁用只影响批量刮削。
+    """
+    scraping = _ACTOR_TYPE_TO_SCRAPING.get(actor_type, FixedScrapingType.YOUMA)
+    field = SCRAPING_TYPE_SITE_FIELDS[scraping]
+    return list(getattr(manager.config, field, None) or [])
+
+
+def build_sources(actor_type: str, *, use_config_sites: bool) -> tuple[list[Source], list[str]]:
+    """把该类型的站点清单变成可执行的 Source 列表，返回 (能查的, 跳过的站名)。
+
+    `use_config_sites=False`（自动判断）用固定站点链；`True`（下拉框选了具体类型）
+    用「软件设置-类型刮削网站」里那一组。
+    """
+    fetchers = _SITE_FETCHERS
+    if actor_type == "FC2":
+        fetchers = _SITE_FETCHERS_FC2
+    elif actor_type == "无码":
+        fetchers = _SITE_FETCHERS_WUMA
+    if use_config_sites:
+        sites = sites_for_type(actor_type)
+    else:
+        sites = list(_AUTO_SITE_ORDER.get(actor_type, _AUTO_SITE_ORDER["有码"]))
+
+    sources: list[Source] = []
+    skipped: list[str] = []
+    for site in sites:
+        fetch = fetchers.get(site)
+        if fetch is None:
+            skipped.append(site.value)
+            continue
+        sources.append(
+            Source(
+                site=site.value,
+                fetch=fetch,
+                group=_SITE_GROUPS.get(site, site.value),
+                timeout=_SITE_TIMEOUTS.get(site, 120.0),
+            )
+        )
+    return sources, skipped
 
 
 # ---------------------------------------------------------------------------
@@ -1375,15 +1627,29 @@ async def _run_group(sources: list[Source], names: list[str]) -> dict[str, dict[
 
 
 async def collect_numbers(
-    actor_type: str, names: list[str], *, log: Callable[[str], None] | None = None
+    actor_type: str,
+    names: list[str],
+    *,
+    use_config_sites: bool = False,
+    log: Callable[[str], None] | None = None,
 ) -> dict[str, NumberHit]:
     """按类型汇总各站点番号；每个站点最多请求两次（首次 + 一次重试）。
 
-    返回 `{归一化键: NumberHit}`，同番号只保留优先级最高（列表里最靠前）的站点。
-    不同域名的站点组并发跑，同域名组内串行，避免同时打同一台站被封。
+    `use_config_sites=False`（自动判断）走固定站点链；`True`（下拉框选了具体类型）
+    走「软件设置-类型刮削网站」里对应那一组，组内被禁用的站点照样参与。
+    组内顺序即优先级。返回 `{归一化键: NumberHit}`，同番号只保留优先级最高的站点，
+    元数据按字段补齐。不同域名的站点组并发跑，同域名组内串行，避免同时打同一台站被封。
     """
     emit = log or _log
-    sources = SOURCES_BY_TYPE.get(actor_type, SOURCES_BY_TYPE["有码"])
+    sources, skipped = build_sources(actor_type, use_config_sites=use_config_sites)
+    if not sources:
+        emit(f"   ⚠️ 「{actor_type}」没有可用于按演员查全量番号的站点")
+        return {}
+    source_desc = "类型刮削网站组" if use_config_sites else "固定站点链"
+    emit(
+        f"   按「{actor_type}」{source_desc}查缺：{len(sources)} 个站点参与"
+        + (f"，{len(skipped)} 个站点无演员页已跳过（{'、'.join(skipped)}）" if skipped else "")
+    )
 
     groups: dict[str, list[Source]] = {}
     for source in sources:
@@ -1402,6 +1668,18 @@ async def collect_numbers(
             continue
         fresh = sum(1 for key in hits if key not in merged)
         for key, hit in hits.items():
-            merged.setdefault(key, hit)
+            if key in merged:
+                # 同番号：站点保留优先级最高的那个，元数据按字段补齐
+                _merge(
+                    merged,
+                    hit.number,
+                    merged[key].site,
+                    merged[key].url,
+                    actors=hit.actors,
+                    release=hit.release,
+                    duration=hit.duration,
+                )
+            else:
+                merged[key] = hit
         emit(f"   {source.site}: {len(hits)} 部（新增 {fresh}）")
     return merged

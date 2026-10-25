@@ -4,6 +4,13 @@
 
 ## 2026-10-25
 
+### 工具页加「只获取单演员」选项；缺失表演员列对齐随人数变化
+
+- 「演员名查缺」下方新增一行：`演员名选项：` + 复选框 `只获取单演员` + 原来的绿色提示（「本地资源库和演员名都可以填写多个，以中英文逗号分开」由单独一行移到该行右侧）。勾上后 `check_missing_number(..., single_actor_only=True)` 只保留演员表里恰好一个演员的番号（`split_single_actor()`），多演员的整条排除并在日志报数；站点没给演员表的按单演员放行，日志同时说明有多少条是这么计入的。
+- 缺失表「演员」列：只有一个演员（或空）居中，两个及以上演员靠左。
+- 自动判断的有码站点链末尾加入 IQQTV（`…→JavBus→IQQTV`）。
+- IQQTV 标题抽番号改为只认标准「字母-数字」写法（`extract_numbers(..., require_separator=True)`）：`马赛克破坏版 … JN4286` 这类自造编号不再入表，`TEK-067` 照取。
+
 ### 工具页「检查演员缺失番号」加「类型」下拉框
 
 - 「演员名查缺」输入框右侧（「选择目录」按钮正下方）新增 `comboBox_actor_type`，七项：自动判断 / 有码番号 / 无码番号 / 个摄番号 / 欧美视频 / 国产传媒 / 动漫里番。文案与顺序复用「软件设置 → 锁定类型」（`FixedScrapingType.names()`）去掉「国产短剧」——国产短剧多为 AI 生成、没有演员，按演员名查不到东西。
@@ -11,6 +18,16 @@
 - 「自动判断」末字只显示一半：宽度被对齐要求钉死在 110px，而通用 `QComboBox` 的 `padding: 3px 30px 3px 8px` 与 26px 的 drop-down 箭头**重复占位**，文本区只剩 44px，四个 13px 汉字要 52px。明暗两套样式各加一条 `QComboBox#comboBox_actor_type { padding: 3px 0px 3px 8px; }`（与 `comboBox_ui_scale` 同一修法），文本区 44→74px，外框宽度与箭头位置不动；`tests/test_actor_type_combo_text_fit.py` 在真实主窗口上量 `SC_ComboBoxEditField` 宽度，明暗两套主题各测一次。
 - 选具体类型后，`check_missing_number(actor_flag, forced_type)` 用 `apply_forced_type()` 把所有演员的类型统一成该类型，直接调该类型的网站列表查缺失番号；选「自动判断」仍按演员名后的 `(无码)(欧美)(国产)(动漫)(FC2)` 标注走，未标注按有码。个摄番号对应内部的 FC2 类型。
 - 下拉框文案由 `tests/test_actor_missing_numbers.py::test_tool_actor_type_combo_reuses_fixed_type_options` 钉在 `FixedScrapingType.names()` 上，设置页改了选项这里会一起失败提醒。
+
+### 缺失番号表加演员/日期/时长/类型四列，文件名带时间戳；站点清单分「自动判断 / 指定类型」两条路
+
+- 导出文件名改为「演员名 + 时间戳」：`三上悠亚2026-10-25 12-26-05.xlsx`（`%Y-%m-%d %H-%M-%S`），仍落在本地资源库目录。
+- 表格由三列扩到七列：番号 / 演员 / 日期 / 时长 / 类型 / 网站 / 链接地址。前六列列宽 13、链接 100；表头整行居中，数据行只有链接列靠左；日期写成 Excel 日期型（`[$-409]yyyy\-mm\-dd;@`，可排序），时长写成整数分钟，类型按内部类型名映射（国产 → 传媒）。
+- 元数据来源：DMM_API 的 `iteminfo.actress` / `date` / `volume`、JavDB 网页列表的 `.meta` 发行日、JavDB 移动端的 `release_date` / `duration`、JavBus 演员页第二个 `<date>`、AVSOX/AVheat 的 `releaseDate` / `length`、ThepornDB 的 `date` / `duration`。同番号跨站时元数据按字段补齐（先到的站没给、后到的站给了就补上）；站点没给演员时用查询用的演员名兜底，动漫查的是关键字故不兜底。
+- 站点清单两条路：**自动判断**走固定站点链（有码 DMM→DMM_API→LibreDMM→JavDB→JavDB_API→JavDB_APP→Javlibrary·镜像→JavLibrary→JavBus，无码/FC2/欧美/国产/动漫各按用户定稿的链）；**指定类型**走「软件设置 → 类型刮削网站 → 编辑网站」里对应那一组，组内顺序即优先级，**组内被禁用的站点照样参与查缺**。无码组的 JavBus 走 `/uncensored/searchstar` 通道，FC2 组的 JavDB 三站只留 `FC2-` 番号。
+- 配置组里没有演员页的站点（厂牌官网、聚合站等）跳过并在日志里列名，不会静默当成「查过、没番号」。
+- 标题抽番号收紧：字母段与数字段之间**有分隔符**或**无分隔符但数字 ≥3 位**才算番号。IQQTV 的「SKE48的三上悠亚大玩3P … TEK-067」此前被抽成假番号 `SKE-048`（SKE48 是团体名），现在只取 `TEK-067`；`JN4286` 这类 4 位无分隔符的仍能识别，`AKB48` / `乃木坂46` 不再误判。
+- 日志「需要查询的演员」由两行改成一行：`🔍 需要查询的演员：三上悠亚`。
 
 ### 「检查演员缺失番号」改成多站点汇总 + 归一化对比 + Excel 输出
 

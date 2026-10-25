@@ -2017,12 +2017,53 @@
                     </property>
                   </item>
                 </widget>
+                <widget class="QLabel" name="label_actor_option">
+                  <property name="geometry">
+                    <rect>
+                      <x>30</x>
+                      <y>138</y>
+                      <width>100</width>
+                      <height>20</height>
+                    </rect>
+                  </property>
+                  <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                      <horstretch>0</horstretch>
+                      <verstretch>0</verstretch>
+                    </sizepolicy>
+                  </property>
+                  <property name="layoutDirection">
+                    <enum>Qt::RightToLeft</enum>
+                  </property>
+                  <property name="text">
+                    <string>演员名选项：</string>
+                  </property>
+                  <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                  </property>
+                </widget>
+                <widget class="QCheckBox" name="checkBox_single_actor">
+                  <property name="geometry">
+                    <rect>
+                      <x>136</x>
+                      <y>137</y>
+                      <width>112</width>
+                      <height>22</height>
+                    </rect>
+                  </property>
+                  <property name="toolTip">
+                    <string>勾选后只保留演员表里只有一个演员的番号；不勾选则单演员、多演员的番号都算缺失</string>
+                  </property>
+                  <property name="text">
+                    <string>只获取单演员</string>
+                  </property>
+                </widget>
                 <widget class="QLabel" name="label_62">
                   <property name="geometry">
                     <rect>
-                      <x>80</x>
-                      <y>140</y>
-                      <width>561</width>
+                      <x>252</x>
+                      <y>138</y>
+                      <width>438</width>
                       <height>20</height>
                     </rect>
                   </property>
@@ -2037,9 +2078,6 @@
                   </property>
                   <property name="text">
                     <string>本地资源库和演员名都可以填写多个，以中英文逗号分开</string>
-                  </property>
-                  <property name="wordWrap">
-                    <bool>true</bool>
                   </property>
                 </widget>
               </widget>
