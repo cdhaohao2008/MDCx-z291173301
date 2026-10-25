@@ -772,7 +772,7 @@ class Ui_MDCx(object):
         self.pushButton_move_mp4.setGeometry(QtCore.QRect(140, 110, 351, 40))
         self.pushButton_move_mp4.setObjectName("pushButton_move_mp4")
         self.label_41 = QtWidgets.QLabel(parent=self.groupBox_6)
-        self.label_41.setGeometry(QtCore.QRect(50, 30, 90, 30))
+        self.label_41.setGeometry(QtCore.QRect(30, 30, 90, 30))
         self.label_41.setAlignment(
             QtCore.Qt.AlignmentFlag.AlignLeading
             | QtCore.Qt.AlignmentFlag.AlignLeft
