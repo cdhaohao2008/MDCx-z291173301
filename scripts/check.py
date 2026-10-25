@@ -7,6 +7,11 @@ try:
 except ModuleNotFoundError:
     from install_git_hooks import install_hooks
 
+# ruff 0.17.2 的 formatter 会把 `except (A, B):` 改写成 Python 2 的 `except A, B:`，
+# 那是无效语法（改完 pre-push 直接崩在 SyntaxError 上）。用命名元组绕开这个坑，
+# 既保持「工具链缺失时给提示而不是抛堆栈」，也不会被 formatter 改坏。
+_TOOL_MISSING_ERRORS = (FileNotFoundError, ModuleNotFoundError)
+
 FAST = [
     ["ruff", "format", "--check"],
     ["ruff", "check"],
@@ -126,7 +131,7 @@ def main() -> int:
         print(f"[check] running: {' '.join(resolved)}")
         try:
             result = subprocess.run(resolved)
-        except (FileNotFoundError, ModuleNotFoundError):
+        except _TOOL_MISSING_ERRORS:
             # pre-push 钩子会调用本脚本：工具链没装好时给出可执行的提示，
             # 而不是抛一串 FileNotFoundError 堆栈
             print(
