@@ -1675,7 +1675,7 @@
                 <widget class="QLabel" name="label_10">
                   <property name="geometry">
                     <rect>
-                      <x>60</x>
+                      <x>30</x>
                       <y>100</y>
                       <width>80</width>
                       <height>30</height>
@@ -1704,7 +1704,7 @@
                 <widget class="QLabel" name="label_3">
                   <property name="geometry">
                     <rect>
-                      <x>60</x>
+                      <x>30</x>
                       <y>40</y>
                       <width>80</width>
                       <height>30</height>
@@ -2109,7 +2109,7 @@
                 <widget class="QLabel" name="label_41">
                   <property name="geometry">
                     <rect>
-                      <x>30</x>
+                      <x>50</x>
                       <y>30</y>
                       <width>90</width>
                       <height>30</height>
@@ -2125,7 +2125,7 @@
                 <widget class="QLineEdit" name="lineEdit_escape_dir_move">
                   <property name="geometry">
                     <rect>
-                      <x>140</x>
+                      <x>120</x>
                       <y>30</y>
                       <width>351</width>
                       <height>30</height>

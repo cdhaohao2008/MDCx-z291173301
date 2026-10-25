@@ -604,7 +604,7 @@ class Ui_MDCx(object):
         )
         self.lineEdit_appoint_url.setObjectName("lineEdit_appoint_url")
         self.label_10 = QtWidgets.QLabel(parent=self.groupBox_7)
-        self.label_10.setGeometry(QtCore.QRect(60, 100, 80, 30))
+        self.label_10.setGeometry(QtCore.QRect(30, 100, 80, 30))
         self.label_10.setAlignment(
             QtCore.Qt.AlignmentFlag.AlignLeading
             | QtCore.Qt.AlignmentFlag.AlignLeft
@@ -615,7 +615,7 @@ class Ui_MDCx(object):
         self.pushButton_start_single_file.setGeometry(QtCore.QRect(140, 180, 351, 40))
         self.pushButton_start_single_file.setObjectName("pushButton_start_single_file")
         self.label_3 = QtWidgets.QLabel(parent=self.groupBox_7)
-        self.label_3.setGeometry(QtCore.QRect(60, 40, 80, 30))
+        self.label_3.setGeometry(QtCore.QRect(30, 40, 80, 30))
         self.label_3.setAlignment(
             QtCore.Qt.AlignmentFlag.AlignLeading
             | QtCore.Qt.AlignmentFlag.AlignLeft
@@ -772,7 +772,7 @@ class Ui_MDCx(object):
         self.pushButton_move_mp4.setGeometry(QtCore.QRect(140, 110, 351, 40))
         self.pushButton_move_mp4.setObjectName("pushButton_move_mp4")
         self.label_41 = QtWidgets.QLabel(parent=self.groupBox_6)
-        self.label_41.setGeometry(QtCore.QRect(30, 30, 90, 30))
+        self.label_41.setGeometry(QtCore.QRect(50, 30, 90, 30))
         self.label_41.setAlignment(
             QtCore.Qt.AlignmentFlag.AlignLeading
             | QtCore.Qt.AlignmentFlag.AlignLeft
@@ -780,7 +780,7 @@ class Ui_MDCx(object):
         )
         self.label_41.setObjectName("label_41")
         self.lineEdit_escape_dir_move = QtWidgets.QLineEdit(parent=self.groupBox_6)
-        self.lineEdit_escape_dir_move.setGeometry(QtCore.QRect(140, 30, 351, 30))
+        self.lineEdit_escape_dir_move.setGeometry(QtCore.QRect(120, 30, 351, 30))
         self.lineEdit_escape_dir_move.setStyleSheet(
             " border: 1px solid rgba(0,0,0, 50);\n                      border-radius: 15px;\n"
         )
