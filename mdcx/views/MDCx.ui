@@ -1682,7 +1682,7 @@
                     </rect>
                   </property>
                   <property name="text">
-                    <string>番号网址：</string>
+                    <string>番号链接地址：</string>
                   </property>
                   <property name="alignment">
                     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
@@ -1711,7 +1711,7 @@
                     </rect>
                   </property>
                   <property name="text">
-                    <string>文件路径：</string>
+                    <string>本地文件路径：</string>
                   </property>
                   <property name="alignment">
                     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
@@ -1884,7 +1884,7 @@
                           <enum>Qt::RightToLeft</enum>
                         </property>
                         <property name="text">
-                          <string>演员名查缺：</string>
+                          <string>演员名查缺失：</string>
                         </property>
                         <property name="alignment">
                           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -1934,7 +1934,7 @@
                           <enum>Qt::RightToLeft</enum>
                         </property>
                         <property name="text">
-                          <string>本地资源库：</string>
+                          <string>本地资源目录：</string>
                         </property>
                         <property name="alignment">
                           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -2036,7 +2036,7 @@
                     <enum>Qt::RightToLeft</enum>
                   </property>
                   <property name="text">
-                    <string>演员名选项：</string>
+                    <string>演员姓名选项：</string>
                   </property>
                   <property name="alignment">
                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -2225,7 +2225,7 @@
                           <enum>Qt::RightToLeft</enum>
                         </property>
                         <property name="text">
-                          <string>本地目录：</string>
+                          <string>本地硬盘目录：</string>
                         </property>
                         <property name="alignment">
                           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -2275,7 +2275,7 @@
                           <enum>Qt::RightToLeft</enum>
                         </property>
                         <property name="text">
-                          <string>网盘目录：</string>
+                          <string>网络硬盘目录：</string>
                         </property>
                         <property name="alignment">
                           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -2909,7 +2909,7 @@ QSpinBox::down-button { margin-right: 5px; }</string>
                     <enum>Qt::RightToLeft</enum>
                   </property>
                   <property name="text">
-                    <string>番号补图：</string>
+                    <string>番号补封面图：</string>
                   </property>
                   <property name="alignment">
                     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>

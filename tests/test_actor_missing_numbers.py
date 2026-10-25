@@ -225,7 +225,7 @@ def test_write_missing_excel_layout(tmp_path: Path) -> None:
 
 
 def test_excel_filename_carries_timestamp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """文件名 = 演员名 + YYYY-MM-DD HH-MM-SS.xlsx，落在本地资源库目录下。"""
+    """文件名 = 演员名 + YYYY-MM-DD HH-MM-SS.xlsx，落在本地资源目录目录下。"""
     from mdcx.config.manager import manager
 
     monkeypatch.setattr(manager.config, "local_library", [str(tmp_path)])

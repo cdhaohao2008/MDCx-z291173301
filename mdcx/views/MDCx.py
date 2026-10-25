@@ -13211,9 +13211,9 @@ class Ui_MDCx(object):
             _translate("MDCx", "单文件刮削（指定某个文件的番号网址进行刮削，当存在相同番号时可用这个）")
         )
         self.pushButton_select_file.setText(_translate("MDCx", "选择文件"))
-        self.label_10.setText(_translate("MDCx", "番号网址："))
+        self.label_10.setText(_translate("MDCx", "番号链接地址："))
         self.pushButton_start_single_file.setText(_translate("MDCx", "开始刮削"))
-        self.label_3.setText(_translate("MDCx", "文件路径："))
+        self.label_3.setText(_translate("MDCx", "本地文件路径："))
         self.label.setText(
             _translate(
                 "MDCx",
@@ -13225,8 +13225,8 @@ class Ui_MDCx(object):
         self.pushButton_select_thumb.setText(_translate("MDCx", "选择图片"))
         self.label_6.setText(_translate("MDCx", "此工具支持拖动选择裁剪范围，可将图片裁剪为Poster封面图"))
         self.groupBox_19.setTitle(_translate("MDCx", "检查演员缺失番号（检查本地媒体资源库中指定演员本地缺失的番号）"))
-        self.label_53.setText(_translate("MDCx", "演员名查缺："))
-        self.label_72.setText(_translate("MDCx", "本地资源库："))
+        self.label_53.setText(_translate("MDCx", "演员名查缺失："))
+        self.label_72.setText(_translate("MDCx", "本地资源目录："))
         self.pushButton_find_missing_number.setText(_translate("MDCx", "检查缺失番号"))
         self.pushButton_select_local_library.setText(_translate("MDCx", "选择目录"))
         self.comboBox_actor_type.setToolTip(
@@ -13242,7 +13242,7 @@ class Ui_MDCx(object):
         self.comboBox_actor_type.setItemText(4, _translate("MDCx", "欧美视频"))
         self.comboBox_actor_type.setItemText(5, _translate("MDCx", "国产传媒"))
         self.comboBox_actor_type.setItemText(6, _translate("MDCx", "动漫里番"))
-        self.label_actor_option.setText(_translate("MDCx", "演员名选项："))
+        self.label_actor_option.setText(_translate("MDCx", "演员姓名选项："))
         self.checkBox_single_actor.setToolTip(
             _translate("MDCx", "勾选后只保留演员表里只有一个演员的番号；不勾选则单演员、多演员的番号都算缺失")
         )
@@ -13259,8 +13259,8 @@ class Ui_MDCx(object):
         self.groupBox_21.setTitle(
             _translate("MDCx", "软链接助手（将挂载的网盘文件目录及子目录中的所有视频一键创建软链接到本地）")
         )
-        self.label_338.setText(_translate("MDCx", "本地目录："))
-        self.label_339.setText(_translate("MDCx", "网盘目录："))
+        self.label_338.setText(_translate("MDCx", "本地硬盘目录："))
+        self.label_339.setText(_translate("MDCx", "网络硬盘目录："))
         self.pushButton_creat_symlink.setText(_translate("MDCx", "一键创建软链接"))
         self.pushButton_select_netdisk_path.setText(_translate("MDCx", "选择目录"))
         self.label_340.setText(_translate("MDCx", "本地目录中的软链接文件位置将同步按照网盘的文件目录结构创建"))
@@ -13316,7 +13316,7 @@ class Ui_MDCx(object):
                 "输入番号，多个用空格分隔，自动刮削并补齐缺失的Poster.jpg和Thumb.jpg，复用当前配置站点优先级顺序、命名、裁切、水印规则，输出目录为当前数据目录，可以在设置页修改",
             )
         )
-        self.label_cover_backfill_number.setText(_translate("MDCx", "番号补图："))
+        self.label_cover_backfill_number.setText(_translate("MDCx", "番号补封面图："))
         self.lineEdit_cover_backfill_numbers.setPlaceholderText(_translate("MDCx", "例如：SSIS-001 ABF-371 JIMMY-003"))
         self.pushButton_cover_backfill_start.setText(_translate("MDCx", "开始补图"))
         self.checkBox_cover_backfill_overwrite.setText(_translate("MDCx", "覆盖已有图片"))

@@ -104,10 +104,10 @@ def test_tool_right_aligns_with_setting(win, app, width):
 
 @pytest.mark.parametrize("width", [1050, 1170, 1600])
 def test_actor_type_combo_aligns_under_select_dir_button(win, app, width):
-    """「演员名查缺」右侧的类型下拉框：左缘/宽度跟「选择目录」按钮，高度跟输入框。
+    """「演员名查缺失」右侧的类型下拉框：左缘/宽度跟「选择目录」按钮，高度跟输入框。
 
     用户 2026-10-25 截图要求：下拉框左侧缩到与上方「选择目录」按钮严格上下对齐，
-    高度与「演员名查缺」输入框一致；按钮自身位置保持不变。
+    高度与「演员名查缺失」输入框一致；按钮自身位置保持不变。
 
     坑：这个下拉框是 groupBox_19 的绝对定位直接子项，QComboBox 会被
     CustomScrollArea 的通用宽幅同步判为 _STRETCH（只向右长、左缘不动），
