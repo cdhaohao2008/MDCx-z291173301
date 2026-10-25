@@ -126,7 +126,7 @@ def main() -> int:
         print(f"[check] running: {' '.join(resolved)}")
         try:
             result = subprocess.run(resolved)
-        except FileNotFoundError, ModuleNotFoundError:
+        except (FileNotFoundError, ModuleNotFoundError):
             # pre-push 钩子会调用本脚本：工具链没装好时给出可执行的提示，
             # 而不是抛一串 FileNotFoundError 堆栈
             print(
