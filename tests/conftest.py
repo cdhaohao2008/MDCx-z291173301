@@ -48,6 +48,8 @@ class _DummySignals:
         self.exec_set_main_info = _DummySignal()
         self.change_buttons_status = _DummySignal()
         self.reset_buttons_status = _DummySignal()
+        self.move_mp4_running = _DummySignal()
+        self.find_missing_number_running = _DummySignal()
         self.set_label_file_path = _DummySignal()
         self.label_result = _DummySignal()
         self.logs_failed_settext = _DummySignal()

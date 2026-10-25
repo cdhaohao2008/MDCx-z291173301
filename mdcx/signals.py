@@ -1,4 +1,4 @@
-"""Qt 信号总线：15 个 pyqtSignal + 各自的 emit 包装。
+"""Qt 信号总线：17 个 pyqtSignal + 各自的 emit 包装。
 
 与 `mdcx/log_console.py` / `mdcx/ui_hooks.py` 的分工
 --------------------------------------------------
@@ -32,6 +32,11 @@ class Signals(QObject):
     exec_set_main_info = pyqtSignal(ShowData)  # 主界面更新番号信息
     change_buttons_status = pyqtSignal()
     reset_buttons_status = pyqtSignal()
+    # 两个工具按钮的独占忙/闲信号：只切换各自按钮的文案与可用性，
+    # 与全局 change/reset_buttons_status 解耦，避免一个流程启动把另一个按钮
+    # 也改成「正在刮削中...」（开始移动与检查缺失番号相互独立）。
+    move_mp4_running = pyqtSignal(bool)
+    find_missing_number_running = pyqtSignal(bool)
     set_label_file_path = pyqtSignal(str)
     label_result = pyqtSignal(str)
     logs_failed_settext = pyqtSignal(str)  # 失败面板添加信息日志信号

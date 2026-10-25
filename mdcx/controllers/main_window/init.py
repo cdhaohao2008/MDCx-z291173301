@@ -1080,6 +1080,9 @@ def Init_Singal(self: MyMAinWindow):
     signal_qt.exec_set_main_info.connect(self.set_main_info)
     signal_qt.change_buttons_status.connect(self.change_buttons_status)
     signal_qt.reset_buttons_status.connect(self.reset_buttons_status)
+    # 两个工具按钮的独占忙/闲状态（开始移动与检查缺失番号相互独立）
+    signal_qt.move_mp4_running.connect(self.set_move_mp4_running)
+    signal_qt.find_missing_number_running.connect(self.set_find_missing_number_running)
     signal_qt.logs_failed_settext.connect(self.Ui.textBrowser_log_main_3.setText)
     signal_qt.label_result.connect(self.Ui.label_result.setText)
     signal_qt.set_label_file_path.connect(self.Ui.label_file_path.setText)

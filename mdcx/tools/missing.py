@@ -264,6 +264,7 @@ async def check_missing_number(actor_flag, forced_type: str = "", single_actor_o
     single_actor_only 是「只获取单演员」复选框：勾上就只保留演员表里只有一个
     演员的番号（站点没给演员表的按单演员处理）。
     """
+    signal.find_missing_number_running.emit(True)  # 只标忙「检查缺失番号」自己，不串改「开始移动」文案
     signal.change_buttons_status.emit()
     start_time = time.time()
     local_movies: dict[str, tuple[str, bool]] = {}
@@ -371,3 +372,4 @@ async def check_missing_number(actor_flag, forced_type: str = "", single_actor_o
 
     signal.show_log_text(f"\n🎉 查询完毕！共用时({get_used_time(start_time)}s)")
     signal.reset_buttons_status.emit()
+    signal.find_missing_number_running.emit(False)

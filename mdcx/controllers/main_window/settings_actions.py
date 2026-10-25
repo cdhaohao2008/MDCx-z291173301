@@ -328,9 +328,10 @@ class SettingsActionsMixin:
         # self.Ui.pushButton_check_and_clean_files.setEnabled(False)
         self.Ui.pushButton_check_and_clean_files.setText("正在刮削中...")
         self.Ui.pushButton_move_mp4.setEnabled(False)
-        self.Ui.pushButton_move_mp4.setText("正在刮削中...")
         self.Ui.pushButton_find_missing_number.setEnabled(False)
-        self.Ui.pushButton_find_missing_number.setText("正在刮削中...")
+        # 这两个按钮的「正在刮削中...」文案由各自流程的独占信号管理
+        # （move_mp4_running / find_missing_number_running），这里只禁用不改文案，
+        # 避免一个流程启动把另一个按钮也标成刮削中（两按钮相互独立）。
         self.Ui.pushButton_start_cap.setStyleSheet(
             "QPushButton#pushButton_start_cap{color: white;background-color:#DC2626;}QPushButton:hover#pushButton_start_cap{color: white;background-color:#EF4444;}QPushButton:pressed#pushButton_start_cap{color: white;background-color:#B91C1C;}"
         )
@@ -343,6 +344,16 @@ class SettingsActionsMixin:
         self.Ui.pushButton_actor_db_sync_aliases.setEnabled(False)
         self.Ui.pushButton_actor_db_fill_Minnano.setEnabled(False)
         self.Ui.pushButton_actor_db_fill_zh_javdb.setEnabled(False)
+
+    def set_move_mp4_running(self, running: bool):
+        """「开始移动」按钮的独占忙/闲状态，由移动流程专用信号驱动。"""
+        self.Ui.pushButton_move_mp4.setEnabled(not running)
+        self.Ui.pushButton_move_mp4.setText("正在刮削中..." if running else "开始移动")
+
+    def set_find_missing_number_running(self, running: bool):
+        """「检查缺失番号」按钮的独占忙/闲状态，由查缺失流程专用信号驱动。"""
+        self.Ui.pushButton_find_missing_number.setEnabled(not running)
+        self.Ui.pushButton_find_missing_number.setText("正在刮削中..." if running else "检查缺失番号")
 
     def reset_buttons_status(self):
         self.Ui.pushButton_start_cap.setEnabled(True)

@@ -207,6 +207,7 @@ class ToolPageMixin:
                 signal_qt.show_log_text(traceback.format_exc())
 
     def _move_file_thread(self):
+        signal_qt.move_mp4_running.emit(True)  # 只标忙「开始移动」自己，不串改「检查缺失番号」文案
         signal_qt.change_buttons_status.emit()
         # 协作式停止事件：每次移动开始时清零，停止按钮处理器中置位
         self._move_cancel_event.clear()
@@ -217,6 +218,7 @@ class ToolPageMixin:
             signal_qt.show_log_text(traceback.format_exc())
         finally:
             signal_qt.reset_buttons_status.emit()
+            signal_qt.move_mp4_running.emit(False)
 
     def _move_files_core(self):
         movie_items = []
