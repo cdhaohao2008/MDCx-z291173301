@@ -175,8 +175,8 @@ async def check_missing_number(actor_flag, forced_type: str = ""):
 
     # 获取资源库配置
     movie_type = manager.config.media_type
-    libraries = manager.config.local_library  # 用户设置的扫描媒体路径
-    libraries = {Path(p) for p in libraries if p.strip()}
+    # 用户设置的扫描媒体路径（去空项并转成 Path，下面 movie_lists 要 Path）
+    libraries = {Path(p) for p in manager.config.local_library if str(p).strip()}
 
     # 遍历本地资源库
     signal.show_log_text("")
