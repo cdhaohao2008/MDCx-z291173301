@@ -162,7 +162,9 @@ class DonateDialog(CenterOnFirstShowMixin, QDialog):
         # 先铺底色再建控件：QLabel 一旦挂上样式表，样式引擎会覆盖 setFont 传入的字体，
         # 故本对话框全程不用样式表改字体（配色走 QPalette，字体走 setFont）。
         self._style_dialog()
+        self._rank_tables: list[QTableWidget] = []
         self._build_ui()
+        self._fill_ranks()
 
     # ------------------------------------------------------------------ 配色
 
@@ -370,6 +372,45 @@ class DonateDialog(CenterOnFirstShowMixin, QDialog):
             f"QTableWidget::item {{ border: none; padding: 0px; }}"
         )
         table.viewport().setStyleSheet("background: transparent;")
+        self._rank_tables.append(table)
+
+    # ------------------------------------------------------------------ 榜单数据
+
+    def _fill_ranks(self) -> None:
+        """把导入的账单记录填进两个榜单。
+
+        数据来自 ``mdcx.tools.bill_import.load_records()``：随包
+        ``resources/donate_records.json`` 与用户数据目录那份取并集，故**所有用户**都能
+        看到随包数据，作者本机还能看到自己刚导入的那份。
+
+        左表新人榜按时间倒序（最新 10 个捐助者）、右表土豪榜按金额倒序（金额最大的
+        10 个人），两个榜都按捐助者去重（同一个人只占一行）。记录不足 10 条时其余行
+        留空，版式与参考图一致。
+        """
+        # 延迟导入：本模块被主窗口在启动时导入，账单模块会牵到 openpyxl/resources，
+        # 放在函数里可让「没装 openpyxl」的极端环境仍能弹出收款码窗口。
+        try:
+            from ..tools.bill_import import format_amount, format_rank_time, load_records, newcomer_rank, tycoon_rank
+
+            records = load_records()
+            ranks = (newcomer_rank(records, _RANK_ROWS), tycoon_rank(records, _RANK_ROWS))
+        except Exception:
+            ranks = ((), ())
+        for table, rank in zip(self._rank_tables, ranks, strict=False):
+            for row in range(_RANK_ROWS):
+                if row < len(rank):
+                    record = rank[row]
+                    values = (record.name, format_rank_time(record.time), format_amount(record.amount))
+                    tips = ("", record.time, "")
+                else:
+                    values = ("", "", "")
+                    tips = ("", "", "")
+                for col, text in enumerate(values):
+                    item = table.item(row, col)
+                    if item is not None:
+                        item.setText(text)
+                        # 完整时间进 tooltip：单元格里是省过年份的紧凑写法
+                        item.setToolTip(tips[col])
 
     # ------------------------------------------------------------------ 样式
 

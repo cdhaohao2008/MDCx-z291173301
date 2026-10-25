@@ -369,6 +369,7 @@ class WindowOpsMixin:
             self.set_style()  # 样式美化
             apply_site_priority_theme(self)
             self._style_donate_link()  # 暗黑/亮色切换时同步 [赞助作者] 链接颜色
+            self._style_bill_button()  # 同上，同步「导入账单」按钮配色
 
             # self.setWindowState(Qt.WindowNoState)                               # 恢复正常窗口
             self.show()

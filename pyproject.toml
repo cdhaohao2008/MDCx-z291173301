@@ -168,7 +168,7 @@ module = [
     "mdcx.core.network_check",
 ]
 
-# 主窗口已按职责拆成 29 个 mixin/helper 模块（与 init.py / load_config.py 同属纯 GUI 装配代码）。
+# 主窗口已按职责拆成 30 个 mixin/helper 模块（与 init.py / load_config.py 同属纯 GUI 装配代码）。
 # 每个模块被 mypy 单独分析时看不到兄弟 mixin 与 __init__ 上定义的属性，
 # 只会刷出 self.xxx 的 attr-defined 噪音，因此整组忽略其内部报错。
 # nfo_library 是同一族的 helper 模块（以 self: MyMAinWindow 形式访问懒建属性）。
@@ -178,6 +178,7 @@ module = [
     "mdcx.controllers.main_window.actor_db",
     "mdcx.controllers.main_window.actor_info",
     "mdcx.controllers.main_window.auto_scrape",
+    "mdcx.controllers.main_window.bill_import_ui",
     "mdcx.controllers.main_window.cookie_checks",
     "mdcx.controllers.main_window.dock_layout",
     "mdcx.controllers.main_window.folder_select",

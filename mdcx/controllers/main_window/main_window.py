@@ -44,6 +44,7 @@ from ..cut_window import CutWindow
 from .actor_db import ActorDbMixin
 from .actor_info import ActorInfoMixin
 from .auto_scrape import AutoScrapeMixin
+from .bill_import_ui import BillImportMixin
 from .cookie_checks import CookieChecksMixin
 from .dock_layout import DockLayoutMixin
 from .folder_select import FolderSelectMixin
@@ -100,6 +101,7 @@ class MyMAinWindow(
     ActorDbMixin,
     ActorInfoMixin,
     AutoScrapeMixin,
+    BillImportMixin,
     CookieChecksMixin,
     DockLayoutMixin,
     FolderSelectMixin,
@@ -480,6 +482,7 @@ class MyMAinWindow(
         self.Init_Singal()  # 信号连接
         self.Init_Ui()  # 设置Ui初始状态
         self._init_donate_widgets()  # 侧栏「使用说明」下方加收款码 + [赞助作者] 链接
+        self._init_bill_import_button()  # 高级-高级功能加「导入账单」（绑定本机才显示）
         self.load_config()  # 加载配置
         self._setup_name_template_preview()
         self._setup_cf_bypass_hosts_check()

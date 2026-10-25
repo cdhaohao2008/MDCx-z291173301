@@ -964,6 +964,53 @@ class LayoutMasterMixin:
             ui.gridLayout_20.invalidate()
             ui.gridLayout_20.activate()
 
+        # 最后钉「导入账单」按钮：它的锚点「显示字段内容信息」与同行的「隐藏信息管理」
+        # 都已在上面定稿，放在最末尾量到的才是终态坐标（见方法自身说明）。
+        self._sync_advanced_page_bill_button()
+
+    def _sync_advanced_page_bill_button(self) -> None:
+        """「导入账单」按钮：左缘 = 「显示字段内容信息」那条竖线，纵向与「隐藏信息管理」同行。
+
+        需求（2026-10-26）：「按钮做在隐藏信息管理按钮右侧、和显示字段内容信息严格上下
+        对齐，显示字段内容信息位置保持不变」。**上下对齐 = 左缘 x 相等**（本页其余
+        「严格上下对齐」需求都是这个含义，例如「不限次数刮削」与「显示字段来源信息」）。
+
+        为什么不用布局：按钮若塞进 ``horizontalLayout_nav_hide``，行内就多出一项，
+        那一行的 ``pin_d/room`` 与末尾伸展间隔都要重算，而间隔项的 sizeHint 会顶进
+        gridLayout_20 的列宽——那会把整页连同「不许动」的「显示字段内容信息」一起推走。
+        改成绝对定位后本方法只读不写别人的几何：``checkBox_show_data_log`` 的 x、
+        ``checkBox_hide_nfo_nav`` 的 y 都是实测值，按钮是 host 的游离子项，不参与任何
+        布局的最小宽计算，故对既有控件零影响（与 ``comboBox_actor_type`` 同一套路子）。
+
+        跨分支取坐标：按钮与「隐藏信息管理」同在 host（gridLayoutWidget_20）里，
+        ``mapTo(host)`` 直接可用；而「显示字段内容信息」在 groupBox_3（调试模式）里、
+        不是 host 的后代，须经公共祖先 ``scrollAreaWidgetContents_gaoji`` 中转。
+        按钮隐藏时（未绑定机器 / 尚未探测完）直接返回，零成本。
+        """
+
+        ui = self.Ui
+        button = getattr(ui, "pushButton_import_bill", None)
+        if button is None or button.isHidden():
+            return
+        host = ui.gridLayoutWidget_20
+        if not host.isVisibleTo(self):
+            return
+        src_data = ui.checkBox_show_data_log
+        nfo = ui.checkBox_hide_nfo_nav
+        if not (src_data.isVisibleTo(self) and nfo.isVisibleTo(self)):
+            return
+        content = ui.scrollAreaWidgetContents_gaoji
+        host_x = host.mapTo(content, QPoint(0, 0)).x()
+        target_x = src_data.mapTo(content, QPoint(0, 0)).x() - host_x
+        target_y = nfo.mapTo(host, QPoint(0, 0)).y()
+        # 纵向与「隐藏信息管理」齐平、同高；横向落在锚点竖线上
+        button.setFixedHeight(max(nfo.height(), 1))
+        # 极窄窗口下右侧余量可能不够：收窄按钮而不是左移（左缘对齐是硬需求）
+        natural = getattr(self, "_bill_button_width", button.width())
+        button.setFixedWidth(min(natural, max(host.width() - target_x, 60)))
+        button.move(target_x, target_y)
+        button.raise_()
+
     def _sync_advanced_page_move_file_align(self) -> None:
         """高级页：「移动文件」行的两枚复选框与「界面外观」行严格上下对齐。
 
