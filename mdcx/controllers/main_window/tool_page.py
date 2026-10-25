@@ -50,7 +50,8 @@ class ToolPageMixin:
             self.pushButton_show_log_clicked()  # 点击按钮后跳转到日志页面
             if self.Ui.lineEdit_actors_name.text() != manager.config.actors_name:  # 保存配置
                 self.pushButton_save_config_clicked()
-            executor.submit(check_missing_number(False))
+            # 右侧「类型」下拉框：选具体类型就按该类型的网站列表查，「自动判断」按名字后的标注走
+            executor.submit(check_missing_number(False, self.Ui.comboBox_actor_type.currentText()))
 
     # 工具页面本地资源库点选择目录
     def pushButton_select_local_library_clicked(self):
@@ -105,7 +106,7 @@ class ToolPageMixin:
             or self.Ui.lineEdit_local_library_path.text() != manager.config.local_library
         ):
             self.pushButton_save_config_clicked()
-        executor.submit(check_missing_number(True))
+        executor.submit(check_missing_number(True, self.Ui.comboBox_actor_type.currentText()))
 
     # 工具-单文件刮削
     def pushButton_select_file_clicked(self):

@@ -220,6 +220,12 @@ class CustomScrollArea(QScrollArea):
             "checkBox_cover_backfill_overwrite",
             "checkBox_cover_backfill_watermark",
             "checkBox_create_link",
+            # 检查演员缺失番号组「演员名查缺」右侧的类型下拉：由
+            # MainWindow._sync_tool_page_input_fill 钉在「选择目录」按钮左缘、
+            # 宽度同按钮、高度同输入框。不列入的话它按 QComboBox 判为 _STRETCH，
+            # 页面拉宽时只向右长，左缘停在设计值，而按钮按右缘锚定右移，
+            # 两者左缘就错开了（用户 2026-10-25 截图要求严格上下对齐）。
+            "comboBox_actor_type",
         }
     )
 

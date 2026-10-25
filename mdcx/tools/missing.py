@@ -19,17 +19,35 @@ from ..models.flags import Flags
 from ..signals import signal
 from ..utils import get_used_time
 from ..utils.file import write_file_atomic_async
-from .actor_sources import (
-    _JavbusRotator,
-    fetch_censored,
-    fetch_dongman,
-    fetch_fc2,
-    fetch_guochan,
-    fetch_uncensored,
-    fetch_western,
-)
+from .actor_sources import NumberHit, collect_numbers, normalize_key, resolve_actor_names
 
 _ACTOR_TYPE_PATTERN = re.compile(r"[（(]\s*(有码|无码|欧美|国产|动漫|FC2)\s*[)）]", re.IGNORECASE)
+
+# 工具页「类型」下拉框文案 → 内部演员类型。
+# 文案与「软件设置 → 锁定类型」同源（FixedScrapingType.names()），顺序也一致，
+# 只少了「国产短剧」——国产短剧多为 AI 生成、没有演员，按演员名查不到东西。
+# 个摄番号对应内部的 FC2 类型（FC2 / 1pondo 这类个人拍摄）。
+_FORCED_TYPE_BY_COMBO = {
+    "有码番号": "有码",
+    "无码番号": "无码",
+    "个摄番号": "FC2",
+    "欧美视频": "欧美",
+    "国产传媒": "国产",
+    "动漫里番": "动漫",
+}
+
+
+def resolve_forced_type(label: str) -> str:
+    """下拉框文案 → 内部演员类型；「自动判断」或认不出的文案返回空串。"""
+    return _FORCED_TYPE_BY_COMBO.get(str(label or "").strip(), "")
+
+
+def apply_forced_type(entries: list[tuple[str, str]], label: str) -> list[tuple[str, str]]:
+    """下拉框选了具体类型时，把所有演员的类型统一成该类型（忽略名字后的标注）。"""
+    forced = resolve_forced_type(label)
+    if not forced:
+        return entries
+    return [(name, forced) for name, _type in entries]
 
 
 def _parse_actor_entry(entry: str) -> tuple[str, str]:
@@ -51,52 +69,85 @@ def _parse_actor_entry(entry: str) -> tuple[str, str]:
     return entry, "有码"
 
 
-async def _fetch_actor_numbers(name: str, actor_type: str, rotator: _JavbusRotator) -> set[str] | None:
-    """按演员类型调用对应数据源拉取全部番号。"""
-    if actor_type == "无码":
-        return await fetch_uncensored(name, rotator)
-    if actor_type == "欧美":
-        return await fetch_western(name, rotator)
-    if actor_type == "国产":
-        return await fetch_guochan(name, rotator)
-    if actor_type == "动漫":
-        return await fetch_dongman(name, rotator)
-    if actor_type == "FC2":
-        return await fetch_fc2(name, rotator)
-    return await fetch_censored(name, rotator)
+async def _fetch_actor_numbers(name: str, actor_type: str) -> dict[str, NumberHit]:
+    """解析演员名变体，再按类型汇总各站点番号。"""
+    names = await resolve_actor_names(name)
+    if len(names) > 1:
+        signal.show_log_text(f"   名字变体：{' / '.join(names)}")
+    return await collect_numbers(actor_type, names, log=signal.show_log_text)
 
 
-async def _show_actor_missing_numbers(actor_name: str, actor_type: str, net_numbers: set[str]) -> None:
-    """对比网络番号与本地库，输出缺失列表。"""
+_INVALID_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]+')
+
+
+def _excel_target(actor_name: str) -> Path | None:
+    """缺失番号表格的落盘路径：本地资源库目录 / 演员姓名.xlsx。"""
+    libraries = [p for p in manager.config.local_library if str(p).strip()]
+    if not libraries:
+        return None
+    folder = Path(libraries[0])
+    safe_name = _INVALID_FILENAME_CHARS.sub("_", actor_name).strip() or "actor"
+    return folder / f"{safe_name}.xlsx"
+
+
+def _write_missing_excel(path: Path, rows: list[NumberHit]) -> None:
+    """写缺失番号表：三列（番号 / 网站 / 链接地址），番号 A-Z 排列。
+
+    版式照用户给的样表：番号与网站居中，链接靠左，列宽 8.8 / 11 / 100。
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Sheet1"
+    sheet.append(["番号", "网站", "链接地址"])
+    for hit in rows:
+        sheet.append([hit.number, hit.site, hit.url])
+
+    sheet.column_dimensions["A"].width = 8.8
+    sheet.column_dimensions["B"].width = 11
+    sheet.column_dimensions["C"].width = 100
+
+    font = Font(name="宋体", size=11)
+    for row in sheet.iter_rows(min_row=1, max_row=sheet.max_row, max_col=3):
+        for cell in row:
+            cell.font = font
+            # 第 3 列是链接，靠左；前两列居中
+            cell.alignment = Alignment(horizontal="left" if cell.column == 3 else "center", vertical="center")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    workbook.save(path)
+
+
+def _report_actor_result(actor_name: str, actor_type: str, net_hits: dict[str, NumberHit]) -> None:
+    """汇总一个演员的对比结果，并把缺失项写进 Excel（日志里不再打印番号列表）。"""
     local_set = Flags.local_number_set
-    cnword_set = Flags.local_number_cnword_set
+    local_keys = {normalize_key(n) for n in local_set}
 
-    missing = sorted(n for n in net_numbers if n not in local_set)
-    missing_cnword = sorted(n for n in missing if n in cnword_set)
-
+    missing = sorted(
+        (hit for key, hit in net_hits.items() if key not in local_keys),
+        key=lambda hit: hit.number,
+    )
     type_tag = f"[{actor_type}]" if actor_type != "有码" else ""
-    _log = signal.show_log_text
-    _log(f"\n{'=' * 97}\n👩 {type_tag} {actor_name} 的全部网络番号({len(net_numbers)})...\n{'=' * 97}")
-    if net_numbers:
-        for each in sorted(net_numbers, reverse=True):
-            mark = "✓" if each in local_set else "✗"
-            sub = "🀄️" if each in cnword_set else ""
-            _log(f"   {each:<20} {mark} {sub}")
-    else:
-        _log("   没有找到任何番号...")
+    signal.show_log_text(
+        f"\n📊 {type_tag} {actor_name}：网络番号 {len(net_hits)} 个，本地已有 "
+        f"{len(net_hits) - len(missing)} 个，缺失 {len(missing)} 个"
+    )
+    if not missing:
+        signal.show_log_text("   没有缺失的番号，已全部收集！")
+        return
 
-    _log(f"\n{'=' * 97}\n🔍 {type_tag} {actor_name} 本地缺失的番号({len(missing)})...\n{'=' * 97}")
-    if missing:
-        for each in missing:
-            sub = "🀄️" if each in cnword_set else ""
-            _log(f"   {each:<20} {sub}")
-    else:
-        _log("   没有缺失的番号，已全部收集！")
-
-    if missing_cnword:
-        _log(f"\n{'=' * 97}\n🀄️ {type_tag} {actor_name} 本地缺失的有字幕番号({len(missing_cnword)})...\n{'=' * 97}")
-        for each in missing_cnword:
-            _log(f"   {each}")
+    target = _excel_target(actor_name)
+    if target is None:
+        signal.show_log_text("   ⚠️ 未设置本地资源库目录，缺失番号未写入 Excel（请先在设置里选择本地资源库）")
+        return
+    try:
+        _write_missing_excel(target, missing)
+    except Exception as e:  # 写表格失败不该让整个查询任务中断
+        signal.show_log_text(f"   ⚠️ 缺失番号表格写入失败：{e}")
+        return
+    signal.show_log_text(f"   📗 缺失番号已写入：{target}")
 
 
 async def _try_write_cache_async(p: str | Path, content: str, start_time: float) -> None:
@@ -111,9 +162,12 @@ async def _try_write_cache_async(p: str | Path, content: str, start_time: float)
         signal.show_log_text(f"   ⚠️ 缓存文件写入失败（不影响本次查询结果，但下次会重新扫描）：{e}")
 
 
-async def check_missing_number(actor_flag):
+async def check_missing_number(actor_flag, forced_type: str = ""):
     """
     检查缺失番号
+
+    forced_type 是工具页「类型」下拉框的文案：选具体类型时所有演员都按该类型的
+    网站列表查，跳过演员名后的 (无码)(欧美) 标注；「自动判断」/空串按标注走。
     """
     signal.change_buttons_status.emit()
     start_time = time.time()
@@ -196,22 +250,23 @@ async def check_missing_number(actor_flag):
     if manager.config.actors_name:
         raw_list = re.split(r"[,，]", manager.config.actors_name)
         actor_entries = [_parse_actor_entry(e) for e in raw_list if e.strip()]
+        # 下拉框选了具体类型就统一按该类型查，忽略名字后面的 (无码)(欧美) 标注
+        actor_entries = apply_forced_type(actor_entries, forced_type)
         summary = ", ".join(f"{n}({t})" if t != "有码" else n for n, t in actor_entries)
         signal.show_log_text(
             f"\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n🔍 需要查询的演员：\n   {summary}"
         )
-        rotator = _JavbusRotator()
         for actor_name, actor_type in actor_entries:
             signal.show_log_text(
                 f"\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n⏳ 查询 [ {actor_name} ]({actor_type}) 的所有番号列表..."
             )
             try:
-                net_numbers = await _fetch_actor_numbers(actor_name, actor_type, rotator)
+                net_hits = await _fetch_actor_numbers(actor_name, actor_type)
             except Exception as e:
                 signal.show_log_text(f"   查询出错: {e}")
                 continue
-            if net_numbers:
-                await _show_actor_missing_numbers(actor_name, actor_type, net_numbers)
+            if net_hits:
+                _report_actor_result(actor_name, actor_type, net_hits)
             else:
                 signal.show_log_text(f"\n🔴 未找到 [ {actor_name} ] 的作品，请检查演员名或类型标注是否正确")
     else:

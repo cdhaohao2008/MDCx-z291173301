@@ -1,51 +1,89 @@
 """
 演员作品数据源：为「检查演员缺失番号」提供按演员拉取全部番号的能力。
 
-支持六类数据源（有码/无码/欧美/国产/动漫/FC2），每类有主源 + 兜底源：
+按演员类型分组，每组内站点顺序即优先级（同一番号在多个站出现时，记在前面的站）：
 
-  有码: libredmm(xlsx href → fuzzy 搜索) → javbus searchstar 兜底
-  无码: avsox(getFilterMovies) → javbus uncensored searchstar 兜底
-  欧美: avheat(getFilterMovies)
-  国产: iqqtv(search.php?s_type=actor 演员页 num 分页)
-  动漫: JavDB 移动端 API 关键字搜索
-  FC2:  avsox(getFilterMovies) → JavDB 移动端 API 关键字搜索兜底(仅 FC2- 番号)
+  有码: DMM → DMM_API → LibreDMM → JavDB → JavDB_API → JavDB_APP
+        → Javlibrary·镜像 → JavLibrary → JavBus
+  无码: AVSOX → JavDB → JavDB_API → JavDB_APP
+  FC2 : AVSOX → FC2 → FC2PPVDB → JavDB → JavDB_API → JavDB_APP
+  欧美: AVheat → ThepornDB → JavDB → JavDB_API → JavDB_APP
+  国产: IQQTV → Madou.club → Madouqu → JavDay
+  动漫: JavDB_APP（签名 API）→ Getchu
 
-javbus 使用 12 镜像轮询（与 JavBusCrawler 一致），不写死单域名。
+两个硬约束：
 
-动漫与 FC2 没有「演员→作品」页可抓，这两类统一走 JavDB 的**关键字**搜索，
+1. **每个站点最多重试一次**（首次 + 1 次重试，共 2 次请求机会），由
+   `collect_numbers` 统一控制，各站点实现内部不再自行重试；
+2. **各站点的番号先归一化再比较**：站点返回的形态五花八门（DMM 的
+   `ssis00006`、JavDB 的 `SSIS-006`、FC2 的 `FC2-PPV-1234567`），统一经
+   `normalize_key()` 折叠成比较键后，才与本地 number_list 比对。
+
+动漫 / FC2 没有「演员→作品」页可抓，这两类统一走关键字搜索，
 所以用户填的是社团名/作品关键词（动漫）或卖家名（FC2），不是演员名。
 """
 
 import asyncio
 import json
 import re
-from urllib.parse import quote
+import time
+import unicodedata
+from collections.abc import Awaitable, Callable, Iterable
+from contextvars import ContextVar
+from dataclasses import dataclass
+from typing import Any, cast
+from urllib.parse import quote, urljoin
 
 from lxml import etree
 
-from ..base.web import get_aio_domain
+from ..base.web import get_aio_domain, get_javlibrary_domain, get_javlibrary_mirror_domain
 from ..config.manager import manager
-from ..config.resources import resources
+from ..config.models import Website
 from ..log_console import log_console
 from ..utils.domain_rotate import DomainRotator
+from ..utils.site_url import strip_redundant_www
 
+# ---------------------------------------------------------------------------
+# 站点常量
+# ---------------------------------------------------------------------------
+
+_DMM = "https://www.dmm.co.jp"
+_DMM_API = "https://api.dmm.com"
 _LIBREDMM = "https://www.libredmm.com"
+_JAVDB_FALLBACK = "https://javdb580.com"
 _IQQTV_DOMAINS = ["https://iqqq3.quest", "https://iqq5.xyz", "https://iqqk4.quest"]
+_FC2_BASE = "https://adult.contents.fc2.com"
+_FC2PPVDB_BASE = "https://fc2ppvdb.com"
+_FC2CMADB_BASE = "https://fc2cmadb.com"
+_THEPORNDB_API = "https://api.theporndb.net"
+_THEPORNDB_WEB = "https://theporndb.net"
+_MADOU_CLUB = "https://madou.club"
+_MADOUQU_FALLBACK = "https://madouqu.shop"
+_JAVDAY_FALLBACK = "https://javday.app"
+_GETCHU_FALLBACK = "http://getchu.com"
+
+# 2026-10-25 实测（应用自身代理 + 真实 UA，逐个 GET 首页并校验页面内容）：
+#   busjav.bond  → 5568 字节 JS 跳转壳（"Redirecting..."，非站点内容）
+#   seejav.cyou  → 同上
+#   javbus.bond  → 同上（HTTP/2 偶发 RST，重试后仍是跳转壳）
+#   buscdn.bond  → HTTP 404
+# 四个已删除，只保留实测能返回真实 JavBus 页面的 8 个。
 _JAVBUS_DOMAINS = [
     "https://www.javbus.com",
     "https://www.dmmsee.casa",
-    "https://www.busjav.bond",
     "https://www.cdnbus.bond",
-    "https://www.seejav.cyou",
-    "https://www.buscdn.bond",
     "https://www.javsee.cyou",
     "https://www.fanbus.bond",
     "https://www.busdmm.bond",
     "https://www.cdnbus.cyou",
     "https://www.dmmbus.bond",
-    "https://www.javbus.bond",
 ]
 _HEADERS = {"Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,ja;q=0.6"}
+
+# 每类最多用几个名字变体去试探（日文原名 / 繁中 / 用户输入）
+_MAX_NAME_VARIANTS = 3
+# 单个站点的翻页上限，防止异常页面导致无限翻页
+_MAX_PAGES = 60
 
 
 def _log(msg: str) -> None:
@@ -53,17 +91,214 @@ def _log(msg: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# javbus 镜像轮询封装
+# 软超时：让翻页循环到点自己收手，把已经拿到的番号带回来
+# ---------------------------------------------------------------------------
+
+_DEADLINE: ContextVar[float] = ContextVar("actor_source_deadline", default=0.0)
+
+
+def _out_of_time() -> bool:
+    """当前站点是否已用完时间预算（0 表示没有设置预算）。"""
+    deadline = _DEADLINE.get()
+    return bool(deadline) and time.monotonic() >= deadline
+
+
+# ---------------------------------------------------------------------------
+# 番号归一化
+# ---------------------------------------------------------------------------
+
+# 常见厂牌前缀（用于从标题/文件名里捞番号）
+_NUMBER_IN_TEXT = re.compile(
+    r"(?<![A-Z0-9])("
+    r"FC2[-_ ]?(?:PPV)?[-_ ]?\d{5,8}"
+    r"|[A-Z]{2,10}[-_ ]?\d{2,6}(?:[-_]\d{1,4})?"
+    r"|1PONDO[-_ ]?\d{6}[-_ ]?\d{3}"
+    r"|CARIBBEANCOM[-_ ]?\d{6}[-_ ]?\d{3}"
+    r"|10MUSUME[-_ ]?\d{6}[-_ ]?\d{2}"
+    r"|PACOPACOMAMA[-_ ]?\d{6}[-_ ]?\d{3}"
+    r"|HEYZO[-_ ]?\d{3,4}"
+    r"|HEYDOUGA[-_ ]?\d{4}[-_ ]?\d{3,4}"
+    r")(?![0-9])",
+    re.IGNORECASE,
+)
+
+
+def _pad_digits(digits: str) -> str:
+    """编号段去前导零，但至少保留 3 位（DMM 的 00006 → 006）。"""
+    stripped = digits.lstrip("0") or "0"
+    return stripped.rjust(3, "0")
+
+
+def normalize_key(number: str) -> str:
+    """比较键：大写、去掉所有分隔符、FC2PPV 折叠成 FC2。
+
+    本地 number_list 与各站点返回的番号都先过这里再比对，
+    `SSIS-006` / `ssis006` / `SSIS 006` / `SSIS-00006` 视为同一个。
+    """
+    key = unicodedata.normalize("NFKC", str(number or "")).strip().upper()
+    key = re.sub(r"[\s_\-\.]+", "", key)
+    key = key.replace("FC2PPV", "FC2")
+    # 纯字母 + 数字的编号段补零差异（SSIS00006 与 SSIS006）也折叠掉
+    if m := re.fullmatch(r"([A-Z]{2,10})0*(\d{1,7})(\d{1,4})?", key):
+        key = f"{m.group(1)}{m.group(2)}{m.group(3) or ''}"
+    return key
+
+
+def display_number(raw: str) -> str:
+    """展示用番号：`ssis00006` / `ssis 6` / `SSIS_00006` 统一成 `SSIS-006`。
+
+    认不出的形态原样大写返回，不猜——猜错比不猜更糟。
+    """
+    text = unicodedata.normalize("NFKC", str(raw or "")).strip()
+    if not text:
+        return ""
+    text = re.sub(r"\s+", "", text).upper().replace("_", "-")
+    text = re.sub(r"-{2,}", "-", text)
+    if m := re.fullmatch(r"FC2-?(?:PPV-?)?(\d{4,8})", text):
+        return f"FC2-{m.group(1)}"
+    if m := re.fullmatch(r"([A-Z]{2,10})(\d{2,7})", text):
+        return f"{m.group(1)}-{_pad_digits(m.group(2))}"
+    if m := re.fullmatch(r"([A-Z]{2,10})-(\d{2,7})(-\d{1,4})?", text):
+        return f"{m.group(1)}-{_pad_digits(m.group(2))}{m.group(3) or ''}"
+    return text
+
+
+def extract_numbers(text: str) -> list[str]:
+    """从标题/文件名里捞出所有番号（已归一化为展示形态）。"""
+    found: list[str] = []
+    for raw in _NUMBER_IN_TEXT.findall(str(text or "")):
+        number = display_number(raw)
+        if number and number not in found:
+            found.append(number)
+    return found
+
+
+@dataclass(frozen=True, slots=True)
+class NumberHit:
+    """一条番号记录：番号 + 来自哪个站 + 该站的详情页地址。"""
+
+    number: str
+    site: str
+    url: str
+
+
+# ---------------------------------------------------------------------------
+# HTTP 辅助（统一不重试，重试交给 collect_numbers 控制）
+# ---------------------------------------------------------------------------
+
+
+async def _http_text(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    cookies: dict[str, str] | None = None,
+    encoding: str = "utf-8",
+) -> str | None:
+    try:
+        async with manager.acquire_computed() as computed:
+            html, _error = await computed.async_client.get_text(
+                url,
+                headers={**_HEADERS, **(headers or {})},
+                cookies=cookies,
+                encoding=encoding,
+                retry_count=0,
+            )
+    except Exception:
+        return None
+    return html or None
+
+
+async def _http_json(
+    url: str, *, headers: dict[str, str] | None = None, cookies: dict[str, str] | None = None
+) -> dict | None:
+    try:
+        async with manager.acquire_computed() as computed:
+            data, _error = await computed.async_client.get_json(
+                url, headers={**_HEADERS, **(headers or {})}, cookies=cookies, retry_count=0
+            )
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+async def _http_post_json(
+    url: str, payload: object, *, headers: dict[str, str] | None = None, cookies: dict[str, str] | None = None
+) -> dict | None:
+    try:
+        async with manager.acquire_computed() as computed:
+            data, _error = await computed.async_client.post_json(
+                url,
+                data=json.dumps(payload),
+                headers={
+                    **_HEADERS,
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    **(headers or {}),
+                },
+                cookies=cookies,
+                retry_count=0,
+            )
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _html_tree(html: str) -> etree._Element | None:
+    try:
+        return etree.fromstring(html, etree.HTMLParser())
+    except Exception:
+        return None
+
+
+def _joined_text(node: etree._Element) -> str:
+    return "".join(node.xpath(".//text()")).strip()
+
+
+def _name_matches(target: str, candidate: str) -> bool:
+    """宽松演员名匹配：归一化后相等、互为子串，或繁简/异体差异下前 N-1 字相同。"""
+
+    def norm(value: str) -> str:
+        value = unicodedata.normalize("NFKC", str(value or "")).strip().lower()
+        return re.sub(r"[\s\-・.。,，()（）\[\]【】]", "", value)
+
+    t, c = norm(target), norm(candidate)
+    if not t or not c:
+        return False
+    if t == c or t in c or c in t:
+        return True
+    return len(t) >= 3 and len(c) >= 3 and t[:-1] == c[:-1]
+
+
+def _pick_name(names: Iterable[str], limit: int = _MAX_NAME_VARIANTS) -> list[str]:
+    seen: list[str] = []
+    for name in names:
+        name = str(name or "").strip()
+        if name and name not in seen:
+            seen.append(name)
+    return seen[:limit]
+
+
+def _merge(hits: dict[str, NumberHit], number: str, site: str, url: str) -> None:
+    """把一条记录塞进结果集；同番号只保留最先出现的站点（即优先级最高的站）。"""
+    number = display_number(number)
+    if not number:
+        return
+    key = normalize_key(number)
+    if not key or key in hits:
+        return
+    hits[key] = NumberHit(number=number, site=site, url=str(url or "").strip())
+
+
+# ---------------------------------------------------------------------------
+# JavBus：8 镜像轮询
 # ---------------------------------------------------------------------------
 
 
 class _JavbusRotator:
-    """javbus 12 镜像轮询，连接失败自动切下一个域名。"""
+    """javbus 镜像轮询，连接失败自动切下一个域名。"""
 
     def __init__(self) -> None:
-        custom = manager.config.get_site_url(  # type: ignore[attr-defined]
-            __import__("mdcx.config.enums", fromlist=["Website"]).Website.JAVBUS, ""
-        )
+        custom = manager.config.get_site_url(Website.JAVBUS, "")
         self._rotator = DomainRotator(_JAVBUS_DOMAINS, custom_url=custom)
 
     @property
@@ -72,9 +307,13 @@ class _JavbusRotator:
 
     async def get_text(self, url: str) -> str | None:
         """带镜像轮询的 GET 请求，连接级失败切镜像，返回 HTML 或 None。"""
+        headers = dict(_HEADERS)
+        if manager.config.javbus:
+            # 与 JavBusCrawler 一致：Cookie 串直接放请求头
+            headers["cookie"] = manager.config.javbus
         for _ in range(len(self._rotator.domains)):
             async with manager.acquire_computed() as computed:
-                html, error = await computed.async_client.get_text(url, headers=_HEADERS)
+                html, error = await computed.async_client.get_text(url, headers=headers)
             if html is not None:
                 return html
             # 404 是业务级错误（演员不存在），不轮询。必须匹配 "HTTP 404" 状态
@@ -88,179 +327,183 @@ class _JavbusRotator:
         return None
 
 
-# ---------------------------------------------------------------------------
-# 番号归一化
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# 有码：libredmm → javbus 兜底
-# ---------------------------------------------------------------------------
-
-
-async def fetch_censored(name: str, rotator: _JavbusRotator) -> set[str] | None:
-    """有码演员番号：libredmm(xlsx href → fuzzy) → javbus 兜底。"""
-    # 1. libredmm: xlsx href
-    href = resources.get_actor_data(name).get("href") or ""
-    if href and "libredmm.com" in href:
-        nums = await _libredmm_fetch_numbers(href)
-        if nums:
-            _log(f"   [libredmm] {name} 找到 {len(nums)} 部 (xlsx href)")
-            return nums
-
-    # 2. libredmm: fuzzy 搜索
-    rel = await _libredmm_fuzzy_search(name)
-    if rel:
-        nums = await _libredmm_fetch_numbers(rel)
-        if nums:
-            _log(f"   [libredmm] {name} 找到 {len(nums)} 部 (fuzzy 搜索)")
-            return nums
-
-    # 3. javbus 兜底
-    star_url = await _javbus_searchstar(rotator, name, uncensored=False)
-    if star_url:
-        nums = await _javbus_star_numbers(rotator, star_url)
-        if nums:
-            _log(f"   [javbus] {name} 找到 {len(nums)} 部 (兜底)")
-            return nums
-
-    _log(f"   {name} 未在任一有码数据源找到")
-    return None
-
-
-async def _libredmm_fuzzy_search(name: str) -> str | None:
-    """libredmm 演员模糊搜索，返回相对路径 /actresses/{id} 或 None。"""
-    url = f"{_LIBREDMM}/actresses?order=New&fuzzy={quote(name)}&commit=Filter+by+name"
-    async with manager.acquire_computed() as computed:
-        html, error = await computed.async_client.get_text(url, headers=_HEADERS)
+async def _javbus_searchstar(rotator: _JavbusRotator, name: str, uncensored: bool) -> str | None:
+    """javbus 按演员名搜索，返回 star 页 URL 或 None。"""
+    prefix = "/uncensored" if uncensored else ""
+    url = f"{rotator.base}{prefix}/searchstar/{quote(name)}"
+    html = await rotator.get_text(url)
     if not html:
         return None
-    root = etree.fromstring(html, etree.HTMLParser())
-    anchors = root.xpath('//a[contains(@href,"/actresses/")]')
-    # 逐 <a> 成对取 href 与完整文本，避免跨 xpath 的 links/names zip 数量不等导致错位配对
-    for a in anchors:
-        link = str(a.get("href") or "")
-        nm = "".join(a.xpath(".//text()")).strip()
-        if nm == name or name in nm or nm in name:
-            return link
-    return str(anchors[0].get("href") or "") if anchors else None
+    root = _html_tree(html)
+    if root is None:
+        return None
+    picked: str | None = None
+    for a in root.xpath("//a[contains(@href,'/star/')]"):
+        href = str(a.get("href") or "")
+        if not href or "/searchstar/" in href:
+            continue
+        if uncensored != ("/uncensored/star/" in href):
+            continue
+        title = str(a.xpath(".//img/@title")[0]) if a.xpath(".//img/@title") else _joined_text(a)
+        if _name_matches(name, title):
+            picked = href
+            break
+        if picked is None:
+            picked = href
+    if not picked:
+        return None
+    return picked if picked.startswith("http") else f"{rotator.base}{picked}"
 
 
-async def _libredmm_fetch_numbers(rel_or_url: str) -> set[str]:
-    """拉取 libredmm 演员页全部作品番号，支持分页。"""
-    href = rel_or_url if rel_or_url.startswith("http") else f"{_LIBREDMM}{rel_or_url}"
-    all_nums: set[str] = set()
+async def _fetch_javbus(names: list[str]) -> dict[str, NumberHit]:
+    """有码：javbus searchstar → star 页分页。"""
+    rotator = _JavbusRotator()
+    site = Website.JAVBUS.value
+    for name in _pick_name(names):
+        star_url = await _javbus_searchstar(rotator, name, uncensored=False)
+        if not star_url:
+            continue
+        hits: dict[str, NumberHit] = {}
+        page = 1
+        while not _out_of_time() and page <= _MAX_PAGES:
+            url = star_url if page == 1 else f"{star_url}/{page}"
+            html = await rotator.get_text(url)
+            if not html:
+                break
+            root = _html_tree(html)
+            if root is None:
+                break
+            boxes = root.xpath('//a[@class="movie-box"]')
+            for box in boxes:
+                href = str(box.get("href") or "")
+                dates = box.xpath(".//date/text()")
+                number = str(dates[0]).strip() if dates else ""
+                if not number and href:
+                    number = href.rstrip("/").rsplit("/", 1)[-1]
+                _merge(hits, number, site, href)
+            next_pages = root.xpath(
+                '//a[contains(text(),"下一頁") or contains(text(),"下一页") or contains(text(),"Next")]/@href'
+            )
+            if not next_pages or len(boxes) < 30:
+                break
+            page += 1
+        if hits:
+            return hits
+    return {}
+
+
+# ---------------------------------------------------------------------------
+# JavDB 网页版 / JavDB_API
+# ---------------------------------------------------------------------------
+
+
+def _javdb_cookie() -> dict[str, str] | None:
+    cookie = manager.config.javdb
+    return {"cookie": cookie} if cookie else None
+
+
+# JavDB 的「分类」入口，长得和演员主页一样（/actors/censored），不能当成演员
+_JAVDB_NON_ACTOR_PATHS = frozenset({"censored", "uncensored", "western"})
+
+
+async def _javdb_actor_path(base: str, name: str) -> str | None:
+    """演员搜索页取演员主页路径 `/actors/xxxx`。"""
+    for query in (f"/search?q={quote(name)}&f=actor", f"/search?q={quote(name)}"):
+        html = await _http_text(base + query, headers=_javdb_cookie())
+        if not html:
+            continue
+        if "banned your access" in html or "Due to copyright restrictions" in html:
+            return None
+        root = _html_tree(html)
+        if root is None:
+            continue
+        # 演员卡片带 actor-box 类，优先按卡片取，避免抓到分类入口
+        for a in root.xpath('//a[contains(@class,"actor-box")]'):
+            href = str(a.get("href") or "")
+            if re.fullmatch(r"/actors/[A-Za-z0-9]+", href):
+                return href
+        for href in root.xpath('//a[contains(@href,"/actors/")]/@href'):
+            href = str(href)
+            if not re.fullmatch(r"/actors/[A-Za-z0-9]+", href):
+                continue
+            if href.rsplit("/", 1)[-1].lower() in _JAVDB_NON_ACTOR_PATHS:
+                continue
+            return href
+    return None
+
+
+async def _javdb_actor_numbers(base: str, path: str) -> dict[str, NumberHit]:
+    site = Website.JAVDB.value
+    hits: dict[str, NumberHit] = {}
     page = 1
-    while True:
-        url = href if page == 1 else f"{href}?page={page}"
-        async with manager.acquire_computed() as computed:
-            html, error = await computed.async_client.get_text(url, headers=_HEADERS)
+    while not _out_of_time() and page <= _MAX_PAGES:
+        url = f"{base}{path}" if page == 1 else f"{base}{path}?page={page}"
+        html = await _http_text(url, headers=_javdb_cookie())
         if not html:
             break
-        root = etree.fromstring(html, etree.HTMLParser())
-        movies = root.xpath('//a[contains(@href,"/movies/")]/@href')
-        for m in movies:
-            num = m.split("/movies/")[-1]
-            if num:
-                all_nums.add(num)
-        next_p = root.xpath('//a[contains(@href,"?page=")]/text()')
-        joined = "".join(next_p)
-        has_next = "Next" in joined or "下一頁" in joined or "下一页" in joined
-        if not has_next or len(movies) < 60:
+        root = _html_tree(html)
+        if root is None:
+            break
+        boxes = root.xpath('//div[contains(@class,"movie-list")]//a[@class="box"]')
+        if not boxes:
+            break
+        for box in boxes:
+            href = str(box.get("href") or "")
+            number = "".join(box.xpath('.//div[contains(@class,"video-title")]/strong/text()')).strip()
+            _merge(hits, number, site, urljoin(base, href))
+        if not root.xpath('//a[contains(@class,"pagination-next")]/@href'):
             break
         page += 1
-        if page > 60:
-            break
-    return all_nums
+    return hits
+
+
+async def _javdb_site_numbers(names: list[str], *, site: Website, fallback: str) -> dict[str, NumberHit]:
+    # 自定义网址只比默认地址多个 www. 时按默认地址走：`www.javdb580.com`
+    # 是只回 1 字节的空壳（主站是 javdb580.com），留着它等于整站不可用。
+    base = strip_redundant_www(manager.config.get_site_url(site, fallback), fallback).rstrip("/")
+    for name in _pick_name(names):
+        path = await _javdb_actor_path(base, name)
+        if not path:
+            continue
+        hits = await _javdb_actor_numbers(base, path)
+        if hits:
+            # 站点名按各自站点标注（JavDB / JavDB_API 分开统计）
+            return {k: NumberHit(v.number, site.value, v.url) for k, v in hits.items()}
+    return {}
+
+
+async def _fetch_javdb(names: list[str]) -> dict[str, NumberHit]:
+    return await _javdb_site_numbers(names, site=Website.JAVDB, fallback=_JAVDB_FALLBACK)
+
+
+async def _fetch_javdb_api(names: list[str]) -> dict[str, NumberHit]:
+    return await _javdb_site_numbers(names, site=Website.JAVDB_API, fallback=_JAVDB_FALLBACK)
+
+
+def _only_fc2(hits: dict[str, NumberHit]) -> dict[str, NumberHit]:
+    """FC2 类型只留 FC2- 番号，别把同一个演员的有码作品混进来。"""
+    return {key: hit for key, hit in hits.items() if key.startswith("FC2")}
+
+
+async def _fetch_javdb_fc2(names: list[str]) -> dict[str, NumberHit]:
+    return _only_fc2(await _fetch_javdb(names))
+
+
+async def _fetch_javdb_api_fc2(names: list[str]) -> dict[str, NumberHit]:
+    return _only_fc2(await _fetch_javdb_api(names))
 
 
 # ---------------------------------------------------------------------------
-# 无码：avsox → javbus 兜底
-# ---------------------------------------------------------------------------
-
-
-async def fetch_uncensored(name: str, rotator: _JavbusRotator) -> set[str] | None:
-    """无码演员番号：avsox(getFilterMovies) → javbus uncensored 兜底。"""
-    # 1. avsox
-    nums = await _avmoo_fetch_numbers("avsox", "javu", name)
-    if nums:
-        _log(f"   [avsox] {name} 找到 {len(nums)} 部")
-        return nums
-
-    # 2. javbus uncensored 兜底
-    star_url = await _javbus_searchstar(rotator, name, uncensored=True)
-    if star_url:
-        nums = await _javbus_star_numbers(rotator, star_url)
-        if nums:
-            _log(f"   [javbus] {name} 找到 {len(nums)} 部 (无码兜底)")
-            return nums
-
-    _log(f"   {name} 未在任一无码数据源找到")
-    return None
-
-
-# ---------------------------------------------------------------------------
-# 欧美：avheat
-# ---------------------------------------------------------------------------
-
-
-async def fetch_western(name: str, rotator: _JavbusRotator) -> set[str] | None:
-    """欧美演员番号：avheat(getFilterMovies)。"""
-    nums = await _avmoo_fetch_numbers("avheat", "wav", name)
-    if nums:
-        _log(f"   [avheat] {name} 找到 {len(nums)} 部")
-        return nums
-    _log(f"   {name} 未在 avheat 找到")
-    return None
-
-
-# ---------------------------------------------------------------------------
-# JavDB 移动端 API 关键字搜索：动漫 / FC2 共用
+# JavDB_APP：移动端签名 API
 # ---------------------------------------------------------------------------
 
 _JAVDB_APP_LIMIT = 50
 _JAVDB_APP_MAX_PAGES = 20  # 服务端把 page 截断在 20，20 页 × 50 = 最多 1000 条
-_JAVDB_APP_INTERVAL = 0.3  # 页间稍作间隔，避免连续打满移动端 API
+_JAVDB_APP_INTERVAL = 0.3
 
 
-async def fetch_dongman(name: str, rotator: _JavbusRotator) -> set[str] | None:
-    """动漫番号：JavDB 移动端 API 关键字搜索。
-
-    `name` 是关键字（社团名/作品关键词），不是演员名——JavDB 没有
-    「按名字列出全部作品」的接口，只能用它的搜索接口兜着。
-    """
-    nums = await _javdb_app_search_numbers(name)
-    if nums:
-        _log(f"   [javdb] {name} 找到 {len(nums)} 部 (动漫关键字搜索)")
-        return nums
-    _log(f"   {name} 未在 JavDB 动漫关键字搜索找到")
-    return None
-
-
-async def fetch_fc2(name: str, rotator: _JavbusRotator) -> set[str] | None:
-    """FC2 番号：avsox(getFilterMovies) → JavDB 关键字搜索兜底。
-
-    JavDB 兜底按 FC2- 前缀过滤，避免卖家名同时命中的有码作品混进来。
-    """
-    nums = await _avmoo_fetch_numbers("avsox", "javu", name)
-    if nums:
-        _log(f"   [avsox] {name} 找到 {len(nums)} 部")
-        return nums
-
-    nums = await _javdb_app_search_numbers(name, number_prefix="FC2-")
-    if nums:
-        _log(f"   [javdb] {name} 找到 {len(nums)} 部 (FC2 兜底)")
-        return nums
-
-    _log(f"   {name} 未在任一 FC2 数据源找到")
-    return None
-
-
-async def _javdb_app_search_numbers(keyword: str, *, number_prefix: str | None = None) -> set[str]:
-    """JavDB 移动端 API 关键字搜索，按页收集番号；主域名空结果再切备用域名。
-
-    复用 `crawlers.javdb_app` 的签名与参数构造，不重复实现鉴权细节。
-    """
+async def _fetch_javdb_app(names: list[str], *, fc2_only: bool = False) -> dict[str, NumberHit]:
+    """JavDB 移动端签名 API 关键字搜索（动漫 / FC2 也走这里）。"""
     from ..crawlers.javdb_app import (  # 局部导入：避免 crawlers 包的重量级导入链
         _API_BASE,
         _API_FALLBACKS,
@@ -269,236 +512,896 @@ async def _javdb_app_search_numbers(keyword: str, *, number_prefix: str | None =
         make_signature,
     )
 
-    for host in [_API_BASE, *_API_FALLBACKS]:
-        headers = {"jdsignature": make_signature(), "accept-language": "zh", "User-Agent": "Dart/3.5 (dart:io)"}
-        nums: set[str] = set()
+    site = Website.JAVDB_APP.value
+    hits: dict[str, NumberHit] = {}
+    for name in _pick_name(names):
+        for host in [_API_BASE, *_API_FALLBACKS]:
+            headers = {"jdsignature": make_signature(), "accept-language": "zh", "User-Agent": "Dart/3.5 (dart:io)"}
+            page = 1
+            while not _out_of_time() and page <= _JAVDB_APP_MAX_PAGES:
+                params = _build_api_params()
+                params.update({"q": name, "page": str(page), "type": "movie", "limit": str(_JAVDB_APP_LIMIT)})
+                data = await _http_json(_get_api_url(host, "/api/v2/search", params), headers=headers)
+                if not data:
+                    break
+                movies = (data.get("data") or {}).get("movies") or []
+                if not movies:
+                    break
+                for movie in movies:
+                    number = str(movie.get("number") or "").strip()
+                    if not number:
+                        continue
+                    if fc2_only and not normalize_key(number).startswith("FC2"):
+                        continue
+                    movie_id = str(movie.get("id") or "")
+                    _merge(hits, number, site, f"{_JAVDB_FALLBACK}/v/{movie_id}" if movie_id else "")
+                if len(movies) < _JAVDB_APP_LIMIT:
+                    break
+                page += 1
+                await asyncio.sleep(_JAVDB_APP_INTERVAL)
+            if hits:
+                return hits
+    return hits
+
+
+async def _fetch_javdb_app_all(names: list[str]) -> dict[str, NumberHit]:
+    return await _fetch_javdb_app(names)
+
+
+async def _fetch_javdb_app_fc2(names: list[str]) -> dict[str, NumberHit]:
+    return await _fetch_javdb_app(names, fc2_only=True)
+
+
+# ---------------------------------------------------------------------------
+# JavLibrary / Javlibrary·镜像
+# ---------------------------------------------------------------------------
+
+
+async def _javlibrary_numbers(base: str, names: list[str], site: str) -> dict[str, NumberHit]:
+    """JavLibrary：按名字搜演员 → vl_star 分页 → 取 code 链接。"""
+    base = base.rstrip("/")
+    for name in _pick_name(names):
+        search_html = await _http_text(f"{base}/cn/vl_searchby_name.php?keyword={quote(name)}")
+        if not search_html:
+            continue
+        root = _html_tree(search_html)
+        if root is None:
+            continue
+        star_path = ""
+        for a in root.xpath('//a[contains(@href,"vl_star.php?s=")]'):
+            text = _joined_text(a)
+            if _name_matches(name, text):
+                star_path = str(a.get("href") or "")
+                break
+        if not star_path:
+            continue
+        hits: dict[str, NumberHit] = {}
         page = 1
-        truncated = False
-        while page <= _JAVDB_APP_MAX_PAGES:
-            params = _build_api_params()
-            params.update({"q": keyword, "page": str(page), "type": "movie", "limit": str(_JAVDB_APP_LIMIT)})
-            try:
-                async with manager.acquire_computed() as computed:
-                    data, error = await computed.async_client.get_json(
-                        _get_api_url(host, "/api/v2/search", params), headers=headers
-                    )
-            except Exception:
+        while not _out_of_time() and page <= _MAX_PAGES:
+            sep = "&" if "?" in star_path else "?"
+            url = (
+                f"{base}/cn/{star_path.lstrip('/')}"
+                if page == 1
+                else f"{base}/cn/{star_path.lstrip('/')}{sep}page={page}"
+            )
+            html = await _http_text(url)
+            if not html:
                 break
-            if error or not isinstance(data, dict):
+            page_root = _html_tree(html)
+            if page_root is None:
                 break
-            movies = (data.get("data") or {}).get("movies") or []
-            if not movies:
-                break
-            for m in movies:
-                num = str(m.get("number") or "").strip().upper()
-                if not num or (number_prefix and not num.startswith(number_prefix)):
+            videos = page_root.xpath('//div[@class="video"]')
+            for video in videos:
+                code = video.xpath('.//span[@class="code"]/a')
+                if not code:
                     continue
-                nums.add(num)
-            if len(movies) < _JAVDB_APP_LIMIT:
+                number = _joined_text(code[0])
+                href = str(code[0].get("href") or "")
+                _merge(hits, number, site, urljoin(f"{base}/cn/", href))
+            next_page = page_root.xpath('//a[contains(@class,"page") and contains(@class,"next")]/@href')
+            if not next_page or not videos:
                 break
-            truncated = page == _JAVDB_APP_MAX_PAGES
             page += 1
-            await asyncio.sleep(_JAVDB_APP_INTERVAL)
-        if nums:
-            if truncated:
-                _log(f"   ⚠️ JavDB 关键字「{keyword}」只翻了前 {_JAVDB_APP_MAX_PAGES} 页，番号可能不完整")
-            return nums
-    return set()
+        if hits:
+            return hits
+    return {}
+
+
+def _javlibrary_base(url: str) -> str:
+    """JavLibrary 站点根地址：去掉结尾斜杠与 `/cn` 语言段（路径里会自己拼 /cn）。"""
+    base = str(url or "").strip().rstrip("/")
+    if base.endswith("/cn"):
+        base = base[: -len("/cn")]
+    return base.rstrip("/")
+
+
+async def _fetch_javlibrary(names: list[str]) -> dict[str, NumberHit]:
+    custom = manager.config.get_site_url(Website.JAVLIBRARY, "")
+    base = _javlibrary_base(custom) or _javlibrary_base(await get_javlibrary_domain())
+    return await _javlibrary_numbers(base, names, Website.JAVLIBRARY.value)
+
+
+async def _fetch_javlibrary_mirror(names: list[str]) -> dict[str, NumberHit]:
+    custom = manager.config.get_site_url(Website.JAVLIBRARY_MIRROR, "")
+    base = _javlibrary_base(custom) or _javlibrary_base(await get_javlibrary_mirror_domain())
+    return await _javlibrary_numbers(base, names, Website.JAVLIBRARY_MIRROR.value)
 
 
 # ---------------------------------------------------------------------------
-# avmoo 系通用（avsox/avheat）：搜索影片定位 starId → getFilterMovies
+# DMM（网页）
 # ---------------------------------------------------------------------------
 
 
-async def _avmoo_fetch_numbers(domain_site: str, namespace: str, name: str) -> set[str]:
-    """avmoo 系站点：搜索演员名 → 从影片 star 拿 starId → getFilterMovies 全部分页。"""
+def _dmm_number_from_cid(cid: str) -> str:
+    """DMM content_id → 展示番号（ssis00006 → SSIS-006，55t2800645 → T28-00645）。"""
+    cid = str(cid or "").strip().lower()
+    if not cid:
+        return ""
+    if m := re.fullmatch(r"([a-z]+)(\d+)", cid):
+        return display_number(f"{m.group(1)}-{m.group(2)}")
+    if m := re.fullmatch(r"\d+([a-z]+\d*?)(\d{5,})", cid):
+        return display_number(f"{m.group(1)}-{m.group(2)}")
+    if m := re.fullmatch(r"h_(\d+)([a-z]+)(\d+)", cid):
+        return display_number(f"{m.group(2)}-{m.group(3)}")
+    return display_number(cid)
+
+
+async def _dmm_actress_id(name: str) -> str:
+    html = await _http_text(f"{_DMM}/search/=/searchstr={quote(name)}/", cookies={"age_check_done": "1"})
+    if not html or "not-available-in-your-region" in html:
+        return ""
+    ids = re.findall(r"actress/-/detail/=/id=(\d+)/", html) or re.findall(r"article=actress/id=(\d+)/", html)
+    return ids[0] if ids else ""
+
+
+async def _fetch_dmm(names: list[str]) -> dict[str, NumberHit]:
+    """有码：DMM 网页版演员作品列表。"""
+    site = Website.DMM.value
+    actress_id = ""
+    for name in _pick_name(names, 2):
+        actress_id = await _dmm_actress_id(name)
+        if actress_id:
+            break
+    if not actress_id:
+        return {}
+    hits: dict[str, NumberHit] = {}
+    for page in range(1, _MAX_PAGES + 1):
+        if _out_of_time():
+            break
+        url = f"{_DMM}/digital/videoa/-/list/=/article=actress/id={actress_id}/sort=date/page={page}/"
+        html = await _http_text(url, cookies={"age_check_done": "1"})
+        if not html:
+            break
+        cids = re.findall(r"/cid=([a-z0-9_]+)/", html)
+        if not cids:
+            cids = re.findall(r"content/\?id=([a-z0-9_]+)", html)
+        new = 0
+        for cid in dict.fromkeys(cids):
+            before = len(hits)
+            _merge(hits, _dmm_number_from_cid(cid), site, f"{_DMM}/digital/videoa/-/detail/=/cid={cid}/")
+            new += len(hits) - before
+        if new == 0:
+            break
+    return hits
+
+
+# ---------------------------------------------------------------------------
+# DMM_API（Affiliate API）
+# ---------------------------------------------------------------------------
+
+
+async def _dmm_api_actress_id(name: str) -> str:
+    from ..crawlers.dmm_api import DmmApiCrawler
+
+    url = (
+        f"{_DMM_API}/affiliate/v3/ActressSearch?"
+        f"api_id={DmmApiCrawler._api_id()}&affiliate_id={DmmApiCrawler._affiliate_id()}"
+        f"&output=json&keyword={quote(name)}&hits=10"
+    )
+    data = await _http_json(url)
+    if not data:
+        return ""
+    actresses = ((data.get("result") or {}).get("actress")) or []
+    fallback = ""
+    for actress in actresses:
+        actress_id = str(actress.get("id") or "")
+        actress_name = str(actress.get("name") or "")
+        if not actress_id:
+            continue
+        if actress_name == name:
+            return actress_id
+        if not fallback and _name_matches(name, actress_name):
+            fallback = actress_id
+    return fallback
+
+
+async def _fetch_dmm_api(names: list[str]) -> dict[str, NumberHit]:
+    """有码：DMM Affiliate API（ActressSearch → ItemList 分页）。"""
+    from ..crawlers.dmm_api import DmmApiCrawler
+
+    site = Website.DMM_API.value
+    actress_id = ""
+    for name in _pick_name(names, 2):
+        actress_id = await _dmm_api_actress_id(name)
+        if actress_id:
+            break
+    if not actress_id:
+        return {}
+    hits: dict[str, NumberHit] = {}
+    offset = 1
+    while not _out_of_time() and offset <= 3000:
+        url = (
+            f"{_DMM_API}/affiliate/v3/ItemList?"
+            f"api_id={DmmApiCrawler._api_id()}&affiliate_id={DmmApiCrawler._affiliate_id()}"
+            f"&output=json&site=FANZA&service=digital&floor=videoa"
+            f"&article=actress&article_id={actress_id}&hits=100&offset={offset}&sort=date"
+        )
+        data = await _http_json(url)
+        if not data:
+            break
+        result = data.get("result") or {}
+        items = result.get("items") or []
+        if not items:
+            break
+        for item in items:
+            cid = str(item.get("content_id") or item.get("product_id") or "")
+            url_detail = str(item.get("URL") or "")
+            if not cid:
+                continue
+            _merge(
+                hits,
+                _dmm_number_from_cid(cid),
+                site,
+                url_detail or f"{_DMM}/digital/videoa/-/detail/=/cid={cid}/",
+            )
+        if len(items) < 100:
+            break
+        offset += 100
+    return hits
+
+
+# ---------------------------------------------------------------------------
+# LibreDMM
+# ---------------------------------------------------------------------------
+
+
+async def _libredmm_fuzzy_search(name: str) -> str | None:
+    """libredmm 演员模糊搜索，返回相对路径 /actresses/{id} 或 None。"""
+    url = f"{_LIBREDMM}/actresses?order=New&fuzzy={quote(name)}&commit=Filter+by+name"
+    html = await _http_text(url)
+    if not html:
+        return None
+    root = _html_tree(html)
+    if root is None:
+        return None
+    anchors = root.xpath('//a[contains(@href,"/actresses/")]')
+    # 逐 <a> 成对取 href 与完整文本，避免跨 xpath 的 links/names zip 数量不等导致错位配对
+    for a in anchors:
+        link = str(a.get("href") or "")
+        nm = _joined_text(a)
+        if nm == name or name in nm or nm in name:
+            return link
+    return str(anchors[0].get("href") or "") if anchors else None
+
+
+async def _libredmm_fetch_numbers(href: str) -> dict[str, NumberHit]:
+    """拉取 libredmm 演员页全部作品，支持分页；番号取自 /movies/{num} 链接。"""
+    site = Website.LIBREDMM.value
+    full = href if href.startswith("http") else f"{_LIBREDMM}{href}"
+    hits: dict[str, NumberHit] = {}
+    page = 1
+    while not _out_of_time() and page <= _MAX_PAGES:
+        url = full if page == 1 else f"{full}?page={page}"
+        html = await _http_text(url)
+        if not html:
+            break
+        root = _html_tree(html)
+        if root is None:
+            break
+        movies = root.xpath('//a[contains(@href,"/movies/")]/@href')
+        for href_movie in movies:
+            number = str(href_movie).split("/movies/")[-1].strip("/")
+            if number:
+                _merge(hits, number, site, urljoin(_LIBREDMM, str(href_movie)))
+        next_text = "".join(root.xpath('//a[contains(@href,"?page=")]/text()'))
+        if not movies or ("Next" not in next_text and "下一頁" not in next_text and "下一页" not in next_text):
+            break
+        if len(movies) < 60:
+            break
+        page += 1
+    return hits
+
+
+async def _fetch_libredmm(names: list[str]) -> dict[str, NumberHit]:
+    """有码：LibreDMM（演员页优先用演员库已存地址，其次模糊搜索）。"""
+    for name in _pick_name(names):
+        href = ""
+        try:
+            from ..config.resources import resources
+
+            href = resources.get_actor_data(name).get("href") or ""
+        except Exception:
+            href = ""
+        if href and "libredmm.com" in href:
+            hits = await _libredmm_fetch_numbers(href)
+            if hits:
+                return hits
+        rel = await _libredmm_fuzzy_search(name)
+        if rel:
+            hits = await _libredmm_fetch_numbers(rel)
+            if hits:
+                return hits
+    return {}
+
+
+# ---------------------------------------------------------------------------
+# AVSOX / AVheat（tellme.pw AIO 平台，JSON API）
+# ---------------------------------------------------------------------------
+
+
+async def _aio_warmup(root: str) -> dict[str, str]:
+    """预热会话，拿 _csrf 之类 Cookie；无 Cookie 直接 POST 会被 WAF 403。"""
+    try:
+        async with manager.acquire_computed() as computed:
+            resp, _error = await computed.async_client.request(
+                "GET", root, headers=_HEADERS, retry_count=0, enable_cf_bypass=False
+            )
+    except Exception:
+        return {}
+    if resp is None:
+        return {}
+    try:
+        jar = resp.cookies
+        if hasattr(jar, "get_dict"):
+            return dict(jar.get_dict())
+        # 兜底分支: httpx 以外的 cookie jar。运行时迭代出的是带 name/value 的
+        # Cookie 对象, 但 httpx 存根把 Cookies 的元素类型标错成 str, 故 cast。
+        return {c.name: c.value for c in cast("Iterable[Any]", jar)}
+    except Exception:
+        return {}
+
+
+async def _aio_locate_star_id(root: str, namespace: str, name: str, cookies: dict[str, str]) -> str:
+    """搜索演员名 → 影片详情 → star 字段定位 starId。"""
+    data = await _http_post_json(
+        f"{root}/{namespace}/data/api/search", [{"search": name, "lang": "cn"}, 20, 1], cookies=cookies
+    )
+    if not data:
+        return ""
+    for item in (data.get("data") or [])[:8]:
+        movie_id = item.get("movieId")
+        if not movie_id:
+            continue
+        detail = await _http_post_json(f"{root}/{namespace}/data/api/getMovie", {"movieId": movie_id}, cookies=cookies)
+        if not detail:
+            continue
+        for star in (detail.get("data") or {}).get("star") or []:
+            star_name = str(star.get("starName_ja") or star.get("starName_en") or "").strip()
+            if star_name and _name_matches(name, star_name):
+                return str(star.get("starId") or "")
+    return ""
+
+
+async def _aio_numbers(site: str, namespace: str, names: list[str]) -> dict[str, NumberHit]:
+    domain_site = site.lower()
     try:
         base = await get_aio_domain(domain_site)
     except Exception:
         base = f"https://{domain_site}.shop"
-    all_nums: set[str] = set()
-    star_id = await _avmoo_locate_star_id(base, namespace, name)
+    root = base.rstrip("/")
+    if root.endswith("/cn"):
+        root = root[: -len("/cn")]
+    cookies = await _aio_warmup(root)
+    star_id = ""
+    for name in _pick_name(names, 2):
+        star_id = await _aio_locate_star_id(root, namespace, name, cookies)
+        if star_id:
+            break
     if not star_id:
-        return all_nums
+        return {}
+    site_name = Website.AVSOX.value if namespace == "javu" else Website.AVHEAT.value
+    hits: dict[str, NumberHit] = {}
     page = 1
-    while True:
-        async with manager.acquire_computed() as computed:
-            json_data, error = await computed.async_client.post_json(
-                f"{base}/{namespace}/data/api/getFilterMovies",
-                data=json.dumps(["star", star_id, "cn", 60, page]),
-                headers={"Accept": "application/json", "Content-Type": "application/json"},
-            )
-        if error or json_data is None:
+    while not _out_of_time() and page <= 30:
+        data = await _http_post_json(
+            f"{root}/{namespace}/data/api/getFilterMovies",
+            ["star", star_id, "cn", 60, page],
+            cookies=cookies,
+        )
+        if not data:
             break
-        arr = json_data.get("data") or []
-        if not isinstance(arr, list):
+        rows = data.get("data") or []
+        if not isinstance(rows, list) or not rows:
             break
-        for m in arr:
-            num = m.get("movieFanHao")
-            if num:
-                all_nums.add(num)
-        if len(arr) < 60:
+        for row in rows:
+            number = str(row.get("movieFanHao") or "").strip()
+            movie_id = str(row.get("movieId") or "").strip()
+            if not number:
+                continue
+            _merge(hits, number, site_name, f"{root}/cn/movie/{movie_id}" if movie_id else "")
+        if len(rows) < 60:
             break
         page += 1
-        if page > 30:
-            break
-    return all_nums
+    return hits
 
 
-async def _avmoo_locate_star_id(base: str, namespace: str, name: str) -> str | None:
-    """通过搜索演员名 → 影片详情 → star 字段定位 starId。"""
-    for _ in range(3):
-        async with manager.acquire_computed() as computed:
-            json_data, error = await computed.async_client.post_json(
-                f"{base}/{namespace}/data/api/search",
-                data=json.dumps([{"search": name, "lang": "cn"}, 20, 1]),
-                headers={"Accept": "application/json", "Content-Type": "application/json"},
-            )
-        if error or json_data is None:
-            continue
-        items = json_data.get("data") or []
-        for it in items[:8]:
-            mid = it.get("movieId")
-            if not mid:
-                continue
-            async with manager.acquire_computed() as computed:
-                detail, derr = await computed.async_client.post_json(
-                    f"{base}/{namespace}/data/api/getMovie",
-                    data=json.dumps({"movieId": mid}),
-                    headers={"Accept": "application/json", "Content-Type": "application/json"},
-                )
-            if derr or detail is None:
-                continue
-            stars = (detail.get("data") or {}).get("star") or []
-            for st in stars:
-                sn = (st.get("starName_ja") or st.get("starName_en") or "").strip()
-                if sn and (sn == name or name in sn or sn in name):
-                    return st.get("starId")
-        # 无匹配：继续下一次 attempt（原实现在此 return None，使重试只对网络错误生效）
-    return None
+async def _fetch_avsox(names: list[str]) -> dict[str, NumberHit]:
+    return await _aio_numbers("avsox", "javu", names)
+
+
+async def _fetch_avheat(names: list[str]) -> dict[str, NumberHit]:
+    return await _aio_numbers("avheat", "wav", names)
 
 
 # ---------------------------------------------------------------------------
-# 国产：iqqtv
+# IQQTV（国产）
 # ---------------------------------------------------------------------------
 
-_IQQTV_NUMBER_PAT = re.compile(
-    r"([A-Z]{2,8}[-]?\d{2,6}[A-Z]?(?:-\d+)?|1pondo[-_]?\d+[-_]?\d+|caribbeancom[-_]?\d+[-_]?\d+|10musume[-_]?\d+[-_]?\d+|pacopacomama[-_]?\d+[-_]?\d+|heyzo[-_]?\d+|heydouga[-_]?\d+[-_]?\d+)"
-)
 
-
-async def fetch_guochan(name: str, rotator: _JavbusRotator) -> set[str] | None:
-    """国产演员番号：iqqtv 搜索演员 → num 分页 → title 提取番号。"""
-    tid = await _iqqtv_search_actor(name)
-    if not tid:
-        _log(f"   {name} 未在 iqqtv 找到")
-        return None
-    all_nums: set[str] = set()
-    page = 1
-    while True:
-        html = await _iqqtv_get_page(tid, page)
-        if not html:
-            break
-        root = etree.fromstring(html, etree.HTMLParser())
-        titles = root.xpath('//a[contains(@href,"player.php")]//@title')
-        for t in titles:
-            nums = _IQQTV_NUMBER_PAT.findall(t)
-            for n in nums:
-                all_nums.add(n.upper())
-        # iqqtv 每页约 48 个作品
-        cards = root.xpath('//a[contains(@href,"player.php")]/@href')
-        if len(cards) < 48:
-            break
-        page += 1
-        if page > 30:
-            break
-    if all_nums:
-        _log(f"   [iqqtv] {name} 找到 {len(all_nums)} 部")
-    return all_nums if all_nums else None
-
-
-async def _iqqtv_search_actor(name: str) -> str | None:
-    """iqqtv 搜索演员名，返回匹配的 s_tid。"""
+async def _iqqtv_search_actor(name: str) -> tuple[str, str]:
+    """iqqtv 搜索演员名，返回 (域名, s_tid)。"""
     for base in _IQQTV_DOMAINS:
-        url = f"{base}/cn/search.php?kw={quote(name)}"
-        async with manager.acquire_computed() as computed:
-            html, error = await computed.async_client.get_text(url, headers=_HEADERS)
+        html = await _http_text(f"{base}/cn/search.php?kw={quote(name)}")
         if not html:
             continue
-        root = etree.fromstring(html, etree.HTMLParser())
+        root = _html_tree(html)
+        if root is None:
+            continue
         for a in root.xpath("//a[contains(@href,'s_type=actor')]"):
-            nm = "".join(a.xpath(".//text()")).strip()
+            nm = _joined_text(a)
             if not nm or "すべて" in nm or "全部" in nm or "表示" in nm:
                 continue
-            if nm == name or name in nm or nm in name:
-                return a.get("href", "").split("s_tid=")[-1].split("&")[0]
-        # 首个域名成功但未匹配，不再试第二个
-        return None
-    return None
+            if _name_matches(name, nm):
+                return base, str(a.get("href") or "").split("s_tid=")[-1].split("&")[0]
+        return "", ""
+    return "", ""
 
 
-async def _iqqtv_get_page(tid: str, page: int) -> str | None:
-    """iqqtv 演员作品分页，使用 num 参数。"""
-    for base in _IQQTV_DOMAINS:
-        url = f"{base}/cn/search.php?s_type=actor&s_tid={tid}&num={page}"
-        async with manager.acquire_computed() as computed:
-            html, error = await computed.async_client.get_text(url, headers=_HEADERS)
-        if html:
-            return html
-    return None
-
-
-# ---------------------------------------------------------------------------
-# javbus 通用：searchstar 定位 + star 页拉番号
-# ---------------------------------------------------------------------------
-
-
-async def _javbus_searchstar(rotator: _JavbusRotator, name: str, uncensored: bool) -> str | None:
-    """javbus 按演员名搜索，返回 star 页 URL 或 None。"""
-    prefix = "/uncensored" if uncensored else ""
-    url = f"{rotator.base}{prefix}/searchstar/{quote(name)}"
-    html = await rotator.get_text(url)
-    if not html:
-        return None
-    root = etree.fromstring(html, etree.HTMLParser())
-    all_hrefs = root.xpath("//a[contains(@href,'/star/')]/@href")
-    star_hrefs: list[str] = []
-    for href in all_hrefs:
-        if "/searchstar/" in href:
+async def _fetch_iqqtv(names: list[str]) -> dict[str, NumberHit]:
+    """国产：iqqtv 演员页分页，番号从作品标题里提取。"""
+    site = Website.IQQTV.value
+    for name in _pick_name(names, 2):
+        base, tid = await _iqqtv_search_actor(name)
+        if not tid:
             continue
-        if uncensored:
-            if "/uncensored/star/" in href:
-                star_hrefs.append(href)
-        else:
-            if "/uncensored/" not in href:
-                star_hrefs.append(href)
-    if star_hrefs:
-        href = star_hrefs[0]
-        # 页面返回的 href 可能是根相对路径（/star/xxx），补全为绝对 URL 供后续请求
-        return href if href.startswith("http") else f"{rotator.base}{href}"
-    return None
+        hits: dict[str, NumberHit] = {}
+        page = 1
+        while not _out_of_time() and page <= 30:
+            html = await _http_text(f"{base}/cn/search.php?s_type=actor&s_tid={tid}&num={page}")
+            if not html:
+                break
+            root = _html_tree(html)
+            if root is None:
+                break
+            links = root.xpath('//a[contains(@href,"player.php")]')
+            for link in links:
+                title = str(link.get("title") or _joined_text(link))
+                href = str(link.get("href") or "")
+                for number in extract_numbers(title):
+                    _merge(hits, number, site, urljoin(base, href))
+            if len(links) < 48:
+                break
+            page += 1
+        if hits:
+            return hits
+    return {}
 
 
-async def _javbus_star_numbers(rotator: _JavbusRotator, star_url: str) -> set[str]:
-    """javbus 演员页分页拉全部番号（每页 30 个，番号在 date 标签）。"""
-    all_nums: set[str] = set()
+# ---------------------------------------------------------------------------
+# 国产：Madou.club / Madouqu / JavDay
+# ---------------------------------------------------------------------------
+
+
+async def _wordpress_search_numbers(base: str, site: str, names: list[str]) -> dict[str, NumberHit]:
+    """WordPress 站点（madou.club / madouqu）按 `?s=` 搜索演员名，标题里取番号。"""
+    base = base.rstrip("/")
+    for name in _pick_name(names, 2):
+        html = await _http_text(f"{base}/?s={quote(name)}")
+        if not html:
+            continue
+        root = _html_tree(html)
+        if root is None:
+            continue
+        hits: dict[str, NumberHit] = {}
+        for article in root.xpath("//article"):
+            title = _joined_text(article.xpath(".//h2")[0]) if article.xpath(".//h2") else ""
+            hrefs = article.xpath(".//h2//a/@href")
+            href = str(hrefs[0]) if hrefs else ""
+            if not title:
+                continue
+            for number in extract_numbers(title):
+                _merge(hits, number, site, urljoin(base, href))
+        if hits:
+            return hits
+    return {}
+
+
+async def _fetch_madou_club(names: list[str]) -> dict[str, NumberHit]:
+    base = manager.config.get_site_url(Website.MADOUCLUB, _MADOU_CLUB)
+    return await _wordpress_search_numbers(base, Website.MADOUCLUB.value, names)
+
+
+async def _fetch_madouqu(names: list[str]) -> dict[str, NumberHit]:
+    base = manager.config.get_site_url(Website.MADOUQU, _MADOUQU_FALLBACK)
+    return await _wordpress_search_numbers(base, Website.MADOUQU.value, names)
+
+
+async def _fetch_javday(names: list[str]) -> dict[str, NumberHit]:
+    """国产：JavDay 站内搜索页，从 videoBox 标题取番号。"""
+    base = manager.config.get_site_url(Website.JAVDAY, _JAVDAY_FALLBACK).rstrip("/")
+    site = Website.JAVDAY.value
+    for name in _pick_name(names, 2):
+        html = await _http_text(f"{base}/search?q={quote(name)}")
+        if not html:
+            continue
+        root = _html_tree(html)
+        if root is None:
+            continue
+        hits: dict[str, NumberHit] = {}
+        for box in root.xpath('//a[contains(@class,"videoBox")]'):
+            href = str(box.get("href") or "")
+            title = (
+                _joined_text(box.xpath('.//span[contains(@class,"title")]')[0])
+                if box.xpath('.//span[contains(@class,"title")]')
+                else _joined_text(box)
+            )
+            for number in extract_numbers(title):
+                _merge(hits, number, site, urljoin(base, href))
+        if hits:
+            return hits
+    return {}
+
+
+# ---------------------------------------------------------------------------
+# FC2 / FC2PPVDB
+# ---------------------------------------------------------------------------
+
+
+async def _fetch_fc2(names: list[str]) -> dict[str, NumberHit]:
+    """FC2：站内搜索卖家 → 卖家页作品列表（需登录时返回空）。"""
+    site = Website.FC2.value
+    for name in _pick_name(names, 2):
+        html = await _http_text(f"{_FC2_BASE}/search/?q={quote(name)}")
+        # FC2 站内搜索要登录，未登录会整页返回登录页（标题「登录 FC2 …」）
+        if not html or "登录 FC2" in html:
+            return {}
+        root = _html_tree(html)
+        if root is None:
+            return {}
+        seller_ids = [
+            m.group(1)
+            for m in (
+                re.search(r"/users/(\d+)", str(a.get("href") or ""))
+                for a in root.xpath('//a[contains(@href,"/users/")]')
+            )
+            if m
+        ]
+        hits: dict[str, NumberHit] = {}
+        for seller_id in dict.fromkeys(seller_ids[:3]):
+            page = 1
+            while not _out_of_time() and page <= 30:
+                page_url = (
+                    f"{_FC2_BASE}/users/{seller_id}" if page == 1 else f"{_FC2_BASE}/users/{seller_id}/page/{page}/"
+                )
+                page_html = await _http_text(page_url)
+                if not page_html:
+                    break
+                article_ids = re.findall(r"/article/(\d{5,8})/", page_html)
+                if not article_ids:
+                    break
+                for article_id in dict.fromkeys(article_ids):
+                    _merge(hits, f"FC2-{article_id}", site, f"{_FC2_BASE}/article/{article_id}/")
+                page += 1
+        if hits:
+            return hits
+    return {}
+
+
+async def _fc2ppvdb_actress_ids(base: str, name: str) -> list[str]:
+    html = await _http_text(f"{base}/search?keyword={quote(name)}")
+    if not html:
+        return []
+    ids: list[str] = []
+    for m in re.finditer(r'href="[^"]*/actresses/(\d+)"[^>]*>(.{0,120}?)</a>', html, re.S):
+        text = re.sub(r"<[^>]+>", "", m.group(2))
+        if _name_matches(name, text.strip()):
+            ids.append(m.group(1))
+    return ids
+
+
+async def _fc2ppvdb_numbers(base: str, actress_id: str, site: str) -> dict[str, NumberHit]:
+    hits: dict[str, NumberHit] = {}
     page = 1
-    while True:
-        url = star_url if page == 1 else f"{star_url}/{page}"
-        html = await rotator.get_text(url)
+    while not _out_of_time() and page <= 30:
+        url = f"{base}/actresses/{actress_id}" if page == 1 else f"{base}/actresses/{actress_id}?page={page}"
+        html = await _http_text(url)
         if not html:
             break
-        root = etree.fromstring(html, etree.HTMLParser())
-        boxes = root.xpath('//a[@class="movie-box"]')
-        nums = [b.xpath(".//date/text()")[0] for b in boxes if b.xpath(".//date/text()")]
-        all_nums |= set(nums)
-        next_p = root.xpath(
-            '//a[contains(text(),"下一頁") or contains(text(),"下一页") or contains(text(),"Next")]/@href'
-        )
-        if not next_p or len(nums) < 30:
+        article_ids = re.findall(r"/articles/(\d{5,8})", html)
+        if not article_ids:
             break
+        for article_id in dict.fromkeys(article_ids):
+            _merge(hits, f"FC2-{article_id}", site, f"{_FC2PPVDB_BASE}/articles/{article_id}")
         page += 1
-        if page > 60:
+    return hits
+
+
+async def _fetch_fc2ppvdb(names: list[str]) -> dict[str, NumberHit]:
+    """FC2：FC2PPVDB 演员页（主域被 CF 拦时走 fc2cmadb 镜像）。"""
+    site = Website.FC2PPVDB.value
+    for name in _pick_name(names, 2):
+        for base in (_FC2PPVDB_BASE, _FC2CMADB_BASE):
+            ids = await _fc2ppvdb_actress_ids(base, name)
+            for actress_id in ids[:2]:
+                hits = await _fc2ppvdb_numbers(base, actress_id, site)
+                if hits:
+                    return hits
+    return {}
+
+
+# ---------------------------------------------------------------------------
+# 欧美：ThepornDB
+# ---------------------------------------------------------------------------
+
+
+async def _fetch_theporndb(names: list[str]) -> dict[str, NumberHit]:
+    """欧美：ThepornDB API 关键字搜索（movies + scenes）。"""
+    from ..crawlers.theporndb import get_number
+
+    token = str(getattr(manager.config, "theporndb_api_token", "") or "").strip()
+    if not token:
+        return {}
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    site = Website.THEPORNDB.value
+    for name in _pick_name(names, 2):
+        hits: dict[str, NumberHit] = {}
+        for kind in ("movies", "scenes"):
+            page = 1
+            while not _out_of_time() and page <= 10:
+                url = f"{_THEPORNDB_API}/{kind}?q={quote(name)}&per_page=100&page={page}"
+                data = await _http_json(url, headers=headers)
+                if not data:
+                    break
+                rows = data.get("data") or []
+                if not rows:
+                    break
+                for row in rows:
+                    title = str(row.get("title") or "")
+                    site_info = row.get("site") if isinstance(row.get("site"), dict) else {}
+                    number = get_number(str(site_info.get("short_name") or ""), str(row.get("date") or ""), title)
+                    slug = str(row.get("slug") or "")
+                    _merge(hits, number, site, f"{_THEPORNDB_WEB}/{kind}/{slug}" if slug else "")
+                if len(rows) < 100:
+                    break
+                page += 1
+        if hits:
+            return hits
+    return {}
+
+
+# ---------------------------------------------------------------------------
+# 动漫：Getchu
+# ---------------------------------------------------------------------------
+
+
+async def _fetch_getchu(names: list[str]) -> dict[str, NumberHit]:
+    """动漫：Getchu 关键字搜索，标题里取番号（同人/游戏品番）。"""
+    base = manager.config.get_site_url(Website.GETCHU, _GETCHU_FALLBACK).rstrip("/")
+    site = Website.GETCHU.value
+    for name in _pick_name(names, 2):
+        keyword = quote(name, encoding="euc-jp", errors="ignore")
+        html = await _http_text(f"{base}/php/search.phtml?genre=all&search_keyword={keyword}&gc=gc", encoding="euc-jp")
+        if not html:
+            continue
+        root = _html_tree(html)
+        if root is None:
+            continue
+        hits: dict[str, NumberHit] = {}
+        for a in root.xpath("//a[@class='blueb']"):
+            title = _joined_text(a)
+            href = str(a.get("href") or "").replace("../", "/")
+            for number in extract_numbers(title):
+                _merge(hits, number, site, urljoin(base + "/", href))
+        if hits:
+            return hits
+    return {}
+
+
+# ---------------------------------------------------------------------------
+# 站点注册表
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class Source:
+    site: str
+    fetch: Callable[[list[str]], Awaitable[dict[str, NumberHit]]]
+    # 同一个域名组的站点串行跑（避免同时打同一台站被封），不同组之间并发
+    group: str = ""
+    # 该站点的单次等待上限（秒）。JavLibrary 系走 CF 绕过，天然慢，给得短一些
+    timeout: float = 120.0
+
+
+SOURCES_BY_TYPE: dict[str, tuple[Source, ...]] = {
+    "有码": (
+        Source(Website.DMM.value, _fetch_dmm, "dmm", 60),
+        Source(Website.DMM_API.value, _fetch_dmm_api, "dmm", 120),
+        Source(Website.LIBREDMM.value, _fetch_libredmm, "libredmm", 120),
+        # JavDB 三站同一台域名，串行跑；作品多的演员（如欧美）页数很多，
+        # 到点就由翻页循环自己收手，把已拿到的番号带回来，不整站丢弃
+        Source(Website.JAVDB.value, _fetch_javdb, "javdb", 90),
+        Source(Website.JAVDB_API.value, _fetch_javdb_api, "javdb", 60),
+        Source(Website.JAVDB_APP.value, _fetch_javdb_app_all, "javdb", 60),
+        # JavLibrary 原站/镜像都有 CF 墙，过盾本身就慢；单个站点给 60s
+        Source(Website.JAVLIBRARY_MIRROR.value, _fetch_javlibrary_mirror, "javlibrary", 60),
+        Source(Website.JAVLIBRARY.value, _fetch_javlibrary, "javlibrary", 60),
+        Source(Website.JAVBUS.value, _fetch_javbus, "javbus", 120),
+    ),
+    "无码": (
+        Source(Website.AVSOX.value, _fetch_avsox, "avsox"),
+        Source(Website.JAVDB.value, _fetch_javdb, "javdb", 90),
+        Source(Website.JAVDB_API.value, _fetch_javdb_api, "javdb", 60),
+        Source(Website.JAVDB_APP.value, _fetch_javdb_app_all, "javdb", 60),
+    ),
+    "FC2": (
+        Source(Website.AVSOX.value, _fetch_avsox, "avsox"),
+        Source(Website.FC2.value, _fetch_fc2, "fc2"),
+        Source(Website.FC2PPVDB.value, _fetch_fc2ppvdb, "fc2"),
+        Source(Website.JAVDB.value, _fetch_javdb_fc2, "javdb", 90),
+        Source(Website.JAVDB_API.value, _fetch_javdb_api_fc2, "javdb", 60),
+        Source(Website.JAVDB_APP.value, _fetch_javdb_app_fc2, "javdb", 60),
+    ),
+    "欧美": (
+        Source(Website.AVHEAT.value, _fetch_avheat, "avheat"),
+        Source(Website.THEPORNDB.value, _fetch_theporndb, "theporndb"),
+        Source(Website.JAVDB.value, _fetch_javdb, "javdb", 90),
+        Source(Website.JAVDB_API.value, _fetch_javdb_api, "javdb", 60),
+        Source(Website.JAVDB_APP.value, _fetch_javdb_app_all, "javdb", 60),
+    ),
+    "国产": (
+        Source(Website.IQQTV.value, _fetch_iqqtv, "guochan"),
+        Source(Website.MADOUCLUB.value, _fetch_madou_club, "guochan"),
+        Source(Website.MADOUQU.value, _fetch_madouqu, "guochan"),
+        Source(Website.JAVDAY.value, _fetch_javday, "guochan"),
+    ),
+    "动漫": (
+        Source(Website.JAVDB_APP.value, _fetch_javdb_app_all, "javdb", 60),
+        Source(Website.GETCHU.value, _fetch_getchu, "getchu"),
+    ),
+}
+
+ACTOR_TYPES: tuple[str, ...] = tuple(SOURCES_BY_TYPE)
+
+
+# ---------------------------------------------------------------------------
+# 演员名解析
+# ---------------------------------------------------------------------------
+
+
+async def resolve_actor_names(name: str) -> list[str]:
+    """把用户填的名字扩展成各站能查到的写法（日文原名 / 繁中 / 别名）。
+
+    日文站（DMM、JavBus、JavLibrary、libredmm）只认日文原名，用户填简体
+    「三上悠亚」时这些站一个都查不到；JavDB 的演员库里同时存着原名与
+    繁中/别名，用它解析一次，后续所有站点共用这组名字变体。
+    """
+    base_name = str(name or "").strip()
+    if not base_name:
+        return []
+    names: list[str] = [base_name]
+
+    def push(value: str) -> None:
+        value = str(value or "").strip()
+        if value and value not in names:
+            names.append(value)
+
+    # 1) JavDB 移动端演员搜索：一次请求拿到 name / name_zht / other_name
+    try:
+        from ..crawlers.javdb_app import _API_BASE, _build_api_params, _get_api_url, make_signature
+
+        params = _build_api_params()
+        params.update({"q": base_name, "page": "1", "type": "actor", "limit": "10"})
+        data = await _http_json(
+            _get_api_url(_API_BASE, "/api/v2/search", params),
+            headers={"jdsignature": make_signature(), "accept-language": "zh", "User-Agent": "Dart/3.5 (dart:io)"},
+        )
+        for actor in ((data or {}).get("data") or {}).get("actors") or []:
+            actor_name = str(actor.get("name") or "")
+            if not _name_matches(base_name, actor_name):
+                continue
+            push(actor_name)
+            push(str(actor.get("name_zht") or ""))
+            for alias in re.split(r"[,，、/]", str(actor.get("other_name") or "")):
+                push(alias)
+    except Exception:
+        pass
+
+    # 2) JavDB 网页演员页标题：「三上悠亜, 三上悠亞」
+    try:
+        base = manager.config.get_site_url(Website.JAVDB, _JAVDB_FALLBACK).rstrip("/")
+        path = await _javdb_actor_path(base, base_name)
+        if path:
+            html = await _http_text(f"{base}{path}", headers=_javdb_cookie())
+            if html:
+                root = _html_tree(html)
+                if root is not None:
+                    for node in root.xpath('//div[contains(@class,"actor-section-name")]'):
+                        for part in re.split(r"[,，、/]", _joined_text(node)):
+                            push(part)
+    except Exception:
+        pass
+
+    # 3) 兜底：简转繁（「三上悠亚」→「三上悠亞」），至少让繁体站能查
+    if len(names) == 1:
+        try:
+            from zhconv import convert as zhconv_convert
+
+            push(zhconv_convert(base_name, "zh-hant"))
+        except Exception:
+            pass
+
+    return names
+
+
+async def _run_source(source: Source, names: list[str]) -> dict[str, NumberHit]:
+    """单个站点：首次 + 一次重试，最多两次请求机会。
+
+    到时间预算就由翻页循环自己收手（拿到的番号照常返回），不再重试；
+    超时说明站点慢或被盾拦住，再来一次只是把等待翻倍。
+    """
+    for attempt in (1, 2):
+        token = _DEADLINE.set(time.monotonic() + source.timeout)
+        try:
+            hits = await asyncio.wait_for(source.fetch(names), timeout=source.timeout + 15)
+        except TimeoutError:
+            return {}
+        except Exception:
+            hits = {}
+        finally:
+            _DEADLINE.reset(token)
+        if hits:
+            return hits
+        if attempt == 2:
             break
-    return all_nums
+    return {}
+
+
+async def _run_group(sources: list[Source], names: list[str]) -> dict[str, dict[str, NumberHit]]:
+    """同域名组内串行（先跑的站点优先级更高），组与组之间由调用方并发。"""
+    results: dict[str, dict[str, NumberHit]] = {}
+    for source in sources:
+        results[source.site] = await _run_source(source, names)
+    return results
+
+
+async def collect_numbers(
+    actor_type: str, names: list[str], *, log: Callable[[str], None] | None = None
+) -> dict[str, NumberHit]:
+    """按类型汇总各站点番号；每个站点最多请求两次（首次 + 一次重试）。
+
+    返回 `{归一化键: NumberHit}`，同番号只保留优先级最高（列表里最靠前）的站点。
+    不同域名的站点组并发跑，同域名组内串行，避免同时打同一台站被封。
+    """
+    emit = log or _log
+    sources = SOURCES_BY_TYPE.get(actor_type, SOURCES_BY_TYPE["有码"])
+
+    groups: dict[str, list[Source]] = {}
+    for source in sources:
+        groups.setdefault(source.group or source.site, []).append(source)
+    emit(f"   并行查询 {len(groups)} 组站点，共 {len(sources)} 个站点...")
+    group_results = await asyncio.gather(*[_run_group(items, names) for items in groups.values()])
+    per_source: dict[str, dict[str, NumberHit]] = {}
+    for result in group_results:
+        per_source.update(result)
+
+    merged: dict[str, NumberHit] = {}
+    for source in sources:
+        hits = per_source.get(source.site) or {}
+        if not hits:
+            emit(f"   {source.site}: 未取到番号")
+            continue
+        fresh = sum(1 for key in hits if key not in merged)
+        for key, hit in hits.items():
+            merged.setdefault(key, hit)
+        emit(f"   {source.site}: {len(hits)} 部（新增 {fresh}）")
+    return merged

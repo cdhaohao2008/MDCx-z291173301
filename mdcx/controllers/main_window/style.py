@@ -421,6 +421,14 @@ def set_style(self: MyMAinWindow):
         QComboBox#comboBox_ui_scale{{
             padding: 3px 0px 3px 8px;
         }}
+        /* 「检查演员缺失番号」右侧的类型下拉框：宽度被「与选择目录按钮严格上下对齐」
+           钉死在 110px，不能加宽，只能从控件内部腾地方。通用 QComboBox 的
+           `padding-right: 30px` 与 26px 箭头重复占位，110px 的框里文本区只剩 44px，
+           而「自动判断」要 52px，末字被截成半个。清零右内边距后文本区 44→74px，
+           外框宽度与箭头位置都不动（见 tests/test_actor_type_combo_text_fit.py）。 */
+        QComboBox#comboBox_actor_type{{
+            padding: 3px 0px 3px 8px;
+        }}
         QComboBox::drop-down{{
             subcontrol-origin: padding;
             subcontrol-position: top right;
@@ -1091,6 +1099,11 @@ def set_dark_style(self: MyMAinWindow):
         QComboBox#comboBox_ui_scale{{
             padding: 3px 0px 3px 8px;
         }}
+        /* 暗色同理：类型下拉框宽 110px 固定，右内边距清零后「自动判断」才不被截字。 */
+        QComboBox#comboBox_actor_type{{
+            padding: 3px 0px 3px 8px;
+        }}
+
         QComboBox::drop-down {{
             subcontrol-origin: padding;
             subcontrol-position: right;

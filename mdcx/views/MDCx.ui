@@ -1969,6 +1969,54 @@
                     <string>选择目录</string>
                   </property>
                 </widget>
+                <widget class="QComboBox" name="comboBox_actor_type">
+                  <property name="geometry">
+                    <rect>
+                      <x>571</x>
+                      <y>96</y>
+                      <width>110</width>
+                      <height>30</height>
+                    </rect>
+                  </property>
+                  <property name="toolTip">
+                    <string>选择后直接按该类型的网站列表查缺失番号，跳过演员名后的类型标注。选「自动判断」时按 (无码)(欧美)(国产)(动漫)(FC2) 标注走，未标注按有码。</string>
+                  </property>
+                  <item>
+                    <property name="text">
+                      <string>自动判断</string>
+                    </property>
+                  </item>
+                  <item>
+                    <property name="text">
+                      <string>有码番号</string>
+                    </property>
+                  </item>
+                  <item>
+                    <property name="text">
+                      <string>无码番号</string>
+                    </property>
+                  </item>
+                  <item>
+                    <property name="text">
+                      <string>个摄番号</string>
+                    </property>
+                  </item>
+                  <item>
+                    <property name="text">
+                      <string>欧美视频</string>
+                    </property>
+                  </item>
+                  <item>
+                    <property name="text">
+                      <string>国产传媒</string>
+                    </property>
+                  </item>
+                  <item>
+                    <property name="text">
+                      <string>动漫里番</string>
+                    </property>
+                  </item>
+                </widget>
                 <widget class="QLabel" name="label_62">
                   <property name="geometry">
                     <rect>

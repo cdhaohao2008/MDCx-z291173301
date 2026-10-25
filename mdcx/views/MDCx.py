@@ -729,6 +729,16 @@ class Ui_MDCx(object):
         self.pushButton_select_local_library = QtWidgets.QPushButton(parent=self.groupBox_19)
         self.pushButton_select_local_library.setGeometry(QtCore.QRect(571, 40, 110, 40))
         self.pushButton_select_local_library.setObjectName("pushButton_select_local_library")
+        self.comboBox_actor_type = QtWidgets.QComboBox(parent=self.groupBox_19)
+        self.comboBox_actor_type.setGeometry(QtCore.QRect(571, 96, 110, 30))
+        self.comboBox_actor_type.setObjectName("comboBox_actor_type")
+        self.comboBox_actor_type.addItem("")
+        self.comboBox_actor_type.addItem("")
+        self.comboBox_actor_type.addItem("")
+        self.comboBox_actor_type.addItem("")
+        self.comboBox_actor_type.addItem("")
+        self.comboBox_actor_type.addItem("")
+        self.comboBox_actor_type.addItem("")
         self.label_62 = QtWidgets.QLabel(parent=self.groupBox_19)
         self.label_62.setGeometry(QtCore.QRect(80, 140, 561, 20))
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
@@ -13203,6 +13213,19 @@ class Ui_MDCx(object):
         self.label_72.setText(_translate("MDCx", "本地资源库："))
         self.pushButton_find_missing_number.setText(_translate("MDCx", "检查缺失番号"))
         self.pushButton_select_local_library.setText(_translate("MDCx", "选择目录"))
+        self.comboBox_actor_type.setToolTip(
+            _translate(
+                "MDCx",
+                "选择后直接按该类型的网站列表查缺失番号，跳过演员名后的类型标注。选「自动判断」时按 (无码)(欧美)(国产)(动漫)(FC2) 标注走，未标注按有码。",
+            )
+        )
+        self.comboBox_actor_type.setItemText(0, _translate("MDCx", "自动判断"))
+        self.comboBox_actor_type.setItemText(1, _translate("MDCx", "有码番号"))
+        self.comboBox_actor_type.setItemText(2, _translate("MDCx", "无码番号"))
+        self.comboBox_actor_type.setItemText(3, _translate("MDCx", "个摄番号"))
+        self.comboBox_actor_type.setItemText(4, _translate("MDCx", "欧美视频"))
+        self.comboBox_actor_type.setItemText(5, _translate("MDCx", "国产传媒"))
+        self.comboBox_actor_type.setItemText(6, _translate("MDCx", "动漫里番"))
         self.label_62.setText(_translate("MDCx", "本地资源库和演员名都可以填写多个，以中英文逗号分开"))
         self.groupBox_6.setTitle(
             _translate("MDCx", "移动视频与字幕（将待刮削目录下所有子目录中的视频文件移动到一个目录中以方便进行查看）")

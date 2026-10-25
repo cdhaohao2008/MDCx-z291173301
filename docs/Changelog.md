@@ -4,6 +4,27 @@
 
 ## 2026-10-25
 
+### 工具页「检查演员缺失番号」加「类型」下拉框
+
+- 「演员名查缺」输入框右侧（「选择目录」按钮正下方）新增 `comboBox_actor_type`，七项：自动判断 / 有码番号 / 无码番号 / 个摄番号 / 欧美视频 / 国产传媒 / 动漫里番。文案与顺序复用「软件设置 → 锁定类型」（`FixedScrapingType.names()`）去掉「国产短剧」——国产短剧多为 AI 生成、没有演员，按演员名查不到东西。
+- 几何：左缘与「选择目录」按钮严格上下对齐、宽度同按钮（110）、高度同「演员名查缺」输入框（30）。该下拉框是 groupBox_19 的绝对定位直接子项，QComboBox 会被 `CustomScrollArea` 通用宽幅同步判为 `_STRETCH`（只向右长），而按钮判为 `_DOCK_RIGHT`（右缘锚定右移），宽态下两者左缘会错开——故把 `comboBox_actor_type` 登记进 `_MANUAL_WIDGET_NAMES`，几何交给 `_sync_tool_page_input_fill` 按按钮/输入框实时几何钉死，1050/1170/1600 三档窗宽逐像素对齐（`tests/test_tool_page_right_align.py::test_actor_type_combo_aligns_under_select_dir_button`）。
+- 「自动判断」末字只显示一半：宽度被对齐要求钉死在 110px，而通用 `QComboBox` 的 `padding: 3px 30px 3px 8px` 与 26px 的 drop-down 箭头**重复占位**，文本区只剩 44px，四个 13px 汉字要 52px。明暗两套样式各加一条 `QComboBox#comboBox_actor_type { padding: 3px 0px 3px 8px; }`（与 `comboBox_ui_scale` 同一修法），文本区 44→74px，外框宽度与箭头位置不动；`tests/test_actor_type_combo_text_fit.py` 在真实主窗口上量 `SC_ComboBoxEditField` 宽度，明暗两套主题各测一次。
+- 选具体类型后，`check_missing_number(actor_flag, forced_type)` 用 `apply_forced_type()` 把所有演员的类型统一成该类型，直接调该类型的网站列表查缺失番号；选「自动判断」仍按演员名后的 `(无码)(欧美)(国产)(动漫)(FC2)` 标注走，未标注按有码。个摄番号对应内部的 FC2 类型。
+- 下拉框文案由 `tests/test_actor_missing_numbers.py::test_tool_actor_type_combo_reuses_fixed_type_options` 钉在 `FixedScrapingType.names()` 上，设置页改了选项这里会一起失败提醒。
+
+### 「检查演员缺失番号」改成多站点汇总 + 归一化对比 + Excel 输出
+
+- 数据源按类型重排（顺序即优先级，同番号记在最靠前的站）：有码 `DMM → DMM_API → LibreDMM → JavDB → JavDB_API → JavDB_APP → Javlibrary·镜像 → JavLibrary → JavBus`；无码 `AVSOX → JavDB → JavDB_API → JavDB_APP`；FC2 `AVSOX → FC2 → FC2PPVDB → JavDB → JavDB_API → JavDB_APP`；欧美 `AVheat → ThepornDB → JavDB → JavDB_API → JavDB_APP`；国产 `IQQTV → Madou.club → Madouqu → JavDay`；动漫 `JavDB_APP（签名 API）→ Getchu`。
+- `tools/actor_sources.py` 重写为「站点注册表 + 统一归一化」：各站返回的 `ssis00006` / `SSIS-006` / `FC2-PPV-1234567` 先经 `normalize_key()` 折叠成比较键再与本地 `number_list` 比对，`display_number()` 负责还原成 `SSIS-006` / `FC2-1234567` 的展示形态。
+- 每个站点最多请求两次（首次 + 一次重试）；超时不重试。不同域名的站点组并发、同域名组（JavDB 三站、JavLibrary 两站）串行，实测三上悠亚（有码）9 站合计 487 个番号、用时约 125 秒（其中 JavLibrary 两站在被 Cloudflare 拦住时各占 60 秒超时）。
+- 演员名先解析再查询：`resolve_actor_names()` 用 JavDB 演员库拿到日文原名/繁中/别名（三上悠亚 → 三上悠亜），解决日文站只认原名、填简体时全站查不到的问题。
+- 日志不再打印番号清单，只留每站命中数与缺失统计；缺失番号写入本地资源库目录下 `演员名.xlsx`（三列：番号 / 网站 / 链接地址，番号 A-Z 排列，番号与网站居中、链接靠左，列宽 8.8 / 11 / 100）。
+
+### JavBus 12 个内置镜像实测审查：删掉 4 个失效的
+
+- 实测（2026-10-25，应用自身代理）：`busjav.bond`、`seejav.cyou`、`javbus.bond` 返回 5568 字节的 JS 跳转壳（`Redirecting...`，不是站点内容，`javbus.bond` 还伴随 HTTP/2 RST），`buscdn.bond` 直接 404。四个已从 `tools/actor_sources.py::_JAVBUS_DOMAINS` 删除。
+- 保留并逐个验过标题为「JavBus - AV磁力連結分享」的 8 个：`www.javbus.com`、`www.dmmsee.casa`、`www.cdnbus.bond`、`www.javsee.cyou`、`www.fanbus.bond`、`www.busdmm.bond`、`www.cdnbus.cyou`、`www.dmmbus.bond`。
+
 ### 信息管理切换番号时封面/缩略图不跟着换
 
 - 现象：信息管理页选中目录后上下切换 NFO，部分番号（如 `FC2-1385526`、`FC2-1387324`）右侧封面与缩略图仍显示前一个番号（`FC2-1379316`）的图，但表单字段与封面 URL 都是当前番号的。

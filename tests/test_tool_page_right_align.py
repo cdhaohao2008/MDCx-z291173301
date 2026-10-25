@@ -100,3 +100,38 @@ def test_tool_right_aligns_with_setting(win, app, width):
     assert tool_right == setting_right, (width, tool_right, setting_right)
     # 左缘不动：演员库分组左缘保持设计值 30
     assert ui.groupBox_actor_db_maintenance.x() == 30
+
+
+@pytest.mark.parametrize("width", [1050, 1170, 1600])
+def test_actor_type_combo_aligns_under_select_dir_button(win, app, width):
+    """「演员名查缺」右侧的类型下拉框：左缘/宽度跟「选择目录」按钮，高度跟输入框。
+
+    用户 2026-10-25 截图要求：下拉框左侧缩到与上方「选择目录」按钮严格上下对齐，
+    高度与「演员名查缺」输入框一致；按钮自身位置保持不变。
+
+    坑：这个下拉框是 groupBox_19 的绝对定位直接子项，QComboBox 会被
+    CustomScrollArea 的通用宽幅同步判为 _STRETCH（只向右长、左缘不动），
+    而「选择目录」按钮判为 _DOCK_RIGHT（右缘锚定、随页宽右移），
+    两者在宽态下左缘就错开了。故下拉框登记进 _MANUAL_WIDGET_NAMES，
+    几何交给 _sync_tool_page_input_fill 按按钮/输入框实时几何钉死。
+    """
+    ui = win.Ui
+    win.resize(width, 800)
+    win.show()
+    app.processEvents()
+    ui.stackedWidget.setCurrentWidget(ui.page_tool)
+    app.processEvents()
+    win._sync_page_layouts()
+    app.processEvents()
+
+    anchor = ui.groupBox_19
+    combo = ui.comboBox_actor_type
+    button = ui.pushButton_select_local_library
+    edit = ui.lineEdit_actors_name
+    combo_top = combo.mapTo(anchor, combo.rect().topLeft()).y()
+    edit_top = edit.mapTo(anchor, edit.rect().topLeft()).y()
+
+    assert combo.x() == button.x(), (width, combo.x(), button.x())
+    assert combo.width() == button.width(), (width, combo.width(), button.width())
+    assert combo.height() == edit.height(), (width, combo.height(), edit.height())
+    assert combo_top == edit_top, (width, combo_top, edit_top)

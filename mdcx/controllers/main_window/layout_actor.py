@@ -656,6 +656,16 @@ class LayoutActorMixin:
             if act is None or ref is None:
                 continue
             act.setGeometry(act.x(), act.y(), max(ref.x() - GAP - act.x(), 150), act.height())
+        # 「演员名查缺」右侧的类型下拉框：左缘与「选择目录」按钮左缘严格对齐、
+        # 宽度同按钮、高度同输入框（用户 2026-10-25 要求）。宽度/高度都读实时几何，
+        # 页宽变化时按钮被右缘锚定右移，下拉跟着走，两者永远同一条竖线上。
+        combo = getattr(ui, "comboBox_actor_type", None)
+        select_btn = getattr(ui, "pushButton_select_local_library", None)
+        actor_edit = getattr(ui, "lineEdit_actors_name", None)
+        anchor = getattr(ui, "groupBox_19", None)
+        if combo is not None and select_btn is not None and actor_edit is not None and anchor is not None:
+            edit_top = actor_edit.mapTo(anchor, actor_edit.rect().topLeft()).y()
+            combo.setGeometry(select_btn.x(), edit_top, select_btn.width(), actor_edit.height())
 
     @staticmethod
     def _scroll_stretch_extra(scroll) -> int:
