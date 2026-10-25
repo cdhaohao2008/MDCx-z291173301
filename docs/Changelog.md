@@ -2,6 +2,15 @@
 
 按日期分段记录（`## YYYY-MM-DD`，新 → 旧）。每条只写「做了什么 / 改了什么 / 修了什么」，原因与排查过程见 `docs/Development.md` 与 `DADA/MEMORY.md`。
 
+## 2026-10-25
+
+### 信息管理切换番号时封面/缩略图不跟着换
+
+- 现象：信息管理页选中目录后上下切换 NFO，部分番号（如 `FC2-1385526`、`FC2-1387324`）右侧封面与缩略图仍显示前一个番号（`FC2-1379316`）的图，但表单字段与封面 URL 都是当前番号的。
+- 根因：`nfo_lib_layout.py::_sync_nfo_lib_preview_pixmaps()` 只在「缩放后的预览图尺寸变化」时才 `setPixmap`。FC2 归档的封面多为 1:1（如 `poster.jpg`），不同番号的图缩放到同一个预览框后尺寸完全一致，于是被误判为「图没变」，一直保留上一张。
+- 修复：预览同步新增 `force` 参数；`nfo_library.py::on_nfo_lib_data_loaded()` 与 `_refresh_nfo_lib_previews()` 在换图后传 `force=True` 强制重设。预览图读取统一收进 `_load_nfo_lib_pixmap()`，路径缺失或图片损坏时返回 `None` 并显示「无海报 / 无缩略图」，同样不会残留旧图。
+- 测试：`tests/test_nfo_library_maximize_preview.py::test_switch_nfo_refreshes_same_size_preview_images` 用同尺寸红/蓝图钉住「切番号必须换图」，并覆盖无图番号的占位清理。
+
 ## 2026-10-24
 
 ### JavBus 四条线路一律改用 www 入口：网络检测不再误报「Cookie 可能无效」

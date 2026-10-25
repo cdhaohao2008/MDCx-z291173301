@@ -669,6 +669,64 @@ def test_preview_pixmaps_rescale_after_resize(win, app, tmp_path):
     assert after[0] > before[0], f"放大窗口后海报没有跟着变大: {before[0]} -> {after[0]}"
 
 
+def _preview_center_color(label):
+    """取预览 label 内 pixmap 的中心像素（用于判断显示的是哪一张图）。"""
+    pixmap = label.pixmap()
+    assert pixmap is not None and not pixmap.isNull(), f"{label.objectName()} 没有图片"
+    image = pixmap.toImage()
+    return image.pixelColor(image.width() // 2, image.height() // 2)
+
+
+def test_switch_nfo_refreshes_same_size_preview_images(win, app, tmp_path):
+    """切换番号时封面/缩略图必须跟着换，即使新旧图缩放后尺寸完全相同。
+
+    用户归档（FC2）里每个番号子目录用通用名 poster.jpg / thumb.jpg，封面多
+    为 1:1：缩放到同一个预览框后尺寸完全一致。旧逻辑只在「缩放后尺寸变了」
+    时才 setPixmap，因此切到后面的番号仍显示第一次载入的图；这里用两种颜色
+    的图钉住内容必须真的换掉。
+    """
+    root = tmp_path / "switch_preview"
+    colors = {"AAA-001": (255, 0, 0), "BBB-002": (0, 0, 255)}
+    for name, color in colors.items():
+        folder = root / name
+        folder.mkdir(parents=True)
+        (folder / f"{name}.nfo").write_text(f"<movie><title>{name}</title><num>{name}</num></movie>", encoding="utf-8")
+        # 目录通用名、同尺寸：与用户归档的实际结构一致
+        Image.new("RGB", (300, 420), color).save(folder / "poster.jpg", quality=95)
+        Image.new("RGB", (400, 225), color).save(folder / "thumb.jpg", quality=95)
+    no_image = root / "CCC-003"
+    no_image.mkdir()
+    (no_image / "CCC-003.nfo").write_text("<movie><title>CCC-003</title><num>CCC-003</num></movie>", encoding="utf-8")
+
+    _goto_nfo_lib(win, app)
+    win.resize(1030, 700)
+    win.Ui.lineEdit_nfo_lib_dir.setText(str(root))
+    win.pushButton_nfo_lib_refresh_clicked()
+    assert _wait_until(app, lambda: win.Ui.lineEdit_nfo_lib_title.text() == "AAA-001"), "第一个番号未加载"
+    first_poster = _preview_center_color(win.Ui.label_nfo_lib_poster_preview)
+    first_thumb = _preview_center_color(win.Ui.label_nfo_lib_thumb_preview)
+    assert first_poster.red() > 200 and first_poster.blue() < 80, "第一个番号封面加载错误"
+    assert first_thumb.red() > 200 and first_thumb.blue() < 80, "第一个番号缩略图加载错误"
+
+    win.Ui.listWidget_nfo_lib.setCurrentRow(1)
+    assert _wait_until(app, lambda: win.Ui.lineEdit_nfo_lib_title.text() == "BBB-002"), "第二个番号未加载"
+    second_poster = _preview_center_color(win.Ui.label_nfo_lib_poster_preview)
+    second_thumb = _preview_center_color(win.Ui.label_nfo_lib_thumb_preview)
+    assert second_poster.blue() > 200 and second_poster.red() < 80, "切番号后封面仍显示上一张"
+    assert second_thumb.blue() > 200 and second_thumb.red() < 80, "切番号后缩略图仍显示上一张"
+
+    # 没有图片的番号：占位文字顶掉上一张图，不能残留旧封面
+    win.Ui.listWidget_nfo_lib.setCurrentRow(2)
+    assert _wait_until(app, lambda: win.Ui.lineEdit_nfo_lib_title.text() == "CCC-003"), "第三个番号未加载"
+    assert win.Ui.label_nfo_lib_poster_preview.text() == "无海报"
+    assert win.Ui.label_nfo_lib_thumb_preview.text() == "无缩略图"
+    # setText 后 QLabel.pixmap() 仍返回对象，但内容必须是空的
+    poster_pix = win.Ui.label_nfo_lib_poster_preview.pixmap()
+    thumb_pix = win.Ui.label_nfo_lib_thumb_preview.pixmap()
+    assert poster_pix is None or poster_pix.isNull()
+    assert thumb_pix is None or thumb_pix.isNull()
+
+
 def test_long_url_title_cursor_at_start(win, app):
     """标题/封面URL/海报URL 填长文本后光标归零，优先展示开头的 http(s)://。"""
     from mdcx.models.model_types import CrawlersResult

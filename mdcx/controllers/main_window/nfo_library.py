@@ -292,6 +292,22 @@ def listWidget_nfo_lib_item_clicked(self: MyMAinWindow) -> None:
     executor.submit(_load())
 
 
+def _load_nfo_lib_pixmap(path: Path | None) -> QPixmap | None:
+    """读取本地预览图；路径缺失、读盘失败或图片损坏时返回 None。
+
+    每次切换番号都重新读盘，不沿用上一张图；返回 None 时由调用方显示占位文字。
+    """
+    if path is None:
+        return None
+    try:
+        if not path.is_file():
+            return None
+    except OSError:
+        return None
+    pix = QPixmap(str(path))
+    return None if pix.isNull() else pix
+
+
 def on_nfo_lib_data_loaded(self: MyMAinWindow, nfo_path_str: str) -> None:
     """后台读取 NFO 完成后，在主线程填充表单（线程安全）。"""
     data: CrawlersResult | None = getattr(self, "_nfo_lib_pending_data", None)
@@ -335,19 +351,15 @@ def on_nfo_lib_data_loaded(self: MyMAinWindow, nfo_path_str: str) -> None:
     # 加载本地封面预览（只存原图，贴边缩放统一交给 _sync_nfo_lib_preview_pixmaps）
     poster_path = info.poster_path if info else None
     thumb_path = info.thumb_path if info else None
-    if poster_path and poster_path.is_file():
-        pix = QPixmap(str(poster_path))
-        self._nfo_lib_poster_pix = pix if not pix.isNull() else None
-    else:
-        self._nfo_lib_poster_pix = None
+    self._nfo_lib_poster_pix = _load_nfo_lib_pixmap(poster_path)
+    self._nfo_lib_thumb_pix = _load_nfo_lib_pixmap(thumb_path)
+    if self._nfo_lib_poster_pix is None:
         self.Ui.label_nfo_lib_poster_preview.setText("无海报")
-    if thumb_path and thumb_path.is_file():
-        pix = QPixmap(str(thumb_path))
-        self._nfo_lib_thumb_pix = pix if not pix.isNull() else None
-    else:
-        self._nfo_lib_thumb_pix = None
+    if self._nfo_lib_thumb_pix is None:
         self.Ui.label_nfo_lib_thumb_preview.setText("无缩略图")
-    self._sync_nfo_lib_preview_pixmaps()
+    # force=True：换番号后新图缩放尺寸可能与旧图完全相同（同为 1:1 封面），
+    # 只按尺寸判断会漏掉 setPixmap，导致仍显示上一张图。
+    self._sync_nfo_lib_preview_pixmaps(force=True)
 
     # 保留原始数据副本作为保存前 diff 的基准
     self._nfo_lib_original_data = copy.deepcopy(data)
@@ -376,19 +388,14 @@ def _refresh_nfo_lib_previews(self: MyMAinWindow) -> None:
         return
     poster_path = _resolve_nfo_image(nfo_path, "poster")
     thumb_path = _resolve_nfo_image(nfo_path, "thumb")
-    if poster_path is not None:
-        pix = QPixmap(str(poster_path))
-        self._nfo_lib_poster_pix = pix if not pix.isNull() else None
-    else:
-        self._nfo_lib_poster_pix = None
+    self._nfo_lib_poster_pix = _load_nfo_lib_pixmap(poster_path)
+    self._nfo_lib_thumb_pix = _load_nfo_lib_pixmap(thumb_path)
+    if self._nfo_lib_poster_pix is None:
         self.Ui.label_nfo_lib_poster_preview.setText("无海报")
-    if thumb_path is not None:
-        pix = QPixmap(str(thumb_path))
-        self._nfo_lib_thumb_pix = pix if not pix.isNull() else None
-    else:
-        self._nfo_lib_thumb_pix = None
+    if self._nfo_lib_thumb_pix is None:
         self.Ui.label_nfo_lib_thumb_preview.setText("无缩略图")
-    self._sync_nfo_lib_preview_pixmaps()
+    # 见 on_nfo_lib_data_loaded：新图缩放尺寸可能与旧图相同，必须强制重设
+    self._sync_nfo_lib_preview_pixmaps(force=True)
 
 
 def _collect_form_data(self: MyMAinWindow) -> CrawlersResult:

@@ -232,7 +232,7 @@ class NfoLibLayoutMixin:
             layout.invalidate()
             layout.activate()
 
-    def _sync_nfo_lib_preview_pixmaps(self) -> None:
+    def _sync_nfo_lib_preview_pixmaps(self, force: bool = False) -> None:
         """海报/缩略图预览按 label 当前边界等比缩放（图片贴边、保持长宽比）。
 
         载图处（on_nfo_lib_data_loaded / _refresh_nfo_lib_previews）只存原图
@@ -241,7 +241,10 @@ class NfoLibLayoutMixin:
         重新贴边；QLabel 自己不会跟几何重缩放，以前载图时按固定 200×280 /
         200×120 缩一次就不管了，窗口一变图片就贴不上边。
         原图为空（无图）时不动 label，占位文字由载图处负责。
-        只在目标尺寸变化时 setPixmap，避免每遍同步都重设引发闪烁/重排。
+        平时只在目标尺寸变化时 setPixmap，避免每遍同步都重设引发闪烁/重排；
+        但载入新图后必须传 force=True：不同番号的封面常是同一长宽比（FC2
+        归档里多为 1:1），缩放到同一个预览框后尺寸完全一致，只比尺寸会误判
+        「图没变」而不 setPixmap，表现为切换番号后仍显示上一张封面/缩略图。
         跑在 _sync_page_layouts 末尾（预览与按钮行无关，排最后即可），载图后
         也调一次让新图立刻贴边。
         """
@@ -256,7 +259,7 @@ class NfoLibLayoutMixin:
                 continue
             scaled = pix.scaled(size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             current = label.pixmap()
-            if current is None or current.isNull() or current.size() != scaled.size():
+            if force or current is None or current.isNull() or current.size() != scaled.size():
                 label.setPixmap(scaled)
 
     def _nfo_lib_form_rows(self) -> list[tuple[QWidget | None, QWidget | None]]:
