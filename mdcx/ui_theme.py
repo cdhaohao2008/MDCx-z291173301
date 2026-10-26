@@ -237,3 +237,37 @@ def build_scrollbar_style(dark: bool) -> str:
             background: transparent;
         }}
     """
+
+
+def build_setting_button_style(object_name: str, dark: bool) -> str:
+    """设置页里那种紧凑方角小按钮的样式（「导入账单」「设备编号」共用一套）。
+
+    不复用全局那套 8px 描边圆角：设置页里的按钮要和同行的复选框同高（30px）、
+    紧贴文字，圆角一大就显得比复选框"胖"一圈。
+    """
+    t = _tokens(dark)
+    return f"""
+        QPushButton#{object_name} {{
+            color: {t["text"]};
+            background: {t["surface"]};
+            border: 1px solid {t["border"]};
+            border-radius: 4px;
+            padding: 0px 10px;
+            font-size: 13px;
+        }}
+        QPushButton:hover#{object_name} {{
+            color: #FFFFFF;
+            background: {t["accent"]};
+            border-color: {t["accent"]};
+        }}
+        QPushButton:pressed#{object_name} {{
+            color: #FFFFFF;
+            background: {t["accent_pressed"]};
+            border-color: {t["accent_pressed"]};
+        }}
+        QPushButton:disabled#{object_name} {{
+            color: {t["text_disabled"]};
+            background: {t["surface_muted"]};
+            border-color: {t["border"]};
+        }}
+    """

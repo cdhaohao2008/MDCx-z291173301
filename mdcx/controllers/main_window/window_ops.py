@@ -285,6 +285,11 @@ class WindowOpsMixin:
     # 各自锚点，见 _sync_advanced_page_tail_align；该方法每态都按实测锚点重算，
     # 此常量仅作「放弃对齐 / 最小化态复位」时的设计态对照值。
     _ADV_HIDE_LW_W = 551
+    # 高级页「隐藏图标」行右侧「设备编号」按钮与「隐藏菜单图标」复选框之间的间隔。
+    # 该行右端余量实测 104~941px（1000×700 最窄档 → 1920×1170 最宽档），92px 按钮
+    # 加本间隔绰绰有余；窗口更窄时由 _sync_advanced_page_device_id_button 按余量
+    # 收窄按钮，不左移。
+    _ADV_DEVICE_BUTTON_GAP = 10
 
     # 当隐藏边框时，最小化后，点击任务栏时，需要监听事件，在恢复窗口时隐藏边框
     def changeEvent(self, a0):
@@ -370,6 +375,7 @@ class WindowOpsMixin:
             apply_site_priority_theme(self)
             self._style_donate_link()  # 暗黑/亮色切换时同步 [赞助作者] 链接颜色
             self._style_bill_button()  # 同上，同步「导入账单」按钮配色
+            self._style_device_button()  # 同上，同步「设备编号」按钮配色
 
             # self.setWindowState(Qt.WindowNoState)                               # 恢复正常窗口
             self.show()

@@ -180,6 +180,7 @@ module = [
     "mdcx.controllers.main_window.auto_scrape",
     "mdcx.controllers.main_window.bill_import_ui",
     "mdcx.controllers.main_window.cookie_checks",
+    "mdcx.controllers.main_window.device_id_ui",
     "mdcx.controllers.main_window.dock_layout",
     "mdcx.controllers.main_window.folder_select",
     "mdcx.controllers.main_window.layout_actor",

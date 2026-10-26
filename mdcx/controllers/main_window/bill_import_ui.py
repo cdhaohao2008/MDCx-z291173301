@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
 )
 
 from mdcx.signals import signal_qt
-from mdcx.ui_theme import get_theme_tokens
+from mdcx.ui_theme import build_setting_button_style
 from mdcx.utils import machine_binding
 
 _BILL_BUTTON_TEXT = "导入账单"
@@ -41,33 +41,8 @@ _BILL_BIND_POLL_MS = 150
 
 
 def _bill_button_qss(dark: bool) -> str:
-    """「导入账单」按钮样式：贴合设置页的紧凑方角按钮（不复用那套 8px 描边圆角）。"""
-    t = get_theme_tokens(dark)
-    return f"""
-        QPushButton#pushButton_import_bill {{
-            color: {t["text"]};
-            background: {t["surface"]};
-            border: 1px solid {t["border"]};
-            border-radius: 4px;
-            padding: 0px 10px;
-            font-size: 13px;
-        }}
-        QPushButton:hover#pushButton_import_bill {{
-            color: #FFFFFF;
-            background: {t["accent"]};
-            border-color: {t["accent"]};
-        }}
-        QPushButton:pressed#pushButton_import_bill {{
-            color: #FFFFFF;
-            background: {t["accent_pressed"]};
-            border-color: {t["accent_pressed"]};
-        }}
-        QPushButton:disabled#pushButton_import_bill {{
-            color: {t["text_disabled"]};
-            background: {t["surface_muted"]};
-            border-color: {t["border"]};
-        }}
-    """
+    """「导入账单」按钮样式：贴合设置页的紧凑方角按钮（与「设备编号」共用一套）。"""
+    return build_setting_button_style("pushButton_import_bill", dark)
 
 
 class BillImportMixin:

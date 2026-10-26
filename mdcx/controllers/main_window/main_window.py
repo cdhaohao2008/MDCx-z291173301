@@ -46,6 +46,7 @@ from .actor_info import ActorInfoMixin
 from .auto_scrape import AutoScrapeMixin
 from .bill_import_ui import BillImportMixin
 from .cookie_checks import CookieChecksMixin
+from .device_id_ui import DeviceIdMixin
 from .dock_layout import DockLayoutMixin
 from .folder_select import FolderSelectMixin
 from .handlers import show_netstatus
@@ -103,6 +104,7 @@ class MyMAinWindow(
     AutoScrapeMixin,
     BillImportMixin,
     CookieChecksMixin,
+    DeviceIdMixin,
     DockLayoutMixin,
     FolderSelectMixin,
     LayoutActorMixin,
@@ -483,6 +485,7 @@ class MyMAinWindow(
         self.Init_Ui()  # 设置Ui初始状态
         self._init_donate_widgets()  # 侧栏「使用说明」下方加收款码 + [赞助作者] 链接
         self._init_bill_import_button()  # 高级-高级功能加「导入账单」（绑定本机才显示）
+        self._init_device_id_button()  # 高级-隐藏图标行右侧加「设备编号」（导出设备 ID）
         self.load_config()  # 加载配置
         self._setup_name_template_preview()
         self._setup_cf_bypass_hosts_check()

@@ -967,6 +967,9 @@ class LayoutMasterMixin:
         # 最后钉「导入账单」按钮：它的锚点「显示字段内容信息」与同行的「隐藏信息管理」
         # 都已在上面定稿，放在最末尾量到的才是终态坐标（见方法自身说明）。
         self._sync_advanced_page_bill_button()
+        # 「设备编号」按钮：紧贴「隐藏菜单图标」右侧，纵向同行同高（2026-10-26 需求）。
+        # 同样放在最末尾——「隐藏菜单图标」的 x 是上面「隐藏图标行」那段才钉出来的。
+        self._sync_advanced_page_device_id_button()
 
     def _sync_advanced_page_bill_button(self) -> None:
         """「导入账单」按钮：左缘 = 「显示字段内容信息」那条竖线，纵向与「隐藏信息管理」同行。
@@ -1007,6 +1010,47 @@ class LayoutMasterMixin:
         button.setFixedHeight(max(nfo.height(), 1))
         # 极窄窗口下右侧余量可能不够：收窄按钮而不是左移（左缘对齐是硬需求）
         natural = getattr(self, "_bill_button_width", button.width())
+        button.setFixedWidth(min(natural, max(host.width() - target_x, 60)))
+        button.move(target_x, target_y)
+        button.raise_()
+
+    def _sync_advanced_page_device_id_button(self) -> None:
+        """「设备编号」按钮：紧贴「隐藏菜单图标」右侧，纵向与该复选框同行同高。
+
+        需求（2026-10-26）：「在设置-高级-隐藏图标右侧加上设备编号按钮，样式宽度
+        同导入账单一致」。本页「隐藏图标：」那一行的行内布局是
+        ``horizontalLayout_dock``（隐藏Dock图标 | 固定间隔 | 隐藏菜单栏图标 |
+        末尾 Expanding 间隔），故「右侧」= 行末那枚「隐藏菜单图标」的右缘再往右。
+
+        为什么不用布局：与 ``_sync_advanced_page_bill_button`` 同源——按钮若塞进
+        ``horizontalLayout_dock``，行内就多出一项，上面那段 ``gap_b`` 的间隔计算
+        与末尾伸展间隔都要重算，而间隔项的 sizeHint 会顶进 ``gridLayout_20`` 的列宽，
+        把整页连同所有锚点一起推走。绝对定位后本方法只读「隐藏菜单图标」的实测
+        几何，不写任何别人的坐标（与 ``comboBox_actor_type`` 同一套路子）。
+
+        窗口极窄时右端余量可能不够：按余量收窄按钮（左缘仍贴在复选框右侧，
+        绝不左移压字）；余量小于 60px 时保底 60px，宁可右侧被裁一点也不盖住复选框。
+        按钮隐藏（未建好 / 页面还没显示过）时直接返回，零成本。
+        """
+
+        ui = self.Ui
+        button = getattr(ui, "pushButton_device_id", None)
+        if button is None or button.isHidden():
+            return
+        host = ui.gridLayoutWidget_20
+        if not host.isVisibleTo(self):
+            return
+        menu_icon = ui.checkBox_hide_menu_icon
+        if not menu_icon.isVisibleTo(self):
+            return
+        gap = self._ADV_DEVICE_BUTTON_GAP
+        # 「隐藏菜单图标」与按钮同在 host（gridLayoutWidget_20）里，mapTo(host) 直接可用
+        target_x = menu_icon.mapTo(host, QPoint(menu_icon.width(), 0)).x() + gap
+        target_y = menu_icon.mapTo(host, QPoint(0, 0)).y()
+        button.setFixedHeight(max(menu_icon.height(), 1))
+        natural = getattr(self, "_device_button_width", button.width())
+        # 极窄窗口下右侧余量可能不够：按余量收窄按钮而不是左移（左缘贴住复选框是硬需求），
+        # 与 _sync_advanced_page_bill_button 同一公式、同一 60px 下限，两枚按钮收窄规则一致
         button.setFixedWidth(min(natural, max(host.width() - target_x, 60)))
         button.move(target_x, target_y)
         button.raise_()

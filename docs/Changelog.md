@@ -4,6 +4,14 @@
 
 ## 2026-10-26
 
+### 高级页「隐藏图标」行右侧新增「设备编号」按钮（导出设备 ID 的 txt）
+
+- 设置 → 高级 的「隐藏图标：」行末（「隐藏菜单图标」右侧）新增「设备编号」按钮：样式与宽度同「导入账单」（共用 `ui_theme.build_setting_button_style`，同一套自然宽 92~128 与窄窗收窄公式），纵向与「隐藏菜单图标」同行同高、间隔 10px。按钮同样是 `gridLayoutWidget_20` 的绝对定位游离子项，几何由 `_sync_advanced_page_device_id_button` 每遍按「隐藏菜单图标」的实测右缘钉死，不进 `horizontalLayout_dock`、不改任何既有控件坐标。
+- 点击后取本机设备编号（`mdcx/utils/device_id.py`）并弹保存对话框让用户选 txt 存放位置，默认文件名 `设备编号_<计算机名>.txt`、默认落在桌面；正文四行「设备编号 / 系统 / 计算机名 / 生成时间」，UTF-8 写出。
+- 取号口径与系统「关于」页一致：Windows 11 取 `HKLM\SOFTWARE\Microsoft\SQMClient` 的 `MachineId`（即「设置 → 系统 → 关于 → 设备 ID」，带花括号），读不到退回 `Cryptography\MachineGuid` 与 DMI 整机 UUID；macOS 取 `ioreg` 的 `IOPlatformUUID`（硬件 UUID），退回 `system_profiler`；Linux / Ubuntu 取 `/etc/machine-id`，退回 `dbus` 的 machine-id 与 `/sys/class/dmi/id/product_uuid`。全本地读取、不联网，结果进程内缓存。
+- 与「导入账单」不同：本按钮**不绑定机器**——它就是给用户导出编号、发给作者申请授权用的，人人都该点得到。
+- 测试：`tests/test_device_id_button.py`（按钮在「隐藏菜单图标」右侧不重叠且同行同高、宽度与「导入账单」一致、未绑定机器仍显示、显隐前后既有控件坐标不变、导出写 txt / 用户取消 / 取不到编号三条路径、Windows 取号与注册表值一致）。
+
 ### 赞助窗口接入微信 / 支付宝账单：新增「导入账单」入口（绑定本机 CPU）
 
 - 设置 → 高级 → 高级功能 的「隐藏信息管理」右侧新增「导入账单」按钮：左缘与「显示字段内容信息」严格上下对齐（两者 x 相等）、纵向与「隐藏信息管理」同行同高，「显示字段内容信息」位置保持不变。按钮是 `gridLayoutWidget_20` 的绝对定位游离子项、不进任何布局（与 `comboBox_actor_type` 同一套路子），几何由 `_sync_advanced_page_bill_button` 每遍按两个锚点的实测坐标钉死，因此不会把整页列宽连同锚点一起推走。
